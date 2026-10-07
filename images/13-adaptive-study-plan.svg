@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="650" viewBox="0 0 920 650" role="img">
+<title>A plan that fits the time you have</title>
+<rect x="0.5" y="0.5" width="919" height="649" rx="12" fill="#fafafa" stroke="#ccc"/>
+<style>text{font-family:Arial,sans-serif;fill:#242424}.small{font-size:13px;fill:#606060}.body{font-size:16px}.heading{font-size:19px;font-weight:600}.title{font-size:27px;font-weight:600}.brand{font-family:Georgia,serif;font-size:24px}.button{font-size:14px}.white{fill:white}</style>
+<text x="26" y="38" class="brand">StillGotIt</text>
+<text x="684" y="35" class="small">Linear algebra · Design sketch</text>
+<path d="M0 58H920" stroke="#d4d4d4"/>
+<text x="26" y="101" class="title">A plan that fits the time you have</text>
+<text x="26" y="129" class="small">Exam preparation takes priority; deferred work remains visible.</text>
+<circle cx="38" cy="169" r="12" fill="#222"/>
+<text x="38" y="173" text-anchor="middle" class="small white">1</text>
+<text x="60" y="175" class="heading">Midterm in 6 days · 30 minutes available per day</text>
+<rect x="688" y="153" width="206" height="38" rx="7" fill="#fff" stroke="#aaa"/>
+<text x="700" y="177" class="button">Change dates or budget</text>
+<rect x="26" y="209" width="539" height="365" rx="7" fill="#fff" stroke="#d2d2d2"/>
+<text x="46" y="242" class="heading">Proposed today · 30 minutes</text>
+<rect x="46" y="263" width="499" height="77" rx="7" fill="#f7f7f7" stroke="#d2d2d2"/>
+<text x="60" y="289" class="body">12 min · Matrix multiplication</text>
+<text x="60" y="316" class="small">Fresh check after a hinted attempt.</text>
+<rect x="46" y="356" width="499" height="77" rx="7" fill="#f7f7f7" stroke="#d2d2d2"/>
+<text x="60" y="382" class="body">18 min · Change of basis</text>
+<text x="60" y="409" class="small">Practice the unit emphasized by your professor.</text>
+<rect x="46" y="477" width="144" height="38" rx="7" fill="#222" stroke="#222"/>
+<text x="58" y="501" class="button white">Confirm tradeoffs</text>
+<rect x="207" y="477" width="142" height="38" rx="7" fill="#fff" stroke="#aaa"/>
+<text x="219" y="501" class="button">Revise priorities</text>
+<text x="46" y="546" class="small">Your current plan stays active until you confirm these exam cuts.</text>
+<rect x="585" y="209" width="309" height="365" rx="7" fill="#fff" stroke="#d2d2d2"/>
+<circle cx="610" cy="238" r="12" fill="#222"/>
+<text x="610" y="242" text-anchor="middle" class="small white">2</text>
+<text x="632" y="244" class="heading">Why this plan changed</text>
+<text x="605" y="282" class="small">Yesterday’s session was missed.</text>
+<text x="605" y="306" class="small">Preparation remaining: about 4 hr.</text>
+<text x="605" y="330" class="small">Time available before exam: 3 hr.</text>
+<text x="605" y="377" class="small">Defer: 60 min of eigenvalue practice.</text>
+<text x="605" y="401" class="small">Reason: lower stated exam emphasis.</text>
+<text x="605" y="425" class="small">Tradeoff: fewer unfamiliar examples.</text>
+<circle cx="609" cy="479" r="12" fill="#222"/>
+<text x="609" y="483" text-anchor="middle" class="small white">3</text>
+<text x="631" y="485" class="small">Waiting for your confirmation.</text>
+<text x="631" y="509" class="small">Review the omissions before applying.</text>
+<rect x="605" y="525" width="125" height="38" rx="7" fill="#fff" stroke="#aaa"/>
+<text x="617" y="549" class="button">View all cuts</text>
+<rect x="742" y="525" width="130" height="38" rx="7" fill="#fff" stroke="#aaa"/>
+<text x="754" y="549" class="button">Keep current</text>
+<path d="M26 612H894" stroke="#d4d4d4"/>
+<text x="26" y="635" class="small">Illustrative content and estimates. Numbered notes are explained in the design document.</text>
+</svg>

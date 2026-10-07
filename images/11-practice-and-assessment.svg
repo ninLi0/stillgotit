@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="650" viewBox="0 0 920 650" role="img">
+<title>Show what you can do</title>
+<rect x="0.5" y="0.5" width="919" height="649" rx="12" fill="#fafafa" stroke="#ccc"/>
+<style>text{font-family:Arial,sans-serif;fill:#242424}.small{font-size:13px;fill:#606060}.body{font-size:16px}.heading{font-size:19px;font-weight:600}.title{font-size:27px;font-weight:600}.brand{font-family:Georgia,serif;font-size:24px}.button{font-size:14px}.white{fill:white}</style>
+<text x="26" y="38" class="brand">StillGotIt</text>
+<text x="684" y="35" class="small">Linear algebra · Design sketch</text>
+<path d="M0 58H920" stroke="#d4d4d4"/>
+<text x="26" y="101" class="title">Show what you can do</text>
+<text x="26" y="129" class="small">Learn from the source, practice, and inspect the evidence behind your estimate.</text>
+<circle cx="38" cy="163" r="12" fill="#222"/>
+<text x="38" y="167" text-anchor="middle" class="small white">1</text>
+<text x="60" y="169" class="heading">Matrix multiplication · Check 1 of 2</text>
+<rect x="26" y="192" width="543" height="390" rx="7" fill="#fff" stroke="#d2d2d2"/>
+<text x="46" y="224" class="heading">Work through AB and explain each step.</text>
+<text x="46" y="263" class="body">A = [[1, 2], [0, 1]]</text>
+<text x="46" y="289" class="body">B = [[3, 0], [1, 2]]</text>
+<rect x="46" y="318" width="503" height="106" rx="7" fill="#f7f7f7" stroke="#d2d2d2"/>
+<text x="60" y="346" class="small">AB = [[5, 4], [1, 2]]</text>
+<text x="60" y="372" class="small">The first entry is 1×3 + 2×1 = 5.</text>
+<text x="60" y="398" class="small">Each output entry combines a row of A with a column of B.</text>
+<text x="46" y="453" class="body">Follow-up: Why is reversing the order different?</text>
+<text x="46" y="481" class="small">Source: Lecture 4, page 3 · Matrix composition</text>
+<rect x="46" y="518" width="168" height="38" rx="7" fill="#fff" stroke="#aaa"/>
+<text x="58" y="542" class="button">Open source lesson</text>
+<rect x="229" y="518" width="183" height="38" rx="7" fill="#222" stroke="#222"/>
+<text x="241" y="542" class="button white">Try a fresh check</text>
+<rect x="589" y="192" width="305" height="390" rx="7" fill="#fff" stroke="#d2d2d2"/>
+<circle cx="614" cy="221" r="12" fill="#222"/>
+<text x="614" y="225" text-anchor="middle" class="small white">2</text>
+<text x="636" y="227" class="heading">Assessment</text>
+<text x="609" y="264" class="heading">Supported success</text>
+<text x="609" y="294" class="small">The method and result are correct.</text>
+<text x="609" y="317" class="small">A row-by-column hint was used,</text>
+<text x="609" y="340" class="small">so this is not an independent pass.</text>
+<text x="609" y="387" class="heading">61% estimated mastery</text>
+<text x="609" y="416" class="small">Some readiness is restored.</text>
+<text x="609" y="439" class="small">A fresh problem without hints</text>
+<text x="609" y="462" class="small">is needed before restoring the rest.</text>
+<circle cx="616" cy="515" r="12" fill="#222"/>
+<text x="616" y="519" text-anchor="middle" class="small white">3</text>
+<rect x="638" y="495" width="234" height="38" rx="7" fill="#fff" stroke="#aaa"/>
+<text x="650" y="519" class="button">Request regrade</text>
+<rect x="609" y="538" width="265" height="38" rx="7" fill="#fff" stroke="#aaa"/>
+<text x="621" y="562" class="button">Correct result / adjust estimate</text>
+<path d="M26 612H894" stroke="#d4d4d4"/>
+<text x="26" y="635" class="small">Illustrative content and estimates. Numbered notes are explained in the design document.</text>
+</svg>

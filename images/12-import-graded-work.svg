@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="650" viewBox="0 0 920 650" role="img">
+<title>Recalibrate from real coursework</title>
+<rect x="0.5" y="0.5" width="919" height="649" rx="12" fill="#fafafa" stroke="#ccc"/>
+<style>text{font-family:Arial,sans-serif;fill:#242424}.small{font-size:13px;fill:#606060}.body{font-size:16px}.heading{font-size:19px;font-weight:600}.title{font-size:27px;font-weight:600}.brand{font-family:Georgia,serif;font-size:24px}.button{font-size:14px}.white{fill:white}</style>
+<text x="26" y="38" class="brand">StillGotIt</text>
+<text x="684" y="35" class="small">Linear algebra · Design sketch</text>
+<path d="M0 58H920" stroke="#d4d4d4"/>
+<text x="26" y="101" class="title">Recalibrate from real coursework</text>
+<text x="26" y="129" class="small">Confirm the extracted work and skill mapping before applying the results.</text>
+<rect x="26" y="158" width="868" height="91" rx="7" fill="#fff" stroke="#d2d2d2"/>
+<circle cx="52" cy="184" r="12" fill="#222"/>
+<text x="52" y="188" text-anchor="middle" class="small white">1</text>
+<text x="75" y="190" class="heading">Midterm 1 — graded work</text>
+<text x="46" y="219" class="body">Performed October 2 · Uploaded October 6 · Overall mark: 84/100</text>
+<circle cx="39" cy="281" r="12" fill="#222"/>
+<text x="39" y="285" text-anchor="middle" class="small white">2</text>
+<text x="61" y="287" class="heading">Confirm which work provides evidence for each skill</text>
+<rect x="26" y="309" width="868" height="73" rx="7" fill="#fff" stroke="#d2d2d2"/>
+<text x="46" y="334" class="heading">Question 2 · 8/10</text>
+<text x="337" y="334" class="heading">Matrix multiplication</text>
+<text x="46" y="362" class="small">Correct method; one arithmetic error. Proposed result: Slip.</text>
+<rect x="787" y="326" width="88" height="38" rx="7" fill="#fff" stroke="#aaa"/>
+<text x="799" y="350" class="button">Edit</text>
+<rect x="26" y="398" width="868" height="73" rx="7" fill="#fff" stroke="#d2d2d2"/>
+<text x="46" y="423" class="heading">Question 4 · 4/10</text>
+<text x="337" y="423" class="heading">Change of basis</text>
+<text x="46" y="451" class="small">Reasoning misses a coordinate conversion. Proposed result: Gap.</text>
+<rect x="787" y="415" width="88" height="38" rx="7" fill="#fff" stroke="#aaa"/>
+<text x="799" y="439" class="button">Edit</text>
+<circle cx="39" cy="507" r="12" fill="#222"/>
+<text x="39" y="511" text-anchor="middle" class="small white">3</text>
+<text x="61" y="512" class="small">The original marks stay unchanged. Recalibration uses the performance date.</text>
+<text x="61" y="535" class="small">Skills without relevant evidence keep their existing estimates.</text>
+<rect x="26" y="554" width="178" height="38" rx="7" fill="#fff" stroke="#aaa"/>
+<text x="38" y="578" class="button">Review extracted work</text>
+<rect x="646" y="554" width="248" height="38" rx="7" fill="#222" stroke="#222"/>
+<text x="658" y="578" class="button white">Confirm and recalibrate</text>
+<path d="M26 612H894" stroke="#d4d4d4"/>
+<text x="26" y="635" class="small">Illustrative content and estimates. Numbered notes are explained in the design document.</text>
+</svg>

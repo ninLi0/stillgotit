@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="650" viewBox="0 0 920 650" role="img">
+<title>Turn your course into skills</title>
+<rect x="0.5" y="0.5" width="919" height="649" rx="12" fill="#fafafa" stroke="#ccc"/>
+<style>text{font-family:Arial,sans-serif;fill:#242424}.small{font-size:13px;fill:#606060}.body{font-size:16px}.heading{font-size:19px;font-weight:600}.title{font-size:27px;font-weight:600}.brand{font-family:Georgia,serif;font-size:24px}.button{font-size:14px}.white{fill:white}</style>
+<text x="26" y="38" class="brand">StillGotIt</text>
+<text x="684" y="35" class="small">Linear algebra · Design sketch</text>
+<path d="M0 58H920" stroke="#d4d4d4"/>
+<text x="26" y="101" class="title">Turn your course into skills</text>
+<text x="26" y="129" class="small">Review the AI proposal before it becomes your course map.</text>
+<rect x="26" y="154" width="280" height="428" rx="7" fill="#fff" stroke="#d2d2d2"/>
+<circle cx="51" cy="179" r="12" fill="#222"/>
+<text x="51" y="183" text-anchor="middle" class="small white">1</text>
+<text x="73" y="185" class="heading">Start with your material</text>
+<text x="45" y="224" class="body">Lecture 4 — Matrices.pdf</text>
+<text x="45" y="249" class="body">6 readable pages · Added</text>
+<rect x="45" y="265" width="240" height="38" rx="7" fill="#fff" stroke="#aaa"/>
+<text x="57" y="289" class="button">Add document or paste notes</text>
+<text x="45" y="328" class="small">No course material?</text>
+<text x="45" y="350" class="small">Choose a suggested textbook</text>
+<text x="45" y="372" class="small">or lesson before teaching starts.</text>
+<text x="45" y="420" class="heading">What matters most?</text>
+<rect x="45" y="436" width="241" height="98" rx="7" fill="#f6f6f6" stroke="#d2d2d2"/>
+<text x="57" y="460" class="small">Professor emphasized matrix</text>
+<text x="57" y="482" class="small">composition and change of basis.</text>
+<rect x="326" y="154" width="568" height="428" rx="7" fill="#fff" stroke="#d2d2d2"/>
+<circle cx="351" cy="179" r="12" fill="#222"/>
+<text x="351" y="183" text-anchor="middle" class="small white">2</text>
+<text x="373" y="185" class="heading">Review the proposed skills</text>
+<text x="348" y="218" class="small">Unit: Matrices</text>
+<rect x="346" y="234" width="526" height="58" rx="7" fill="#f9f9f9" stroke="#d2d2d2"/>
+<text x="359" y="256" class="body">Matrix dimensions</text>
+<text x="359" y="278" class="small">Recognize when AB is defined.</text>
+<rect x="346" y="302" width="526" height="58" rx="7" fill="#f9f9f9" stroke="#d2d2d2"/>
+<text x="359" y="324" class="body">Matrix multiplication</text>
+<text x="359" y="346" class="small">Compute AB and explain how each entry is formed.</text>
+<rect x="346" y="370" width="526" height="58" rx="7" fill="#f9f9f9" stroke="#d2d2d2"/>
+<text x="359" y="392" class="body">Matrix composition</text>
+<text x="359" y="414" class="small">Explain how composing maps relates to multiplication.</text>
+<circle cx="359" cy="458" r="12" fill="#222"/>
+<text x="359" y="462" text-anchor="middle" class="small white">3</text>
+<text x="381" y="463" class="body">Initial confidence: 75% · Provisional</text>
+<text x="347" y="495" class="small">Demonstration: two fresh problems + conceptual follow-ups.</text>
+<rect x="347" y="523" width="160" height="38" rx="7" fill="#fff" stroke="#aaa"/>
+<text x="359" y="547" class="button">Edit proposed skills</text>
+<rect x="524" y="523" width="227" height="38" rx="7" fill="#222" stroke="#222"/>
+<text x="536" y="547" class="button white">Confirm skills and continue</text>
+<path d="M26 612H894" stroke="#d4d4d4"/>
+<text x="26" y="635" class="small">Illustrative content and estimates. Numbered notes are explained in the design document.</text>
+</svg>
