@@ -33,7 +33,7 @@
 <text x="609" y="317" class="small">A row-by-column hint was used,</text>
 <text x="609" y="340" class="small">so this is not an independent pass.</text>
 <text x="609" y="387" class="heading">61% estimated mastery</text>
-<text x="609" y="416" class="small">Some readiness is restored.</text>
+<text x="609" y="416" class="small">Some estimated mastery is restored.</text>
 <text x="609" y="439" class="small">A fresh problem without hints</text>
 <text x="609" y="462" class="small">is needed before restoring the rest.</text>
 <circle cx="616" cy="515" r="12" fill="#222"/>

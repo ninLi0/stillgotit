@@ -16,4 +16,4 @@ Sketches are in [images](images/). The design notebook is in the private individ
 
 ## Course references
 
-[Background documents, rubrics, and P1 directions](reference%20docs/README.md).
+[Background documents, rubrics, and P1 directions](reference_docs/README.md).

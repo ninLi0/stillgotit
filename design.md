@@ -85,11 +85,11 @@ The [concept specifications](concepts.md) define five concepts.
 
 | Concept | Responsibility |
 | --- | --- |
-| [SkillMapping](concepts.md#1-skillmapping-user-material) | Store confirmed skills, source links, demonstration criteria, and prerequisites. |
-| [GroundedTutoring](concepts.md#2-groundedtutoring-learner-scope-topic) | Teach from source material. Record practice through voice, text, and photos. |
-| [AssessmentReviewing](concepts.md#3-assessmentreviewing-author-subject-task) | Judge submitted work. Retain imports, regrades, and corrections. |
-| [MasteryEstimating](concepts.md#4-masteryestimating-learner-subject-evidence) | Estimate current mastery from confidence, time, evidence, and manual adjustments. |
-| [StudyPlanning](concepts.md#5-studyplanning-learner-scope-subject) | Fit activities into available time. Apply exam priorities and confirmed tradeoffs. |
+| [SkillMapping](concepts.md#1-skillmapping-user-material) | Define skills, sources, and prerequisites. Keep earlier versions of requirements. |
+| [GroundedTutoring](concepts.md#2-groundedtutoring-learner-scope-topic-definition) | Teach from source material. Record practice through voice, text, and photos. |
+| [AssessmentReviewing](concepts.md#3-assessmentreviewing-author-subject-definition-task) | Judge submitted work. Retain imports, regrades, and corrections. |
+| [MasteryEstimating](concepts.md#4-masteryestimating-learner-subject-definition-evidence) | Estimate current mastery from confidence, time, evidence, and manual adjustments. |
+| [StudyPlanning](concepts.md#5-studyplanning-learner-scope-subject-definition) | Fit activities into available time. Apply exam priorities and confirmed tradeoffs. |
 
 A regrade changes one judgment. It does not add a new attempt. A manual mastery adjustment sets a new estimate that continues to change. Finishing a session consumes time even when the answer is wrong.
 
@@ -97,7 +97,7 @@ The [essential reactions](concepts.md#essential-reactions) connect the concepts.
 
 ## UI sketches
 
-The seven sketches show the main interactions. Values and dates are examples. Tree images come from a navigation prototype; other screens are static sketches.
+The eight sketches show the main interactions. Values and dates are examples. Tree images come from a navigation prototype; other screens are static sketches.
 
 ### Confirm course skills
 
@@ -106,6 +106,8 @@ The seven sketches show the main interactions. Values and dates are examples. Tr
 1. Upload a document or paste text. If needed, choose a suggested reference before teaching starts.
 2. Edit the proposed skill names, criteria, and groups. Confirm the map and mark important units.
 3. Report confidence. The app labels these estimates as provisional until practice supplies evidence.
+
+You can revise confirmed requirements later. The skill keeps its leaf and earlier work. The old score is labeled “Previous definition.” The revised skill shows “Needs a new check.”
 
 ### Course tree and skill focus
 
@@ -123,13 +125,22 @@ The trunk is the course. Branches are units. Each leaf is one skill. Black, whit
 2. Read the estimate and next action in the panel. A hinted success prompts a fresh check without hints.
 3. Use the skill menu as an alternative to the tree, especially on small screens.
 
+### Learn from your course
+
+![A source passage, AI explanation, follow-up conversation, and button to start practice.](images/15-source-based-lesson.png)
+
+1. Open the cited page to read the source in context. The passage and file shown here are examples.
+2. Read an explanation and worked example based on that passage. The screen identifies AI-generated content.
+3. Ask a follow-up by voice or text. The question and answer stay with the lesson.
+4. Select “Start practice” to try a fresh problem. A worked example is not evidence of independent success. Requested hints are recorded with the attempt.
+
 ### Talk through work on paper
 
 ![Photographed physics work, a spoken follow-up, transcript, and capture controls.](images/14-voice-and-paper-work.png)
 
 1. Take or upload photos of the whole solution. Add pages or close-ups as needed. Keep the original images with the attempt.
 2. Explain aloud and hear the AI's questions. Pause or switch to typing. During an independent check, corrections wait until submission unless you request a hint.
-3. Clarify unclear symbols or correct misheard words. Input errors do not lower mastery. Submit the work and conversation together.
+3. Clarify unclear symbols and confirm or correct the transcript. Input errors do not lower mastery. Submit the work and conversation together. Raw audio is deleted after transcript confirmation.
 
 The physics example shows the same interaction in another subject. Each learner still uses one course in the first version.
 
@@ -161,7 +172,9 @@ The physics example shows the same interaction in another subject. Each learner 
 
 **Find a gap.** A student prepares for a linear algebra exam. Matrix multiplication looks familiar, but a new problem takes much longer than expected. They want to find weak foundations before time runs out.
 
-**Set up the course.** They upload notes and [confirm the proposed skills](#confirm-course-skills). They mark a unit their professor emphasized and report their confidence. On the [course tree](#course-tree-and-skill-focus), they select matrix multiplication and open its lesson.
+**Set up the course.** They upload notes and [confirm the proposed skills](#confirm-course-skills). They mark a unit their professor emphasized and report their confidence. On the [course tree](#course-tree-and-skill-focus), they select matrix multiplication.
+
+**Understand the method.** They open the [lesson](#learn-from-your-course) and its source passage. They ask why the method combines rows and columns. The explanation connects each column to an input vector. They then select “Start practice” to try a fresh problem.
 
 **Show the work.** They solve a problem on paper, take a photo, and [explain it aloud](#talk-through-work-on-paper). The AI asks neutral questions. A requested hint helps them finish, so the [assessment](#practice-and-inspect-the-assessment) records supported success. They try a fresh problem without hints. A later review checks the skill again. The full demonstration requires two fresh problems and conceptual follow-ups. If the grader misses a valid step, they can request a regrade.
 

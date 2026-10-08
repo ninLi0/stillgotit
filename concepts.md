@@ -2,24 +2,21 @@
 
 ## Scope and notation
 
-The first version supports one course per learner. It accepts source documents, voice, text, and photos. Sign-in uses a standard authentication service.
+The first version supports one course per learner. It accepts source documents, voice, text, and photos.
 
-These specifications follow the course's [standard form](https://61040.github.io/fa26/background/specifying-concepts/) and [state notation](https://61040.github.io/fa26/background/specifying-concept-state/).
-
-- Generic types identify external objects. A concept cannot read their fields.
-- Structured inputs are immutable values: stored copies that cannot change.
-- `now` is server time. New identities are unique. Unmentioned state stays unchanged.
-- An action occurs only when its preconditions hold. Scores stay between 0 and 100.
-- AI, speech, and document services supply inputs through actions. Service failures preserve existing records and allow retry.
+The specifications use the course's [standard form](https://61040.github.io/fa26/background/specifying-concepts/) and [state notation](https://61040.github.io/fa26/background/specifying-concept-state/). Generic types identify external objects; a concept cannot read their fields. Structured values are saved copies. New identities are unique. Unmentioned state stays unchanged. `now` is server time.
 
 ## 1. SkillMapping [User, Material]
 
-**Purpose:** Store a confirmed map of skills and keep their identities stable as material changes.
+**Purpose:** Help learners identify what to learn and what counts as a successful demonstration.
 
-**Operational principle:** A learner creates a course and units. They edit and confirm proposed skills, then connect prerequisites. More material can attach to an existing skill. Archiving removes a skill from active study but keeps its history.
+**Operational principle:** A learner edits and confirms proposed skills. Later, they change a skill's requirements. The skill keeps its identity, while earlier requirements remain available for judging earlier work.
 
 ```text
 concept SkillMapping [User, Material]
+
+types
+  SkillStatus is DRAFT or CONFIRMED or ARCHIVED
 
 state
   a set of Courses with
@@ -31,16 +28,19 @@ state
   a set of Skills with
     a unit Unit
     a title String
-    an outcome String
-    a gate String
     a materials set of Materials
     a prerequisites set of Skills
-    a status DRAFT or CONFIRMED or ARCHIVED
-  Rule: each unit's course and each skill's unit exist.
-  Rule: prerequisites are skills in the same course; there are no
-    self-dependencies or cycles. A CONFIRMED skill has only confirmed
-    prerequisites.
-  Rule: a confirmed or archived skill's outcome and gate are immutable.
+    a current Version
+    a status SkillStatus
+  a set of Versions with
+    a skill Skill
+    an outcome String
+    a gate String
+  Rule: each unit belongs to an existing course.
+  Rule: each skill belongs to an existing unit; its current version belongs
+    to that skill. Versions are immutable.
+  Rule: prerequisites are confirmed skills in the same course, with no
+    self-dependencies or cycles. Archived skills may retain older links.
 
 actions
   createCourse(owner: User, title: String) : return (course: Course)
@@ -54,53 +54,78 @@ actions
   propose(owner: User, unit: Unit, title: String, outcome: String,
     gate: String, materials: set of Materials) : return (skill: Skill)
     where unit's course belongs to owner; title, outcome, and gate are nonempty
-    then create skill with those values, no prerequisites, and status DRAFT
+    then create DRAFT skill and its current version from these values,
+      with no prerequisites
 
-  reviseDraft(owner: User, skill: Skill, title: String, outcome: String,
-    gate: String, materials: set of Materials)
-    where skill is DRAFT in owner's course and the strings are nonempty
-    then replace its title, outcome, gate, and materials
+  reviseDraft(owner: User, skill: Skill, unit: Unit, title: String,
+    outcome: String, gate: String, materials: set of Materials)
+    where skill is DRAFT in owner's course; unit is in that course;
+      title, outcome, and gate are nonempty
+    then replace unit, title, and materials; if outcome or gate changed,
+      create a version with those values and make it current
+
+  discardDraft(owner: User, skill: Skill)
+    where skill is DRAFT in owner's course
+    then remove skill and its versions
 
   confirm(owner: User, skill: Skill)
     where skill is DRAFT in owner's course and has at least one material
     then set status to CONFIRMED
 
-  rename(owner: User, skill: Skill, title: String)
-    where skill is CONFIRMED in owner's course and title is nonempty
-    then set title to title
+  editDetails(owner: User, skill: Skill, unit: Unit, title: String)
+    where skill is CONFIRMED in owner's course; unit is in that course;
+      title is nonempty
+    then replace unit and title
+
+  reviseDefinition(owner: User, skill: Skill, outcome: String, gate: String)
+    : return (previous: Version, version: Version)
+    where skill is CONFIRMED in owner's course; outcome and gate are nonempty
+      and at least one differs from the current version
+    then return the current version as previous; create version with skill,
+      outcome, and gate; make it current
 
   attachMaterial(owner: User, skill: Skill, material: Material)
     where skill is CONFIRMED in owner's course
     then add material to its materials
 
   setPrerequisites(owner: User, skill: Skill, prerequisites: set of Skills)
-    where skill is CONFIRMED in owner's course; every proposed prerequisite
-      is confirmed in that course; replacement would preserve the acyclic rule
+    where skill is CONFIRMED in owner's course; replacement preserves
+      the prerequisite rules
     then replace its prerequisites
 
   archive(owner: User, skill: Skill)
     where skill is CONFIRMED in owner's course and no confirmed skill
-      currently lists it as a prerequisite
+      lists it as a prerequisite
     then set status to ARCHIVED
 
   restore(owner: User, skill: Skill)
-    where skill is ARCHIVED in owner's course and every prerequisite
-      remains confirmed
+    where skill is ARCHIVED in owner's course; restoring it preserves
+      the prerequisite rules
     then set status to CONFIRMED
 ```
 
-A skill's `gate` defines a complete demonstration. For matrix multiplication, it requires two fresh problems solved without hints, with correct reasoning and results, plus conceptual follow-ups. Photos, voice, and text can provide the evidence.
+A **gate** is the complete demonstration required for a skill. For matrix multiplication, it requires two fresh problems, correct reasoning and results, and conceptual follow-ups, all without hints.
 
-Changing the ability or gate creates a new skill. Renaming preserves its identity. Units organize the tree; prerequisites are separate relationships.
+Changing requirements creates a new version, not another skill or leaf. New tasks use the current version. Existing tasks keep their saved requirements. Renaming, moving a skill, or adding sources does not change its version. Units group the tree; prerequisites describe dependencies.
 
-## 2. GroundedTutoring [Learner, Scope, Topic]
+## 2. GroundedTutoring [Learner, Scope, Topic, Definition]
 
-**Purpose:** Teach and practice a topic using identifiable source material.
+**Purpose:** Help learners understand and practice a topic using sources they can inspect.
 
-**Operational principle:** A learner adds material. The tutor uses it for an explanation or task. The learner submits work, answers follow-ups, and can request hints. Closing the task preserves its sources, criteria, conversation, and assistance record.
+**Operational principle:** A learner selects material, asks questions, and practices. The tutor explains from those sources and records assistance. The saved conversation lets the learner inspect how they reached an answer.
 
 ```text
-concept GroundedTutoring [Learner, Scope, Topic]
+concept GroundedTutoring [Learner, Scope, Topic, Definition]
+
+types
+  MaterialOrigin is COURSE or REFERENCE
+  Mode is GUIDED or CHECK
+  SessionStatus is OPEN or CLOSED
+  Channel is TEXT or VOICE
+  PassageRef is an immutable (material, passageLocator) value
+  MediaValue records an original image/document reference, kind, and page order
+  DialogueTurn records speaker, purpose, text, media, channel, citations,
+    time, and an optional correction target
 
 state
   a set of Materials with
@@ -109,127 +134,130 @@ state
     a title String
     a locator String
     a content String
-    a originals seq of MediaValues
-    a origin COURSE or REFERENCE
-  a set of Lessons with
+    an originals seq of MediaValues
+    an origin MaterialOrigin
+  a set of Sessions with
     an owner Learner
     a topic Topic
-    a request String
-    a explanation String
+    a definition Definition
     a materials set of Materials
     a citations set of PassageRefs
-  a set of Tasks with
-    an owner Learner
-    a topic Topic
+    a dialogue seq of DialogueTurns
+    a checkedVoiceTurns set of Numbers
+    a status SessionStatus
+  a lessons set of Sessions with
+    a request String
+    an explanation String
+  a tasks set of Sessions with
     a question String
     a criteria String
-    a materials set of Materials
-    a citations set of PassageRefs
-    a mode GUIDED or CHECK
+    a mode Mode
     a fresh Flag
-    a status OPEN or CLOSED
-    a dialogue seq of DialogueTurns
     a hintRequested Flag
-  Rule: PassageRef is an immutable (material, passageLocator) value;
-    citations must identify passages or image regions in the selected materials.
-  Rule: each lesson/task has at least one material, all owned by its owner.
-  Rule: original material, lessons, and task question/criteria are immutable.
-    Dialogue turns are append-only while a task is OPEN and immutable once
-    appended. A CLOSED task cannot receive more turns or attachments.
+  alias Lesson for lessons
+  alias Task for tasks
+  Rule: each session is exactly one lesson or task.
+  Rule: session materials are nonempty and owned by its owner. Citations
+    identify passages or image regions in those materials.
+  Rule: sources, session definitions, and opening content are immutable.
+    Dialogue is append-only while OPEN. CLOSED sessions cannot change.
 
 actions
   addMaterial(owner: Learner, scope: Scope, title: String, locator: String,
-    content: String, originals: seq of MediaValues, origin: COURSE or REFERENCE)
+    content: String, originals: seq of MediaValues, origin: MaterialOrigin)
     : return (material: Material)
     where title and locator are nonempty; content or originals are nonempty
-    then create material with those values
+    then create material with these values
 
-  explain(owner: Learner, topic: Topic, request: String, explanation: String,
-    materials: set of Materials, citations: set of PassageRefs)
-    : return (lesson: Lesson)
-    where request and explanation are nonempty; materials are nonempty and
-      owned by owner; citations are nonempty and refer to those materials
-    then create lesson with those values
+  explain(owner: Learner, topic: Topic, definition: Definition,
+    request: String, explanation: String, materials: set of Materials,
+    citations: set of PassageRefs) : return (lesson: Lesson)
+    where request and explanation are nonempty; source rules hold
+      and citations are nonempty
+    then create OPEN lesson with these values and empty dialogue
+      and checkedVoiceTurns
 
-  prepareTask(owner: Learner, topic: Topic, question: String, criteria: String,
-    materials: set of Materials, citations: set of PassageRefs,
-    mode: GUIDED or CHECK, fresh: Flag) : return (task: Task)
-    where question and criteria are nonempty; materials are nonempty and
-      owned by owner; citations are nonempty and refer to those materials
-    then create OPEN task with those values, an empty dialogue,
-      and hintRequested = false
+  prepareTask(owner: Learner, topic: Topic, definition: Definition,
+    question: String, criteria: String, materials: set of Materials,
+    citations: set of PassageRefs, mode: Mode, fresh: Flag)
+    : return (task: Task)
+    where question and criteria are nonempty; source rules hold
+      and citations are nonempty
+    then create OPEN task with these values, empty dialogue and
+      checkedVoiceTurns, and hintRequested = false
 
-  respond(owner: Learner, task: Task, text: String,
-    media: seq of MediaValues, channel: TEXT or VOICE)
-    where task is OPEN and belongs to owner; text or media are nonempty
-    then append a LEARNER RESPONSE turn with text, media, channel, and at = now
+  respond(owner: Learner, session: Session, text: String,
+    media: seq of MediaValues, channel: Channel)
+    where session is OPEN and belongs to owner; text or media are nonempty
+    then append a learner response with these values and time now
 
-  askFollowup(owner: Learner, task: Task, question: String,
-    channel: TEXT or VOICE)
+  answerLesson(owner: Learner, lesson: Lesson, text: String,
+    citations: set of PassageRefs, channel: Channel)
+    where lesson is OPEN and belongs to owner; text and citations are
+      nonempty; citations refer to its materials
+    then append a tutor explanation with these values and time now
+
+  askFollowup(owner: Learner, task: Task, question: String, channel: Channel)
     where task is OPEN and belongs to owner; question is nonempty and
-      does not disclose correctness, a correction, or a solution method
-    then append a TUTOR PROBE turn with question, no media, channel, and at = now
+      supplies no correctness feedback, correction, or solution method
+    then append a tutor probe with question, channel, and time now
 
-  clarifyInput(owner: Learner, task: Task, question: String,
-    channel: TEXT or VOICE)
-    where task is OPEN and belongs to owner; question is nonempty and
-      clarifies the submitted input without supplying solution content
-    then append a TUTOR INPUT_CLARIFICATION turn with question,
-      no media, channel, and at = now
+  clarifyInput(owner: Learner, session: Session, question: String,
+    channel: Channel)
+    where session is OPEN and belongs to owner; question is nonempty
+      and supplies no solution content
+    then append a tutor input clarification with question, channel, and time now
 
   requestHint(owner: Learner, task: Task)
     where task is OPEN and belongs to owner
     then set hintRequested = true
 
-  giveHint(owner: Learner, task: Task, text: String, channel: TEXT or VOICE)
-    where task is OPEN, belongs to owner, and text is nonempty;
+  giveHint(owner: Learner, task: Task, text: String, channel: Channel)
+    where task is OPEN and belongs to owner; text is nonempty;
       mode is GUIDED or hintRequested is true
-    then append a TUTOR HINT turn with text, no media, channel, and at = now;
+    then append a tutor hint with text, channel, and time now;
       set hintRequested = false
 
-  correctTranscript(owner: Learner, task: Task, turnIndex: Number, text: String)
-    where task is OPEN and belongs to owner; text is nonempty; turnIndex
-      identifies a LEARNER VOICE turn in that task
-    then append a LEARNER INPUT_CORRECTION turn with text and at = now,
-      referring to turnIndex; preserve the original recognized text
+  confirmTranscript(owner: Learner, session: Session, turnIndex: Number,
+    text: String)
+    where session is OPEN and belongs to owner; text is nonempty;
+      turnIndex identifies a learner voice response in its dialogue
+    then append an input correction if text differs from the latest
+      transcript for that turn; add turnIndex to checkedVoiceTurns
 
-  closeTask(owner: Learner, task: Task)
-    where task is OPEN and belongs to owner
-    then set its status to CLOSED
+  close(owner: Learner, session: Session)
+    where session is OPEN and belongs to owner; every learner voice
+      response has a checked transcript
+    then set status to CLOSED
 ```
 
-A `MediaValue` contains the original media reference, kind, and page order. A `DialogueTurn` contains its position, speaker, purpose, text, media, channel, time, and optional correction target. Keep original photos and transcripts. Discard raw audio after transcription. Spoken tutor turns also appear as text.
+Keep original photos and recognized text. Corrections refer to the original turn. Keep raw conversational audio until the learner confirms its transcript, then delete it. Spoken tutor output also appears as text.
 
-Learners can add pages or close-ups, pause voice, and switch to text. Ask for clarification when input is unclear. A transcription correction preserves the original turn. A question that reveals a method counts as a hint.
+CHECK mode withholds corrections until submission unless the learner requests a hint. GUIDED mode permits coaching. A question that reveals a method counts as a hint. Misheard words and unclear symbols need clarification, not a score penalty.
 
-In CHECK mode, wait until submission before giving corrections. Neutral probes and input clarification are allowed. Hints require an explicit request. GUIDED mode permits active coaching.
+Task criteria include both the task requirements and the full gate. A task can contain several problems and follow-up questions, so one submission can demonstrate the full gate. A fresh problem requires work the learner has not already seen solved. It can use the same method. Changing numbers alone does not prove freshness. Source edits create new material records. Citations identify the basis of teaching; they do not prove correctness.
 
-Source edits create new material records. Citations must point to stored passages or image regions. They identify the teaching basis; they do not prove that generated content is correct.
+## 3. AssessmentReviewing [Author, Subject, Definition, Task]
 
-One task can contain the full gate. The application sets `fresh` after comparison with earlier tasks and known exercises. Changed numbers alone do not establish freshness.
+**Purpose:** Give learners an assessment they can inspect and correct without losing the original work.
 
-## 3. AssessmentReviewing [Author, Subject, Task]
-
-**Purpose:** Revise judgments while preserving submitted work and assessment history.
-
-**Operational principle:** A learner submits work or imports graded coursework. A judgment applies the saved criteria. Regrades and manual corrections add revisions. Only the latest revision affects the estimate; the original work and earlier judgments remain available.
+**Operational principle:** A learner submits work or imports graded coursework. They inspect the judgment and request a regrade or make a correction. The new judgment replaces the earlier judgment's effect while both remain available.
 
 ```text
-concept AssessmentReviewing [Author, Subject, Task]
+concept AssessmentReviewing [Author, Subject, Definition, Task]
 
 types
   Result is INDEPENDENT or SUPPORTED or SLIP or GAP or UNCERTAIN
   Help is NONE or HINT or UNKNOWN
-  Origin is AI or COURSEWORK or MANUAL
-  ResponseValue is an immutable bundle of typed/recognized text, original
-    media, and the ordered conversation including clarifications and hints
-  ClarificationValue is an immutable explanation plus optional media
-    about how to read existing submitted evidence
+  Origin is AI or MANUAL
+  ResponseValue contains text, original photos, and the ordered conversation
+  ClarificationValue contains text and optional media about existing work
 
 state
   a set of Cases with
     an author Author
     a subject Subject
+    a definition Definition
     a sourceKey String
     an optional task Task
     a question String
@@ -242,109 +270,93 @@ state
     a imported Flag
     a originalMark String
     a originalFeedback String
-    an optional pendingRegrade Number
-    a nextToken Number
   a set of Judgments with
     a case Case
     a revision Number
     a result Result
     a gateMet Flag
     a rationale String
-    a origin Origin
+    an origin Origin
     a recordedAt DateTime
-  Rule: (author, subject, sourceKey) is unique among cases.
-  Rule: at most one case has any given task.
-  Rule: all case fields except pendingRegrade, nextToken, and the append-only
-    clarifications are immutable. Original media and the submitted conversation
-    are never silently replaced by a later interpretation.
-  Rule: judgments are immutable; revision numbers per case are consecutive
-    starting at 1; the highest revision is effective.
-  Rule: INDEPENDENT requires help NONE; gateMet also requires result
-    INDEPENDENT, fresh true, and fulfillment of all saved gate criteria.
+  Rule: (author, subject, sourceKey) is unique; each task has at most one case.
+  Rule: case fields are immutable except append-only clarifications.
+  Rule: judgments are immutable, with consecutive revisions starting at 1.
+    The highest revision is effective.
+  Rule: INDEPENDENT requires help NONE. gateMet requires INDEPENDENT,
+    fresh work, and fulfillment of the complete saved gate.
 
 actions
-  submit(author: Author, subject: Subject, sourceKey: String, task: Task,
-    question: String, criteria: String, response: ResponseValue,
-    help: Help, fresh: Flag, performedAt: DateTime) : return (case: Case)
-    where the key/task are unused; sourceKey, question, and criteria are nonempty;
-      response contains learner work in at least one modality; performedAt <= now
-    then create case with these values, imported false, empty originalMark
-      and originalFeedback, empty clarifications, no pendingRegrade,
-      and nextToken = 1
+  submit(author: Author, subject: Subject, definition: Definition,
+    sourceKey: String, task: Task, question: String, criteria: String,
+    response: ResponseValue, help: Help, fresh: Flag, performedAt: DateTime)
+    : return (case: Case)
+    where key and task are unused; sourceKey, question, and criteria are
+      nonempty; response contains work; performedAt <= now
+    then create case with these values, imported false, empty clarifications,
+      originalMark, and originalFeedback
 
   assess(case: Case, result: Result, gateMet: Flag, rationale: String)
     : return (judgment: Judgment)
     where case exists and has no judgment; rationale is nonempty;
-      result and gateMet satisfy the rules above
-    then create judgment revision 1 with origin AI and recordedAt = now
+      result and gateMet satisfy the rules
+    then create revision 1 with these values, origin AI, and recordedAt = now
 
-  importGraded(author: Author, subject: Subject, sourceKey: String,
-    question: String, criteria: String, response: ResponseValue, help: Help,
-    fresh: Flag, performedAt: DateTime, mark: String, feedback: String,
-    result: Result, gateMet: Flag, rationale: String)
-    : return (case: Case, judgment: Judgment)
-    where the key is unused; question, criteria, mark, and rationale are nonempty;
-      response contains learner work; performedAt <= now; result/gateMet
-      satisfy the rules
-    then create imported case with no task, these snapshots,
-      empty clarifications, no pendingRegrade, and nextToken = 1
-      create its revision 1 judgment, origin COURSEWORK, recordedAt = now
+  importGraded(author: Author, subject: Subject, definition: Definition,
+    sourceKey: String, question: String, criteria: String,
+    response: ResponseValue, help: Help, fresh: Flag, performedAt: DateTime,
+    mark: String, feedback: String, result: Result, gateMet: Flag,
+    rationale: String) : return (case: Case, judgment: Judgment)
+    where key is unused; sourceKey, question, criteria, mark, and rationale
+      are nonempty; response contains work; performedAt <= now;
+      result and gateMet satisfy the rules
+    then create imported case with these values, no task, empty
+      clarifications, and mark/feedback saved as the original assessment;
+      create revision 1 with origin AI and recordedAt = now
 
-  requestRegrade(author: Author, case: Case, clarification?: ClarificationValue)
-    : return (token: Number)
-    where case belongs to author, has a judgment, and no pendingRegrade
-    then append clarification if supplied (otherwise preserve clarifications);
-      return nextToken; set pendingRegrade to nextToken; increment nextToken
+  clarify(author: Author, case: Case, clarification: ClarificationValue)
+    where case belongs to author; clarification concerns the same work
+    then append clarification
 
-  finishRegrade(case: Case, token: Number, result: Result,
-    gateMet: Flag, rationale: String) : return (judgment: Judgment)
-    where pendingRegrade = token; rationale is nonempty; rules are satisfied
-    then append the next judgment revision with origin AI and recordedAt = now;
-      clear pendingRegrade
-
-  failRegrade(case: Case, token: Number)
-    where pendingRegrade = token
-    then clear pendingRegrade; retain the effective judgment
-
-  overrideResult(author: Author, case: Case, result: Result,
-    gateMet: Flag, rationale: String) : return (judgment: Judgment)
-    where case belongs to author and has a judgment; rationale is nonempty;
-      result and gateMet satisfy the rules above
-    then append the next judgment revision with origin MANUAL and
-      recordedAt = now; clear pendingRegrade
+  revise(author: Author, case: Case, basedOn: Judgment, result: Result,
+    gateMet: Flag, rationale: String, origin: Origin)
+    : return (judgment: Judgment)
+    where case belongs to author; basedOn is its effective judgment;
+      rationale is nonempty; result and gateMet satisfy the rules
+    then append the next revision with these values and recordedAt = now
 ```
 
 | Result | Meaning |
 | --- | --- |
 | INDEPENDENT | Successful work without help. |
 | SUPPORTED | Successful work with assistance. |
-| SLIP | A substantially correct method with a limited execution error. |
-| GAP | Work shows a material gap in understanding or application. |
-| UNCERTAIN | The evidence is insufficient for a useful judgment. |
+| SLIP | A sound method with a small execution error. |
+| GAP | A gap in understanding or application. |
+| UNCERTAIN | Too little reliable evidence to judge. |
 
-Feedback must refer to the response and criteria. Use the photos, reasoning, probes, and hints together. Unreadable input leads to clarification or UNCERTAIN, not a mastery penalty. A clearer view of the same work can support a regrade. A changed solution requires a new attempt.
+An instructor's mark and the app's interpretation are separate. For example, retain “8/10” as the original mark and record “SLIP” as the app's judgment. Confirm extracted work, dates, and skill versions before import. A total grade alone cannot update every skill. One question may support several skills through separate cases.
 
-Confirm question-to-skill mappings before importing coursework. One question can support several skills through separate cases. Preserve the original marks and feedback. Unknown help or freshness cannot establish a full independent pass.
+Regrades use the original requirements and work. A clearer photo can clarify that work; a changed solution needs a new attempt. A late AI regrade based on an older judgment cannot replace a manual correction. Failed regrades leave the effective judgment unchanged.
 
-A manual correction cancels the pending regrade token. A late AI result cannot replace it. Failed regrades retain the earlier judgment and allow retry.
+## 4. MasteryEstimating [Learner, Subject, Definition, Evidence]
 
-## 4. MasteryEstimating [Learner, Subject, Evidence]
+**Purpose:** Help learners judge what they can still do from the evidence available.
 
-**Purpose:** Estimate current mastery from time, evidence, and recorded adjustments.
-
-**Operational principle:** Reported confidence sets a provisional estimate. Time lowers it. Assisted success restores part of it; fresh independent success can restore more. A regrade replaces the same evidence's contribution. A manual adjustment sets a new estimate that continues to change.
+**Operational principle:** Confidence gives a provisional estimate. Time lowers it. Assisted success restores part of a loss. Fresh independent work can restore more. Regrading replaces one contribution; a manual adjustment becomes a new starting estimate.
 
 ```text
-concept MasteryEstimating [Learner, Subject, Evidence]
+concept MasteryEstimating [Learner, Subject, Definition, Evidence]
 
 types
   Signal is INDEPENDENT or SUPPORTED or SLIP or GAP or UNCERTAIN
+  StartingBasis is SELF_REPORTED or PREVIOUS_DEFINITION
 
 state
   a set of Tracks with
     a learner Learner
     a subject Subject
+    a definition Definition
     an initialConfidence Number
+    a startingBasis StartingBasis
     an initializedAt DateTime
   a set of Inputs with
     a track Track
@@ -360,77 +372,84 @@ state
     a value Number
     a reason String
     an at DateTime
-  Rule: tracks have unique learner and subject; inputs have unique track
-    and evidence; values/confidences are between 0 and 100.
-  Rule: evidence identity and performedAt do not change on replacement.
-  Rule: adjustments are immutable. Inputs retain only the effective revision;
-    this concept does not own the underlying assessment history.
+  Rule: tracks have unique learner, subject, and definition.
+    Inputs have unique track and evidence.
+  Rule: confidence and adjustment values are within 0–100.
+    Evidence dates and track assignments cannot change on replacement.
+  Rule: inputs retain only the effective revision; adjustments are immutable.
 
 actions
-  initialize(learner: Learner, subject: Subject, confidence: Number)
-    where no track exists for this pair and 0 <= confidence <= 100
-    then create track with confidence and initializedAt = now
+  initialize(learner: Learner, subject: Subject, definition: Definition,
+    confidence: Number, basis: StartingBasis)
+    where no matching track exists and 0 <= confidence <= 100
+    then create track with these values and initializedAt = now
 
-  acceptEvidence(learner: Learner, subject: Subject, evidence: Evidence,
-    revision: Number, performedAt: DateTime, signal: Signal,
-    fresh: Flag, gateMet: Flag, attribution: String)
-    where track exists; revision is a positive integer; performedAt <= now;
-      attribution is nonempty; this evidence is new or revision exceeds the
-      stored revision and performedAt is unchanged; gateMet implies
-      signal INDEPENDENT and fresh true
-    then insert or replace that evidence's input with the supplied values
+  acceptEvidence(learner: Learner, subject: Subject, definition: Definition,
+    evidence: Evidence, revision: Number, performedAt: DateTime,
+    signal: Signal, fresh: Flag, gateMet: Flag, attribution: String)
+    where matching track exists; revision is a positive integer;
+      performedAt <= now; attribution is nonempty; evidence is new
+      or has a higher revision with its original date and track;
+      gateMet implies signal INDEPENDENT and fresh true
+    then insert or replace the evidence input
 
-  adjust(learner: Learner, subject: Subject, value: Number, reason: String)
-    where track exists, 0 <= value <= 100, and reason is nonempty
-    then append an adjustment with value, reason, and at = now
+  adjust(learner: Learner, subject: Subject, definition: Definition,
+    value: Number, reason: String)
+    where matching track exists; 0 <= value <= 100; reason is nonempty
+    then append adjustment with value, reason, and at = now
 
 queries
-  _estimate(learner: Learner, subject: Subject, at: DateTime)
-    : optional (value: Number, basis: String, ready: Flag,
-      lastGateAt: optional DateTime)
-    If no track exists or at < initializedAt, return no result.
-    Otherwise replay the effective evidence and adjustments up to at
-    using the policy below, and return the estimate, its basis, readiness
-    as defined below, and the latest gateMet event time if any.
-    This query never changes state.
+  _estimate(learner: Learner, subject: Subject, definition: Definition,
+    at: DateTime) : optional (value: Number, basis: String, ready: Flag)
+    Return no result if the track is absent or at precedes initialization.
+    Otherwise replay the effective inputs and adjustments through at
+    using the policy below. Return the estimate, its basis, and readiness.
+    This query does not change state.
 ```
 
 ### Estimation rules
 
-These are initial product parameters. They have not been validated as measures of human mastery.
+These numbers are initial test values, not validated measures of mastery.
 
-Let `m` be the estimate and `r` the recovery reference. Both start at reported confidence. Use one effective revision per evidence record. Process evidence by performance time, even when uploaded later. Start at the earlier of initialization or the first informative evidence date, using confidence as the starting value. Order simultaneous evidence by stable identity. Apply manual adjustments after evidence at the same time.
+Let `m` be the estimate and `r` the recovery reference. Both start at initial confidence. The supported-recovery cap `c` starts unset. Process evidence by performance date, even when imported later. Start at the earlier of initialization or the first informative evidence date. Apply simultaneous evidence by stable identity, then manual adjustments.
+
+Apply the reused-success rule before either success rule below.
 
 | Event | Effect |
 | --- | --- |
-| Time passes | Set `m = m × 2^(-elapsedDays / 60)`. Keep `r` unchanged. |
-| Fresh INDEPENDENT | Set `m = max(m, r, 80)`, or use 95 for a full gate. Then set `r = m`. |
-| Successful reused task | No numerical gain or restored readiness. |
-| SUPPORTED with `m < r` | Restore half the gap: `m = m + (r - m) / 2`. |
-| Other SUPPORTED | Add 5 points up to 79. Do not reduce a higher value. Keep `r` unchanged. |
+| Time passes | `m = m × 2^(-elapsedDays / 60)`. Keep `r` and `c` unchanged. |
+| Successful reused task | No gain and no restored readiness. |
+| Fresh INDEPENDENT, partial check | Add up to 10 points: `m = max(m, min(max(79, r), m + 10))`. |
+| Fresh INDEPENDENT, full gate | `m = max(m, 95)`. |
+| Fresh SUPPORTED | Keep an existing `c`. When unset, set it to `(m + r) / 2` if `m < r`, or `max(m, min(79, m + 5))` otherwise. Set `m = max(m, c)`. |
 | SLIP | Subtract 5 percentage points. |
 | GAP | Subtract 20 percentage points. |
-| UNCERTAIN | No effect and no reset of time decay. |
-| Manual adjustment | Set `m` and `r` to the chosen value. Label it “Manually adjusted.” |
+| UNCERTAIN | No change beyond time decay. |
+| Manual adjustment | Set `m = r = value` and clear `c`. Continue normal updates. |
 
-Keep values within 0–100. Round only for display. An old exam ages from its performance date. Regrading it replaces its contribution and preserves later manual adjustments.
+After fresh independent success, set `r = max(r, m)` and clear `c`. Bound scores to 0–100; round only for display. Regrading replaces the original contribution and replays later events, including manual adjustments.
 
-`lastGateAt` records the latest completed gate. A chosen percentage cannot create that evidence. Prerequisite `ready` requires all three conditions:
+For example, a former estimate of 90 has fallen to 50. Supported success sets a cap of 70. More hinted successes cannot raise that cap. Fresh independent work is needed for further recovery. A partial check adds limited evidence; completing the full gate can justify a high estimate.
 
-1. The latest informative evidence is fresh INDEPENDENT work.
-2. That work was performed within 14 days.
-3. The current estimate is at least 70.
+Prerequisite readiness requires the latest informative result to be fresh INDEPENDENT work within 14 days, with an estimate of at least 70. Ignore UNCERTAIN and successful reused tasks for this test. A later SLIP, GAP, or SUPPORTED result requires a new independent success.
 
-A later GAP, SLIP, or SUPPORTED result requires another independent success. The 70-point threshold lets an 80-point check remain useful after some decay.
+A revised definition gets a separate track. Use the old estimate as a provisional starting value, without copying its evidence. Keep the old version's score visible under **“Previous definition.”** Show **“Needs a new check”** for the new track until it has fresh independent evidence. Changing requirements is not a failed attempt. Regrading old work changes only its matching track.
 
-## 5. StudyPlanning [Learner, Scope, Subject]
+## 5. StudyPlanning [Learner, Scope, Subject, Definition]
 
 **Purpose:** Fit study activities into available time and show what cannot fit.
 
-**Operational principle:** A learner supplies exam dates, priorities, and a daily budget. The plan changes with progress or missed work. Exam preparation gets priority when time is short. New cuts to exam preparation need learner confirmation before the replacement plan becomes active.
+**Operational principle:** A learner sets exam dates, priorities, and a daily budget. The plan changes with progress or missed work. If exam preparation cannot fit, the learner confirms proposed cuts before the new plan takes effect.
 
 ```text
-concept StudyPlanning [Learner, Scope, Subject]
+concept StudyPlanning [Learner, Scope, Subject, Definition]
+
+types
+  PlanStatus is PROPOSED or ACTIVE or SUPERSEDED or DECLINED
+  ItemStatus is TODO or IN_PROGRESS or DONE or MISSED or STOPPED or REPLACED
+  Candidate is (key, subject, definition, activity, minutes, priority,
+    earliestDay, latestDay, reason)
+  CutValue is (exam, candidateKey, omittedScope, minutes, reason, consequence)
 
 state
   a set of Preferences with
@@ -438,281 +457,228 @@ state
     a scope Scope
     a dailyMinutes Number
     a focusNote String
-    a approvedExamCuts seq of CutValues
+    an approvedExamCuts seq of CutValues
   a set of Exams with
     a preferences Preferences
     a date Date
     a covered set of Subjects
+    an active Flag
   a set of Plans with
     a preferences Preferences
-    a createdAt DateTime
-    a status PROPOSED or ACTIVE or SUPERSEDED or DECLINED
+    a status PlanStatus
     a basis String
-    a needsConfirmation Flag
-    a examCuts seq of CutValues
-    an optional confirmedAt DateTime
     a horizonEnd Date
     a explanation String
     an optional focusExam Exam
-    a estimatedExamMinutes Number
-    a availableExamMinutes Number
     an examUrgent Flag
+    an estimatedExamMinutes Number
+    an availableExamMinutes Number
     a deferred seq of Candidates
-    a deferredMinutes Number
+    an examCuts seq of CutValues
+    a needsConfirmation Flag
   a set of Items with
     a plan Plan
-    a subject Subject
-    a candidateKey String
-    a activity String
+    a candidate Candidate
     a day Date
-    a estimatedMinutes Number
-    a reason String
-    a status TODO or IN_PROGRESS or DONE or MISSED or REPLACED
+    a status ItemStatus
     an actualMinutes Number
     an optional spentOn Date
-  Rule: preferences have unique learner and scope.
-  Rule: each preferences record has at most one ACTIVE and one PROPOSED
-    plan. Only ACTIVE plan items may begin. Proposing never replaces the
-    active plan or changes its items. Activation changes only earlier TODO
-    items, preserving all completed or missed activity history.
-  Rule: a plan requiring confirmation cannot become ACTIVE without
-    confirmTradeoffs; the exact approved omissions are retained.
-  Rule: each item has positive estimatedMinutes and nonnegative actualMinutes.
-  Rule: at most one item per learner can be IN_PROGRESS.
+  Rule: preferences are unique by learner and scope, with at most one
+    ACTIVE and one PROPOSED plan.
+  Rule: proposing preserves the active plan. Activation preserves finished
+    and stopped work, missed items, and time records.
+  Rule: each learner has at most one IN_PROGRESS item.
+    Durations are positive; actual time is nonnegative.
 
 actions
   configure(learner: Learner, scope: Scope, dailyMinutes: Number,
     focusNote: String)
-    where dailyMinutes is an integer between 0 and 1440
-    then create or update the matching preferences with these values;
-      a new preferences record starts with no approvedExamCuts
+    where dailyMinutes is an integer from 0 to 1440
+    then create or update preferences; new preferences have no approved cuts
 
   setExam(learner: Learner, scope: Scope, date: Date, covered: set of Subjects)
-    where preferences exist, date >= today, and covered is nonempty
-    then create or replace that preferences/date exam with covered
+    where preferences exist; date >= today; covered is nonempty
+    then create or update that preferences/date exam and set active true
 
   removeExam(learner: Learner, scope: Scope, date: Date)
-    where that exam exists
-    then remove it
+    where matching exam exists
+    then set active false; preserve saved plans
 
-  replan(learner: Learner, scope: Scope, candidates: seq of Candidate,
+  replan(learner: Learner, scope: Scope, candidates: seq of Candidates,
     horizonEnd: Date, explanation: String, basis: String) : return (plan: Plan)
-    where preferences exist, horizonEnd >= today, explanation/basis are nonempty,
-      candidate keys are unique, all durations are positive, the input includes
-      all estimated unfinished preparation for the nearest upcoming exam,
-      the plan horizon includes all study days before that exam, and no item
-      for these preferences is IN_PROGRESS
-    then mark any prior PROPOSED plan SUPERSEDED;
-      compute and store focusExam, estimatedExamMinutes, availableExamMinutes,
-      and examUrgent using the rule below;
-      create a PROPOSED plan and TODO items using allocation below,
-      actualMinutes = 0 and no spentOn; store each candidate key and basis;
-      record the explanation, unscheduled candidates as deferred, and
-      their total minutes as deferredMinutes;
-      record proposed exam omissions in examCuts;
-      set needsConfirmation when these include new or enlarged omissions
-      beyond approvedExamCuts; leave confirmedAt absent
+    where preferences exist; no item for learner is IN_PROGRESS;
+      horizonEnd >= today;
+      explanation and basis are nonempty; keys are unique and durations
+      positive; input includes all unfinished preparation for the nearest
+      exam, if any, and the horizon includes all study days before it
+    then supersede any prior proposal; create a PROPOSED plan using the
+      allocation rules below; record urgency, capacity, deferred work,
+      and exam cuts; set needsConfirmation for new or enlarged cuts;
+      create scheduled TODO items with actualMinutes 0 and no spentOn
 
   activateRoutine(learner: Learner, plan: Plan)
-    where plan belongs to learner, is PROPOSED, does not need confirmation,
-      and no item for its preferences is IN_PROGRESS
-    then activate plan using the activation effects below
+    where plan belongs to learner, is PROPOSED, needs no confirmation,
+      and no item for learner is IN_PROGRESS
+    then activate using the rule below
 
   confirmTradeoffs(learner: Learner, plan: Plan)
     where plan belongs to learner, is PROPOSED, needs confirmation,
-      and no item for its preferences is IN_PROGRESS
-    then set confirmedAt = now;
-      activate plan using the activation effects below
+      and no item for learner is IN_PROGRESS
+    then activate using the rule below
 
   declineTradeoffs(learner: Learner, plan: Plan)
     where plan belongs to learner and is PROPOSED
-    then set its status to DECLINED; leave the active plan unchanged
+    then set status to DECLINED; preserve the active plan
 
   begin(learner: Learner, item: Item)
-    where item belongs to learner, is TODO in the current plan with day = today,
-      and no item for learner is IN_PROGRESS
-    then set item to IN_PROGRESS
+    where item belongs to learner, is TODO in an ACTIVE plan for today,
+      and learner has no IN_PROGRESS item
+    then set status to IN_PROGRESS
 
   finish(learner: Learner, item: Item, actualMinutes: Number)
     where item belongs to learner and is IN_PROGRESS; actualMinutes >= 0
-    then set item to DONE and record actualMinutes and spentOn = today
-
-  miss(learner: Learner, item: Item)
-    where item belongs to learner and is TODO with day <= today
-    then set item to MISSED
+    then set status to DONE; record actualMinutes and spentOn = today
 
   stop(learner: Learner, item: Item, actualMinutes: Number)
     where item belongs to learner and is IN_PROGRESS; actualMinutes >= 0
-    then set item to MISSED and record actualMinutes and spentOn = today
+    then set status to STOPPED; record actualMinutes and spentOn = today
+
+  miss(learner: Learner, item: Item)
+    where item belongs to learner and is TODO with day <= today
+    then set status to MISSED
 ```
 
 ### Plan rules
 
-**Activation:** Set the old active plan to SUPERSEDED. Mark its overdue TODO items MISSED and its remaining TODO items REPLACED. Set the selected plan ACTIVE. Copy its exam cuts to `approvedExamCuts`. Preserve completed work and time records.
+**Activation:** Supersede the old active plan. Mark its overdue TODO items MISSED and remaining TODO items REPLACED. Activate the selected plan and save its exact cuts as the approved cuts. New or enlarged cuts need confirmation; routine timing changes do not.
 
-A `CutValue` records the exam, date, activity key, omitted scope and minutes, reason, and expected consequence. A new or larger omission needs confirmation. Routine timing changes and previously approved cuts do not. Clearing all cuts also clears the approval record. Removing work from the input or understating its duration cannot bypass confirmation.
+**Allocation:** Visit study dates in order. Subtract time already spent across all plans. Consider unfinished candidates within their allowed dates, by priority and then stable key. Schedule each once, where its full duration fits. Show deferred work and its total time. Splitting a long task requires a new proposal. A later review or changed skill version has a new candidate key.
 
-The `basis` identifies the planning inputs. Reactions check that those inputs are still current before activation. A changed budget, exam, priority, or evidence record requires a current proposal.
+**Exam urgency:** For the nearest active exam, compare unfinished preparation `W` with remaining capacity `C`. Include prerequisites and repair work. When `W > C`, devote the budget before the exam to its covered skills and prerequisites. Defer unrelated maintenance. If exam work still cannot fit, explain the cuts and request confirmation. Keep the active plan until approval, with its shortfall visible. Incomplete workload estimates must be flagged. Without an exam, urgency is false.
 
-A `Candidate` is `(key, subject, activity, minutes, priority, earliestDay, latestDay, reason)`. AI proposes activities, priorities, and durations. The planner applies these rules:
+Use only days before the exam date when its time is unknown. A zero budget schedules nothing. Count time spent on wrong answers and stopped work. Missing a session adds no mastery penalty. Skipping a prerequisite check does not erase its estimated workload. Removing work from the input cannot bypass confirmation. Candidate keys prevent completed work from being scheduled again.
 
-1. Visit dates from today through the plan horizon.
-2. Subtract recorded study time from that day's budget. Count DONE and stopped items across plans. Available time cannot fall below zero.
-3. Exclude completed candidate keys. Consider other candidates within their allowed dates, by descending priority and then stable key.
-4. Schedule each candidate once, on the first day where it fits. Show unscheduled work and its duration. Split an oversized activity through a new proposal; do not silently shorten it.
-
-### Exam urgency
-
-For the nearest exam, compare all unfinished preparation `W` with remaining study capacity `C`. Include prerequisites and repair work before deferring anything. Urgent mode is `W > C`. With no exam, both are zero and urgent mode is false.
-
-In urgent mode, reserve time before the exam for covered subjects and their prerequisites. Defer unrelated maintenance. If exam work still cannot fit, explain the proposed cuts and ask for confirmation. A pending proposal leaves the active plan unchanged, with its shortfall visible. On first setup, cuts must be confirmed before any plan activates.
-
-A current proposal can report urgency before approval. Skipping a prerequisite check does not remove its estimated work or create readiness evidence. Recompute urgency after progress, missed work, or changed inputs. Flag incomplete workload estimates instead of treating missing work as zero.
-
-Without an exam time, count only days before its date. Ask the learner to accept or edit a suggested 30-minute budget during setup. A zero budget schedules nothing. Record actual time even after a wrong answer or stopped session. Missing work adds no score penalty beyond time decay. Charge sessions crossing midnight to their completion date. Replan overdue items before starting them.
+The `basis` identifies the inputs used for a proposal. Check that they remain current before activation. Definitions, evidence, priorities, exams, or budget changes require a current proposal.
 
 ## Essential reactions
 
-`Requesting` is the authenticated request boundary. It derives `actor` from sign-in, not from browser input. `AI` represents generation and grading services; `Clock` supplies date events. These are service boundaries, not extra product concepts. Browser requests cannot directly invoke internal actions or AI callbacks.
+`Requesting` represents signed-in requests; `AI` supplies generated content and judgments. Reactions check ownership and course membership before calling actions. The learner confirms sources and skills. Use their material first; select a reference before teaching if none is available.
 
-### Confirm skills and initialize estimates
+### Confirm requirements and initialize estimates
 
 ```text
 when Requesting.confirmSkill(actor, skill)
 where SkillMapping: skill is DRAFT in actor's course
-and GroundedTutoring: every material linked to skill belongs to actor
-  and has scope = skill's course
+and GroundedTutoring: linked materials belong to actor and that course
 then SkillMapping.confirm(actor, skill)
 
 when Requesting.setInitialConfidence(actor, skill, confidence)
-where SkillMapping: skill is CONFIRMED in actor's course
-then MasteryEstimating.initialize(actor, skill, confidence)
+where SkillMapping: skill is CONFIRMED; definition is its current version
+then MasteryEstimating.initialize(actor, skill, definition,
+  confidence, SELF_REPORTED)
+
+when SkillMapping.reviseDefinition(actor, skill, outcome, gate)
+  : return (previous, definition)
+where MasteryEstimating: _estimate(actor, skill, previous, now)
+  returns an estimate with value
+then MasteryEstimating.initialize(actor, skill, definition,
+  value, PREVIOUS_DEFINITION)
 ```
 
-Apply the same owner and course checks to edits, sources, teaching, and read views. Check media access before passing stored references. The first version accepts only one course per learner. Prefer supplied course material; if none exists, finish reference selection before teaching. Confirmed skills without confidence show “Not assessed.”
+Without an initial estimate, show “Not assessed.” On initialization, load any existing judgments for that version, using their original performance dates.
 
-### Teach from the selected sources
-
-```text
-when AI.lessonReady(request, explanation, citations)
-where Requesting: request was authenticated for actor and confirmed skill;
-  selectedMaterials and originalQuestion belong to that request
-and SkillMapping: skill remains CONFIRMED in actor's course
-and GroundedTutoring: selectedMaterials are stored in actor's course
-then GroundedTutoring.explain(actor, skill, originalQuestion,
-  explanation, selectedMaterials, citations)
-```
-
-### Check prerequisites
+### Teach and prepare practice
 
 ```text
 when Requesting.preparePractice(actor, skill, mode)
-where SkillMapping: skill is CONFIRMED in actor's course;
-  prerequisiteSkills are skill's transitive prerequisites
-and MasteryEstimating: _estimate(actor, prerequisite, now).ready is true
-  for every prerequisite
-then AI.preparePractice(actor, skill, mode, stored materials and gate)
+where SkillMapping: skill is CONFIRMED with current version definition;
+  prerequisites include all direct and indirect prerequisites
+and MasteryEstimating: each prerequisite's current version is ready
+then AI.preparePractice(actor, skill, definition, mode,
+  selected sources and saved gate)
 
-when Requesting.preparePractice(actor, skill, mode)
-where SkillMapping: skill is CONFIRMED in actor's course
-and some prerequisite lacks the readiness condition above
-and StudyPlanning: the latest plan with a current input basis has examUrgent
-  true (whether PROPOSED or ACTIVE), and skill is covered by its focusExam
-and Requesting: actor explicitly chose to skip the offered prerequisite check
-then AI.preparePractice(actor, skill, mode, stored materials and gate)
+when AI.taskReady(request, question, criteria, citations, fresh)
+where request remains current; skill and definition still match;
+  sources, criteria, and freshness have been checked
+then GroundedTutoring.prepareTask(request's actor, skill, definition,
+  question, criteria, selected materials, citations, request's mode, fresh)
 ```
 
-When time is sufficient, missing readiness blocks dependent practice. Lessons remain available. A short prerequisite check uses one fresh problem and a brief explanation. Save those criteria with the task. A success is INDEPENDENT; set `gateMet` only if the full gate was completed. Skills without prerequisites pass automatically.
+Without ready prerequisites, offer a short check. Lessons remain available. If a plan or proposal based on current inputs reports exam urgency, the learner may explicitly skip the check for an exam skill. This allows practice without raising mastery. Otherwise, complete prerequisites first.
 
-In urgent mode, an explicit skip allows exam-relevant practice without raising mastery. Before `AI.taskReady` invokes `prepareTask`, check the request, sources, criteria, and freshness. Complete the request once. Discard duplicate results and results for archived skills.
+Lesson generation follows the same source and version checks, then calls `explain`. Follow-up questions and answers stay in that lesson. Once a task starts, a later definition change does not change its requirements.
 
-### Plan recovery and later reviews
-
-After SUPPORTED work, offer a fresh unaided problem now and a review candidate for the next day. After the first independent success, start with a one-day interval. Consecutive successful reviews on later days increase it to three, then seven days. GAP or SLIP returns it to one day. Same-session recovery does not extend this sequence. The application derives eligibility dates from the evidence history. Budget and exam limits still apply.
-
-### Record voice and photos
-
-Route each learner contribution to `respond` after ownership and media checks. Route tutor turns to `askFollowup`, `clarifyInput`, or `giveHint`. CHECK hints require `requestHint` first. A transcription question alone does not request help with the solution. Show spoken output as text. Closed tasks reject late callbacks.
-
-### Submit the complete attempt
-
-Combine stored dialogue and media into one response. Recorded hints or declared outside help set help to HINT. Neutral probes do not. Unknown help stays UNKNOWN. Finish pending uploads and transcription, or ask the learner to exclude them, before submission.
+### Submit work and assess it
 
 ```text
 when Requesting.submitWork(actor, task, outsideHelp)
-where GroundedTutoring: task is OPEN, belongs to actor;
-  topic, question, criteria, fresh, and dialogue are read from task;
-  response is the frozen ResponseValue built from the stored dialogue/media
-and SkillMapping: topic is CONFIRMED in actor's course
-then AssessmentReviewing.submit(actor, topic, task identity as sourceKey,
-  task, question, criteria, response, combinedHelp, fresh, now)
-  : return (case)
+where GroundedTutoring: task is OPEN and owned by actor;
+  voice transcripts are checked; uploads are complete;
+  subject, definition, question, criteria, and fresh come from the task;
+  response combines its saved text, original photos, and dialogue
+then AssessmentReviewing.submit(actor, subject, definition,
+  task identity as sourceKey, task, question, criteria, response,
+  recorded and declared help, fresh, now) : return (case)
 
-when AssessmentReviewing.submit(author, subject, sourceKey, task,
-  question, criteria, response, help, fresh, performedAt) : return (case)
-then GroundedTutoring.closeTask(author, task)
+when AssessmentReviewing.submit(author, subject, definition, sourceKey,
+  task, ...) : return (case)
+then GroundedTutoring.close(author, task)
 
 when AssessmentReviewing.submit(...) : return (case)
-then AI.assess(case, stored question, criteria, complete response bundle,
-  original images, and source context)
+then AI.assess(case, saved requirements, complete work, and source context)
 ```
 
-A grading service failure leaves the case pending for retry. A completed grading response invokes `assess`. Task uniqueness prevents duplicate cases.
+Recorded hints or declared assistance count as help. Neutral probes and input corrections do not. Unknown assistance or freshness cannot establish an independent full pass. Regrade requests send the saved work, clarifications, and effective judgment to AI. The response calls `revise` with that judgment as `basedOn`.
 
-### Apply the effective judgment once
+### Update mastery once per attempt
 
 ```text
 when AssessmentReviewing.assess(case, result, gateMet, rationale)
   : return (judgment)
-where AssessmentReviewing: judgment is the effective revision for case;
-  author, subject, performedAt, fresh, and revision are read from saved state
-and MasteryEstimating: a track exists for author and subject
-then MasteryEstimating.acceptEvidence(author, subject, case, revision,
-  performedAt, result, fresh, gateMet, judgment origin and rationale)
+where AssessmentReviewing: judgment is effective; case supplies author,
+  subject, definition, performedAt, and fresh
+and MasteryEstimating: the matching track exists
+then MasteryEstimating.acceptEvidence(author, subject, definition,
+  case, judgment's revision, performedAt, result, fresh, gateMet,
+  judgment's origin and rationale)
 ```
 
-Use the same rule for `importGraded`, `finishRegrade`, and `overrideResult`. A newer revision replaces the earlier contribution. On track initialization, load any existing reviewed cases with their original performance dates.
+Apply the same linkage to imported work and revised judgments. Each case contributes once to its version. Regrading old work cannot satisfy revised requirements. Manual mastery changes use `adjust`; assessment corrections use `revise`.
 
-Import coursework only after the learner confirms extracted work, marks, and skill mappings. A total grade without supporting work remains unallocated.
+### Refresh the plan
 
-### Keep mastery adjustments separate
-
-```text
-when Requesting.adjustMastery(actor, skill, value, reason)
-where SkillMapping: skill belongs to actor's course
-then MasteryEstimating.adjust(actor, skill, value, reason)
-```
-
-Regrades and result corrections go through AssessmentReviewing. Adjusting mastery creates no successful attempt or completed gate.
-
-### Refresh and activate plans
-
-Request new candidates after evidence, budget, exam, activity, or date changes. Give AI the current skills, estimates, prerequisites, deadlines, and time budget. Route `AI.planReady` to `replan` only if those inputs remain current and no activity is in progress. Otherwise regenerate after the change or activity ends.
+Evidence, skill versions, prerequisites, dates, budget, and activity changes request a new plan. Include a new check after a definition change. Wait for an active session to finish or stop before replacing its plan.
 
 ```text
-when Requesting.confirmExamTradeoffs(actor, plan)
-where StudyPlanning: plan belongs to actor, is PROPOSED, needsConfirmation;
-  its basis matches the application's current planning inputs
-then StudyPlanning.confirmTradeoffs(actor, plan)
+when AI.planReady(request, candidates, horizon, explanation)
+where request's inputs remain current and no item for its learner
+  is IN_PROGRESS
+then StudyPlanning.replan(request's learner, request's scope,
+  candidates, horizon, explanation, request's basis) : return (plan)
 
 when StudyPlanning.replan(...) : return (plan)
-where StudyPlanning: plan is PROPOSED and does not needConfirmation;
-  its basis matches the application's current planning inputs
+where plan needs no confirmation and its basis remains current
 then StudyPlanning.activateRoutine(plan's learner, plan)
+
+when Requesting.confirmExamTradeoffs(actor, plan)
+where plan is actor's current proposal and its basis remains current
+then StudyPlanning.confirmTradeoffs(actor, plan)
 ```
 
-Declining a proposal keeps the active plan. Changing priorities or time requests another proposal. Neither accepts the old cuts. Refresh covered exam subjects when prerequisites change.
+Declining preserves the active plan. Changing inputs does not approve old cuts. Before an item starts, check its skill version and prerequisites. Replan outdated items. Recording time and receiving a grade may each refresh the plan; neither creates another assessment.
 
-Starting an item requires ownership and the practice prerequisite checks. A submitted assessment activity can record elapsed time while grading is pending. Both completion and the later judgment may refresh the plan; neither adds an extra assessment.
+After supported success, offer a fresh unaided check and a next-day review. Independent reviews on later days extend the interval from one to three, then seven days. A SLIP or GAP returns it to one day. Same-session recovery does not extend it. These are test intervals; the budget and exam priorities still apply.
 
 ## How the concepts work together
 
-The map defines the skill. Tutoring supplies lessons and tasks. Assessment judges work. Mastery estimates current ability. Planning allocates time. Reactions connect them; each concept reads only its own state. The tree combines their records in one view.
+SkillMapping defines what to learn. GroundedTutoring teaches and records work. AssessmentReviewing judges that work. MasteryEstimating estimates current ability. StudyPlanning allocates time. Each concept reads only its own state; reactions connect them. The tree combines their records into one view.
 
-`User`, `Learner`, and `Author` are authenticated users. Bind `SkillMapping.Material` to `GroundedTutoring.Material`. Bind tutoring and planning `Scope` to `SkillMapping.Course`. Bind tutoring `Topic` and all `Subject` parameters to `SkillMapping.Skill`. Bind assessment `Task` to `GroundedTutoring.Task`, and mastery `Evidence` to `AssessmentReviewing.Case`.
+Bind user types to signed-in users, `Scope` to `SkillMapping.Course`, and `Topic`/`Subject` to `SkillMapping.Skill`. Bind `Definition` to `SkillMapping.Version`. Bind mapping `Material` to `GroundedTutoring.Material`, assessment `Task` to `GroundedTutoring.Task`, and mastery `Evidence` to `AssessmentReviewing.Case`.
 
 ## Initial policies and implementation scope
 
-The numerical rules above are starting parameters for testing. Build one complete path first: source material, confirmed skill, photographed work, spoken follow-up, assessment, estimate, and next activity.
+Numeric settings need testing. The 10-point partial-check gain limits how much one small success can change the estimate.
 
-The first version excludes cross-course planning, continuous video, a peer-review inbox, and automatic university-system integration. Test source selection, photo interpretation, voice usability, and whether learners understand estimates and assistance records.
+Authentication, AI requests, transcription, and retries use external services. Validate callbacks, reject duplicates, and retain existing records after failures. Raw audio is temporary service input; confirmed text and original photos form the saved attempt.
+
+Build one complete path first: source, confirmed skill, photographed work, spoken follow-up, assessment, estimate, and next activity. The first version excludes cross-course planning, continuous video, peer review, and automatic university integration. Test source selection, photo and voice input, and whether learners understand the estimates.
