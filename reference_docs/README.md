@@ -1,6 +1,6 @@
 # Course reference documents
 
-Markdown copies of 12 background documents, 5 rubrics, and the P1 project directions from the MIT 6.1040 Fall 2026 course website. Updated October 6, 2026.
+Markdown copies of 12 background documents, 7 rubrics, and the P1 and P2 project directions from the MIT 6.1040 Fall 2026 course website. Updated October 11, 2026.
 
 Each document includes its original source link and download date. This folder contains only Markdown files.
 
@@ -26,7 +26,10 @@ Each document includes its original source link and download date. This folder c
 3. [Rubric for technical writing](Rubrics/03-technical-writing.md) · [Source](https://61040.github.io/fa26/rubrics/technical-writing/)
 4. [Rubric for concept design](Rubrics/04-concept-design.md) · [Source](https://61040.github.io/fa26/rubrics/concept-design/)
 5. [Rubric for communicating a proposed solution](Rubrics/05-communicating-a-proposed-solution.md) · [Source](https://61040.github.io/fa26/rubrics/communicating-a-proposed-solution/)
+6. [Rubric for implementing a concept-based application](Rubrics/06-implementing-concepts.md) · [Source](https://61040.github.io/fa26/rubrics/implementing-concepts/)
+7. [Rubric for testing and validating software](Rubrics/07-testing-validating.md) · [Source](https://61040.github.io/fa26/rubrics/testing-validating/)
 
 ## Project directions
 
 1. [P1: Design](Project%20directions/P1.md) · [Source](https://61040.github.io/fa26/assignments/p1/)
+2. [P2: Alpha (MVP)](Project%20directions/P2.md) · [Source](https://61040.github.io/fa26/assignments/p2/)

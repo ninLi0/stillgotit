@@ -1,0 +1,35 @@
+import { MongoClient } from "mongodb";
+import { httpWire } from "@mit-sdg/sync-engine-http/tooling";
+import { assembleApplication } from "./src/assembly.ts";
+import { FederatingConcept } from "./src/concepts/Federating/Federating.ts";
+import { MemoryProvider } from "./src/concepts/Federating/provider.ts";
+import { RegisteringConcept, type User } from "./src/concepts/Registering/Registering.ts";
+import { SessioningConcept } from "./src/concepts/Sessioning/Sessioning.ts";
+import { SkillMapping } from "./src/concepts/SkillMapping.ts";
+import { localMongoUri } from "./src/storage/mongo.ts";
+import { stillGotItPolicy } from "./src/host/http-policy.ts";
+
+function assembleForChecks() {
+  // Construction only: tools inspect declarations and never run database actions.
+  // No connection or index creation is needed for checks and generation.
+  const client = new MongoClient(localMongoUri);
+  return assembleApplication({
+    Registering: new RegisteringConcept(client.db("stillgotit_spec_check")),
+    CommonsFederating: new FederatingConcept<User>(
+      client.db("stillgotit_spec_check"), new MemoryProvider(), "CommonsFederating",
+    ),
+    Sessioning: new SessioningConcept<User>(client.db("stillgotit_spec_check")),
+    SkillMapping: new SkillMapping(client.db("stillgotit_spec_check")),
+  });
+}
+
+export default {
+  assemble: assembleForChecks,
+  title: "StillGotIt",
+  wireName: "StillGotItWire",
+  projections: [httpWire({ policy: stillGotItPolicy("http://localhost:5173"), name: "StillGotItHttp" })],
+  design: {
+    version: 1,
+    documents: [new URL("./design/stages/onboarding.md", import.meta.url)],
+  },
+};

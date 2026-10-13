@@ -1,0 +1,45 @@
+{
+  "name": "stillgotit",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "bun@1.4.2",
+  "dependencies": {
+    "@mit-sdg/sync-engine": "1.1.0",
+    "@mit-sdg/sync-engine-http": "1.1.0",
+    "mongodb": "7.7.0",
+    "vue": "3.5.43"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.4",
+    "@types/node": "^24.0.0",
+    "@vitejs/plugin-vue": "6.0.10",
+    "typescript": ">=6 <7",
+    "vite": "8.3.4",
+    "vue-tsc": "3.3.13"
+  },
+  "scripts": {
+    "generate": "sync-engine artifacts pin",
+    "check": "sync-engine check && sync-engine artifacts check && tsc --noEmit && bun run check:frontend",
+    "db:up": "docker compose up -d --wait --wait-timeout 60 && bun scripts/init-mongo.ts",
+    "db:stop": "docker compose stop",
+    "demo:course": "bun scripts/demo-course.ts",
+    "demo:unit": "bun scripts/demo-unit.ts",
+    "demo:skill": "bun scripts/demo-skill.ts",
+    "demo:revise-draft": "bun scripts/demo-revise-draft.ts",
+    "demo:discard-draft": "bun scripts/demo-discard-draft.ts",
+    "demo:confirm-skill": "bun scripts/demo-confirm-skill.ts",
+    "demo:edit-details": "bun scripts/demo-edit-details.ts",
+    "demo:revise-definition": "bun scripts/demo-revise-definition.ts",
+    "demo:attach-material": "bun scripts/demo-attach-material.ts",
+    "demo:set-prerequisites": "bun scripts/demo-set-prerequisites.ts",
+    "demo:archive-skill": "bun scripts/demo-archive-skill.ts",
+    "demo:restore-skill": "bun scripts/demo-restore-skill.ts",
+    "test": "bun test --timeout 15000",
+    "start": "bun src/main.ts",
+    "build": "vite build --config frontend/vite.config.ts",
+    "check:frontend": "vue-tsc --noEmit -p frontend/tsconfig.json",
+    "dev:server": "PORT=3000 APP_ORIGIN=http://localhost:5173 bun --watch src/main.ts",
+    "dev:frontend": "vite --config frontend/vite.config.ts"
+  }
+}

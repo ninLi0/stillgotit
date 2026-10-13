@@ -1,0 +1,49 @@
+:root { font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif; color: #181818; background: #fff; font-synthesis: none; line-height: 1.55; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+button, input { font: inherit; }
+button, a { -webkit-tap-highlight-color: transparent; }
+button { cursor: pointer; }
+button:disabled { cursor: wait; opacity: .55; }
+button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid #181818; outline-offset: 4px; }
+.shell { max-width: 1320px; min-height: 100dvh; margin: 0 auto; padding: 0 64px; display: flex; flex-direction: column; }
+.header { min-height: 100px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.wordmark { color: inherit; text-decoration: none; font-size: 22px; font-weight: 650; letter-spacing: -.7px; display: flex; align-items: center; gap: 10px; }
+.mark { font-size: 30px; font-weight: 400; }
+.header-note, .account { color: #676767; font-size: 14px; }
+.account { display: flex; align-items: center; gap: 24px; }
+main { flex: 1; display: grid; align-items: center; padding: 46px 0 64px; }
+.workspace { display: grid; grid-template-columns: 1.05fr 1fr; gap: 58px; align-items: center; }
+.task { max-width: 490px; padding: 20px 0; }
+.context { margin: 0 0 20px; font-size: 15px; color: #676767; }
+h1 { margin: 0 0 24px; font-family: Georgia, "Times New Roman", serif; font-size: clamp(36px, 4.1vw, 57px); font-weight: 400; letter-spacing: -1.8px; line-height: 1.14; text-wrap: balance; }
+.course-title { overflow-wrap: anywhere; }
+.intro { max-width: 390px; margin: 0 0 34px; color: #676767; font-size: 17px; line-height: 1.65; }
+.primary { border: 1px solid #181818; border-radius: 6px; background: #181818; color: white; min-height: 48px; padding: 11px 24px; font-weight: 550; }
+.primary:hover:not(:disabled) { background: #333; }
+.quiet { border: 0; padding: 6px 0; color: #454545; background: transparent; font-size: 14px; text-decoration: underline; text-underline-offset: 4px; }
+.quiet:hover { color: #000; }
+.retry { display: block; margin-top: 20px; }
+form { max-width: 410px; }
+label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+input { width: 100%; min-height: 51px; border: 1px solid #aaa; border-radius: 5px; color: #181818; background: #fff; padding: 11px 13px; }
+form .primary { margin-top: 18px; }
+.hint { margin: 10px 0 0; color: #676767; font-size: 13px; }
+.tree-panel { margin: 0; background: #f6f6f6; min-height: 570px; border-radius: 48% 48% 10px 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 32px 20px; }
+.tree-drawing { width: min(100%, 360px); color: #454545; }
+.tree-drawing svg { display: block; width: 100%; }
+figcaption { margin-top: 10px; font-size: 13px; color: #676767; }
+.saved-state { display: flex; align-items: center; gap: 9px; margin: 0 0 24px; font-size: 13px; color: #676767; }
+.saved-dot { width: 6px; height: 6px; border-radius: 50%; background: #181818; }
+.empty-state { display: flex; gap: 20px; align-items: center; padding: 22px 0; border-top: 1px solid #d8d8d8; margin-bottom: 14px; }
+.empty-count { font-family: Georgia, serif; font-size: 46px; line-height: 1; }
+.empty-state strong { font-size: 15px; font-weight: 550; }
+.empty-state p { margin: 3px 0 0; font-size: 13px; color: #676767; }
+.error { margin-top: 24px; padding: 14px 16px; border-left: 3px solid #181818; background: #f6f6f6; font-size: 14px; }
+.error p { margin: 0; }
+.notice { font-size: 14px; color: #454545; }
+.loading { color: #676767; }
+footer { border-top: 1px solid #e7e7e7; padding: 22px 0; display: flex; justify-content: space-between; font-size: 12px; color: #676767; }
+@media (max-width: 850px) { .shell { padding: 0 30px; } .workspace { gap: 30px; } .tree-panel { min-height: 450px; } h1 { font-size: 40px; } }
+@media (max-width: 620px) { .shell { padding: 0 24px; } .header { min-height: 82px; } .header-note { display: none; } .account { gap: 12px; } .workspace { grid-template-columns: 1fr; gap: 30px; } main { padding: 22px 0 38px; } .task { max-width: 100%; } h1 { font-size: 39px; letter-spacing: -1.1px; } .tree-panel { min-height: 320px; padding: 12px 20px 22px; border-radius: 42% 42% 8px 8px; } .tree-drawing { width: 225px; } .intro { margin-bottom: 26px; } }
+@media (prefers-reduced-motion: no-preference) { .primary { transition: background-color 120ms; } }
