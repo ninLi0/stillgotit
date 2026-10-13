@@ -98,6 +98,16 @@ The records have no automatic expiry and survive sign-out, expired attempts, and
 
 Fourteen tests use real MongoDB. Controlled reads make two clients see an absent record before competing to create it. The same identity receives one key and creates one local account through explicit Registering calls. Different identities that generate the same candidate receive different saved keys. A fresh Bun process reads a saved key after its writer closes and after a committed write loses its reply. Other checks cover provider separation, exact subjects, invalid inputs, rejected writes, damaged records, and index failures. The store is now connected to verified browser attempts by the onboarding host.
 
+## GroundedTutoring material storage
+
+The initial GroundedTutoring implementation contains `addMaterial`, `_materials`, and `_material`. It owns its namespaced materials collection and uses the [material data representation](material-data.md). It remains outside the running assembly while the other tutoring methods are pending.
+
+`addMaterial` validates fields and requires nonblank text or a readable rendition. It snapshots input before the first database wait, prepares an owner/scope/ID index, and inserts one complete record. Invalid material is refused before storage work. Database failures remain errors. Each successful call creates a new identity; this action alone does not deduplicate a retried import.
+
+`_materials` reads one owner and scope in material-ID order and returns summaries. `_material` reads a full record by ID. Both queries preserve state. Their inputs are internal identities; public requests will need session and ownership checks in the composition. The concept does not call other concepts or read file bytes.
+
+Thirteen direct tests use real MongoDB and metadata fixtures. They verify both text and image representations, extraction limitations, input snapshots, query projections and filters, missing rows, malformed inputs, rejected writes, database-read failures, and persistence after the writer closes and a fresh process reads the record. These tests do not establish file readability or public access control.
+
 ## Provider and file operations
 
 Use a host operation record for retryable service work. It holds an operation key, actor, kind, target, saved context version, status, and any created domain identities. It does not own skill definitions, grades, or mastery. Reusing a key with different input is refused. A retried successful operation returns the identities already saved for it.

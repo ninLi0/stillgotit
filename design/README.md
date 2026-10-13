@@ -7,7 +7,7 @@ Prepare the current specifications in the sync-engine 1.1.0 format under `design
 ## Current specifications
 
 - [SkillMapping](concepts/SkillMapping.md): preserves the P1 actions and version history. Adds explicit results, refusals, and read queries.
-- [GroundedTutoring](concepts/GroundedTutoring.md): preserves lessons, practice, and recorded help. Adds retained file references, optional transcript corrections during lessons, and one transcript review before assessment.
+- [GroundedTutoring](concepts/GroundedTutoring.md): preserves lessons, practice, and recorded help. Material storage is implemented through `addMaterial`, `_materials`, and `_material`. Its other methods and application registration remain pending. See the concrete [material data representation](material-data.md).
 - [AssessmentReviewing](concepts/AssessmentReviewing.md): preserves the five P1 actions, original work, and judgment history. Expands saved responses to include confirmed transcripts and supported attachments. Adds explicit results, refusals, and read queries.
 - [MasteryEstimating](concepts/MasteryEstimating.md): preserves the three P1 actions, scoring rules, and prerequisite readiness check. Groups the numerical settings and defines calculation order. Adds explicit results, refusals, and queries for the score's evidence and explanation.
 - [StudyPlanning](concepts/StudyPlanning.md): preserves the eleven P1 actions. Adds explicit results, refusals, and read queries. Checks current planning inputs before activation, limits activity changes to active plans, and preserves time records across replacements.
@@ -36,7 +36,7 @@ Action and query signatures use named collection types, such as `MaterialSet`, `
 
 The composition documents name the planned reactions, views, formers, and endpoint paths. A reaction connects successful actions. A view combines concept queries. A former shapes an endpoint response. Pair each document with the corresponding source module as it is implemented.
 
-The full inventory contains eight planned instances. Registering, CommonsFederating, Sessioning, and SkillMapping are implemented and assembled. Their direct and engine tests cover action rules, persistence, concurrent work, and refusals. CommonsProvider and RegistrationRecoveryStore have separate tests. The onboarding stage now connects these parts through HTTP and a Vue page. Material import and the remaining four learning concepts are still planned.
+The full inventory contains eight planned instances. Registering, CommonsFederating, Sessioning, and SkillMapping are implemented and assembled. Their direct and engine tests cover action rules, persistence, concurrent work, and refusals. CommonsProvider and RegistrationRecoveryStore have separate tests. The onboarding stage connects these parts through HTTP and a Vue page. GroundedTutoring has a tested material-storage implementation, but it is not yet assembled. File import and the remaining learning behavior are still planned.
 
 ## Validation and next step
 
@@ -52,6 +52,8 @@ The eight concept files, shared bindings, and seven composition documents pass t
 
 The check has no errors. It reports seven conservative endpoint-fallback warnings and one former-order advisory. Integration tests check actual return and refusal paths; static checks do not prove that every request will receive an answer under every fault. Source checks also do not prove transactions or persistence, so those have direct and engine tests.
 
-Next, implement material import and skill proposals through GroundedTutoring. Add their types and composition documents to the checked stage when the code exists. Keep private design notes in the learner's own words.
+The material step has 13 focused tests against real MongoDB. They cover declared results, validation, preserved renditions, filtered and read-only queries, unchanged saved records, database errors, and retrieval from a fresh process. These are direct concept tests, not an upload or ownership-boundary check. The full GroundedTutoring specification passes the format check; the existing application check still covers its four registered concepts.
+
+Next, implement material processing and the import boundary, including ownership checks and operation tracking for safe retries. Add GroundedTutoring and its composition to the checked stage when the corresponding implementation is ready. Keep private design notes in the learner's own words.
 
 Use the [course setup guide](https://61040.github.io/fa26/resources/sync-engine-local-dev/) and the [sync-engine authoring guide](https://github.com/mit-sdg/sync-engine/blob/v1.1.0/docs/user/guide/authoring.md) for the required format.

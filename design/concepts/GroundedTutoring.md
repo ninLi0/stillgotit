@@ -28,7 +28,7 @@ SessionStatus is OPEN or CLOSED
 Channel is TEXT or VOICE
   Typed or transcribed speech. Retained attachments may accompany either.
 opaque MediaValue
-  A retained file reference with a name, media type, content locations, readable renditions, and any extraction limitations. Covers documents, slides, sheets, text, code, notebooks, images, uploaded source audio, and supported archive contents. Does not contain temporary microphone recordings.
+  A retained file reference with a name, media type, content locations, readable renditions, and any extraction limitations. Covers documents, slides, sheets, text, code, notebooks, images, uploaded source audio, and supported archive contents. Does not contain temporary microphone recordings. Its concrete representation is defined in design/material-data.md; the host verifies referenced files before supplying these values.
 opaque MediaList
   An ordered sequence of MediaValue records. The order preserves pages, slides, files, or other supplied parts.
 opaque MaterialSet
@@ -75,6 +75,7 @@ Rule: an owner's open lesson or task must exist, have that owner and kind, and h
 Rule: source rules require a nonempty set of existing materials, all owned by the session owner and in the same scope. Citations are nonempty and identify valid locations in those materials.
 Rule: material records, session sources, topic, definition, and opening content never change. Source edits produce a new Material. Dialogue is append-only while OPEN. CLOSED sessions cannot change.
 Rule: materials contain readable text or readable retained media. Their file references preserve extraction limitations. Unreadable uploads do not become teaching material.
+Rule: material inputs match their declared types and the material data representation. References are nonblank strings. Malformed material inputs are refused before any state change.
 Rule: dialogue indices are zero-based and remain stable. checkedVoiceTurns contains only indices of learner RESPONSE turns with channel VOICE. The effective transcript is the latest CORRECTION for that response, or its original text when there is no correction.
 Rule: ordinary lessons need no transcript confirmation. Assessment requires every voice response in the task to have its effective transcript confirmed. Closing a session alone does not submit work for assessment.
 Rule: a PROBE asks for reasoning without correctness feedback, correction, or a solution method. A CLARIFICATION resolves input without solution content. Help that reveals a method or correction is a HINT, even when phrased as a question.
@@ -88,10 +89,10 @@ Rule: blank text is empty or contains only whitespace. New identities are unique
 
 ```actions
 addMaterial(owner: Learner, scope: Scope, title: String, locator: String, content: String, originals: MediaList, origin: MaterialOrigin) : returns (material: Material)
-  where title or locator is blank, or neither content nor originals contains readable source material
+  where material inputs do not match their declared types or representation, title or locator is blank, or neither content nor originals contains readable source material
   then
     refuses INVALID_TUTORING_MATERIAL "Provide a title, source location, and readable material."
-  where title and locator are not blank, and at least one of content or originals contains readable source material
+  where material inputs match their declared types and representation, title and locator are not blank, and at least one of content or originals contains readable source material
   then
     create material with owner, scope, title, locator, content, originals, and origin
     returns material
