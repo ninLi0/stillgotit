@@ -1,3 +1,7 @@
+import { StudyPlanning } from "../src/concepts/StudyPlanning/StudyPlanning.ts";
+import { MasteryEstimating } from "../src/concepts/MasteryEstimating/MasteryEstimating.ts";
+import { AssessmentReviewing } from "../src/concepts/AssessmentReviewing/AssessmentReviewing.ts";
+import { GroundedTutoring } from "../src/concepts/GroundedTutoring/GroundedTutoring.ts";
 // The first five tests adapt ConceptBox's Registering tests. See THIRD_PARTY_NOTICES.md.
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
@@ -143,6 +147,10 @@ describe("Registering", () => {
       CommonsFederating: new FederatingConcept<User>(connection!.db, new MemoryProvider(), "CommonsFederating"),
       Sessioning: new SessioningConcept<User>(connection!.db),
       SkillMapping: await createSkillMapping(connection!.db),
+      AssessmentReviewing: new AssessmentReviewing(connection!.db),
+      MasteryEstimating: new MasteryEstimating(connection!.db),
+      StudyPlanning: new StudyPlanning(connection!.db),
+      GroundedTutoring: new GroundedTutoring(connection!.db),
     });
     try {
       const { Registering: accounts, SkillMapping: skills } = application.concepts;

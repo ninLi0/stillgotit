@@ -1,37 +1,35 @@
-# Lessons, practice, and submitted work
+# Learning flows
 
-[LearningContext](view:Learning.LearningContext) joins an owned confirmed skill, its current requirements, and its readable sources. Use the learner's materials first. If none are available, select and save a reputable reference before teaching. Free questions and study buttons use the same context.
+The frontend sends learner choices through the generated client. The session cookie supplies identity. Each flow reads owned state through declared views. Generated answers enter through Generating actions. File access and provider transport receive prepared values and cannot sequence domain actions.
 
-[OpenLesson](reaction:Learning.OpenLesson) requests a grounded explanation and calls `GroundedTutoring.explain` after checking its citations and current context. [OpenPractice](reaction:Learning.OpenPractice) requests a task with the saved demonstration requirements and calls `prepareTask`. A task can contain two fresh problems and reasoning questions. Changing only the numbers in a solved example does not establish freshness.
+[Read](reaction:Learning.Read) returns saved study data through the skill former. [Progress](reaction:Learning.Progress) returns estimates for the owned course. [Confidence](reaction:Learning.Confidence) creates one provisional track for the current requirements or returns the existing track. It never overwrites prior practice.
 
-[PracticeEligibility](view:Learning.PracticeEligibility) checks the current estimates for all direct and indirect prerequisites. Lessons remain available when a prerequisite needs work. Otherwise offer a short prerequisite check before practice. The full exam policy permits an explicit skip only for relevant exam work under a current urgent plan or proposal; a skip gives no mastery credit. The P2 daily-review flow has no automatic skip.
+[Lesson](reaction:Learning.Lesson) joins the skill to its owned sources, requests an explanation, rechecks the session and the original requirements, and saves the lesson. [Task](reaction:Learning.Task) also requires a mastery track and ready prerequisites. It requests the complete demonstration gate and rejects a repeated question. The provider does not assign a mastery score.
 
-[Respond](reaction:Learning.Respond) saves text, retained attachments, or a speech transcript through `GroundedTutoring.respond`. Lesson replies can use `answerLesson` immediately. [TutorReply](reaction:Learning.TutorReply) saves a response only while the session remains open and the request context still matches. In a CHECK task, neutral reasoning questions use `askFollowup`, and input questions use `clarifyInput`; neither may reveal a method or correction.
+[Respond](reaction:Learning.Respond) checks the current dialogue length, open session, and attachment ownership before saving learner work. [Question](reaction:Learning.Question) saves a lesson question and requests its answer in one flow. [Reply](reaction:Learning.Reply) retries an unanswered saved lesson question. [Hint](reaction:Learning.Hint) records requested help before contacting the provider, so a failed hint request cannot later be treated as independent work. [Transcript](reaction:Learning.Transcript) records corrections to an existing voice response.
 
-[Hint](reaction:Learning.Hint) records `requestHint` before requesting and saving `giveHint`. A hint remains in the attempt even if the learner later solves the problem. [CorrectTranscript](reaction:Learning.CorrectTranscript) uses `confirmTranscript` to append a correction. Ordinary lessons need no approval after each spoken message.
+[Assess](reaction:Learning.Assess) requires the learner to review the complete attempt and declare freshness and outside help. Confirmation triggers submission and closure. The endpoint waits for those actions, asks the provider to judge the saved original work, rechecks the session, and records the judgment. It waits for the resulting progress reactions before responding. A provider failure leaves a closed, unjudged case. [RetryAssessment](reaction:Learning.RetryAssessment) grades that saved case without changing its work, date, criteria, or identity. The UI reads completed judgments instead of submitting them again.
 
-## Confirm and assess
+[Correct](reaction:Learning.Correct) appends a manual revision based on the judgment the learner saw. [Regrade](reaction:Learning.Regrade) first saves the learner's clarification, requests another judgment of the original work, and appends a revision only if the expected judgment is still current. Both use the same evidence and planning reactions.
 
-[SubmitWork](reaction:Learning.SubmitWork) applies one review to the whole attempt:
+[Suggest](reaction:Learning.Suggest) requests editable skill suggestions from an owned course source. The learner must still save and confirm the selected skills.
 
-1. [ReviewedAttempt](view:Learning.ReviewedAttempt) checks ownership, task membership, OPEN status, completed uploads and transcription, at least one response, and no existing assessment case for the task.
-2. Under the learner's mutation lock, save any reviewed transcript corrections. Require the displayed dialogue length to match the latest dialogue. Call `confirmAttempt` for that exact version.
-3. Read `_review`, `_task`, `_session`, `_dialogue`, `_sources`, and `_citations`. Build an immutable response from those saved records. Use the task's topic, definition, question, criteria, and freshness. The browser cannot replace them.
-4. Derive assistance from recorded hints and declared outside help. Either makes help HINT; unknown assistance makes it UNKNOWN. A learner's report cannot erase a recorded hint. Neutral probes and input corrections do not count as help.
-5. Call `AssessmentReviewing.submit`, using the task identity as `sourceKey` and the server's submission time as `performedAt`.
-
-[CloseSubmittedTask](reaction:Learning.CloseSubmittedTask) follows a successful submission and calls `GroundedTutoring.close`. [AssessSubmittedWork](reaction:Learning.AssessSubmittedWork) requests assessment of the saved case, requirements, sources, and complete work. It then enters the [assessment result flow](progress.md).
-
-The case is the durable record of submission. All session mutation paths refuse further edits once a case exists, even if a failure left the tutoring session OPEN. On retry or restart, reuse the case and finish closing the session. Do not describe this multi-action sequence as one engine transaction. A failed AI request leaves the submitted work available for retry.
-
-[ReadSession](reaction:Learning.ReadSession) returns owned saved work through [SessionPage](former:Learning.SessionPage). [SessionChange](former:Learning.SessionChange) returns the result of lesson, response, correction, and hint operations. [Submission](former:Learning.Submission) returns the case and assessment state, including a pending or retryable result when grading has not finished.
+The host serializes mutation requests per learner for the single-process P2 app. Conditions observe state; the concepts enforce their own atomic constraints. Source-version checks are repeated after slow provider work. Failed causal work is reported rather than presenting an incomplete response as success.
 
 ```endpoints
-Learning.OpenLesson at /learning/lesson
-Learning.OpenPractice at /learning/practice
+Learning.Read at /learning/read
+Learning.Progress at /learning/progress
+Learning.Confidence at /learning/confidence
+Learning.Lesson at /learning/lesson
+Learning.Task at /learning/task
 Learning.Respond at /learning/respond
+Learning.Question at /learning/question
+Learning.Reply at /learning/reply
 Learning.Hint at /learning/hint
-Learning.CorrectTranscript at /learning/transcript
-Learning.SubmitWork at /learning/submit
-Learning.ReadSession at /learning/session
+Learning.Transcript at /learning/transcript
+Learning.Assess at /learning/assess
+Learning.RetryAssessment at /learning/retry
+Learning.Correct at /learning/correct
+Learning.Regrade at /learning/regrade
+Learning.Suggest at /courses/skills/suggest
 ```

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import type { Collection, Db } from "mongodb";
+import { isDeepStrictEqual } from "node:util";
+import { type Collection, type Db, MongoServerError } from "mongodb";
 
 export type User = string;
 export type Course = string;
@@ -40,6 +41,12 @@ interface VersionDocument {
   skill: Skill;
   outcome: string;
   gate: string;
+}
+
+interface ProposalDocument {
+  _id: string;
+  original: { unit: Unit; title: string; outcome: string; gate: string; materials: Material[] };
+  skill: Skill;
 }
 
 export class InvalidCourseTitleError extends Error {
@@ -84,6 +91,30 @@ export class InvalidSkillProposalError extends Error {
   constructor() {
     super("Enter a skill title, outcome, and demonstration requirements.");
     this.name = "InvalidSkillProposalError";
+  }
+}
+
+export class InvalidSkillProposalKeyError extends Error {
+  readonly code = "INVALID_SKILL_PROPOSAL_KEY";
+  constructor() {
+    super("Provide a nonblank proposal key of at most 100 characters.");
+    this.name = "InvalidSkillProposalKeyError";
+  }
+}
+
+export class SkillProposalConflictError extends Error {
+  readonly code = "SKILL_PROPOSAL_CONFLICT";
+  constructor() {
+    super("Use the original skill details when retrying this save.");
+    this.name = "SkillProposalConflictError";
+  }
+}
+
+export class SkillProposalDiscardedError extends Error {
+  readonly code = "SKILL_PROPOSAL_DISCARDED";
+  constructor() {
+    super("This draft was discarded. Create a new proposal to save it again.");
+    this.name = "SkillProposalDiscardedError";
   }
 }
 
@@ -270,12 +301,14 @@ export class SkillMapping {
     _materials: "many",
     _prerequisites: "many",
     _version: "optional",
+    _map: "one",
   } as const;
 
   private readonly courses: Collection<CourseDocument>;
   private readonly units: Collection<UnitDocument>;
   private readonly skills: Collection<SkillDocument>;
   private readonly versions: Collection<VersionDocument>;
+  private readonly proposals: Collection<ProposalDocument>;
 
   constructor(private readonly db: Db, instanceName = "SkillMapping") {
     // All collections and transaction sessions use this database's client.
@@ -283,6 +316,7 @@ export class SkillMapping {
     this.units = db.collection(`${instanceName}.units`);
     this.skills = db.collection(`${instanceName}.skills`);
     this.versions = db.collection(`${instanceName}.versions`);
+    this.proposals = db.collection(`${instanceName}.proposals`);
   }
 
   async createCourse({ owner, title }: { owner: User; title: string }): Promise<{
@@ -316,14 +350,18 @@ export class SkillMapping {
     return { unit };
   }
 
-  async propose({ owner, unit, title, outcome, gate, materials }: {
+  async propose({ owner, unit, proposalKey, title, outcome, gate, materials }: {
     owner: User;
     unit: Unit;
+    proposalKey: string;
     title: string;
     outcome: string;
     gate: string;
     materials: MaterialSet;
   }): Promise<{ skill: Skill }> {
+    // Freeze the set before any database wait. Its order is not part of the request.
+    const sourceReferences = [...new Set(materials)];
+    const original = { unit, title, outcome, gate, materials: [...sourceReferences].sort() };
     // A unit's course and a course's owner cannot change under this spec.
     const unitRecord = await this.units.findOne({ _id: unit });
     const ownedCourse = unitRecord
@@ -335,13 +373,25 @@ export class SkillMapping {
     if ([title, outcome, gate].some((text) => text.trim().length === 0)) {
       throw new InvalidSkillProposalError();
     }
+    if (typeof proposalKey !== "string" || !proposalKey.trim() || proposalKey.length > 100) {
+      throw new InvalidSkillProposalKeyError();
+    }
 
     const skill = randomUUID();
     const version = randomUUID();
-    const sourceReferences = [...new Set(materials)];
+    // Encoding a pair avoids ambiguous concatenation and gives MongoDB one unique key.
+    const receiptId = JSON.stringify([owner, proposalKey]);
 
-    return this.db.client.withSession((session) =>
+    const save = () => this.db.client.withSession((session) =>
       session.withTransaction(async () => {
+        const receipt = await this.proposals.findOne({ _id: receiptId }, { session });
+        if (receipt) {
+          if (!isDeepStrictEqual(receipt.original, original)) throw new SkillProposalConflictError();
+          if (!await this.skills.findOne({ _id: receipt.skill }, { session })) throw new SkillProposalDiscardedError();
+          return { skill: receipt.skill };
+        }
+        // The receipt, skill, and version commit together. Discard keeps the receipt.
+        await this.proposals.insertOne({ _id: receiptId, original, skill }, { session });
         await this.skills.insertOne({
           _id: skill,
           unit,
@@ -363,6 +413,15 @@ export class SkillMapping {
         writeConcern: { w: "majority", j: true },
       }),
     );
+    try {
+      return await save();
+    } catch (error) {
+      // A competing transaction can win the receipt key. Reread its committed result.
+      if (error instanceof MongoServerError && error.code === 11000 && error.keyValue?._id === receiptId) {
+        return save();
+      }
+      throw error;
+    }
   }
 
   async reviseDraft({ owner, skill, unit, title, outcome, gate, materials }: {
@@ -872,6 +931,17 @@ export class SkillMapping {
   > {
     const row = await this.versions.findOne({ _id: version });
     return row ? [{ skill: row.skill, outcome: row.outcome, gate: row.gate }] : [];
+  }
+
+  async _map({ course }: { course: Course }) {
+    const units = await this._units({ course });
+    const skills = (await Promise.all(units.map(async ({ unit }) => Promise.all((await this._skills({ unit })).map(async (skill) => {
+      const [definition] = await this._version({ version: skill.current });
+      return { ...skill, unit, course, outcome: definition?.outcome ?? "", gate: definition?.gate ?? "",
+        materials: (await this._materials({ skill: skill.skill })).map((row) => row.material),
+        prerequisites: (await this._prerequisites({ skill: skill.skill })).map((row) => row.prerequisite) };
+    }))))).flat();
+    return { skills };
   }
 }
 

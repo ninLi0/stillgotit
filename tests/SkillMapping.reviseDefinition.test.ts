@@ -41,7 +41,7 @@ async function makeDraft(concept = mapping) {
   const owner = randomUUID();
   const { course } = await concept.createCourse({ owner, title: "Linear Algebra" });
   const { unit } = await concept.addUnit({ owner, course, title: "Matrices" });
-  const { skill } = await concept.propose({ ...content, owner, unit });
+  const { skill } = await concept.propose({ proposalKey: crypto.randomUUID(), ...content, owner, unit });
   const [record] = await concept._skill({ skill });
   return { owner, course, unit, skill, current: record!.current };
 }
@@ -65,7 +65,7 @@ async function versionCount(skill: string, instanceName = "SkillMapping") {
 describe("SkillMapping requirements revision", () => {
   test.each(["outcome", "gate", "both"])("creates a new version when %s changes and preserves other state", async (field) => {
     const { owner, unit, skill, current } = await makeConfirmed();
-    const prerequisite = await mapping.propose({ ...content, owner, unit, title: "Read matrix dimensions" });
+    const prerequisite = await mapping.propose({ proposalKey: crypto.randomUUID(), ...content, owner, unit, title: "Read matrix dimensions" });
     await mapping.confirm({ owner, skill: prerequisite.skill });
     // Seed a valid prerequisite fixture only in this test DB.
     await connection!.db.collection<{ _id: string; prerequisites: string[] }>("SkillMapping.skills")

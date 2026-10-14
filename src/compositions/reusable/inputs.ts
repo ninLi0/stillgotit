@@ -1,4 +1,5 @@
 import type { EndpointValidator } from "@mit-sdg/sync-engine/boundary";
+import { isMediaList } from "../../concepts/GroundedTutoring/media.ts";
 
 /** ConceptBox's text-only boundary, with a bound on each submitted field. */
 export const textInput: EndpointValidator = (value) => {
@@ -42,3 +43,44 @@ export const errorOutput: EndpointValidator = (value) =>
   typeof value === "string" && value.length > 0 ? { ok: true } : { ok: false };
 
 export const validators = { input: textInput, output: recordOutput([]), domainError: errorOutput };
+
+export const structuredInput: EndpointValidator = (value) => ({ ok: typeof value === "object" && value !== null && !Array.isArray(value) });
+export const structuredOutput: EndpointValidator = structuredInput;
+
+export const proposalInput: EndpointValidator = (value) => {
+  if (!structuredInput(value).ok) return { ok: false };
+  const record = value as Record<string, unknown>;
+  return { ok: Object.entries(record).every(([key, field]) =>
+    (key === "session" && field === null) || (typeof field === "string" && field.length <= 16000)) &&
+    ["unit", "material", "title", "outcome", "gate"].every((key) => typeof record[key] === "string" && (record[key] as string).trim().length > 0) };
+};
+
+export const proposalSaveInput: EndpointValidator = (value) => {
+  const basic = proposalInput(value);
+  if (!basic.ok) return basic;
+  const key = (value as Record<string, unknown>).proposalKey;
+  return typeof key === "string" && key.trim().length > 0 && key.length <= 100
+    ? { ok: true }
+    : { ok: false, detail: "Provide the original request key when saving a skill draft." };
+};
+
+export const materialInput: EndpointValidator = (value) => {
+  if (!structuredInput(value).ok) return { ok: false };
+  const record = value as Record<string, unknown>;
+  return { ok: ["course", "importKey", "title", "locator"].every((key) => typeof record[key] === "string" && (record[key] as string).trim().length > 0) &&
+    (record.session === null || typeof record.session === "string") && typeof record.content === "string" && record.content.length <= 500000 &&
+    isMediaList(record.originals) && (record.origin === "COURSE" || record.origin === "REFERENCE") };
+};
+
+/** JSON commands carry learner input only. Definitions and provider output are server-owned. */
+export const learningInput: EndpointValidator = (value) => {
+  if (!structuredInput(value).ok) return { ok: false };
+  const record = value as Record<string, unknown>;
+  const numeric = new Set(["confidence", "dialogueLength", "turnIndex", "dailyMinutes", "actualMinutes"]);
+  const flags = new Set(["reviewed", "unseen", "outsideHelp", "gateMet"]);
+  const ok = Object.entries(record).every(([key, field]) => key === "session" ? field === null || typeof field === "string"
+    : numeric.has(key) ? typeof field === "number" && Number.isFinite(field) && field >= 0
+    : flags.has(key) ? typeof field === "boolean"
+    : typeof field === "string" && field.length <= (key === "text" || key === "request" || key === "reason" ? 12000 : 300));
+  return ok ? { ok: true } : { ok: false, detail: "Check the supplied text, numbers, and review choices." };
+};

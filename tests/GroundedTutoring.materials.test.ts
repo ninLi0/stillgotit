@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { MongoError, MongoServerError } from "mongodb";
 import {
-  GroundedTutoring, InvalidTutoringMaterial, type Material, type MaterialData,
+  GroundedTutoring, InvalidTutoringMaterial, type Material, type MaterialData, type MaterialImport,
 } from "../src/concepts/GroundedTutoring/GroundedTutoring.ts";
 import type { MediaValue } from "../src/concepts/GroundedTutoring/media.ts";
 import { connectMongo, localMongoUri } from "../src/storage/mongo.ts";
@@ -29,13 +29,16 @@ function setup() {
   };
 }
 
-function request(overrides: Partial<MaterialData> = {}): MaterialData {
+function request(overrides: Partial<MaterialImport> = {}): MaterialImport {
   return {
+    importKey: randomUUID(),
     owner: "learner-sam", scope: "course-linear-algebra", title: "Matrix multiplication",
     locator: "source:matrix-lesson", content: "Each product entry combines a row with a column.",
     originals: [], origin: "COURSE", ...overrides,
   };
 }
+
+function materialData({ importKey: _, ...data }: MaterialImport): MaterialData { return data; }
 
 // Metadata fixtures only. File extraction and byte access are outside this concept step.
 function source(): MediaValue {
@@ -57,7 +60,7 @@ describe("GroundedTutoring material storage", () => {
     expect(Object.keys(result)).toEqual(["material"]);
     expect(result.material).toMatch(/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/);
     expect(await records.findOne({ _id: result.material })).toEqual({ _id: result.material, ...input });
-    expect(await tutoring._material(result)).toEqual([input]);
+    expect(await tutoring._material(result)).toEqual([materialData(input)]);
     expect(await tutoring._materials(input)).toEqual([{
       material: result.material, title: input.title, locator: input.locator, origin: input.origin,
     }]);
@@ -72,7 +75,7 @@ describe("GroundedTutoring material storage", () => {
     };
     const input = request({ content: "", originals: [source(), lecture], origin: "REFERENCE" });
     const saved = await tutoring.addMaterial(input);
-    expect(await tutoring._material(saved)).toEqual([input]);
+    expect(await tutoring._material(saved)).toEqual([materialData(input)]);
   });
 
   test("accepts a retained image as readable material without requiring extracted text", async () => {
@@ -83,7 +86,7 @@ describe("GroundedTutoring material storage", () => {
       limitations: [],
     };
     const input = request({ content: " \n", originals: [image] });
-    expect(await tutoring._material(await tutoring.addMaterial(input))).toEqual([input]);
+    expect(await tutoring._material(await tutoring.addMaterial(input))).toEqual([materialData(input)]);
   });
 
   test("preserves unreadable originals and their limits when another source provides readable content", async () => {
@@ -93,9 +96,9 @@ describe("GroundedTutoring material storage", () => {
       renditions: [], limitations: ["The appendix is encrypted and was not read."],
     };
     const input = request({ content: "", originals: [unreadable, source()] });
-    expect(await tutoring._material(await tutoring.addMaterial(input))).toEqual([input]);
+    expect(await tutoring._material(await tutoring.addMaterial(input))).toEqual([materialData(input)]);
     const textOnly = request({ originals: [unreadable] });
-    expect(await tutoring._material(await tutoring.addMaterial(textOnly))).toEqual([textOnly]);
+    expect(await tutoring._material(await tutoring.addMaterial(textOnly))).toEqual([materialData(textOnly)]);
   });
 
   test("refuses blank fields and unreadable material before creating a collection", async () => {
@@ -134,7 +137,7 @@ describe("GroundedTutoring material storage", () => {
       ].map((item) => ({ ...request(), originals: [item] })),
     ];
     for (const input of malformed) {
-      await expect(tutoring.addMaterial(input as MaterialData)).rejects.toBeInstanceOf(InvalidTutoringMaterial);
+      await expect(tutoring.addMaterial(input as MaterialImport)).rejects.toBeInstanceOf(InvalidTutoringMaterial);
     }
     expect(await records.countDocuments()).toBe(0);
   });
@@ -149,15 +152,17 @@ describe("GroundedTutoring material storage", () => {
     const expected = structuredClone(input);
     const pending = tutoring.addMaterial(input);
     input.title = "Changed while waiting";
+    input.importKey = "changed-while-waiting";
     original.renditions[0]!.text = "Changed text";
     original.limitations.push("Changed limitation");
     input.originals.push(original);
     const saved = await pending;
-    expect(await tutoring._material(saved)).toEqual([expected]);
+    expect(await tutoring._material(saved)).toEqual([materialData(expected)]);
+    expect(await tutoring.addMaterial(expected)).toEqual(saved);
     const [read] = await tutoring._material(saved);
     read!.title = "Changed query result";
     (read!.originals[0]!.limitations as string[]).push("Changed query result");
-    expect(await tutoring._material(saved)).toEqual([expected]);
+    expect(await tutoring._material(saved)).toEqual([materialData(expected)]);
   });
 
   test("lists only the requested owner and scope, in ID order, without content or originals", async () => {
@@ -186,17 +191,17 @@ describe("GroundedTutoring material storage", () => {
     expect(await connection!.db.listCollections({ name: collectionName }).toArray()).toEqual([]);
   });
 
-  test("new calls get new IDs; a changed source keeps the earlier material readable", async () => {
+  test("new import keys get new IDs; a changed source keeps the earlier material readable", async () => {
     const { tutoring } = setup();
     const input = request({ originals: [source()] });
     const first = await tutoring.addMaterial(input);
-    const duplicate = await tutoring.addMaterial(input);
-    const revision = request({ ...input, content: "A revised explanation." });
+    const duplicate = await tutoring.addMaterial({ ...input, importKey: randomUUID() });
+    const revision = request({ ...input, importKey: randomUUID(), content: "A revised explanation." });
     const second = await tutoring.addMaterial(revision);
     expect(new Set([first.material, duplicate.material, second.material]).size).toBe(3);
-    expect(await tutoring._material(first)).toEqual([input]);
-    expect(await tutoring._material(duplicate)).toEqual([input]);
-    expect(await tutoring._material(second)).toEqual([revision]);
+    expect(await tutoring._material(first)).toEqual([materialData(input)]);
+    expect(await tutoring._material(duplicate)).toEqual([materialData(input)]);
+    expect(await tutoring._material(second)).toEqual([materialData(revision)]);
   });
 
   test("a rejected insert saves no partial material, stays a database error, and allows a later valid write", async () => {
@@ -207,7 +212,7 @@ describe("GroundedTutoring material storage", () => {
     await expect(failed).rejects.toMatchObject({ code: 121 });
     expect(await records.countDocuments()).toBe(0);
     const input = request();
-    expect(await tutoring._material(await tutoring.addMaterial(input))).toEqual([input]);
+    expect(await tutoring._material(await tutoring.addMaterial(input))).toEqual([materialData(input)]);
   });
 
   test("query failures remain errors instead of being reported as empty lists", async () => {
@@ -234,7 +239,7 @@ describe("GroundedTutoring material storage", () => {
       new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited,
     ]);
     expect({ exitCode, errors }).toEqual({ exitCode: 0, errors: "" });
-    expect(JSON.parse(output)).toEqual({ saved: input, materials: [{
+    expect(JSON.parse(output)).toEqual({ saved: materialData(input), materials: [{
       ...saved, title: input.title, locator: input.locator, origin: input.origin,
     }] });
     const separate = new GroundedTutoring(connection!.db, `${name}_other`);

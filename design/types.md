@@ -40,7 +40,7 @@ instantiate StudyPlanning with
   Definition is SkillMapping.Version
 ```
 
-These are eight planned application instances: five learning concepts and three account concepts. Learners and courses are records in their state; creating a course does not create another engine instance. The current implementation stage selects only the instances whose code is ready.
+This original domain inventory has eight application instances: five learning concepts and three account concepts. Learners and courses are records in their state; creating a course does not create another engine instance. The current P2 inventory is in stages/materials.md. It also binds the stateless TutorGenerating provider adapter.
 
 The practice-task binding requires membership in `GroundedTutoring.PracticeSessions`. Its actions take the parent `Session` type, so the application must check task membership before submitting an assessment. A lesson cannot serve as an assessed task.
 

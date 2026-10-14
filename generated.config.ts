@@ -1,3 +1,7 @@
+import { StudyPlanning } from "./src/concepts/StudyPlanning/StudyPlanning.ts";
+import { MasteryEstimating } from "./src/concepts/MasteryEstimating/MasteryEstimating.ts";
+import { AssessmentReviewing } from "./src/concepts/AssessmentReviewing/AssessmentReviewing.ts";
+import { GroundedTutoring } from "./src/concepts/GroundedTutoring/GroundedTutoring.ts";
 import { MongoClient } from "mongodb";
 import { httpWire } from "@mit-sdg/sync-engine-http/tooling";
 import { assembleApplication } from "./src/assembly.ts";
@@ -20,6 +24,10 @@ function assembleForChecks() {
     ),
     Sessioning: new SessioningConcept<User>(client.db("stillgotit_spec_check")),
     SkillMapping: new SkillMapping(client.db("stillgotit_spec_check")),
+    AssessmentReviewing: new AssessmentReviewing(client.db("stillgotit_spec_check")),
+    MasteryEstimating: new MasteryEstimating(client.db("stillgotit_spec_check")),
+    StudyPlanning: new StudyPlanning(client.db("stillgotit_spec_check")),
+    GroundedTutoring: new GroundedTutoring(client.db("stillgotit_spec_check")),
   });
 }
 
@@ -30,6 +38,7 @@ export default {
   projections: [httpWire({ policy: stillGotItPolicy("http://localhost:5173"), name: "StillGotItHttp" })],
   design: {
     version: 1,
-    documents: [new URL("./design/stages/onboarding.md", import.meta.url)],
+    documents: [new URL("./design/stages/materials.md", import.meta.url),
+      ...["courses", "learning", "learning-reads", "progress", "planning", "learning-computations", "learning-access"].map((name) => new URL(`./design/compositions/${name}.md`, import.meta.url))],
   },
 };

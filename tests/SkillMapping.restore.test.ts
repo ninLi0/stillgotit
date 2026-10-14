@@ -44,7 +44,7 @@ async function makeCourse(concept = mapping, owner = randomUUID()) {
 }
 
 async function makeSkill(owner: string, unit: string, concept = mapping) {
-  const { skill } = await concept.propose({ ...content, owner, unit });
+  const { skill } = await concept.propose({ proposalKey: crypto.randomUUID(), ...content, owner, unit });
   await concept.confirm({ owner, skill });
   const [record] = await concept._skill({ skill });
   return { skill, current: record!.current };
@@ -119,7 +119,7 @@ describe("SkillMapping restore", () => {
     await mapping.setPrerequisites({ owner, skill: archived.skill, prerequisites: [foundation.skill] });
     await mapping.archive({ owner, skill: archived.skill });
     await mapping.archive({ owner, skill: foundation.skill });
-    const draft = await mapping.propose({ ...content, owner, unit });
+    const draft = await mapping.propose({ proposalKey: crypto.randomUUID(), ...content, owner, unit });
     const confirmed = await makeSkill(owner, unit);
     const restored = await makeSkill(owner, unit);
     await mapping.archive({ owner, skill: restored.skill });
@@ -178,7 +178,7 @@ describe("SkillMapping restore", () => {
     const { owner, unit } = await makeCourse();
     const target = await makeSkill(owner, unit);
     const valid = await makeSkill(owner, unit);
-    const draft = await mapping.propose({ ...content, owner, unit });
+    const draft = await mapping.propose({ proposalKey: crypto.randomUUID(), ...content, owner, unit });
     const ownOtherCourse = await makeCourse(mapping, owner);
     const ownOtherSkill = await makeSkill(owner, ownOtherCourse.unit);
     const foreign = await makeCourse();

@@ -37,8 +37,16 @@ opaque PassageRef
   An immutable Material identity and a location within that material. Locations may identify pages, paragraphs, slides, cells, image regions, code lines, notebook cells, or audio timestamps.
 opaque PassageSet
   A finite set of PassageRef values, with no duplicates or ordering.
+opaque AttemptDeclaration
+  The dialogue length reviewed by the learner, whether the exact problems are new, and whether the learner used outside help.
 opaque DialogueTurn
   An immutable value containing speaker, purpose, text, media, channel, citations, server time, and an optional correction target. Purposes are RESPONSE, EXPLANATION, PROBE, CLARIFICATION, HINT, or CORRECTION. A correction targets an original learner voice response by its dialogue index.
+opaque SourceRecords
+  Owned materials with their source content and retained files.
+opaque StudyRecords
+  Sessions with their lessons or tasks, dialogue, effective voice transcripts, and review state.
+opaque StudyRecord
+  One session with its lessons or task, dialogue, effective voice transcripts, and review state.
 ```
 
 ## State
@@ -46,6 +54,7 @@ opaque DialogueTurn
 ```state
 a set of Materials with
   an owner Learner
+  an optional importKey String
   a scope Scope
   a title String
   a locator String
@@ -60,6 +69,7 @@ a set of Sessions with
   a citations set of PassageRef
   a dialogue seq of DialogueTurn
   a checkedVoiceTurns set of Number
+  an optional attemptReview AttemptDeclaration
   a status SessionStatus
 a set of Lesson Sessions with
   a request String
@@ -76,6 +86,8 @@ Rule: source rules require a nonempty set of existing materials, all owned by th
 Rule: material records, session sources, topic, definition, and opening content never change. Source edits produce a new Material. Dialogue is append-only while OPEN. CLOSED sessions cannot change.
 Rule: materials contain readable text or readable retained media. Their file references preserve extraction limitations. Unreadable uploads do not become teaching material.
 Rule: material inputs match their declared types and the material data representation. References are nonblank strings. Malformed material inputs are refused before any state change.
+Rule: every new material has a nonblank importKey supplied by the host. Only materials saved before import keys were introduced may lack one. Each (owner, importKey) pair identifies at most one material. The key grants no access and is not returned by material queries.
+Rule: a retry compares scope, title, locator, content, originals, and origin with the saved material. Strings compare exactly, including case and whitespace. List order matters; record field order does not. A matching retry returns the saved material without changing it. Changed input needs a new key and creates a new material. A key belonging to another owner does not recover that owner's material.
 Rule: dialogue indices are zero-based and remain stable. checkedVoiceTurns contains only indices of learner RESPONSE turns with channel VOICE. The effective transcript is the latest CORRECTION for that response, or its original text when there is no correction.
 Rule: ordinary lessons need no transcript confirmation. Assessment requires every voice response in the task to have its effective transcript confirmed. Closing a session alone does not submit work for assessment.
 Rule: a PROBE asks for reasoning without correctness feedback, correction, or a solution method. A CLARIFICATION resolves input without solution content. Help that reveals a method or correction is a HINT, even when phrased as a question.
@@ -88,13 +100,22 @@ Rule: blank text is empty or contains only whitespace. New identities are unique
 ## Actions
 
 ```actions
-addMaterial(owner: Learner, scope: Scope, title: String, locator: String, content: String, originals: MediaList, origin: MaterialOrigin) : returns (material: Material)
-  where material inputs do not match their declared types or representation, title or locator is blank, or neither content nor originals contains readable source material
+addMaterial(owner: Learner, importKey: String, scope: Scope, title: String, locator: String, content: String, originals: MediaList, origin: MaterialOrigin) : returns (material: Material)
+  where owner, scope, title, locator, content, originals, or origin does not match its declared type or representation, title or locator is blank, or neither content nor originals contains readable source material
   then
     refuses INVALID_TUTORING_MATERIAL "Provide a title, source location, and readable material."
-  where material inputs match their declared types and representation, title and locator are not blank, and at least one of content or originals contains readable source material
+  where material fields are valid and importKey is not a nonblank string
   then
-    create material with owner, scope, title, locator, content, originals, and origin
+    refuses INVALID_MATERIAL_IMPORT_KEY "Provide a nonblank import key."
+  where material fields and importKey are valid, owner has a material with importKey, and any supplied material field differs from that material
+  then
+    refuses MATERIAL_IMPORT_CONFLICT "Use the original material input for this import key."
+  where material fields and importKey are valid, owner has a material with importKey, and every supplied material field matches that material
+  then
+    returns material
+  where material fields and importKey are valid and owner has no material with importKey
+  then
+    create material with owner, importKey, scope, title, locator, content, originals, and origin together
     returns material
 
 explain(owner: Learner, topic: Topic, definition: Definition, request: String, explanation: String, materials: MaterialSet, citations: PassageSet) : returns (lesson: Session)
@@ -210,7 +231,7 @@ confirmTranscript(owner: Learner, session: Session, turnIndex: Number, text: Str
     add turnIndex to checkedVoiceTurns
     returns
 
-confirmAttempt(owner: Learner, task: Session, dialogueLength: Number) : returns ()
+confirmAttempt(owner: Learner, task: Session, dialogueLength: Number, unseen?: Flag, outsideHelp?: Flag) : returns ()
   where task is not owner's open task
   then
     refuses ATTEMPT_REVIEW_UNAVAILABLE "Choose one of your open practice tasks."
@@ -220,6 +241,7 @@ confirmAttempt(owner: Learner, task: Session, dialogueLength: Number) : returns 
   where task is owner's open task and dialogueLength equals the current dialogue length
   then
     add every original learner voice response index to checkedVoiceTurns, confirming its current effective transcript
+    when unseen and outsideHelp are both supplied, save them with the reviewed dialogue length as the learner's declaration
     returns
 
 close(owner: Learner, session: Session) : returns ()
@@ -267,4 +289,13 @@ _voiceResponses(session: Session) : many (turnIndex: Number, text: String, confi
 
 _review(task: Session) : optional (dialogueLength: Number, uncheckedVoiceCount: Number, ready: Flag)
   Returns the dialogue length and number of unchecked voice responses. ready is true only for an OPEN task with at least one learner response and no unchecked voice responses. Returns no row for an unknown session or a lesson. This query does not judge correctness or source quality.
+
+_sourceSet(owner: Learner, scope: Scope) : one (sources: SourceRecords)
+  Returns only this owner's sources in scope, or an empty list.
+
+_study(owner: Learner, topic: Topic) : one (sessions: StudyRecords)
+  Returns this owner's sessions for topic, with their own saved dialogue and review state, or an empty list.
+
+_sessionData(session: Session) : optional (data: StudyRecord)
+  Returns the session and its own dialogue, source identities, and review state. Returns no row for an unknown session. The application checks ownership.
 ```

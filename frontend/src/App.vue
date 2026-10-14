@@ -2,6 +2,8 @@
 import { onMounted, ref } from "vue";
 import { api, errorMessage, type Course } from "./api.ts";
 import TreeMark from "./TreeMark.vue";
+import CourseWorkspace from "./CourseWorkspace.vue";
+import { hostRequest } from "./host-api.ts";
 
 const loading = ref(true), busy = ref(false), choosing = ref(false), canResume = ref(false);
 const username = ref<string | null>(null), chosenName = ref("");
@@ -78,6 +80,14 @@ async function signOut() {
 async function reload() { busy.value = true; error.value = ""; await loadAccount(); busy.value = false; }
 
 onMounted(async () => {
+  if (window.location.pathname === "/auth/chatgpt/complete") {
+    const failed = new URLSearchParams(window.location.search).has("error");
+    window.history.replaceState(null, "", "/");
+    try {
+      if (failed) throw new Error("ChatGPT connection was not completed. Try again.");
+      await hostRequest("/ai/connect/finish"); notice.value = "ChatGPT connected.";
+    } catch (problem) { error.value = problem instanceof Error ? problem.message : "ChatGPT connection failed."; }
+  }
   const callback = window.location.pathname === "/auth/commons/callback";
   const params = new URLSearchParams(window.location.search);
   const code = params.get("code"), state = params.get("state");
@@ -98,17 +108,17 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="shell">
+  <div class="shell" :class="{ 'app-shell': username && courses.length }">
     <header class="header">
       <a class="wordmark" href="/" aria-label="StillGotIt home"><span class="mark" aria-hidden="true">✳</span> StillGotIt</a>
       <div v-if="username" class="account"><span>{{ username }}</span><button class="quiet" :disabled="busy" @click="signOut">Sign out</button></div>
       <span v-else class="header-note">Keep what you learn.</span>
     </header>
 
-    <main :aria-busy="loading || busy">
+    <main :class="{ 'course-main': username && courses.length }" :aria-busy="loading || busy">
       <p v-if="loading" class="loading" role="status">Opening your study space…</p>
-      <div v-else class="workspace">
-        <section class="task" aria-labelledby="page-title">
+      <div v-else class="workspace" :class="{ 'course-mode': username && courses.length }">
+        <section class="task" :aria-labelledby="username && courses.length ? undefined : 'page-title'">
           <template v-if="!username && !choosing">
             <p class="context">Your study space</p>
             <h1 id="page-title">A place for<br />what you learn.</h1>
@@ -143,24 +153,19 @@ onMounted(async () => {
           </template>
 
           <template v-else>
-            <p class="context">Your course</p>
-            <h1 id="page-title" class="course-title">{{ courses[0]!.title }}</h1>
-            <div class="saved-state"><span class="saved-dot" aria-hidden="true"></span> Saved to your study space</div>
-            <p class="intro">Your course is ready. Its skills will appear here as you add learning material.</p>
-            <div class="empty-state"><span class="empty-count">0</span><div><strong>Skills added</strong><p>No skills or mastery estimates yet.</p></div></div>
-            <button class="quiet" :disabled="busy" @click="reload">Refresh saved course</button>
+            <CourseWorkspace :course="courses[0]!" />
           </template>
 
           <div v-if="error" class="error" role="alert"><p>{{ error }}</p><button v-if="username" class="quiet" :disabled="busy" @click="reload">Reload saved work</button></div>
-          <p v-if="notice" class="notice" role="status">{{ notice }}</p>
+          <p v-if="notice && !courses.length" class="notice" role="status">{{ notice }}</p>
         </section>
 
-        <figure class="tree-panel">
+        <figure v-if="!username || !courses.length" class="tree-panel">
           <div class="tree-drawing"><TreeMark /></div>
           <figcaption>{{ username && courses.length ? 'Room for your next skill.' : 'Understanding takes root.' }}</figcaption>
         </figure>
       </div>
     </main>
-    <footer>StillGotIt <span>Learn. Practice. Return.</span></footer>
+    <footer v-if="!username || !courses.length">StillGotIt <span>Learn. Practice. Return.</span></footer>
   </div>
 </template>

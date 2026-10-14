@@ -1,3 +1,7 @@
+import { StudyPlanning } from "../src/concepts/StudyPlanning/StudyPlanning.ts";
+import { MasteryEstimating } from "../src/concepts/MasteryEstimating/MasteryEstimating.ts";
+import { AssessmentReviewing } from "../src/concepts/AssessmentReviewing/AssessmentReviewing.ts";
+import { GroundedTutoring } from "../src/concepts/GroundedTutoring/GroundedTutoring.ts";
 import { afterAll, beforeAll, describe, expect, spyOn, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import { Collection, type Document, type Filter } from "mongodb";
@@ -292,6 +296,10 @@ describe("Registering recovery", () => {
       CommonsFederating: new FederatingConcept<User>(connection!.db, new MemoryProvider(), name),
       Sessioning: new SessioningConcept<User>(connection!.db, name),
       SkillMapping: await createSkillMapping(connection!.db, name),
+      AssessmentReviewing: new AssessmentReviewing(connection!.db),
+      MasteryEstimating: new MasteryEstimating(connection!.db),
+      StudyPlanning: new StudyPlanning(connection!.db),
+      GroundedTutoring: new GroundedTutoring(connection!.db, name),
     });
     try {
       const accounts = application.concepts.Registering;

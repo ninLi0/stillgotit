@@ -41,7 +41,7 @@ async function makeDraft(concept = mapping) {
   const owner = randomUUID();
   const { course } = await concept.createCourse({ owner, title: "Linear Algebra" });
   const { unit } = await concept.addUnit({ owner, course, title: "Matrices" });
-  const { skill } = await concept.propose({ ...content, owner, unit });
+  const { skill } = await concept.propose({ proposalKey: crypto.randomUUID(), ...content, owner, unit });
   const [record] = await concept._skill({ skill });
   return { owner, course, unit, skill, current: record!.current };
 }
@@ -65,8 +65,8 @@ describe("SkillMapping confirmed skill details", () => {
     await mapping.confirm({ owner, skill });
     const [record] = await mapping._skill({ skill });
     const target = await mapping.addUnit({ owner, course, title: "Matrix operations" });
-    const prerequisite = await mapping.propose({ ...content, owner, unit: target.unit, title: "Read matrix dimensions" });
-    const dependent = await mapping.propose({ ...content, owner, unit, title: "Compose linear maps" });
+    const prerequisite = await mapping.propose({ proposalKey: crypto.randomUUID(), ...content, owner, unit: target.unit, title: "Read matrix dimensions" });
+    const dependent = await mapping.propose({ proposalKey: crypto.randomUUID(), ...content, owner, unit, title: "Compose linear maps" });
     await mapping.confirm({ owner, skill: prerequisite.skill });
     await mapping.confirm({ owner, skill: dependent.skill });
     // Seed valid prerequisite fixtures only in this test DB.

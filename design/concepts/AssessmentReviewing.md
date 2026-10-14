@@ -29,6 +29,10 @@ opaque ResponseValue
   An immutable copy of reviewed work: text, confirmed speech transcripts, retained attachment references, and the ordered conversation with its corrections and hints. Attachments preserve their readable content, source locations, and extraction limits. The record includes source references and the reviewed dialogue length when available. It excludes temporary microphone recordings.
 opaque ClarificationValue
   Text and optional retained attachments that explain the original work. A clearer image or correction of a transcription error may clarify that work. A changed solution or new answer is not a clarification.
+opaque CaseRecords
+  Cases with original work, clarifications, judgment history, and effective judgment.
+opaque CaseRecord
+  One case with original work, clarifications, judgment history, and effective judgment.
 ```
 
 ## State
@@ -171,4 +175,13 @@ _judgment(judgment: Judgment) : optional (case: Case, revision: Number, result: 
 
 _effectiveJudgment(case: Case) : optional (judgment: Judgment, revision: Number, result: Result, gateMet: Flag, rationale: String, origin: Origin, recordedAt: DateTime)
   Returns the judgment with the highest revision for the case. Returns no row for an unknown case or one that has not been assessed.
+
+_byTask(author: Author, task: Task) : optional (case: Case)
+  Returns the author's saved case for the task, or no row. The submission flow uses this to recover an already-saved attempt after an interrupted reply.
+
+_history(author: Author, subject: Subject) : one (cases: CaseRecords)
+  Returns this author's cases for the subject in performedAt order, or an empty list. Reads only assessment state.
+
+_caseData(case: Case) : optional (data: CaseRecord)
+  Returns this case with its original work and judgment history. Returns no row for an unknown case. The application checks ownership.
 ```

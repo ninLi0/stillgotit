@@ -18,7 +18,7 @@ try {
   async function ensureSkill(title: string, outcome: string, gate: string) {
     let saved = (await mapping._skills({ unit: unit!.unit })).find((record) => record.title === title);
     if (!saved) {
-      const { skill } = await mapping.propose({
+      const { skill } = await mapping.propose({ proposalKey: crypto.randomUUID(),
         owner, unit: unit!.unit, title, outcome, gate,
         // Placeholder identity for the concept demo. No file has been imported.
         materials: ["demo-material-prerequisites"],

@@ -42,7 +42,7 @@ async function makeDraft(concept = mapping, materials = content.materials) {
   const owner = randomUUID();
   const { course } = await concept.createCourse({ owner, title: "Linear Algebra" });
   const { unit } = await concept.addUnit({ owner, course, title: "Matrices" });
-  const { skill } = await concept.propose({ ...content, owner, unit, materials });
+  const { skill } = await concept.propose({ proposalKey: crypto.randomUUID(), ...content, owner, unit, materials });
   const [record] = await concept._skill({ skill });
   return { owner, course, unit, skill, current: record!.current };
 }
@@ -58,7 +58,7 @@ describe("SkillMapping confirmation", () => {
     const { owner, unit, skill, current } = await makeDraft();
     await mapping.reviseDraft({ ...content, owner, unit, skill, gate: "Explain incompatible dimensions." });
     const [draft] = await mapping._skill({ skill });
-    await mapping.propose({ ...content, owner, unit });
+    await mapping.propose({ proposalKey: crypto.randomUUID(), ...content, owner, unit });
     await makeDraft();
     const before = await savedState();
 

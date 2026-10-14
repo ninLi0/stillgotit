@@ -15,6 +15,9 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid 
 main { flex: 1; display: grid; align-items: center; padding: 46px 0 64px; }
 .workspace { display: grid; grid-template-columns: 1.05fr 1fr; gap: 58px; align-items: center; }
 .task { max-width: 490px; padding: 20px 0; }
+.workspace.course-mode { display: block; width: 100%; }
+.course-mode .task { max-width: none; }
+.app-shell{max-width:1440px;padding:0 42px}.app-shell .header{min-height:70px}.course-main{display:block;padding:0}.course-mode .task{padding:0}.app-shell .wordmark{font-size:20px}.app-shell .account{font-size:12px}.app-shell .account .quiet{font-size:12px}
 .context { margin: 0 0 20px; font-size: 15px; color: #676767; }
 h1 { margin: 0 0 24px; font-family: Georgia, "Times New Roman", serif; font-size: clamp(36px, 4.1vw, 57px); font-weight: 400; letter-spacing: -1.8px; line-height: 1.14; text-wrap: balance; }
 .course-title { overflow-wrap: anywhere; }
@@ -47,3 +50,4 @@ footer { border-top: 1px solid #e7e7e7; padding: 22px 0; display: flex; justify-
 @media (max-width: 850px) { .shell { padding: 0 30px; } .workspace { gap: 30px; } .tree-panel { min-height: 450px; } h1 { font-size: 40px; } }
 @media (max-width: 620px) { .shell { padding: 0 24px; } .header { min-height: 82px; } .header-note { display: none; } .account { gap: 12px; } .workspace { grid-template-columns: 1fr; gap: 30px; } main { padding: 22px 0 38px; } .task { max-width: 100%; } h1 { font-size: 39px; letter-spacing: -1.1px; } .tree-panel { min-height: 320px; padding: 12px 20px 22px; border-radius: 42% 42% 8px 8px; } .tree-drawing { width: 225px; } .intro { margin-bottom: 26px; } }
 @media (prefers-reduced-motion: no-preference) { .primary { transition: background-color 120ms; } }
+@media(max-width:650px){.app-shell{padding:0 18px}.app-shell .header{min-height:62px}.course-main{padding:0}.app-shell .wordmark{font-size:18px}}

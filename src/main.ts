@@ -2,6 +2,7 @@ import { CommonsProvider } from "./concepts/Federating/provider.ts";
 import { createRuntime } from "./host/runtime.ts";
 import { serveSite } from "./host/site.ts";
 import { connectMongo } from "./storage/mongo.ts";
+import { UPLOAD_LIMIT } from "./host/material-files.ts";
 
 const port = Number(process.env.PORT ?? 5173);
 const publicOrigin = new URL(process.env.APP_ORIGIN ?? `http://localhost:${port}`).origin;
@@ -14,7 +15,7 @@ try {
     provider: new CommonsProvider({ origin: providerOrigin, app: publicOrigin }),
   });
   const server = Bun.serve({
-    port, hostname: "127.0.0.1", maxRequestBodySize: 16_384,
+    port, hostname: "127.0.0.1", maxRequestBodySize: UPLOAD_LIMIT + 1024 * 1024,
     fetch: serveSite({ api: runtime.handle, directory: `${import.meta.dir}/../frontend/dist` }),
   });
   console.log(`StillGotIt is ready at ${publicOrigin}`);

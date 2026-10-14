@@ -25,6 +25,8 @@ StartingBasis is SELF_REPORTED or PREVIOUS_DEFINITION
   Whether starting confidence comes from the learner's report or the estimate for earlier requirements.
 opaque EstimateExplanation
   A computed explanation containing the policy version, starting confidence and basis, replay start, included evidence identities and revisions, ignored inputs and their reasons, ordered score changes, final estimate, and reasons for prerequisite readiness. Each change identifies its time and source, the values before and after it, and any time decay. It is a query result, not stored assessment history.
+opaque ProgressRows
+  A learner's tracks with effective inputs and current estimates.
 ```
 
 ## State
@@ -145,4 +147,7 @@ _estimate(learner: Learner, subject: Subject, definition: Definition, at: DateTi
 
 _explanation(learner: Learner, subject: Subject, definition: Definition, at: DateTime) : optional (explanation: EstimateExplanation)
   Returns the detailed replay used by _estimate for the same inputs, including reasons for ignored evidence and the readiness decision. Returns no row if the track is absent or at precedes initializedAt. The computation uses the current effective revisions even when at is in the past.
+
+_progress(learner: Learner) : one (tracks: ProgressRows)
+  Returns only this learner's tracks, effective inputs, and estimates at the live concept clock, or an empty list. Reads no other concept.
 ```

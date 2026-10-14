@@ -27,7 +27,7 @@ try {
     (record) => record.title === originalTitle,
   );
   if (!saved) {
-    const { skill } = await mapping.propose({
+    const { skill } = await mapping.propose({ proposalKey: crypto.randomUUID(),
       owner,
       unit: sourceUnit.unit,
       title: originalTitle,

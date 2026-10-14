@@ -3,7 +3,7 @@ import type { StillGotItHttp } from "../../generated/wire.ts";
 
 // The host supplies this field. All other types come from the generated HTTP contract.
 type BrowserWire = {
-  [Path in keyof StillGotItHttp]: Omit<StillGotItHttp[Path], "input"> & {
+  [Path in keyof StillGotItHttp as Path extends `/internal/${string}` ? never : Path]: Omit<StillGotItHttp[Path], "input"> & {
     input: Omit<StillGotItHttp[Path]["input"], "recoveryKey">;
   };
 };
@@ -19,4 +19,9 @@ export function errorMessage(code: string): string {
     case "CONFLICT": return "This request conflicts with saved work. Reload to see the latest version.";
     default: return "The app could not complete the request. Your saved work is still there. Try again.";
   }
+}
+
+export function unwrap<T extends object>(result: T): Exclude<T, { error: unknown }> {
+  if ("error" in result) throw new Error((result as { detail?: string }).detail || errorMessage(String(result.error)));
+  return result as Exclude<T, { error: unknown }>;
 }

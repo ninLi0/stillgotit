@@ -40,7 +40,7 @@ async function makeDraft(concept = mapping) {
   const owner = randomUUID();
   const { course } = await concept.createCourse({ owner, title: "Linear Algebra" });
   const { unit } = await concept.addUnit({ owner, course, title: "Matrices" });
-  const { skill } = await concept.propose({ owner, unit, ...content });
+  const { skill } = await concept.propose({ proposalKey: crypto.randomUUID(), owner, unit, ...content });
   const [record] = await concept._skill({ skill });
   return { owner, course, unit, skill, current: record!.current };
 }
@@ -58,7 +58,7 @@ async function versionCount(skill: string, instanceName = "SkillMapping") {
 describe("SkillMapping draft discard", () => {
   test("removes a draft and its first version without changing other records", async () => {
     const { owner, unit, skill, current } = await makeDraft();
-    await mapping.propose({ owner, unit, ...content });
+    await mapping.propose({ proposalKey: crypto.randomUUID(), owner, unit, ...content });
     await makeDraft();
     const before = await savedState();
 

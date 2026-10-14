@@ -22,7 +22,7 @@ try {
     gate: "Explain whether two given matrices can be multiplied.",
     materials: [],
   };
-  const { skill } = await mapping.propose({ owner, unit: unit.unit, ...content });
+  const { skill } = await mapping.propose({ proposalKey: crypto.randomUUID(), owner, unit: unit.unit, ...content });
   const firstVersion = (await mapping._skill({ skill }))[0]!.current;
   await mapping.reviseDraft({
     ...content, owner, skill, unit: unit.unit,

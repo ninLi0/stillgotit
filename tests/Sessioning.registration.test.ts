@@ -1,3 +1,7 @@
+import { StudyPlanning } from "../src/concepts/StudyPlanning/StudyPlanning.ts";
+import { MasteryEstimating } from "../src/concepts/MasteryEstimating/MasteryEstimating.ts";
+import { AssessmentReviewing } from "../src/concepts/AssessmentReviewing/AssessmentReviewing.ts";
+import { GroundedTutoring } from "../src/concepts/GroundedTutoring/GroundedTutoring.ts";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import type { ActionRefusal } from "@mit-sdg/sync-engine/assembly";
@@ -57,6 +61,10 @@ async function setup() {
     CommonsFederating: new FederatingConcept<User>(db, new MemoryProvider(), name, clock),
     Sessioning: new SessioningConcept<User>(db, name, clock),
     SkillMapping: await createSkillMapping(db, name),
+    AssessmentReviewing: new AssessmentReviewing(db),
+    MasteryEstimating: new MasteryEstimating(db),
+    StudyPlanning: new StudyPlanning(db),
+    GroundedTutoring: new GroundedTutoring(db, name),
   });
   const application = await assembleFor(connection!.db);
   applications.push(application);

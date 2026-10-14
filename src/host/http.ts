@@ -1,25 +1,179 @@
+import { admissions, composition as Access } from "../compositions/access.ts";
+import { learningInput, structuredInput } from "../compositions/reusable/inputs.ts";
 import { createHttpHandler } from "@mit-sdg/sync-engine-http/handler";
-import { createGateway } from "@mit-sdg/sync-engine/boundary";
-import type { assembleApplication } from "../assembly.ts";
+import { createGateway, type Invoker, type InvocationResult } from "@mit-sdg/sync-engine/boundary";
+import { executionLimits, type assembleApplication } from "../assembly.ts";
 import type { Attempt } from "../concepts/Federating/Federating.ts";
 import type { Session } from "../concepts/Sessioning/Sessioning.ts";
 import type { RegistrationRecoveryStore } from "../storage/RegistrationRecoveryStore.ts";
 import { ATTEMPT_COOKIE, BODY_LIMIT, SESSION_COOKIE, stillGotItPolicy } from "./http-policy.ts";
 import { KeyedLocks } from "./locks.ts";
+import type { ChatGPTConnection } from "./chatgpt.ts";
+import type { MaterialFiles } from "./material-files.ts";
+import type { MaterialImportStore } from "../storage/MaterialImportStore.ts";
+import type { Material } from "../concepts/GroundedTutoring/GroundedTutoring.ts";
 
 type Application = ReturnType<typeof assembleApplication>;
 
-export function createApplicationHttp({ application, recovery, publicOrigin, clock = () => new Date() }: {
+export function createApplicationHttp({ application, recovery, publicOrigin, clock = () => new Date(), chatgpt, files, imports }: {
   application: Application;
   recovery: Pick<RegistrationRecoveryStore, "getOrCreate">;
   publicOrigin: string;
   clock?: () => Date;
+  chatgpt?: ChatGPTConnection;
+  files?: MaterialFiles;
+  imports?: MaterialImportStore;
 }) {
-  const gateway = createGateway({ application });
+  const rawGateway = createGateway({ application, executionLimits });
   const policy = stillGotItPolicy(publicOrigin);
-  const inner = createHttpHandler({ application, gateway, policy });
+  const inner = createHttpHandler({ application, gateway: rawGateway, policy });
+  const preparedInner = createHttpHandler({ application, gateway: rawGateway, policy: stillGotItPolicy(publicOrigin, 4 * 1024 * 1024) });
   const locks = new KeyedLocks();
   const { CommonsFederating, Registering, Sessioning } = application.concepts;
+  const chatCookie = "stillgotit-chatgpt-attempt";
+
+  async function admission(path: string, body: Record<string, unknown>, owner: string) {
+    const entry = admissions[path as keyof typeof admissions];
+    if (!entry) return null;
+    const values = Object.fromEntries(entry.fields.map((field) => [field, field === "assessment" ? body.case : body[field]]));
+    return Object.values(values).some((value) => value === undefined) || !await application.form(entry.check({ ...values, owner }))
+      ? entry : null;
+  }
+
+  // Native callers use the same declared admission checks and learner lock as HTTP.
+  // The raw invoker remains internal; it assumes these application preconditions.
+  const admittedInvoker: Invoker<Record<string, { input: unknown; output: unknown }>> = {
+    async invoke(path, input, options = {}) {
+      const learning = path.startsWith("/learning/") || path.startsWith("/planning/") || path === "/courses/skills/suggest";
+      const courseMutation = ["/courses/create", "/courses/units/add", "/courses/skills/propose", "/courses/skills/edit", "/courses/skills/confirm"].includes(path);
+      if (!learning && !courseMutation) {
+        return rawGateway.invoke(path, input, options);
+      }
+      const refuse = (value: string): InvocationResult => ({ ok: false, error: { kind: "domain", value } });
+      const invalid = (detail: string): InvocationResult => ({ ok: false, error: { kind: "framework", code: "INVALID_INPUT", detail } });
+      if (options.signal?.aborted) return { ok: false, error: { kind: "framework", code: "ABORTED" } };
+      if (!(learning ? learningInput(input) : structuredInput(input)).ok) return invalid("Check the supplied text, numbers, and review choices.");
+      const body = input as Record<string, unknown>;
+      if (typeof body.session !== "string") return refuse("NOT_SIGNED_IN");
+      try {
+        const identity = await Sessioning.use({ session: body.session as Session });
+        if ("error" in identity) return refuse("NOT_SIGNED_IN");
+        return await locks.run(`user:${identity.subject}`, async () => {
+          if (options.signal?.aborted) return { ok: false as const, error: { kind: "framework" as const, code: "ABORTED" as const } };
+          const declined = await admission(path, body, identity.subject);
+          if (declined) return invalid(declined.detail);
+          try { return await rawGateway.invoke(path, input, options); }
+          finally { await rawGateway.whenIdle(); }
+        });
+      } catch {
+        return { ok: false, error: { kind: "framework", code: "INTERNAL_ERROR" } };
+      }
+    },
+  };
+  const gateway = createGateway({ executionLimits, application: {
+    publicInterface: application.publicInterface,
+    invoker: admittedInvoker,
+    beginDrain: () => rawGateway.beginDrain(),
+    whenIdle: () => rawGateway.whenIdle(),
+  } });
+
+  async function learner(request: Request) {
+    const session = cookie(request.headers.get("Cookie"), SESSION_COOKIE);
+    if (!session) return null;
+    const identity = await Sessioning.use({ session: session as Session });
+    return "error" in identity ? null : identity.subject;
+  }
+
+  function internal(request: Request, body: unknown) {
+    return new Request(new URL("/api/internal/materials/add", request.url), { method: "POST", headers: {
+      "Content-Type": "application/json", Origin: publicOrigin, Cookie: request.headers.get("Cookie") ?? "",
+    }, body: JSON.stringify(body) });
+  }
+
+  async function importMaterial(request: Request): Promise<Response> {
+    const owner = await learner(request);
+    if (!owner) return failure("UNAUTHORIZED", 401);
+    if (!files || !imports) return failure("UNAVAILABLE", 503);
+    if (!request.headers.get("Content-Type")?.startsWith("multipart/form-data")) return failure("INVALID_REQUEST", 400);
+    const form = await request.formData();
+    const course = form.get("course"), title = form.get("title"), requestId = form.get("requestId");
+    const uploaded = form.getAll("files");
+    if (typeof course !== "string" || typeof title !== "string" || !title.trim() || title.length > 160 ||
+      typeof requestId !== "string" || !requestId.trim() || requestId.length > 100 || !uploaded.every((file) => file instanceof File)) {
+      return failure("INVALID_REQUEST", 400);
+    }
+    if (!await application.form(Access.CourseReady({ owner, course }))) return failure("FORBIDDEN", 403);
+    const sources = await files.describe(uploaded);
+    return locks.run(`import:${owner}:${requestId}`, async () => {
+      const identity = { owner, requestId };
+      let operation = await imports.getOrCreate({ ...identity, request: { scope: course, title, origin: "COURSE", sources } });
+      if (operation.stage === "CREATED") operation = await imports.saveSources({ ...identity, revision: operation.revision, sources: await files.retain(operation, uploaded) });
+      if (operation.stage === "SOURCES_SAVED") operation = await imports.savePrepared({ ...identity, revision: operation.revision, prepared: {
+        owner, scope: course, importKey: operation.importKey, title, locator: `upload:${operation.importKey}`, origin: "COURSE",
+        ...await files.prepare(operation),
+      } });
+      return locks.run(`user:${owner}`, async () => {
+        if (await learner(request) !== owner) return failure("UNAUTHORIZED", 401);
+        if (!await application.form(Access.CourseReady({ owner, course }))) return failure("FORBIDDEN", 403);
+        if (operation.stage === "COMPLETE") return Response.json({ material: operation.material });
+        const prepared = operation.prepared!;
+        const response = await preparedInner(internal(request, { course, importKey: prepared.importKey, title: prepared.title,
+          locator: prepared.locator, content: prepared.content, originals: prepared.originals, origin: prepared.origin }));
+        await rawGateway.whenIdle();
+        if (!response.ok) return response;
+        const result = await response.clone().json() as { material?: string };
+        if (typeof result.material !== "string") throw new Error("The material save did not return an identity.");
+        await imports.complete({ ...identity, revision: operation.revision, material: result.material });
+        return response;
+      });
+    });
+  }
+
+  async function providerRequest(request: Request, path: string): Promise<Response> {
+    const owner = await learner(request);
+    if (!owner) return failure("UNAUTHORIZED", 401);
+    const body = await readBody(request);
+    if (!body) return failure("INVALID_REQUEST", 400);
+    if (path.startsWith("/api/ai/") && !chatgpt) return failure("UNAVAILABLE", 503);
+    if (path === "/api/ai/status") return Response.json(await chatgpt!.status(owner));
+    if (path === "/api/ai/connect/start") {
+      if (body.clientId !== undefined && typeof body.clientId !== "string") return failure("INVALID_REQUEST", 400);
+      const start = await chatgpt!.start(owner, body.clientId as string | undefined);
+      return Response.json({ address: start.address }, { headers: {
+        "Set-Cookie": `${chatCookie}=${start.attempt}; Path=/; HttpOnly; SameSite=Lax; Max-Age=600${publicOrigin.startsWith("https:") ? "; Secure" : ""}`,
+      } });
+    }
+    if (path === "/api/ai/connect/finish") {
+      const attempt = cookie(request.headers.get("Cookie"), chatCookie);
+      if (!attempt) return failure("FORBIDDEN", 403);
+      await chatgpt!.finish(owner, attempt);
+      return Response.json({ connected: true }, { headers: { "Set-Cookie": `${chatCookie}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0` } });
+    }
+    if (path === "/api/ai/models") return Response.json({ models: await chatgpt!.models(owner) });
+    if (path === "/api/ai/model") {
+      if (typeof body.model !== "string" || (body.effort !== undefined && typeof body.effort !== "string")) return failure("INVALID_REQUEST", 400);
+      await chatgpt!.selectModel(owner, body.model, body.effort as string | undefined); return Response.json(await chatgpt!.status(owner));
+    }
+    if (path === "/api/ai/account") {
+      if (typeof body.clientId !== "string") return failure("INVALID_REQUEST", 400);
+      await chatgpt!.select(owner, body.clientId); return Response.json({});
+    }
+    if (path === "/api/ai/disconnect") return Response.json(await chatgpt!.disconnect(owner));
+    if (path === "/api/courses/materials/file") {
+      if (typeof body.material !== "string") return failure("INVALID_REQUEST", 400);
+      const material = body.material as Material;
+      const session = cookie(request.headers.get("Cookie"), SESSION_COOKIE);
+      const permitted = await rawGateway.invoke("/courses/materials/read", { session, material });
+      if (!permitted.ok) return failure("FORBIDDEN", 403);
+      const data = permitted.value as { originals: import("../concepts/GroundedTutoring/media.ts").MediaList };
+      const allowed = data.originals.flatMap((file) => [file.file, ...file.renditions.flatMap((part) => part.kind === "IMAGE" ? [part.file] : [])]);
+      if (typeof body.file !== "string" || !allowed.includes(body.file) || !files) return failure("FORBIDDEN", 403);
+      return new Response(new Uint8Array(await files.read(owner, body.file)), { headers: {
+        "Content-Type": "application/octet-stream", "Content-Disposition": "attachment", "X-Content-Type-Options": "nosniff",
+      } });
+    }
+    return failure("INVALID_REQUEST", 404);
+  }
 
   async function resume(request: Request): Promise<Response> {
     const attempt = cookie(request.headers.get("Cookie"), ATTEMPT_COOKIE) as Attempt | null;
@@ -50,14 +204,14 @@ export function createApplicationHttp({ application, recovery, publicOrigin, clo
       });
 
       let response = await inner(prepared());
-      await gateway.whenIdle();
+      await rawGateway.whenIdle();
       // A competing registration or link may have completed. Re-read before one bounded retry.
       if (response.status === 409 && identity.expiresAt > clock()) {
         const [savedLink] = await CommonsFederating._user({ attempt });
         const [savedAccount] = recoveryKey ? await Registering._byRecoveryKey({ recoveryKey }) : [];
         if (savedLink || savedAccount) {
           response = await inner(prepared());
-          await gateway.whenIdle();
+          await rawGateway.whenIdle();
         }
       }
       if (identity.expiresAt <= clock()) {
@@ -76,13 +230,52 @@ export function createApplicationHttp({ application, recovery, publicOrigin, clo
 
   async function handle(request: Request): Promise<Response> {
     const path = new URL(request.url).pathname;
+    if (path.startsWith("/api/internal/")) return failure("FORBIDDEN", 403);
+    if (path === "/auth/chatgpt/return" && request.method === "GET" && chatgpt) {
+      try {
+        await chatgpt.callback(new URL(request.url).searchParams);
+        return Response.redirect(`${publicOrigin}/auth/chatgpt/complete`, 303);
+      } catch {
+        return Response.redirect(`${publicOrigin}/auth/chatgpt/complete?error=connection`, 303);
+      }
+    }
     // Check before the wrapper does any work, as well as inside the reference adapter.
     if (request.method !== "POST") return failure("INVALID_REQUEST", 405);
     if (request.headers.get("Origin") !== publicOrigin) return failure("FORBIDDEN", 403);
-    if (request.headers.get("Content-Type")?.split(";")[0]?.trim() !== "application/json") {
+    const multipart = path === "/api/courses/materials/add" || path === "/api/learning/transcribe";
+    if (!multipart && request.headers.get("Content-Type")?.split(";")[0]?.trim() !== "application/json") {
       return failure("INVALID_REQUEST", 400);
     }
     try {
+      if (path === "/api/courses/materials/add") return await importMaterial(request);
+      if (path === "/api/learning/transcribe") {
+        const owner = await learner(request);
+        if (!owner) return failure("UNAUTHORIZED", 401);
+        if (!files || !request.headers.get("Content-Type")?.startsWith("multipart/form-data")) return failure("INVALID_REQUEST", 400);
+        const recording = (await request.formData()).get("recording");
+        if (!(recording instanceof File)) return failure("INVALID_REQUEST", 400);
+        const transcript = await files.transcribe(owner, recording);
+        return await learner(request) === owner ? Response.json(transcript) : failure("UNAUTHORIZED", 401);
+      }
+      if (path.startsWith("/api/learning/") || path.startsWith("/api/planning/") || path === "/api/courses/skills/suggest") {
+        const owner = await learner(request);
+        if (!owner) return failure("UNAUTHORIZED", 401);
+        return locks.run(`user:${owner}`, async () => {
+          const entry = admissions[path.slice(4) as keyof typeof admissions];
+          if (entry) {
+            const body = await readBody(request.clone());
+            if (!body || !learningInput(body).ok) return failure("INVALID_REQUEST", 400);
+            if (await admission(path.slice(4), body, owner)) {
+              return Response.json({ error: "INVALID_REQUEST", detail: entry.detail }, { status: 400, headers: { "Cache-Control": "no-store" } });
+            }
+          }
+          try { return await inner(request); }
+          finally { await rawGateway.whenIdle(); }
+        });
+      }
+      if (path.startsWith("/api/ai/") || path === "/api/courses/materials/file") {
+        return await providerRequest(request, path);
+      }
       if (path === "/api/auth/commons/resume" || path === "/api/auth/commons/choose") {
         return await resume(request);
       }
@@ -91,21 +284,26 @@ export function createApplicationHttp({ application, recovery, publicOrigin, clo
         if (!attempt) return failure("FORBIDDEN", 403);
         return await locks.run(`attempt:${attempt}`, async () => {
           try { return await inner(request); }
-          finally { await gateway.whenIdle(); }
+          finally { await rawGateway.whenIdle(); }
         });
       }
-      if (path === "/api/courses/create") {
+      if (path === "/api/courses/create" || path === "/api/courses/units/add" ||
+        ["/api/courses/skills/propose", "/api/courses/skills/edit", "/api/courses/skills/confirm"].includes(path)) {
         const session = cookie(request.headers.get("Cookie"), SESSION_COOKIE);
         if (!session) return await inner(request);
         const identity = await Sessioning.use({ session: session as Session });
         if ("error" in identity) return await inner(request);
         return await locks.run(`user:${identity.subject}`, async () => {
           try { return await inner(request); }
-          finally { await gateway.whenIdle(); }
+          finally { await rawGateway.whenIdle(); }
         });
       }
       return await inner(request);
-    } catch {
+    } catch (error) {
+      if (multipart || path.startsWith("/api/ai/") || path.startsWith("/api/learning/") || path.startsWith("/api/planning/") || path === "/api/courses/skills/suggest") {
+        const detail = error instanceof Error && error.name !== "MongoServerError" ? error.message : "This operation could not finish. Your saved work is available to retry.";
+        return Response.json({ error: "OPERATION_FAILED", detail }, { status: 400, headers: { "Cache-Control": "no-store" } });
+      }
       // Never return database errors, codes, keys, or session values to the browser or logs.
       return failure("INTERNAL_ERROR", 500);
     }

@@ -18,7 +18,7 @@ try {
   const title = "Identify compatible matrix dimensions";
   let saved = (await mapping._skills({ unit: unit.unit })).find((record) => record.title === title);
   if (!saved) {
-    const { skill } = await mapping.propose({
+    const { skill } = await mapping.propose({ proposalKey: crypto.randomUUID(),
       owner,
       unit: unit.unit,
       title,

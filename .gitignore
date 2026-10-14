@@ -3,6 +3,9 @@
 node_modules/
 dist/
 coverage/
+.venv/
+.data/
+__pycache__/
 .vite/
 .env
 .env.*

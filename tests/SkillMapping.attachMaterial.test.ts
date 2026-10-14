@@ -39,7 +39,7 @@ async function makeDraft(concept = mapping) {
   const owner = randomUUID();
   const { course } = await concept.createCourse({ owner, title: "Linear Algebra" });
   const { unit } = await concept.addUnit({ owner, course, title: "Matrices" });
-  const { skill } = await concept.propose({ ...content, owner, unit });
+  const { skill } = await concept.propose({ proposalKey: crypto.randomUUID(), ...content, owner, unit });
   const [record] = await concept._skill({ skill });
   return { owner, course, unit, skill, current: record!.current };
 }
@@ -63,7 +63,7 @@ describe("SkillMapping material attachment", () => {
       owner, skill, outcome: content.outcome, gate: "Explain why matrix order matters.",
     });
     const material = "source-new";
-    const prerequisite = await mapping.propose({
+    const prerequisite = await mapping.propose({ proposalKey: crypto.randomUUID(),
       ...content, owner, unit, title: "Read matrix dimensions",
       materials: [...content.materials, material],
     });

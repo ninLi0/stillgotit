@@ -1,38 +1,51 @@
 # StillGotIt
 
-A web app to help students learn course skills and keep using them. Students practice with voice, text, or photos, track mastery, and plan reviews around exams.
+Learn course skills, test your understanding, and return before you forget.
 
-## P2: Alpha in progress
+The P2 learning and planning flows use sync-engine endpoints, views, formers, and reactions. The [implementation guide](design/README.md) links the specifications to source and generated read-back. External files and account tokens stay in the host layer.
 
-[Core journey, implementation plan, and verified progress](P2.md).
+## Run locally
 
-Registering, CommonsFederating, Sessioning, and SkillMapping are registered with sync-engine and save records in MongoDB. Registering creates local user identities. CommonsFederating confirms Commons identities and links them to local users. Sessioning starts, checks, and ends sessions for those users. SkillMapping supports courses, units, draft review, requirements versions, source links, prerequisite rules, archiving, and restoration. Use Bun 1.4.2 to run the setup checks:
+Use Bun 1.4.2, Docker, and Python 3.11 or newer. LibreOffice adds document and slide rendering; text extraction still works for supported modern Office files when rendering is unavailable.
 
 ```sh
 bun install --frozen-lockfile
-bun run generate
-bun run check
-```
-
-Checks and generation do not connect to MongoDB. To run the app, start Docker and run:
-
-```sh
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
 bun run db:up
 bun run build
 bun run start
 ```
 
-Open **http://localhost:5173**. Sign in with Commons, then create one course. The Vue page reads saved courses from MongoDB. Reloading or restarting the server keeps the course. The server listens on loopback and uses `COMMONS_ORIGIN`, `APP_ORIGIN`, and `PORT` from [.env.example](.env.example), with those same defaults. Use `localhost`, not a different host name, so the origin and cookie checks agree.
+Open **http://localhost:5173**. Sign in with Commons. Create a course, then select **Continue with ChatGPT**. Review OpenAI's permission screen to connect your plan. No API key is required for this local connection. The loopback callback uses `127.0.0.1` and then returns to `localhost`.
 
-The [implemented stage](design/stages/onboarding.md) describes eight endpoints, a course ownership view, and a course-list former. Their ConceptBox-style endpoint chains generate `when / where / then` reactions in [the read-back](generated/stillgotit.md). The host owns cookies, recovery-key storage, expiry checks, and the per-user lock. It does not write concept collections.
+Voice recognition runs locally with Whisper. The first use downloads its base model. Microphone recordings are deleted after transcription. Uploaded lecture audio is retained as course material. The pinned PyAV version avoids a known incompatibility in faster-whisper 1.2.1.
 
-Commons confirmation and continuation use separate requests. Confirmation redeems the one-time code. Continuation uses the saved identity and recovery key to find or create the local account, link it, and start a session. A failed link can resume without another registration or code redemption. The browser never chooses a local user ID or recovery key.
+MongoDB stores learning records. `.data/` stores source files, the speech model, and protected OAuth credentials. `.env`, `.data/`, and `.venv/` are ignored by Git. Defaults are in [.env.example](.env.example). Back up MongoDB and `.data/files` together to preserve original attachments.
 
-Live Commons sign-in and course creation have been checked in the browser. The full onboarding test run passed 270 tests. Automated HTTP tests cover returning sign-in, username choice, saved state across a new runtime, interrupted linking, expiry during waits, isolation between learners, simultaneous course creation, and logout. The diagnostic check still gives seven conservative endpoint-fallback warnings and one source-order advisory. The endpoints are tested, but the checker does not prove every chain will answer. Database outages still return an error and require a retry.
+## P2 flow
 
-GroundedTutoring now implements `addMaterial`, `_materials`, and `_material`. It validates and stores prepared text and retained-file metadata. Thirteen focused MongoDB tests pass, including retrieval from a fresh process. The [material data contract](design/material-data.md) defines readable renditions and extraction limits. Upload processing, ownership checks at the import boundary, safe import retries, and application registration remain pending for this concept.
+**Home** shows the skill tree and study plan. **Course materials** opens import and skill review. Select a leaf and choose **Open lesson** to enter **Learn**, where text, voice, photos, and reasoning effort share one chat composer.
 
-The [full plan](P2.md) still includes material import, tutoring, voice, assessment, mastery, and review planning. Those features are not implemented. The entries below record the earlier backend steps; their descriptions of pending HTTP work describe that earlier stage.
+Import material → review and confirm skills → report confidence → study a lesson → answer a fresh task → review the answer → receive assessment and a mastery estimate → set a review budget.
+
+The interface supports free questions, preset study requests, spoken answers, text, photos, transcript corrections, regrades, manual assessment corrections, and a leaf for each confirmed skill. Mastery and review intervals use initial test settings. They are not validated measurements of learning.
+
+Eight concepts are registered against their specifications. Domain writes run through ConceptBox-style endpoint chains, which generate `when / where / then` reactions. The host handles authentication, files, provider calls, and recovery. See the [checked P2 stage](design/stages/materials.md), [generated read-back](generated/stillgotit.md), and [runtime contract](design/runtime.md).
+
+```sh
+bun run check
+bun test --timeout 15000
+```
+
+[The P2 plan](P2.md) separates completed checks from live-account and submission work. The automated journey uses real MongoDB and controlled provider responses. It does not establish live AI quality. The local app uses one Bun process; it is not a hosted, multi-server deployment.
+
+## Earlier implementation steps
+
+<details>
+<summary>Open the historical step-by-step record</summary>
+
+These entries describe the state at each earlier increment. Their pending-work notes are historical. Use the P2 plan above for current status.
 
 ### Step 1: save a course
 
@@ -359,6 +372,9 @@ MongoDB 8.0.32 runs at `127.0.0.1:27017`. The default database is `stillgotit`. 
 Tests use a fresh database and delete only that database. They do not use the demo database. To stop MongoDB and keep its data, run `bun run db:stop`. Start it again with `bun run db:up`.
 
 Next, review how sign-in uses the confirmed identity and saved recovery key to register or recover the local account. Then implement that flow, linking, and session creation before adding public course endpoints and a minimal Vue page.
+
+
+</details>
 
 ## P1 design submission
 

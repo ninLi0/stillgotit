@@ -45,7 +45,7 @@ async function makeCourse(concept = mapping) {
 }
 
 async function makeSkill(owner: string, unit: string, concept = mapping) {
-  const { skill } = await concept.propose({ ...content, owner, unit });
+  const { skill } = await concept.propose({ proposalKey: crypto.randomUUID(), ...content, owner, unit });
   await concept.confirm({ owner, skill });
   const [record] = await concept._skill({ skill });
   return { skill, current: record!.current };
@@ -92,7 +92,7 @@ describe("SkillMapping archive", () => {
   test("refuses unknown, foreign, draft, and already archived skills without changing storage", async () => {
     const { owner, unit } = await makeCourse();
     const confirmed = await makeSkill(owner, unit);
-    const draft = await mapping.propose({ ...content, owner, unit });
+    const draft = await mapping.propose({ proposalKey: crypto.randomUUID(), ...content, owner, unit });
     const archived = await makeSkill(owner, unit);
     await mapping.archive({ owner, skill: archived.skill });
     const before = await savedState("SkillMapping", true);

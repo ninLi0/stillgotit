@@ -1,25 +1,43 @@
-# Course materials and confirmed skills
+# Courses, materials, and skill drafts
 
-Every request calls `Sessioning.use` and uses its returned user in the relevant ownership view. P2 allows one course per learner. The [CreateCourse](reaction:Courses.CreateCourse) boundary checks `SkillMapping._courses` and calls `createCourse` only when none exists. The host holds the learner's mutation lock across that check and action; two concurrent requests cannot both create a course.
+These flows describe the current P2 application. The [P2 stage](../stages/materials.md) binds the concept instances. Each endpoint calls `Sessioning.use` and uses the returned user for ownership checks. Application callers use HTTP or the exported runtime gateway, as described in the [runtime contract](../runtime.md).
 
-[AddUnit](reaction:Courses.AddUnit) checks [OwnedCourse](view:Access.OwnedCourse) and calls `SkillMapping.addUnit`.
+## Reading course data
 
-The [AddMaterial](reaction:Courses.AddMaterial) boundary accepts an upload or source reference. File processing finishes before `GroundedTutoring.addMaterial` runs. [ReadableMaterial](view:Courses.ReadableMaterial) supplies the owned course, retained originals, readable content, locations, and extraction limits. A stored file that has not been read is not ready for teaching. Keep uploaded source audio; temporary microphone audio follows the separate transcription rule.
+[ListCourses](reaction:Courses.ListCourses) returns [CourseList](former:Courses.CourseList) for the signed-in learner. [OwnedCourse](view:Courses.OwnedCourse) relates a course to its owner. [OwnedUnit](view:Courses.OwnedUnit) and [OwnedSkill](view:Courses.OwnedSkill) check ownership through the course.
 
-[ProposeSkills](reaction:Courses.ProposeSkills) requests skill suggestions from the selected course materials. A suggestion supplies a title, outcome, full demonstration requirements, and source references. [SkillSources](view:Courses.SkillSources) checks every reference against `GroundedTutoring._material`: it must belong to the learner and the same course. Each accepted suggestion calls `SkillMapping.propose` and remains a draft.
+[ReadCourse](reaction:Courses.ReadCourse) requires an owned course. It returns [Materials](former:Courses.Materials), [Units](former:Courses.Units), and [Skills](former:Courses.Skills). Skills include their status and current requirements. These three lists and CourseList sort by each record's unique identity. [ReadMaterial](reaction:Courses.ReadMaterial) returns source content, original-file references, and extraction limits after checking material and course ownership.
 
-[EditDraft](reaction:Courses.EditDraft) rechecks ownership and every selected source through SkillSources, then applies the learner's changes through `SkillMapping.reviseDraft`. [ConfirmSkill](reaction:Courses.ConfirmSkill) rechecks sources and calls `SkillMapping.confirm`. Neither operation assigns a mastery percentage. The learner reports confidence through the [progress flow](progress.md).
+## Saving courses and materials
 
-[ReviseRequirements](reaction:Courses.ReviseRequirements) calls `SkillMapping.reviseDefinition` for an owned confirmed skill. Existing lessons and attempts keep their saved requirements. The new version triggers the mastery and planning reactions; it is not a failed attempt.
+[CreateCourse](reaction:Courses.CreateCourse) calls `SkillMapping.createCourse` only when the learner has no course. Otherwise it returns `COURSE_EXISTS`. The host holds the learner's lock across the check and write in the single-process P2 app. [AddUnit](reaction:Courses.AddUnit) calls `SkillMapping.addUnit`, which checks course ownership.
 
-[CourseChange](former:Courses.CourseChange) returns saved identities and state after these operations. [SkillDrafts](former:Courses.SkillDrafts) returns the proposed skills for learner review. Delayed AI suggestions must still match the source selection and request that produced them. Save valid drafts incrementally; retries reuse the request's saved draft identities instead of proposing them again.
+The public upload route at `/api/courses/materials/add` accepts multipart files. The host checks ownership, retains the files, and saves one import key and frozen prepared input. It then calls the private [AddMaterial](reaction:Courses.AddMaterial) endpoint. This endpoint rechecks session and course ownership before calling `GroundedTutoring.addMaterial`. A completed retry returns the saved material identity. Browser calls to `/api/internal/*` are refused. File processing and recovery-store writes run outside read-only `where` conditions. See the [import store](../material-import-store.md).
+
+## Reviewing skills
+
+[Suggest](reaction:Learning.Suggest) requests editable suggestions from one owned course material. It does not save skills. [ProposeSkill](reaction:Courses.ProposeSkill) saves one accepted suggestion through `SkillMapping.propose`. Its unit and material must belong to the same owned course. [singleMaterial](computation:singleMaterial) creates the source set; one material may contain several files.
+
+Each draft save carries a `proposalKey`. SkillMapping saves the original input, returned skill identity, skill, and first requirements version in one transaction. Repeating the same key and input returns the same skill. Different content with that key is refused. Keys are scoped to the learner and grant no access. A retry preserves later edits or confirmation. If the draft was discarded, the saved receipt prevents its recreation and the retry is refused.
+
+After choosing an existing unit or receiving a new unit's identity, the browser saves a frozen queue in session storage before sending any draft. Each queue entry has its own key and source. An acknowledged save removes that entry. A failed or lost reply leaves it available to retry, including after a page reload or server restart. A retry sends the original input.
+
+[EditDraft](reaction:Courses.EditDraft) checks the chosen unit and material, then calls `SkillMapping.reviseDraft`. The action checks that the skill is an owned draft and stays within its course. [ConfirmSkill](reaction:Courses.ConfirmSkill) requires an owned skill with no [UnavailableSkillMaterial](view:Courses.UnavailableSkillMaterial), then calls `SkillMapping.confirm`. The action requires draft status and at least one source. Confirmation assigns no mastery score; confidence is recorded through the [learning flow](learning.md).
+
+Editing confirmed requirements is implemented in the concept but has no P2 endpoint or screen.
+
+## Endpoints
+
+The HTTP adapter adds `/api` to these paths. Skill suggestions belong to the [learning composition](learning.md).
 
 ```endpoints
+Courses.ListCourses at /courses
 Courses.CreateCourse at /courses/create
+Courses.ReadCourse at /courses/read
+Courses.ReadMaterial at /courses/materials/read
 Courses.AddUnit at /courses/units/add
-Courses.AddMaterial at /courses/materials/add
-Courses.ProposeSkills at /courses/skills/propose
+Courses.AddMaterial at /internal/materials/add
+Courses.ProposeSkill at /courses/skills/propose
 Courses.EditDraft at /courses/skills/edit
 Courses.ConfirmSkill at /courses/skills/confirm
-Courses.ReviseRequirements at /courses/skills/requirements
 ```

@@ -1,3 +1,7 @@
+import { StudyPlanning } from "../src/concepts/StudyPlanning/StudyPlanning.ts";
+import { MasteryEstimating } from "../src/concepts/MasteryEstimating/MasteryEstimating.ts";
+import { AssessmentReviewing } from "../src/concepts/AssessmentReviewing/AssessmentReviewing.ts";
+import { GroundedTutoring } from "../src/concepts/GroundedTutoring/GroundedTutoring.ts";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import type { ActionRefusal } from "@mit-sdg/sync-engine/assembly";
@@ -26,6 +30,10 @@ beforeAll(async () => {
     CommonsFederating: new FederatingConcept<User>(connection.db, new MemoryProvider(), "CommonsFederating"),
     Sessioning: new SessioningConcept<User>(connection.db),
     SkillMapping: await createSkillMapping(connection.db),
+    AssessmentReviewing: new AssessmentReviewing(connection.db),
+    MasteryEstimating: new MasteryEstimating(connection.db),
+    StudyPlanning: new StudyPlanning(connection.db),
+    GroundedTutoring: new GroundedTutoring(connection.db),
   });
 });
 
@@ -55,7 +63,7 @@ describe("SkillMapping framework registration", () => {
       owner, unit, title: "Multiply matrices", outcome: "Compute a product.",
       gate: "Solve two fresh problems.", materials: ["test-source"],
     };
-    const { skill } = success(await skills.propose(draft));
+    const { skill } = success(await skills.propose({ ...draft, proposalKey: crypto.randomUUID() }));
     const [proposed] = await skills._skill({ skill });
     expect(await skills.reviseDraft({ ...draft, skill, gate: "Explain two fresh products." }))
       .toEqual({});
@@ -79,7 +87,7 @@ describe("SkillMapping framework registration", () => {
       { material: "extra-source" }, { material: "test-source" },
     ]);
 
-    const foundation = success(await skills.propose({ ...draft, title: "Read rows and columns" }));
+    const foundation = success(await skills.propose({ proposalKey: crypto.randomUUID(), ...draft, title: "Read rows and columns" }));
     expect(await skills.confirm({ owner, skill: foundation.skill })).toEqual({});
     expect(await skills.setPrerequisites({ owner, skill, prerequisites: [foundation.skill] }))
       .toEqual({});
@@ -91,7 +99,7 @@ describe("SkillMapping framework registration", () => {
     expect(await skills.archive({ owner, skill })).toEqual({});
     expect(await skills.restore({ owner, skill })).toEqual({});
 
-    const temporary = success(await skills.propose({ ...draft, title: "Discard this draft" }));
+    const temporary = success(await skills.propose({ proposalKey: crypto.randomUUID(), ...draft, title: "Discard this draft" }));
     const [temporaryRecord] = await skills._skill({ skill: temporary.skill });
     expect(await skills.discardDraft({ owner, skill: temporary.skill })).toEqual({});
     expect(await skills._skill({ skill: temporary.skill })).toEqual([]);
@@ -109,6 +117,10 @@ describe("SkillMapping framework registration", () => {
         CommonsFederating: new FederatingConcept<User>(secondConnection.db, new MemoryProvider(), "CommonsFederating"),
         Sessioning: new SessioningConcept<User>(secondConnection.db),
         SkillMapping: await createSkillMapping(secondConnection.db),
+        AssessmentReviewing: new AssessmentReviewing(secondConnection.db),
+        MasteryEstimating: new MasteryEstimating(secondConnection.db),
+        StudyPlanning: new StudyPlanning(secondConnection.db),
+        GroundedTutoring: new GroundedTutoring(secondConnection.db),
       });
       expect(await second.concepts.SkillMapping._skill({ skill }))
         .toEqual(await skills._skill({ skill }));
@@ -134,7 +146,7 @@ describe("SkillMapping framework registration", () => {
     });
     expect(await skills._units({ course })).toEqual([]);
     const { unit } = success(await skills.addUnit({ owner, course, title: "Motion" }));
-    const { skill } = success(await skills.propose({
+    const { skill } = success(await skills.propose({ proposalKey: crypto.randomUUID(),
       owner, unit, title: "Explain motion", outcome: "Describe motion.",
       gate: "Explain two examples.", materials: [],
     }));

@@ -44,7 +44,7 @@ async function makeCourse(concept = mapping, owner = randomUUID()) {
 }
 
 async function makeSkill(owner: string, unit: string, concept = mapping) {
-  const { skill } = await concept.propose({ ...content, owner, unit });
+  const { skill } = await concept.propose({ proposalKey: crypto.randomUUID(), ...content, owner, unit });
   await concept.confirm({ owner, skill });
   const [record] = await concept._skill({ skill });
   return { skill, current: record!.current };
@@ -113,7 +113,7 @@ describe("SkillMapping prerequisites", () => {
   test("refuses missing, foreign, draft, and archived targets before validating prerequisites", async () => {
     const { owner, unit } = await makeCourse();
     const confirmed = await makeSkill(owner, unit);
-    const draft = await mapping.propose({ ...content, owner, unit });
+    const draft = await mapping.propose({ proposalKey: crypto.randomUUID(), ...content, owner, unit });
     const archived = await makeSkill(owner, unit);
     // Seed an archived fixture for this action's status checks.
     await connection!.db.collection<{ _id: string; status: string }>("SkillMapping.skills")
@@ -139,7 +139,7 @@ describe("SkillMapping prerequisites", () => {
     const { owner, unit } = await makeCourse();
     const target = await makeSkill(owner, unit);
     const valid = await makeSkill(owner, unit);
-    const draft = await mapping.propose({ ...content, owner, unit });
+    const draft = await mapping.propose({ proposalKey: crypto.randomUUID(), ...content, owner, unit });
     const archived = await makeSkill(owner, unit);
     await connection!.db.collection<{ _id: string; status: string }>("SkillMapping.skills")
       .updateOne({ _id: archived.skill }, { $set: { status: "ARCHIVED" } });

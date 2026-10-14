@@ -1,3 +1,7 @@
+import { StudyPlanning } from "../src/concepts/StudyPlanning/StudyPlanning.ts";
+import { MasteryEstimating } from "../src/concepts/MasteryEstimating/MasteryEstimating.ts";
+import { AssessmentReviewing } from "../src/concepts/AssessmentReviewing/AssessmentReviewing.ts";
+import { GroundedTutoring } from "../src/concepts/GroundedTutoring/GroundedTutoring.ts";
 import { afterAll, beforeAll, describe, expect, spyOn, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import { Collection, type Db, type Document, type Filter } from "mongodb";
@@ -61,6 +65,10 @@ async function setup() {
     CommonsFederating: new FederatingConcept<User>(db, commons, name, clock),
     Sessioning: new SessioningConcept<User>(db, name, clock),
     SkillMapping: await createSkillMapping(db, name),
+    AssessmentReviewing: new AssessmentReviewing(db),
+    MasteryEstimating: new MasteryEstimating(db),
+    StudyPlanning: new StudyPlanning(db),
+    GroundedTutoring: new GroundedTutoring(db, name),
   });
   const application = await assembleFor(connection!.db);
   applications.push(application);
@@ -168,7 +176,7 @@ describe("CommonsFederating framework registration", () => {
       expect(await second.concepts.SkillMapping._course({ course }))
         .toEqual([{ owner: user, title: "Linear Algebra" }]);
       expect(Object.keys(second.concepts).sort())
-        .toEqual(["CommonsFederating", "Registering", "Sessioning", "SkillMapping"]);
+        .toEqual(["AssessmentReviewing", "CommonsFederating", "GroundedTutoring", "MasteryEstimating", "Registering", "Sessioning", "SkillMapping", "StudyPlanning", "TutorGenerating"]);
       expect(Object.keys(second.publicInterface.routes)).toContain("/courses");
       expect(await links.countDocuments()).toBe(1);
     } finally {

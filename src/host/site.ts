@@ -6,7 +6,7 @@ export function serveSite({ api, directory }: {
   const root = resolve(directory);
   return async (request: Request) => {
     const path = new URL(request.url).pathname;
-    if (path.startsWith("/api/")) {
+    if (path.startsWith("/api/") || path === "/auth/chatgpt/return") {
       const response = await api(request);
       response.headers.set("Referrer-Policy", "no-referrer");
       response.headers.set("Cache-Control", "no-store");
@@ -21,7 +21,7 @@ export function serveSite({ api, directory }: {
       const asset = Bun.file(assetPath);
       return await asset.exists() ? new Response(asset, { headers }) : new Response("Not found", { status: 404, headers });
     }
-    if (path !== "/" && path !== "/auth/commons/callback") return new Response("Not found", { status: 404, headers });
+    if (path !== "/" && path !== "/auth/commons/callback" && path !== "/auth/chatgpt/complete") return new Response("Not found", { status: 404, headers });
     const page = Bun.file(resolve(root, "index.html"));
     return await page.exists()
       ? new Response(page, { headers })

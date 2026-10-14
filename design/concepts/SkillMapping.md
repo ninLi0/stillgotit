@@ -21,6 +21,8 @@ opaque MaterialSet
   A finite set of Material identities, with no duplicates or ordering.
 opaque SkillSet
   A finite set of Skill identities, with no duplicates or ordering.
+opaque SkillMapRows
+  Current skill definitions, source identities, and prerequisites within one course.
 ```
 
 ## State
@@ -43,12 +45,22 @@ a set of Versions with
   a skill Skill
   an outcome String
   a gate String
+a set of ProposalReceipts with
+  an owner User
+  a proposalKey String
+  a unit Unit
+  a title String
+  an outcome String
+  a gate String
+  a materials set of Materials
+  a skillIdentity String
 Rule: each unit belongs to an existing course. Each skill belongs to an existing unit.
 Rule: a unit or skill belongs to the owner of its course. An unknown record belongs to no owner.
 Rule: a skill's current version belongs to that skill. Existing versions never change. Discarding a draft removes its versions; other actions preserve them.
 Rule: an outcome describes the ability. A gate describes the complete demonstration required for that ability.
 Rule: a confirmed skill's prerequisites are confirmed skills in the same course. A skill cannot require itself, and prerequisite links cannot form a cycle. Archived skills may retain links to archived prerequisites.
 Rule: blank text is empty or contains only whitespace. Titles, outcomes, and gates are not blank.
+Rule: proposal keys are nonblank strings of at most 100 characters. Each owner and key pair has at most one receipt. A receipt stores the original input and returned skill identity; its content never changes. Discarding a draft retains its receipt, so replay cannot recreate it.
 Rule: new identities are unique. A refused action changes no state. Unmentioned state stays unchanged.
 ```
 
@@ -76,17 +88,32 @@ addUnit(owner: User, course: Course, title: String) : returns (unit: Unit)
     create unit with course and title
     returns unit
 
-propose(owner: User, unit: Unit, title: String, outcome: String, gate: String, materials: MaterialSet) : returns (skill: Skill)
+propose(owner: User, unit: Unit, proposalKey: String, title: String, outcome: String, gate: String, materials: MaterialSet) : returns (skill: Skill)
   where unit does not belong to owner
   then
     refuses PROPOSAL_UNIT_UNAVAILABLE "Choose a unit in one of your courses."
   where unit belongs to owner and at least one of title, outcome, and gate is blank
   then
     refuses INVALID_SKILL_PROPOSAL "Enter a skill title, outcome, and demonstration requirements."
-  where unit belongs to owner and title, outcome, and gate are not blank
+  where unit belongs to owner, title, outcome, and gate are not blank, and proposalKey is invalid
+  then
+    refuses INVALID_SKILL_PROPOSAL_KEY "Provide a nonblank proposal key of at most 100 characters."
+  where input is valid and owner's receipt for proposalKey has different original input
+  then
+    refuses SKILL_PROPOSAL_CONFLICT "Use the original skill details when retrying this save."
+  where input matches owner's receipt for proposalKey and its skill no longer exists
+  then
+    refuses SKILL_PROPOSAL_DISCARDED "This draft was discarded. Create a new proposal to save it again."
+  where input matches owner's receipt for proposalKey and its skill still exists
+  then
+    use the receipt's skill and keep its current content, version, and status unchanged
+    returns skill
+  where input is valid and owner has no receipt for proposalKey
   then
     create skill with unit, title, materials, an empty prerequisites set, and status DRAFT
     create a version with skill, outcome, and gate, and make it the skill's current version
+    save a receipt with owner, proposalKey, the original input, and skill
+    commit skill, version, and receipt together
     returns skill
 
 reviseDraft(owner: User, skill: Skill, unit: Unit, title: String, outcome: String, gate: String, materials: MaterialSet) : returns ()
@@ -232,4 +259,7 @@ _prerequisites(skill: Skill) : many (prerequisite: Skill)
 
 _version(version: Version) : optional (skill: Skill, outcome: String, gate: String)
   Returns the version's skill, outcome, and gate, including earlier versions of an existing skill. Returns no row for an unknown or discarded version.
+
+_map(course: Course) : one (skills: SkillMapRows)
+  Returns the course skills with their current definition and own source/prerequisite identities. An unknown or empty course returns an empty list. Reads only SkillMapping state.
 ```
