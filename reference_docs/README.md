@@ -1,9 +1,3 @@
-# Course reference documents
-
-Markdown copies of 12 background documents, 7 rubrics, and the P1 and P2 project directions from the MIT 6.1040 Fall 2026 course website. Updated October 11, 2026.
-
-Each document includes its original source link and download date. This folder contains only Markdown files.
-
 ## Background docs
 
 1. [What concept design is](Background%20docs/01-what-concept-design-is.md) · [Source](https://61040.github.io/fa26/background/what-concept-design-is/)
@@ -28,8 +22,11 @@ Each document includes its original source link and download date. This folder c
 5. [Rubric for communicating a proposed solution](Rubrics/05-communicating-a-proposed-solution.md) · [Source](https://61040.github.io/fa26/rubrics/communicating-a-proposed-solution/)
 6. [Rubric for implementing a concept-based application](Rubrics/06-implementing-concepts.md) · [Source](https://61040.github.io/fa26/rubrics/implementing-concepts/)
 7. [Rubric for testing and validating software](Rubrics/07-testing-validating.md) · [Source](https://61040.github.io/fa26/rubrics/testing-validating/)
+8. [Rubric for interaction design](Rubrics/08-interaction-design.md) · [Source](https://61040.github.io/fa26/rubrics/interaction-design/)
+9. [Rubric for visual design](Rubrics/09-visual-design.md) · [Source](https://61040.github.io/fa26/rubrics/visual-design/)
 
 ## Project directions
 
 1. [P1: Design](Project%20directions/P1.md) · [Source](https://61040.github.io/fa26/assignments/p1/)
 2. [P2: Alpha (MVP)](Project%20directions/P2.md) · [Source](https://61040.github.io/fa26/assignments/p2/)
+3. [P3: Beta (complete functionality)](Project%20directions/P3.md) · [Source](https://61040.github.io/fa26/assignments/p3/)

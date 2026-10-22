@@ -90,29 +90,22 @@ export class FederatingConcept<User extends string> {
 
   async link({ attempt, user }: { attempt: Attempt; user: User }) {
     await this.#ready();
+    const confirmed = await this.#confirmed(attempt);
+    if (confirmed === null) throw new NotConfirmed("This sign-in hasn't been confirmed.");
+    if (confirmed.expiresAt <= this.clock()) throw new SignInExpired("This sign-in has expired. Start again.");
+    // The unique subject index refuses a second link, even when two requests arrive at once.
+    // MongoDB on the platform has no transactions, so a link that lands after expiry is removed again.
     try {
-      return await this.database.client.withSession((session) => session.withTransaction(async () => {
-        const confirmed = await this.attempts.findOne<ConfirmedAttempt>(
-          { _id: attempt, ...CONFIRMED },
-          { session },
-        );
-        if (confirmed === null) throw new NotConfirmed("This sign-in hasn't been confirmed.");
-        if (confirmed.expiresAt <= this.clock()) throw new SignInExpired("This sign-in has expired. Start again.");
-
-        await this.links.insertOne({ subject: confirmed.subject, user }, { session });
-
-        // The insert can take time. If it finishes too late, abort the transaction
-        // so the new link never becomes visible. A retry also rechecks expiry.
-        if (confirmed.expiresAt <= this.clock()) throw new SignInExpired("This sign-in has expired. Start again.");
-        return { user };
-      }, {
-        readConcern: { level: "snapshot" },
-        writeConcern: { w: "majority", j: true },
-      }));
+      await this.links.insertOne({ subject: confirmed.subject, user });
     } catch (error) {
       if (isDuplicate(error)) throw new AlreadyLinked("This account on the other site is already linked.");
       throw error;
     }
+    if (confirmed.expiresAt <= this.clock()) {
+      await this.links.deleteOne({ subject: confirmed.subject, user });
+      throw new SignInExpired("This sign-in has expired. Start again.");
+    }
+    return { user };
   }
 
   async _identity({ attempt }: { attempt: Attempt }) {

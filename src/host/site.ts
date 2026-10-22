@@ -13,8 +13,8 @@ export function serveSite({ api, directory }: {
       return response;
     }
     const headers = { "Referrer-Policy": "no-referrer", "X-Content-Type-Options": "nosniff", "Cache-Control": "no-store" };
+    if (path === "/health" && (request.method === "GET" || request.method === "HEAD")) return new Response("ok", { headers });
     if (request.method !== "GET") return new Response("Method not allowed", { status: 405, headers });
-    if (path === "/health") return new Response("ok", { headers });
     if (path.startsWith("/assets/")) {
       const assetPath = resolve(root, `.${path}`);
       if (!assetPath.startsWith(`${root}${sep}`)) return new Response("Not found", { status: 404, headers });

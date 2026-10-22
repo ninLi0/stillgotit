@@ -290,7 +290,7 @@ describe("CommonsFederating framework registration", () => {
     }
   });
 
-  test("a link insert at expiry is rolled back and returns SIGN_IN_EXPIRED through the engine", async () => {
+  test("a link insert that finishes at expiry is removed and returns SIGN_IN_EXPIRED through the engine", async () => {
     const { federating, confirmed, register, advance, attempts, links } = await setup();
     const { user } = await register();
     const request = await confirmed();
@@ -307,7 +307,7 @@ describe("CommonsFederating framework registration", () => {
     const pending = settle(federating.link({ ...request, user }));
     try {
       await gate.arrived;
-      expect(await links.countDocuments()).toBe(0);
+      expect(await links.countDocuments()).toBe(1);
       advance(10 * MINUTE);
       gate.release();
       expect(await pending).toEqual({ status: "fulfilled", value: expired });

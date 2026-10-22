@@ -10,3 +10,6 @@ __pycache__/
 .env
 .env.*
 !.env.example
+
+# Worktrees that Claude Code creates for helper agents.
+.claude/worktrees/

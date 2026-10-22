@@ -3,7 +3,8 @@ name: stillgotit
 services:
   mongo:
     image: mongo:8.0@sha256:d0d926f94df099bff534b7ee5b5986458131a22489dfff8664509af0c1e2ca9c
-    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    # Standalone, like the 6.1040 Apps platform, so local runs catch any use of transactions.
+    command: ["mongod", "--bind_ip_all"]
     ports:
       - "127.0.0.1:27017:27017"
     volumes:

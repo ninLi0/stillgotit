@@ -38,9 +38,10 @@
     "demo:restore-skill": "bun scripts/demo-restore-skill.ts",
     "test": "bun test --timeout 15000",
     "start": "bun src/main.ts",
+    "preview": "bun run db:up && bun run build && NODE_ENV=production PORT=3000 PUBLIC_ORIGIN=http://127.0.0.1:3000 bun run start",
     "build": "vite build --config frontend/vite.config.ts",
     "check:frontend": "vue-tsc --noEmit -p frontend/tsconfig.json",
-    "dev:server": "PORT=3000 APP_ORIGIN=http://localhost:5173 bun --watch src/main.ts",
+    "dev:server": "PORT=3000 PUBLIC_ORIGIN=http://localhost:5173 bun --watch src/main.ts",
     "dev:frontend": "vite --config frontend/vite.config.ts"
   }
 }
