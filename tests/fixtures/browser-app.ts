@@ -7,7 +7,7 @@ import { serveSite } from "../../src/host/site.ts";
 import { MemoryProvider } from "../../src/concepts/Federating/provider.ts";
 import { connectMongo, localMongoUri } from "../../src/storage/mongo.ts";
 import { CourseTutor } from "../../src/host/tutor.ts";
-import { ChatGPTConnection } from "../../src/host/chatgpt.ts";
+import { Gemini } from "../../src/host/gemini.ts";
 import { MaterialFiles } from "../../src/host/material-files.ts";
 if (process.env.ALLOW_UI_FIXTURES !== "1") throw new Error("This server requires ALLOW_UI_FIXTURES=1.");
 const origin = "http://127.0.0.1:5174";
@@ -31,29 +31,17 @@ const fixtureTutor: Pick<CourseTutor, "suggest" | "generate"> = {
     return { text: "The order selects different rows and columns. The resulting sums can change, and one order might not be defined.", citations };
   },
 };
-const liveUsername = process.env.STILLGOTIT_LIVE_TEST_USER;
-let tutor: Pick<CourseTutor, "suggest" | "generate"> = fixtureTutor;
-let model = "fixture";
-if (liveUsername) {
-  const production = await connectMongo();
-  try {
-    const account = await production.db.collection("registering.users").findOne({ username: liveUsername });
-    if (!account) throw new Error("Choose a connected app account for the live test.");
-    const owner = String(account._id), connection = new ChatGPTConnection("http://localhost:5173");
-    const status = await connection.status(owner);
-    if (!status.connected) throw new Error("Connect ChatGPT in the main app first.");
-    model = status.model || (await connection.models(owner))[0]!.slug;
-    // Reuse only the approved provider connection. All learning state belongs to the test database.
-    tutor = new CourseTutor({ respond: async (_learner, instructions, content, schema) => {
-      const started = performance.now();
-      console.log("Live provider request started.");
-      try { const result = await connection.respond(owner, instructions, content, schema);
-        console.log(`Live provider request completed in ${Math.round(performance.now() - started)} ms.`); return result; }
-      catch (error) { console.log(`Live provider request failed after ${Math.round(performance.now() - started)} ms (${error instanceof Error ? error.name : "unknown error"}).`); throw error; }
-    } }, new MaterialFiles());
-  } finally { await production.client.close(); }
-}
-const runtime = await createRuntime({ database: db, provider, providerOrigin: origin, publicOrigin: origin, tutor });
+// STILLGOTIT_LIVE_AI=1 uses the real Gemini key from .env. All learning state still belongs to the test database.
+const live = process.env.STILLGOTIT_LIVE_AI === "1", gemini = new Gemini();
+if (live && !gemini.status().available) throw new Error("Set GEMINI_API_KEY in .env for the live test.");
+const tutor: Pick<CourseTutor, "suggest" | "generate"> = live ? new CourseTutor({ json: async (instructions, parts, schema) => {
+  const started = performance.now();
+  console.log(`Live ${gemini.model} request started.`);
+  try { const result = await gemini.json(instructions, parts, schema);
+    console.log(`Live provider request completed in ${Math.round(performance.now() - started)} ms.`); return result; }
+  catch (error) { console.log(`Live provider request failed after ${Math.round(performance.now() - started)} ms (${error instanceof Error ? error.message : "unknown error"}).`); throw error; }
+} }, new MaterialFiles()) : fixtureTutor;
+const runtime = await createRuntime({ database: db, provider, providerOrigin: origin, publicOrigin: origin, tutor, gemini });
 const site = serveSite({ api: runtime.handle, directory: `${import.meta.dir}/../../frontend/dist` });
 let dropDraftReply = process.env.STILLGOTIT_TEST_DROP_DRAFT_REPLY === "1";
 const server = Bun.serve({ hostname: "127.0.0.1", port: 5174, maxRequestBodySize: 26 * 1024 * 1024, async fetch(request) {
@@ -62,15 +50,15 @@ const server = Bun.serve({ hostname: "127.0.0.1", port: 5174, maxRequestBodySize
     const reply = provider.approve(request.url, { subject: "ui-test-learner", username: "ui_tester" });
     return Response.redirect(`${origin}/auth/commons/callback?${new URLSearchParams(reply)}`, 303);
   }
-  if (url.pathname === "/api/ai/status") return Response.json({ connected: true, active: "fixture", model, effort: "", accounts: [{ id: "fixture", label: liveUsername ? "Approved ChatGPT connection — test learner" : "Local test fixtures", connected: true }] });
-  if (url.pathname === "/api/ai/models") return Response.json({ models: [{ slug: model, display_name: liveUsername ? model : "Canned responses for UI checks", supported_reasoning_levels: [], default_reasoning_level: "" }] });
+  // Canned responses need no key, so report the tutor as available.
+  if (url.pathname === "/api/ai/status" && !live) return Response.json({ available: true, reason: "" });
   const result = await site(request);
   if (dropDraftReply && url.pathname === "/api/courses/skills/propose" && result.ok) {
     dropDraftReply = false;
     return Response.json({ error: "TEST_REPLY_LOST", detail: "Test interruption: the draft was saved but its reply was lost. Retry the pending save." }, { status: 503 });
   }
   if (result.headers.get("Content-Type")?.includes("text/html")) {
-    const label = liveUsername ? "LIVE AI TEST — scripted learner, separate database" : "UI TEST ONLY — canned AI responses, separate database";
+    const label = live ? "LIVE AI TEST — scripted learner, separate database" : "UI TEST ONLY — canned AI responses, separate database";
     const html = (await result.text()).replace("<body>", `<body><div role="note" style="position:sticky;top:0;z-index:100;padding:8px;text-align:center;background:#222;color:#fff;font:12px sans-serif">${label}</div>`);
     return new Response(html, { status: result.status, headers: result.headers });
   }

@@ -60,7 +60,7 @@ export class MasteryEstimating {
     const record = await this.tracks.findOne({ learner, subject, definition });
     if (!record) throw new refusal.EvidenceTrackUnavailable();
     if (!Number.isInteger(value.revision) || value.revision <= 0 || !(value.performedAt instanceof Date) ||
-      !Number.isFinite(value.performedAt.getTime()) || value.performedAt > this.clock() || !value.attribution?.trim() ||
+      !Number.isFinite(value.performedAt.getTime()) || value.performedAt > this.clock() || typeof value.attribution !== "string" || !value.attribution.trim() ||
       !["INDEPENDENT", "SUPPORTED", "SLIP", "GAP", "UNCERTAIN"].includes(value.signal) ||
       typeof value.fresh !== "boolean" || typeof value.gateMet !== "boolean" ||
       (value.gateMet && (value.signal !== "INDEPENDENT" || !value.fresh))) throw new refusal.InvalidMasteryEvidence();

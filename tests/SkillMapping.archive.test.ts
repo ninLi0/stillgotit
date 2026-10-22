@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { MongoServerError } from "mongodb";
@@ -9,6 +9,7 @@ import {
   type SkillMapping,
 } from "../src/concepts/SkillMapping.ts";
 import { connectMongo, localMongoUri } from "../src/storage/mongo.ts";
+import { clearCollections } from "./fixtures/clear-collections.ts";
 import { withOverlappingSkillReads } from "./fixtures/overlap-skill-reads.ts";
 
 const database = `stillgotit_test_${randomUUID().replaceAll("-", "")}`;
@@ -26,6 +27,11 @@ const content = {
 beforeAll(async () => {
   connection = await connectMongo({ uri, database });
   mapping = await createSkillMapping(connection.db);
+});
+
+beforeEach(async () => {
+  // Each test starts from empty collections in this file's database.
+  await clearCollections(connection!.db);
 });
 
 afterAll(async () => {
@@ -171,7 +177,7 @@ describe("SkillMapping archive", () => {
   });
 
   for (const rejectedWrite of ["courses", "skills"] as const) {
-    test(`rolls back all storage changes when MongoDB rejects the ${rejectedWrite} write`, async () => {
+    test(`a rejected ${rejectedWrite} write leaves the skill confirmed, releases the course, and a retry succeeds`, async () => {
       const instanceName = `ArchiveFailure_${rejectedWrite}`;
       const concept = await createSkillMapping(connection!.db, instanceName);
       const { owner, unit } = await makeCourse(concept);
@@ -187,6 +193,8 @@ describe("SkillMapping archive", () => {
         const result = concept.archive({ owner, skill });
         await expect(result).rejects.toBeInstanceOf(MongoServerError);
         await expect(result).rejects.toMatchObject({ code: 121 });
+        expect((await concept._skill({ skill }))[0]!.status).toBe("CONFIRMED");
+        // The stored records, including the course claim, match the earlier state.
         expect(await savedState(instanceName, true)).toEqual(before);
       } finally {
         await connection!.db.command({ collMod: `${instanceName}.${rejectedWrite}`, validator: {} });

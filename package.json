@@ -7,8 +7,10 @@
   "dependencies": {
     "@mit-sdg/sync-engine": "1.1.0",
     "@mit-sdg/sync-engine-http": "1.1.0",
-    "jose": "^6.2.12",
+    "fflate": "0.8.3",
+    "mammoth": "1.13.0",
     "mongodb": "7.7.0",
+    "unpdf": "1.9.1",
     "vue": "3.5.43"
   },
   "devDependencies": {

@@ -10,7 +10,7 @@ export type PassageSet = readonly PassageRef[];
 export type MaterialSet = readonly Material[];
 export interface DialogueTurn {
   speaker: "LEARNER" | "TUTOR";
-  purpose: "RESPONSE" | "EXPLANATION" | "PROBE" | "CLARIFICATION" | "HINT" | "CORRECTION";
+  purpose: "RESPONSE" | "EXPLANATION" | "HINT" | "CORRECTION";
   text: string;
   media: MediaList;
   channel: Channel;

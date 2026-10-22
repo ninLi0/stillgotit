@@ -1,4 +1,5 @@
 import { CourseTutor, objectSchema } from "./tutor.ts";
+import { GeminiError } from "./gemini.ts";
 import type { TutorRequest, TutorAnswer } from "../learning-data.ts";
 import type { PassageSet } from "../concepts/GroundedTutoring/dialogue.ts";
 const text = { type: "string" };
@@ -10,8 +11,29 @@ const prompts = {
   HINT: "Give one small hint for the practice task. Do not give the full answer. The learner explicitly requested help; the saved attempt records it.",
   GRADE: "Assess the saved work against ALL saved criteria. Do not solve missing parts for the learner. Check every result and the reasoning. Return INDEPENDENT only if help is NONE and the answer is correct. With help, a correct answer is SUPPORTED. SLIP is a small execution error with a sound method. GAP means missing or wrong understanding. Use UNCERTAIN when work cannot be read or judged. gateMet is true only if fresh is true, result is INDEPENDENT, and the complete saved demonstration gate is met. A manual clarification can explain original work but cannot count as a new solution. Explain the judgment in plain language. Address the learner directly. Say requirements, new problems, and without hints. Do not expose internal field names or uppercase status codes.",
 };
+/**
+ * The Generating concept reports every provider failure as GENERATION_FAILED. This keeps the learner-facing
+ * reason for the host, which reads it under the same learner lock as the request.
+ */
+export class TutorFailures {
+  private readonly reasons = new Map<string, string>();
+  record(owner: string, error: unknown) {
+    const reason = error instanceof GeminiError ? error.message : "The tutor could not produce a usable answer. Try again.";
+    this.reasons.set(owner, `${reason} Your saved work is still available.`);
+  }
+  take(owner: string): string | undefined { const reason = this.reasons.get(owner); this.reasons.delete(owner); return reason; }
+}
+
 /** Provider transport and output validation only. It cannot read or write concept state. */
-export function tutorGenerator(tutor: Pick<CourseTutor, "generate" | "suggest">) {
+export function tutorGenerator(tutor: Pick<CourseTutor, "generate" | "suggest">, failures?: TutorFailures) {
+  const generate = validated(tutor);
+  return async (owner: string, request: TutorRequest): Promise<TutorAnswer> => {
+    try { return await generate(owner, request); }
+    catch (error) { failures?.record(owner, error); throw error; }
+  };
+}
+
+function validated(tutor: Pick<CourseTutor, "generate" | "suggest">) {
   return async (owner: string, request: TutorRequest): Promise<TutorAnswer> => {
     const answer: TutorAnswer = { text: "", citations: [], materials: request.sources.map((source) => source.material),
       result: "UNCERTAIN", gateMet: false, rationale: "", suggestions: { unitTitle: "", skills: [] } };

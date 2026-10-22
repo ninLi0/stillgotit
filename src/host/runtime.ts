@@ -11,21 +11,21 @@ import { SessioningConcept } from "../concepts/Sessioning/Sessioning.ts";
 import { createSkillMapping } from "../concepts/SkillMapping.ts";
 import { RegistrationRecoveryStore } from "../storage/RegistrationRecoveryStore.ts";
 import { createApplicationHttp } from "./http.ts";
-import { ChatGPTConnection } from "./chatgpt.ts";
+import { Gemini } from "./gemini.ts";
 import { MaterialFiles } from "./material-files.ts";
 import { MaterialImportStore } from "../storage/MaterialImportStore.ts";
 import { CourseTutor } from "./tutor.ts";
 import { TutorGenerating } from "../concepts/Generating/registry.ts";
-import { tutorGenerator } from "./tutor-generation.ts";
+import { TutorFailures, tutorGenerator } from "./tutor-generation.ts";
 
-export async function createRuntime({ database, provider, providerOrigin, publicOrigin, clock = () => new Date(), tutor: suppliedTutor }: {
+export async function createRuntime({ database, provider, providerOrigin, publicOrigin, clock = () => new Date(), tutor: suppliedTutor, gemini = new Gemini() }: {
   database: Db; provider: Provider; providerOrigin: string; publicOrigin: string; clock?: () => Date;
-  tutor?: Pick<CourseTutor, "suggest" | "generate">;
+  tutor?: Pick<CourseTutor, "suggest" | "generate">; gemini?: Gemini;
 }) {
-  const chatgpt = new ChatGPTConnection(publicOrigin), files = new MaterialFiles(), imports = new MaterialImportStore(database);
-  const tutor = suppliedTutor ?? new CourseTutor(chatgpt, files);
+  const files = new MaterialFiles(), imports = new MaterialImportStore(database), failures = new TutorFailures();
+  const tutor = suppliedTutor ?? new CourseTutor(gemini, files);
   const application = assembleApplication({
-    TutorGenerating: new TutorGenerating(tutorGenerator(tutor)),
+    TutorGenerating: new TutorGenerating(tutorGenerator(tutor, failures)),
     Registering: new RegisteringConcept(database),
     CommonsFederating: new FederatingConcept<User>(database, provider, "CommonsFederating", clock),
     Sessioning: new SessioningConcept<User>(database, "Sessioning", clock),
@@ -36,6 +36,6 @@ export async function createRuntime({ database, provider, providerOrigin, public
     GroundedTutoring: new GroundedTutoring(database, "GroundedTutoring", clock),
   }, clock);
   const recovery = new RegistrationRecoveryStore(database, providerOrigin);
-  const http = createApplicationHttp({ application, recovery, publicOrigin, clock, chatgpt, files, imports });
-  return { application, recovery, chatgpt, files, imports, tutor, ...http };
+  const http = createApplicationHttp({ application, recovery, publicOrigin, clock, gemini, failures, files, imports });
+  return { application, recovery, gemini, files, imports, tutor, ...http };
 }

@@ -126,7 +126,7 @@ describe("Study time", () => {
     expect((await p.concept._proposalCheck({ learner: "sam", ...plan, currentBasis: "v1" }))[0]!.locallyCurrent).toBe(false);
     await expect(p.concept.activateRoutine({ learner: "sam", ...plan, currentBasis: "v1" })).rejects.toMatchObject({ code: "ROUTINE_PLAN_OUTDATED" });
   });
-  test("zero budget defers work; urgent exam cuts need confirmation before replacing the active plan", async () => {
+  test("zero budget defers work; an urgent exam cut needs confirmation and moves maintenance to the exam day", async () => {
     const p = await planner(0), empty = await p.propose([candidate("maintenance")]);
     expect(await p.concept._items(empty)).toEqual([]); expect(await p.concept._deferred(empty)).toHaveLength(1);
     await p.concept.configure({ learner: "sam", scope: "math", dailyMinutes: 10, focusNote: "Exam" });
@@ -139,7 +139,7 @@ describe("Study time", () => {
     expect(items.find((i) => i.candidate.key === "maintenance")!.day).toBe("2026-10-14");
     expect(await p.concept._cuts(plan)).toHaveLength(1);
   });
-  test("competing starts allow only one active activity across scopes", async () => {
+  test("competing starts on one plan leave only one activity in progress", async () => {
     const p = await planner();
     const plan = await p.propose([candidate("a"), candidate("b")]);
     await p.concept.activateRoutine({ learner: "sam", ...plan, currentBasis: "v1" });

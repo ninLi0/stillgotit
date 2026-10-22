@@ -3,7 +3,6 @@ import { onMounted, ref } from "vue";
 import { api, errorMessage, type Course } from "./api.ts";
 import TreeMark from "./TreeMark.vue";
 import CourseWorkspace from "./CourseWorkspace.vue";
-import { hostRequest } from "./host-api.ts";
 
 const loading = ref(true), busy = ref(false), choosing = ref(false), canResume = ref(false);
 const username = ref<string | null>(null), chosenName = ref("");
@@ -80,14 +79,6 @@ async function signOut() {
 async function reload() { busy.value = true; error.value = ""; await loadAccount(); busy.value = false; }
 
 onMounted(async () => {
-  if (window.location.pathname === "/auth/chatgpt/complete") {
-    const failed = new URLSearchParams(window.location.search).has("error");
-    window.history.replaceState(null, "", "/");
-    try {
-      if (failed) throw new Error("ChatGPT connection was not completed. Try again.");
-      await hostRequest("/ai/connect/finish"); notice.value = "ChatGPT connected.";
-    } catch (problem) { error.value = problem instanceof Error ? problem.message : "ChatGPT connection failed."; }
-  }
   const callback = window.location.pathname === "/auth/commons/callback";
   const params = new URLSearchParams(window.location.search);
   const code = params.get("code"), state = params.get("state");

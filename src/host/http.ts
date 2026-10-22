@@ -8,19 +8,21 @@ import type { Session } from "../concepts/Sessioning/Sessioning.ts";
 import type { RegistrationRecoveryStore } from "../storage/RegistrationRecoveryStore.ts";
 import { ATTEMPT_COOKIE, BODY_LIMIT, SESSION_COOKIE, stillGotItPolicy } from "./http-policy.ts";
 import { KeyedLocks } from "./locks.ts";
-import type { ChatGPTConnection } from "./chatgpt.ts";
+import type { Gemini } from "./gemini.ts";
+import type { TutorFailures } from "./tutor-generation.ts";
 import type { MaterialFiles } from "./material-files.ts";
 import type { MaterialImportStore } from "../storage/MaterialImportStore.ts";
 import type { Material } from "../concepts/GroundedTutoring/GroundedTutoring.ts";
 
 type Application = ReturnType<typeof assembleApplication>;
 
-export function createApplicationHttp({ application, recovery, publicOrigin, clock = () => new Date(), chatgpt, files, imports }: {
+export function createApplicationHttp({ application, recovery, publicOrigin, clock = () => new Date(), gemini, failures, files, imports }: {
   application: Application;
   recovery: Pick<RegistrationRecoveryStore, "getOrCreate">;
   publicOrigin: string;
   clock?: () => Date;
-  chatgpt?: ChatGPTConnection;
+  gemini?: Pick<Gemini, "status" | "transcribe">;
+  failures?: TutorFailures;
   files?: MaterialFiles;
   imports?: MaterialImportStore;
 }) {
@@ -30,7 +32,6 @@ export function createApplicationHttp({ application, recovery, publicOrigin, clo
   const preparedInner = createHttpHandler({ application, gateway: rawGateway, policy: stillGotItPolicy(publicOrigin, 4 * 1024 * 1024) });
   const locks = new KeyedLocks();
   const { CommonsFederating, Registering, Sessioning } = application.concepts;
-  const chatCookie = "stillgotit-chatgpt-attempt";
 
   async function admission(path: string, body: Record<string, unknown>, owner: string) {
     const entry = admissions[path as keyof typeof admissions];
@@ -134,31 +135,8 @@ export function createApplicationHttp({ application, recovery, publicOrigin, clo
     if (!owner) return failure("UNAUTHORIZED", 401);
     const body = await readBody(request);
     if (!body) return failure("INVALID_REQUEST", 400);
-    if (path.startsWith("/api/ai/") && !chatgpt) return failure("UNAVAILABLE", 503);
-    if (path === "/api/ai/status") return Response.json(await chatgpt!.status(owner));
-    if (path === "/api/ai/connect/start") {
-      if (body.clientId !== undefined && typeof body.clientId !== "string") return failure("INVALID_REQUEST", 400);
-      const start = await chatgpt!.start(owner, body.clientId as string | undefined);
-      return Response.json({ address: start.address }, { headers: {
-        "Set-Cookie": `${chatCookie}=${start.attempt}; Path=/; HttpOnly; SameSite=Lax; Max-Age=600${publicOrigin.startsWith("https:") ? "; Secure" : ""}`,
-      } });
-    }
-    if (path === "/api/ai/connect/finish") {
-      const attempt = cookie(request.headers.get("Cookie"), chatCookie);
-      if (!attempt) return failure("FORBIDDEN", 403);
-      await chatgpt!.finish(owner, attempt);
-      return Response.json({ connected: true }, { headers: { "Set-Cookie": `${chatCookie}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0` } });
-    }
-    if (path === "/api/ai/models") return Response.json({ models: await chatgpt!.models(owner) });
-    if (path === "/api/ai/model") {
-      if (typeof body.model !== "string" || (body.effort !== undefined && typeof body.effort !== "string")) return failure("INVALID_REQUEST", 400);
-      await chatgpt!.selectModel(owner, body.model, body.effort as string | undefined); return Response.json(await chatgpt!.status(owner));
-    }
-    if (path === "/api/ai/account") {
-      if (typeof body.clientId !== "string") return failure("INVALID_REQUEST", 400);
-      await chatgpt!.select(owner, body.clientId); return Response.json({});
-    }
-    if (path === "/api/ai/disconnect") return Response.json(await chatgpt!.disconnect(owner));
+    // Availability only: whether this server has a Gemini key. The key never leaves the server.
+    if (path === "/api/ai/status") return Response.json(gemini?.status() ?? { available: false, reason: "The AI tutor is not set up on this server." });
     if (path === "/api/courses/materials/file") {
       if (typeof body.material !== "string") return failure("INVALID_REQUEST", 400);
       const material = body.material as Material;
@@ -231,14 +209,6 @@ export function createApplicationHttp({ application, recovery, publicOrigin, clo
   async function handle(request: Request): Promise<Response> {
     const path = new URL(request.url).pathname;
     if (path.startsWith("/api/internal/")) return failure("FORBIDDEN", 403);
-    if (path === "/auth/chatgpt/return" && request.method === "GET" && chatgpt) {
-      try {
-        await chatgpt.callback(new URL(request.url).searchParams);
-        return Response.redirect(`${publicOrigin}/auth/chatgpt/complete`, 303);
-      } catch {
-        return Response.redirect(`${publicOrigin}/auth/chatgpt/complete?error=connection`, 303);
-      }
-    }
     // Check before the wrapper does any work, as well as inside the reference adapter.
     if (request.method !== "POST") return failure("INVALID_REQUEST", 405);
     if (request.headers.get("Origin") !== publicOrigin) return failure("FORBIDDEN", 403);
@@ -251,10 +221,10 @@ export function createApplicationHttp({ application, recovery, publicOrigin, clo
       if (path === "/api/learning/transcribe") {
         const owner = await learner(request);
         if (!owner) return failure("UNAUTHORIZED", 401);
-        if (!files || !request.headers.get("Content-Type")?.startsWith("multipart/form-data")) return failure("INVALID_REQUEST", 400);
+        if (!gemini || !request.headers.get("Content-Type")?.startsWith("multipart/form-data")) return failure("INVALID_REQUEST", 400);
         const recording = (await request.formData()).get("recording");
         if (!(recording instanceof File)) return failure("INVALID_REQUEST", 400);
-        const transcript = await files.transcribe(owner, recording);
+        const transcript = await gemini.transcribe(recording);
         return await learner(request) === owner ? Response.json(transcript) : failure("UNAUTHORIZED", 401);
       }
       if (path.startsWith("/api/learning/") || path.startsWith("/api/planning/") || path === "/api/courses/skills/suggest") {
@@ -269,8 +239,14 @@ export function createApplicationHttp({ application, recovery, publicOrigin, clo
               return Response.json({ error: "INVALID_REQUEST", detail: entry.detail }, { status: 400, headers: { "Cache-Control": "no-store" } });
             }
           }
-          try { return await inner(request); }
+          failures?.take(owner);
+          let response: Response;
+          try { response = await inner(request); }
           finally { await rawGateway.whenIdle(); }
+          // GENERATION_FAILED reaches HTTP as a bare INVALID_REQUEST. Add the provider's reason so the learner knows to retry.
+          const reason = failures?.take(owner);
+          return reason && response.status === 400
+            ? Response.json({ error: "INVALID_REQUEST", detail: reason }, { status: 400, headers: { "Cache-Control": "no-store" } }) : response;
         });
       }
       if (path.startsWith("/api/ai/") || path === "/api/courses/materials/file") {

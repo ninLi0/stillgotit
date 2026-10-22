@@ -9,7 +9,7 @@ export async function withOverlappingSkillReads<T>(
   const original = Collection.prototype.findOne;
   const seen = new Set<string>();
   const ready = Promise.withResolvers<void>();
-  const timeout = setTimeout(() => ready.reject(new Error("Both transaction reads must arrive.")), 5_000);
+  const timeout = setTimeout(() => ready.reject(new Error("Both first skill reads must arrive.")), 5_000);
   const read = spyOn(Collection.prototype, "findOne").mockImplementation(
     async function<T>(this: Collection, filter: Filter<Document> = {}, options?: Parameters<typeof original>[1]): Promise<T | null> {
       const record = await original.call(this, filter, options);
@@ -18,7 +18,7 @@ export async function withOverlappingSkillReads<T>(
         && (filter.status === "CONFIRMED" || filter.status === "ARCHIVED")
         && skills.includes(id) && !seen.has(id)) {
         // Keep real MongoDB reads and writes. Pause the first reads so both
-        // transactions hold a snapshot from before either edit.
+        // requests read their skills before either one edits anything.
         seen.add(id);
         if (seen.size === skills.length) ready.resolve();
         await ready.promise;

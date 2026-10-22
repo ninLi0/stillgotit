@@ -22,7 +22,7 @@ external Task
 Result is INDEPENDENT or SUPPORTED or SLIP or GAP or UNCERTAIN
   INDEPENDENT means successful work without help. SUPPORTED means successful work with help. SLIP means a sound method with a small execution error. GAP means a gap in understanding or application. UNCERTAIN means too little reliable evidence to judge.
 Help is NONE or HINT or UNKNOWN
-  No assistance, recorded or declared assistance, or unknown assistance. Neutral probes and input corrections are not help.
+  No assistance, recorded or declared assistance, or unknown assistance. Corrections to a transcript are not help.
 Origin is AI or MANUAL
   Whether the judgment came from an automated assessment or a learner's manual correction.
 opaque ResponseValue

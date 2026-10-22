@@ -1,7 +1,7 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { MongoServerError } from "mongodb";
+import { Collection, MongoServerError } from "mongodb";
 import {
   createSkillMapping,
   InvalidSkillDefinitionError,
@@ -10,6 +10,7 @@ import {
   type SkillMapping,
 } from "../src/concepts/SkillMapping.ts";
 import { connectMongo, localMongoUri } from "../src/storage/mongo.ts";
+import { clearCollections } from "./fixtures/clear-collections.ts";
 
 const database = `stillgotit_test_${randomUUID().replaceAll("-", "")}`;
 const uri = process.env.MONGODB_TEST_URI ?? localMongoUri;
@@ -26,6 +27,11 @@ const content = {
 beforeAll(async () => {
   connection = await connectMongo({ uri, database });
   mapping = await createSkillMapping(connection.db);
+});
+
+beforeEach(async () => {
+  // Each test starts from empty collections in this file's database.
+  await clearCollections(connection!.db);
 });
 
 afterAll(async () => {
@@ -67,9 +73,7 @@ describe("SkillMapping requirements revision", () => {
     const { owner, unit, skill, current } = await makeConfirmed();
     const prerequisite = await mapping.propose({ proposalKey: crypto.randomUUID(), ...content, owner, unit, title: "Read matrix dimensions" });
     await mapping.confirm({ owner, skill: prerequisite.skill });
-    // Seed a valid prerequisite fixture only in this test DB.
-    await connection!.db.collection<{ _id: string; prerequisites: string[] }>("SkillMapping.skills")
-      .updateOne({ _id: skill }, { $set: { prerequisites: [prerequisite.skill] } });
+    await mapping.setPrerequisites({ owner, skill, prerequisites: [prerequisite.skill] });
     await makeConfirmed();
     const before = await savedState();
     const outcome = field === "gate" ? content.outcome : " Explain how matrix multiplication combines linear maps. ";
@@ -122,9 +126,7 @@ describe("SkillMapping requirements revision", () => {
     const confirmed = await makeConfirmed();
     const draft = await makeDraft();
     const archived = await makeConfirmed();
-    // Seed an archived fixture for this action's status checks.
-    await connection!.db.collection<{ _id: string; status: string }>("SkillMapping.skills")
-      .updateOne({ _id: archived.skill }, { $set: { status: "ARCHIVED" } });
+    await mapping.archive({ owner: archived.owner, skill: archived.skill });
     const before = await savedState();
     for (const identity of [
       { owner: randomUUID(), skill: confirmed.skill },
@@ -173,8 +175,8 @@ describe("SkillMapping requirements revision", () => {
     }
   });
 
-  test.each(["versions", "skills"])("rolls back all changes if the %s write fails", async (collection) => {
-    const instanceName = `DefinitionRollback_${collection}`;
+  test.each(["versions", "skills"])("a failed %s write keeps the current version and a retry saves one new version", async (collection) => {
+    const instanceName = `DefinitionFailure_${collection}`;
     const concept = await createSkillMapping(connection!.db, instanceName);
     const { owner, skill, current } = await makeConfirmed(concept);
     const before = await savedState(instanceName);
@@ -189,6 +191,11 @@ describe("SkillMapping requirements revision", () => {
       const result = concept.reviseDefinition(revision);
       await expect(result).rejects.toBeInstanceOf(MongoServerError);
       await expect(result).rejects.toMatchObject({ code: 121 });
+      expect((await concept._skill({ skill }))[0]?.current).toBe(current);
+      expect(await concept._version({ version: current })).toEqual([{
+        skill, outcome: content.outcome, gate: content.gate,
+      }]);
+      // A version saved before a rejected skill write never became current, so it is removed.
       expect(await savedState(instanceName)).toEqual(before);
     } finally {
       await connection!.db.command({ collMod: `${instanceName}.${collection}`, validator: {} });
@@ -197,6 +204,34 @@ describe("SkillMapping requirements revision", () => {
     expect(result.previous).toBe(current);
     expect((await concept._skill({ skill }))[0]?.current).toBe(result.version);
     expect(await versionCount(skill, instanceName)).toBe(2);
+  });
+
+  test("a request that stops before switching versions leaves the old version current", async () => {
+    const { owner, skill, current } = await makeConfirmed();
+    const revision = { owner, skill, outcome: content.outcome, gate: "Explain incompatible dimensions." };
+    // Simulate a process that stops right after saving the new version: neither
+    // the switch nor the removal of the unused version runs.
+    const update = spyOn(Collection.prototype, "updateOne")
+      .mockImplementationOnce(async () => { throw new Error("Stopped before the switch."); });
+    const remove = spyOn(Collection.prototype, "deleteOne")
+      .mockImplementationOnce(async () => { throw new Error("Stopped before the removal."); });
+    try {
+      await expect(mapping.reviseDefinition(revision)).rejects.toThrow("Stopped before the switch.");
+    } finally {
+      update.mockRestore();
+      remove.mockRestore();
+    }
+    expect((await mapping._skill({ skill }))[0]?.current).toBe(current);
+    expect(await mapping._version({ version: current })).toEqual([{
+      skill, outcome: content.outcome, gate: content.gate,
+    }]);
+
+    const result = await mapping.reviseDefinition(revision);
+    expect(result.previous).toBe(current);
+    expect((await mapping._skill({ skill }))[0]?.current).toBe(result.version);
+    // The stopped attempt left one unused version. No action returned its
+    // identity and the skill never used it, so no query reaches it.
+    expect(await versionCount(skill)).toBe(3);
   });
 
   test("concurrent identical revisions create one version and one unchanged refusal", async () => {

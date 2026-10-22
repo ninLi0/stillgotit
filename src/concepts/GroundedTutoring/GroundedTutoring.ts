@@ -179,20 +179,6 @@ export class GroundedTutoring<Learner extends string = string, Scope extends str
     });
   }
 
-  async askFollowup({ owner, task, question, channel }: { owner: Learner; task: Session; question: string; channel: Channel }): Promise<Record<string, never>> {
-    return this.#edit(owner, task, "PRACTICE", refusal.FollowupTaskUnavailable, (record) => {
-      if (!nonblank(question) || !["TEXT", "VOICE"].includes(channel)) throw new refusal.InvalidTaskProbe();
-      record.dialogue.push({ speaker: "TUTOR", purpose: "PROBE", text: question, media: [], channel, citations: [], at: this.clock() });
-    });
-  }
-
-  async clarifyInput({ owner, session, question, channel }: { owner: Learner; session: Session; question: string; channel: Channel }): Promise<Record<string, never>> {
-    return this.#edit(owner, session, undefined, refusal.ClarificationSessionUnavailable, (record) => {
-      if (!nonblank(question) || !["TEXT", "VOICE"].includes(channel)) throw new refusal.InvalidInputClarification();
-      record.dialogue.push({ speaker: "TUTOR", purpose: "CLARIFICATION", text: question, media: [], channel, citations: [], at: this.clock() });
-    });
-  }
-
   async requestHint({ owner, task }: { owner: Learner; task: Session }): Promise<Record<string, never>> {
     return this.#edit(owner, task, "PRACTICE", refusal.HintRequestUnavailable, (record) => { record.hintRequested = true; });
   }

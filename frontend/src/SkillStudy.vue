@@ -6,7 +6,8 @@ import { api, unwrap } from "./api.ts";
 import type { StillGotItHttp } from "../../generated/wire.ts";
 type SkillData = StillGotItHttp["/learning/read"]["output"]["data"];
 type StudySession = SkillData["sessions"][number];
-const props = defineProps<{ skill: string; course: string; connected: boolean; active?: boolean }>();
+// aiReason explains why AI features are off when aiAvailable is false.
+const props = defineProps<{ skill: string; course: string; aiAvailable: boolean; aiReason: string; active?: boolean }>();
 const emit = defineEmits<{ changed: [] }>();
 const data = shallowRef<SkillData | null>(null), selected = ref<StudySession["session"] | "">(""), busy = ref(false), error = ref("");
 const confidence = ref(50), freshLesson = ref(false), recording = ref(false), reviewOpen = ref(false), thread = ref<HTMLElement | null>(null);
@@ -14,7 +15,7 @@ const response = ref(""), channel = ref<"TEXT" | "VOICE">("TEXT"), attachment = 
 const reviewed = ref(false), unseen = ref(true), outsideHelp = ref(false), reason = ref(""), correction = ref<NonNullable<SkillData["cases"][number]["judgment"]>["result"]>("SLIP"), fullGate = ref(false);
 const current = computed(() => freshLesson.value ? undefined : data.value?.sessions.find((session) => session.session === selected.value));
 const currentCases = computed(() => data.value?.cases.filter((item) => item.task === selected.value) ?? []);
-const canSend = computed(() => !busy.value && !recording.value && (props.connected || !!current.value?.task) && (!!response.value.trim() || (!!attachment.value && !!current.value)));
+const canSend = computed(() => !busy.value && !recording.value && (props.aiAvailable || !!current.value?.task) && (!!response.value.trim() || (!!attachment.value && !!current.value)));
 const unsent = new Map<string, { text: string; channel: "TEXT" | "VOICE"; attachment: string; name: string }>();
 const speechEdits = ref<Record<number, string>>({});
 const unsavedTranscripts = computed(() => current.value?.voice.some((voice) => speechEdits.value[voice.turnIndex] !== voice.text) ?? false);
@@ -103,7 +104,7 @@ onBeforeUnmount(() => { if ("speechSynthesis" in window) window.speechSynthesis.
     <div class="chat-main">
       <header class="chat-heading">
         <div><h1 id="page-title">{{ data?.skill.title || 'Opening your lesson…' }}</h1><p>{{ current?.task ? 'Independent practice' : 'Your learning conversation' }}<span v-if="data?.estimate"> · {{ Math.round(data.estimate.value) }}% estimated mastery</span></p></div>
-        <button class="practice-button" :disabled="busy || recording || !connected || !data?.track" @click="startTask">Check my understanding</button>
+        <button class="practice-button" :disabled="busy || recording || !aiAvailable || !data?.track" :title="aiAvailable ? undefined : aiReason" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="startTask">Check my understanding</button>
       </header>
       <div ref="thread" class="chat-thread">
         <div v-if="data && !data.track" class="confidence-note">
@@ -119,20 +120,20 @@ onBeforeUnmount(() => { if ("speechSynthesis" in window) window.speechSynthesis.
             <details v-if="current.citations.length" class="sources"><summary>Sources used</summary><ul><li v-for="source in current.citations" :key="`${source.material}:${source.location}`">{{ source.location }}</li></ul></details>
           </article>
           <article v-for="item in current.dialogue" :key="item.turnIndex" class="message" :class="item.turn.speaker === 'LEARNER' ? 'from-you' : 'from-tutor'"><span class="speaker">{{ item.turn.speaker === 'LEARNER' ? 'You' : 'StillGotIt' }}{{ item.turn.purpose === 'HINT' ? ' · hint' : item.turn.purpose === 'CORRECTION' ? ' · transcript correction' : '' }}</span><p class="prose">{{ item.turn.text }}</p><p v-for="file in item.turn.media" :key="file.name" class="attachment-label">Attachment · {{ file.name }}</p></article>
-          <button v-if="current.lesson && current.dialogue.at(-1)?.turn.speaker === 'LEARNER'" class="message-action" :disabled="busy || !connected" @click="retryReply">Retry tutor reply</button>
+          <button v-if="current.lesson && current.dialogue.at(-1)?.turn.speaker === 'LEARNER'" class="message-action" :disabled="busy || !aiAvailable" @click="retryReply">Retry tutor reply</button>
           <div v-if="current.task && current.status === 'OPEN' && current.dialogue.some(item => item.turn.speaker === 'LEARNER' && item.turn.purpose === 'RESPONSE')" class="review-step">
             <button class="practice-button" :disabled="busy || recording" @click="reviewOpen = !reviewOpen">{{ reviewOpen ? 'Close review' : 'Review and assess my work' }}</button>
             <div v-if="reviewOpen" class="attempt-review">
               <h3>Ready to check your understanding?</h3><p class="hint">Review your complete answer before assessment.</p>
               <div v-for="voice in current.voice" :key="voice.turnIndex" class="transcript"><label :for="`voice-${voice.turnIndex}`">Speech transcript {{ voice.turnIndex + 1 }}</label><textarea :id="`voice-${voice.turnIndex}`" v-model="speechEdits[voice.turnIndex]" rows="3" /><button class="message-action" :disabled="busy" @click="correctTranscript(voice.turnIndex)">Save transcript correction</button></div>
               <label class="check"><input v-model="unseen" type="checkbox" /> These exact problems are new to me.</label><label class="check"><input v-model="outsideHelp" type="checkbox" /> I used help outside this conversation.</label><label class="check"><input v-model="reviewed" type="checkbox" /> I reviewed my answer and all speech transcripts.</label>
-              <p v-if="unsavedTranscripts" class="hint">Save your transcript corrections first.</p><button class="primary" :disabled="busy || !connected || !reviewed || unsavedTranscripts" @click="assess">Assess my work</button>
+              <p v-if="unsavedTranscripts" class="hint">Save your transcript corrections first.</p><button class="primary" :disabled="busy || !aiAvailable || !reviewed || unsavedTranscripts" @click="assess">Assess my work</button>
             </div>
           </div>
-          <button v-if="current.status === 'CLOSED' && !currentCases.some(item => item.judgment)" class="practice-button" :disabled="busy || !connected" @click="assess">Retry saved assessment</button>
+          <button v-if="current.status === 'CLOSED' && !currentCases.some(item => item.judgment)" class="practice-button" :disabled="busy || !aiAvailable" @click="assess">Retry saved assessment</button>
           <article v-for="item in currentCases" :key="item.case" class="assessment">
             <template v-if="item.judgment"><span class="speaker">Your assessment</span><h3>{{ resultLabels[item.judgment.result] }}</h3><p class="prose">{{ item.judgment.rationale }}</p>
-              <details><summary>Review or correct this assessment</summary><label>Reason<textarea v-model="reason" rows="3" /></label><button class="message-action" :disabled="busy || !connected || !reason.trim()" @click="requestRegrade(item.case, item.judgment.judgment)">Request regrade</button>
+              <details><summary>Review or correct this assessment</summary><label>Reason<textarea v-model="reason" rows="3" /></label><button class="message-action" :disabled="busy || !aiAvailable || !reason.trim()" @click="requestRegrade(item.case, item.judgment.judgment)">Request regrade</button>
               <label>Manual correction<select v-model="correction"><option v-for="(label,value) in resultLabels" :key="value" :value="value">{{ label }}</option></select></label><label class="check"><input v-model="fullGate" type="checkbox" /> All requirements were met in fresh independent work.</label><button class="message-action" :disabled="busy || !reason.trim()" @click="saveCorrection(item.case, item.judgment.judgment)">Save correction</button><ol><li v-for="judgment in item.history" :key="judgment.judgment">{{ resultLabels[judgment.result] }} · {{ judgment.origin === 'AI' ? 'Tutor' : 'Your correction' }}<p>{{ judgment.rationale }}</p></li></ol></details>
             </template><p v-else>Your answer is saved. Assessment is pending.</p>
           </article>
@@ -147,13 +148,13 @@ onBeforeUnmount(() => { if ("speechSynthesis" in window) window.speechSynthesis.
             <label class="sr-only" for="chat-message">{{ current?.task ? 'Your answer and reasoning' : 'Message your tutor' }}</label>
             <textarea id="chat-message" v-model="response" rows="2" :disabled="busy" :placeholder="current?.task ? 'Explain your reasoning. You can type, speak, or attach your work.' : 'Ask a question or tell me what you want to learn…'" @keydown="enterToSend" />
             <div class="composer-tools"><div class="input-tools"><label class="attach-button" :class="{ unavailable: !current || busy || recording }" :title="current ? 'Attach a photo of your work' : 'Start a lesson before attaching work'"><span aria-hidden="true">＋</span><span class="sr-only">Add a photo of your work</span><input type="file" accept="image/*" capture="environment" :disabled="busy || recording || !current" @change="uploadWork" /></label>
-              <button v-if="current?.task" class="hint-button" :disabled="busy || recording || !connected" @click="requestHint">Hint</button>
-            </div><div class="composer-right"><slot name="composer-settings" /><SpeechInput :disabled="busy" :active="active !== false" compact @recording="recording = $event" @transcript="response = response ? response + '\n' + $event : $event; channel = 'VOICE'" @error="error = $event" /><button class="send-button" :disabled="!canSend" :aria-label="current?.task ? 'Save answer' : 'Send message'" @click="submitMessage"><span aria-hidden="true">↑</span></button></div></div>
+              <button v-if="current?.task" class="hint-button" :disabled="busy || recording || !aiAvailable" @click="requestHint">Hint</button>
+            </div><div class="composer-right"><SpeechInput :disabled="busy || !aiAvailable" :active="active !== false" compact @recording="recording = $event" @transcript="response = response ? response + '\n' + $event : $event; channel = 'VOICE'" @error="error = $event" /><button class="send-button" :disabled="!canSend" :aria-label="current?.task ? 'Save answer' : 'Send message'" @click="submitMessage"><span aria-hidden="true">↑</span></button></div></div>
           </div>
           <p class="composer-note">{{ recording ? 'Recording. Stop to review your words before sending.' : current?.task ? 'Review your complete answer before requesting assessment.' : 'Grounded in your course materials. Check important details.' }}</p>
         </template>
-        <div v-else class="finished-message"><p>This attempt is saved.</p><button class="practice-button" :disabled="busy || !connected" @click="startTask">Try a fresh check</button><button class="message-action" :disabled="busy" @click="newLesson">Keep learning</button></div>
-        <p v-if="!connected" class="hint">Connect ChatGPT in Tutor settings to continue.</p>
+        <div v-else class="finished-message"><p>This attempt is saved.</p><button class="practice-button" :disabled="busy || !aiAvailable" @click="startTask">Try a fresh check</button><button class="message-action" :disabled="busy" @click="newLesson">Keep learning</button></div>
+        <p v-if="!aiAvailable && aiReason" id="ai-reason-chat" class="hint">{{ aiReason }}</p>
       </div>
     </div>
   </section>

@@ -2,7 +2,7 @@ import { StudyPlanning } from "../src/concepts/StudyPlanning/StudyPlanning.ts";
 import { MasteryEstimating } from "../src/concepts/MasteryEstimating/MasteryEstimating.ts";
 import { AssessmentReviewing } from "../src/concepts/AssessmentReviewing/AssessmentReviewing.ts";
 import { GroundedTutoring } from "../src/concepts/GroundedTutoring/GroundedTutoring.ts";
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import type { ActionRefusal } from "@mit-sdg/sync-engine/assembly";
 import { assembleApplication } from "../src/assembly.ts";
@@ -12,6 +12,7 @@ import { RegisteringConcept, type User } from "../src/concepts/Registering/Regis
 import { SessioningConcept } from "../src/concepts/Sessioning/Sessioning.ts";
 import { createSkillMapping } from "../src/concepts/SkillMapping.ts";
 import { connectMongo, localMongoUri } from "../src/storage/mongo.ts";
+import { clearCollections } from "./fixtures/clear-collections.ts";
 
 const database = `stillgotit_test_${randomUUID().replaceAll("-", "")}`;
 const uri = process.env.MONGODB_TEST_URI ?? localMongoUri;
@@ -35,6 +36,11 @@ beforeAll(async () => {
     StudyPlanning: new StudyPlanning(connection.db),
     GroundedTutoring: new GroundedTutoring(connection.db),
   });
+});
+
+beforeEach(async () => {
+  // Each test starts from empty collections in this file's database.
+  await clearCollections(connection!.db);
 });
 
 afterAll(async () => {

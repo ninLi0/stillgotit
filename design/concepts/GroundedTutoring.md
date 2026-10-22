@@ -40,7 +40,7 @@ opaque PassageSet
 opaque AttemptDeclaration
   The dialogue length reviewed by the learner, whether the exact problems are new, and whether the learner used outside help.
 opaque DialogueTurn
-  An immutable value containing speaker, purpose, text, media, channel, citations, server time, and an optional correction target. Purposes are RESPONSE, EXPLANATION, PROBE, CLARIFICATION, HINT, or CORRECTION. A correction targets an original learner voice response by its dialogue index.
+  An immutable value containing speaker, purpose, text, media, channel, citations, server time, and an optional correction target. Purposes are RESPONSE, EXPLANATION, HINT, or CORRECTION. The learner adds RESPONSE and CORRECTION turns. The tutor adds EXPLANATION turns to lessons and HINT turns to tasks. A correction targets an original learner voice response by its dialogue index.
 opaque SourceRecords
   Owned materials with their source content and retained files.
 opaque StudyRecords
@@ -90,9 +90,9 @@ Rule: every new material has a nonblank importKey supplied by the host. Only mat
 Rule: a retry compares scope, title, locator, content, originals, and origin with the saved material. Strings compare exactly, including case and whitespace. List order matters; record field order does not. A matching retry returns the saved material without changing it. Changed input needs a new key and creates a new material. A key belonging to another owner does not recover that owner's material.
 Rule: dialogue indices are zero-based and remain stable. checkedVoiceTurns contains only indices of learner RESPONSE turns with channel VOICE. The effective transcript is the latest CORRECTION for that response, or its original text when there is no correction.
 Rule: ordinary lessons need no transcript confirmation. Assessment requires every voice response in the task to have its effective transcript confirmed. Closing a session alone does not submit work for assessment.
-Rule: a PROBE asks for reasoning without correctness feedback, correction, or a solution method. A CLARIFICATION resolves input without solution content. Help that reveals a method or correction is a HINT, even when phrased as a question.
-Rule: CHECK tasks withhold corrections before submission unless help is requested. GUIDED tasks permit coaching. Recorded hints stay in the dialogue and count as assistance; input corrections and neutral questions do not.
-Rule: task criteria include both the task requirements and the full demonstration gate. A task may contain several problems and follow-up questions. Fresh work has not already been shown solved to the learner; different numbers alone do not establish freshness.
+Rule: the tutor adds turns to a task only as hints. Any tutor message in a task is recorded as a HINT, even when it is phrased as a question.
+Rule: in a CHECK task, the tutor gives a hint only after the learner requests one. In a GUIDED task, the tutor may give a hint at any time. Recorded hints stay in the dialogue and count as assistance. A learner's transcript correction does not count as assistance.
+Rule: task criteria include both the task requirements and the full demonstration gate. A task's question may contain several problems and follow-up questions. Fresh work has not already been shown solved to the learner; different numbers alone do not establish freshness.
 Rule: a voice response must contain a nonblank transcript. Microphone audio is temporary transcription input, not retained dialogue media. Uploaded source audio remains part of its Material.
 Rule: blank text is empty or contains only whitespace. New identities are unique. now is server time. Refused actions change no state; unmentioned state stays unchanged.
 ```
@@ -164,30 +164,6 @@ answerLesson(owner: Learner, lesson: Session, text: String, citations: PassageSe
   where lesson is owner's open lesson, text is not blank, and citations are nonempty and valid within its materials
   then
     append a tutor EXPLANATION with text, channel, citations, empty media, time now, and no correction target
-    returns
-
-askFollowup(owner: Learner, task: Session, question: String, channel: Channel) : returns ()
-  where task is not owner's open task
-  then
-    refuses FOLLOWUP_TASK_UNAVAILABLE "Choose one of your open practice tasks."
-  where task is owner's open task, and (question is blank or supplies feedback, a correction, or a solution method)
-  then
-    refuses INVALID_TASK_PROBE "Ask for reasoning without supplying feedback or a method."
-  where task is owner's open task and question is nonblank and supplies no feedback, correction, or solution method
-  then
-    append a tutor PROBE with question as text, channel, empty media and citations, time now, and no correction target
-    returns
-
-clarifyInput(owner: Learner, session: Session, question: String, channel: Channel) : returns ()
-  where session does not belong to owner or is not OPEN
-  then
-    refuses CLARIFICATION_SESSION_UNAVAILABLE "Choose one of your open sessions."
-  where session belongs to owner and is OPEN, and (question is blank or supplies solution content)
-  then
-    refuses INVALID_INPUT_CLARIFICATION "Ask about the unclear input without supplying a solution."
-  where session belongs to owner and is OPEN, and question is nonblank and supplies no solution content
-  then
-    append a tutor CLARIFICATION with question as text, channel, empty media and citations, time now, and no correction target
     returns
 
 requestHint(owner: Learner, task: Session) : returns ()

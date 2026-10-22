@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { MongoServerError } from "mongodb";
@@ -9,6 +9,7 @@ import {
   type SkillMapping,
 } from "../src/concepts/SkillMapping.ts";
 import { connectMongo, localMongoUri } from "../src/storage/mongo.ts";
+import { clearCollections } from "./fixtures/clear-collections.ts";
 import { withOverlappingSkillReads } from "./fixtures/overlap-skill-reads.ts";
 
 const database = `stillgotit_test_${randomUUID().replaceAll("-", "")}`;
@@ -26,6 +27,11 @@ const content = {
 beforeAll(async () => {
   connection = await connectMongo({ uri, database });
   mapping = await createSkillMapping(connection.db);
+});
+
+beforeEach(async () => {
+  // Each test starts from empty collections in this file's database.
+  await clearCollections(connection!.db);
 });
 
 afterAll(async () => {
@@ -115,9 +121,7 @@ describe("SkillMapping prerequisites", () => {
     const confirmed = await makeSkill(owner, unit);
     const draft = await mapping.propose({ proposalKey: crypto.randomUUID(), ...content, owner, unit });
     const archived = await makeSkill(owner, unit);
-    // Seed an archived fixture for this action's status checks.
-    await connection!.db.collection<{ _id: string; status: string }>("SkillMapping.skills")
-      .updateOne({ _id: archived.skill }, { $set: { status: "ARCHIVED" } });
+    await mapping.archive({ owner, skill: archived.skill });
     const before = await savedState("SkillMapping", true);
     for (const identity of [
       { owner, skill: randomUUID() },
@@ -141,8 +145,7 @@ describe("SkillMapping prerequisites", () => {
     const valid = await makeSkill(owner, unit);
     const draft = await mapping.propose({ proposalKey: crypto.randomUUID(), ...content, owner, unit });
     const archived = await makeSkill(owner, unit);
-    await connection!.db.collection<{ _id: string; status: string }>("SkillMapping.skills")
-      .updateOne({ _id: archived.skill }, { $set: { status: "ARCHIVED" } });
+    await mapping.archive({ owner, skill: archived.skill });
     const ownOtherCourse = await makeCourse(mapping, owner);
     const ownOtherSkill = await makeSkill(owner, ownOtherCourse.unit);
     const foreign = await makeCourse();
@@ -207,7 +210,7 @@ describe("SkillMapping prerequisites", () => {
   });
 
   for (const rejectedWrite of ["courses", "skills"] as const) {
-    test(`rolls back all storage changes when MongoDB rejects the ${rejectedWrite} write`, async () => {
+    test(`a rejected ${rejectedWrite} write keeps the old links, releases the course, and a retry succeeds`, async () => {
       const instanceName = `PrerequisitesFailure_${rejectedWrite}`;
       const concept = await createSkillMapping(connection!.db, instanceName);
       const { owner, unit } = await makeCourse(concept);
@@ -225,6 +228,8 @@ describe("SkillMapping prerequisites", () => {
         const result = concept.setPrerequisites(request);
         await expect(result).rejects.toBeInstanceOf(MongoServerError);
         await expect(result).rejects.toMatchObject({ code: 121 });
+        expect(await concept._prerequisites({ skill: target.skill })).toEqual([]);
+        // The stored records, including the course claim, match the earlier state.
         expect(await savedState(instanceName, true)).toEqual(before);
       } finally {
         await connection!.db.command({ collMod: `${instanceName}.${rejectedWrite}`, validator: {} });
@@ -233,6 +238,33 @@ describe("SkillMapping prerequisites", () => {
       expect(await concept._prerequisites({ skill: target.skill })).toEqual([{ prerequisite: prerequisite.skill }]);
     });
   }
+
+  test("a claim left by a stopped request expires, and a held claim makes a change wait", async () => {
+    const { owner, course, unit } = await makeCourse();
+    const target = await makeSkill(owner, unit);
+    const prerequisite = await makeSkill(owner, unit);
+    const courses = connection!.db.collection<{ _id: string; prerequisiteLock?: unknown }>("SkillMapping.courses");
+    // Simulate a request that stopped a minute ago while it held the claim.
+    await courses.updateOne({ _id: course }, {
+      $set: { prerequisiteLock: { holder: "stopped", expires: new Date(Date.now() - 60_000) } },
+    });
+    expect(await mapping.setPrerequisites({ owner, skill: target.skill, prerequisites: [prerequisite.skill] })).toEqual({});
+    expect((await courses.findOne({ _id: course }))?.prerequisiteLock).toBeUndefined();
+
+    // Simulate a request that is still running. The change waits for its release.
+    await courses.updateOne({ _id: course }, {
+      $set: { prerequisiteLock: { holder: "running", expires: new Date(Date.now() + 60_000) } },
+    });
+    let settled = false;
+    const waiting = mapping.setPrerequisites({ owner, skill: target.skill, prerequisites: [] })
+      .finally(() => { settled = true; });
+    await Bun.sleep(200);
+    expect(settled).toBe(false);
+    expect(await mapping._prerequisites({ skill: target.skill })).toEqual([{ prerequisite: prerequisite.skill }]);
+    await courses.updateOne({ _id: course }, { $unset: { prerequisiteLock: "" } });
+    expect(await waiting).toEqual({});
+    expect(await mapping._prerequisites({ skill: target.skill })).toEqual([]);
+  });
 
   for (const indirect of [false, true]) {
     test(`rejects one of two overlapping edits that together create a ${indirect ? "longer" : "two-skill"} cycle`, async () => {

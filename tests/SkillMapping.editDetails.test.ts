@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { MongoServerError } from "mongodb";
@@ -10,6 +10,7 @@ import {
   type SkillMapping,
 } from "../src/concepts/SkillMapping.ts";
 import { connectMongo, localMongoUri } from "../src/storage/mongo.ts";
+import { clearCollections } from "./fixtures/clear-collections.ts";
 
 const database = `stillgotit_test_${randomUUID().replaceAll("-", "")}`;
 const uri = process.env.MONGODB_TEST_URI ?? localMongoUri;
@@ -26,6 +27,11 @@ const content = {
 beforeAll(async () => {
   connection = await connectMongo({ uri, database });
   mapping = await createSkillMapping(connection.db);
+});
+
+beforeEach(async () => {
+  // Each test starts from empty collections in this file's database.
+  await clearCollections(connection!.db);
 });
 
 afterAll(async () => {
@@ -69,10 +75,8 @@ describe("SkillMapping confirmed skill details", () => {
     const dependent = await mapping.propose({ proposalKey: crypto.randomUUID(), ...content, owner, unit, title: "Compose linear maps" });
     await mapping.confirm({ owner, skill: prerequisite.skill });
     await mapping.confirm({ owner, skill: dependent.skill });
-    // Seed valid prerequisite fixtures only in this test DB.
-    const skills = connection!.db.collection<{ _id: string; prerequisites: string[] }>("SkillMapping.skills");
-    await skills.updateOne({ _id: skill }, { $set: { prerequisites: [prerequisite.skill] } });
-    await skills.updateOne({ _id: dependent.skill }, { $set: { prerequisites: [skill] } });
+    await mapping.setPrerequisites({ owner, skill, prerequisites: [prerequisite.skill] });
+    await mapping.setPrerequisites({ owner, skill: dependent.skill, prerequisites: [skill] });
     await makeConfirmed();
     const before = await savedState();
     const title = "Multiply compatible matrices";
@@ -115,9 +119,7 @@ describe("SkillMapping confirmed skill details", () => {
     const confirmed = await makeConfirmed();
     const draft = await makeDraft();
     const archived = await makeConfirmed();
-    // Seed an archived fixture for this action's status checks.
-    await connection!.db.collection<{ _id: string; status: string }>("SkillMapping.skills")
-      .updateOne({ _id: archived.skill }, { $set: { status: "ARCHIVED" } });
+    await mapping.archive({ owner: archived.owner, skill: archived.skill });
     const before = await savedState();
 
     for (const identity of [

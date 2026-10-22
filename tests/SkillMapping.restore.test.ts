@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { MongoServerError } from "mongodb";
@@ -9,6 +9,7 @@ import {
   type SkillMapping,
 } from "../src/concepts/SkillMapping.ts";
 import { connectMongo, localMongoUri } from "../src/storage/mongo.ts";
+import { clearCollections } from "./fixtures/clear-collections.ts";
 import { withOverlappingSkillReads } from "./fixtures/overlap-skill-reads.ts";
 
 const database = `stillgotit_test_${randomUUID().replaceAll("-", "")}`;
@@ -26,6 +27,11 @@ const content = {
 beforeAll(async () => {
   connection = await connectMongo({ uri, database });
   mapping = await createSkillMapping(connection.db);
+});
+
+beforeEach(async () => {
+  // Each test starts from empty collections in this file's database.
+  await clearCollections(connection!.db);
 });
 
 afterAll(async () => {
@@ -186,27 +192,23 @@ describe("SkillMapping restore", () => {
     const cycle = await makeSkill(owner, unit);
     await mapping.archive({ owner, skill: target.skill });
     const skills = connection!.db.collection<{ _id: string; prerequisites: string[] }>("SkillMapping.skills");
-    // These invalid links cannot be created through the actions. Seed them
-    // only in this test DB to ensure restoration refuses these links.
+    // No sequence of actions can create these invalid links, so this test
+    // writes them directly in its own database to check that restoration
+    // still refuses damaged records.
     await skills.updateOne({ _id: cycle.skill }, { $set: { prerequisites: [target.skill] } });
-    try {
-      for (const invalid of [randomUUID(), draft.skill, ownOtherSkill.skill, foreignSkill.skill, target.skill, cycle.skill]) {
-        await skills.updateOne({ _id: target.skill }, { $set: { prerequisites: [valid.skill, invalid] } });
-        const before = await savedState("SkillMapping", true);
-        await expect(mapping.restore({ owner, skill: target.skill })).rejects.toMatchObject({
-          code: "SKILL_RESTORE_PREREQUISITES",
-          message: "Restore this skill's prerequisites before restoring the skill.",
-        });
-        expect(await savedState("SkillMapping", true)).toEqual(before);
-      }
-    } finally {
-      await skills.updateOne({ _id: target.skill }, { $set: { prerequisites: [] } });
-      await skills.updateOne({ _id: cycle.skill }, { $set: { prerequisites: [] } });
+    for (const invalid of [randomUUID(), draft.skill, ownOtherSkill.skill, foreignSkill.skill, target.skill, cycle.skill]) {
+      await skills.updateOne({ _id: target.skill }, { $set: { prerequisites: [valid.skill, invalid] } });
+      const before = await savedState("SkillMapping", true);
+      await expect(mapping.restore({ owner, skill: target.skill })).rejects.toMatchObject({
+        code: "SKILL_RESTORE_PREREQUISITES",
+        message: "Restore this skill's prerequisites before restoring the skill.",
+      });
+      expect(await savedState("SkillMapping", true)).toEqual(before);
     }
   });
 
   for (const rejectedWrite of ["courses", "skills"] as const) {
-    test(`rolls back all storage changes when MongoDB rejects the ${rejectedWrite} write`, async () => {
+    test(`a rejected ${rejectedWrite} write leaves the skill archived, releases the course, and a retry succeeds`, async () => {
       const instanceName = `RestoreFailure_${rejectedWrite}`;
       const concept = await createSkillMapping(connection!.db, instanceName);
       const { owner, unit } = await makeCourse(concept);
@@ -223,6 +225,8 @@ describe("SkillMapping restore", () => {
         const result = concept.restore({ owner, skill });
         await expect(result).rejects.toBeInstanceOf(MongoServerError);
         await expect(result).rejects.toMatchObject({ code: 121 });
+        expect((await concept._skill({ skill }))[0]!.status).toBe("ARCHIVED");
+        // The stored records, including the course claim, match the earlier state.
         expect(await savedState(instanceName, true)).toEqual(before);
       } finally {
         await connection!.db.command({ collMod: `${instanceName}.${rejectedWrite}`, validator: {} });

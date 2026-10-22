@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { MongoServerError } from "mongodb";
@@ -6,9 +6,11 @@ import {
   createSkillMapping,
   DraftDiscardUnavailableError,
   DraftRevisionUnavailableError,
+  SkillProposalDiscardedError,
   type SkillMapping,
 } from "../src/concepts/SkillMapping.ts";
 import { connectMongo, localMongoUri } from "../src/storage/mongo.ts";
+import { clearCollections } from "./fixtures/clear-collections.ts";
 
 const database = `stillgotit_test_${randomUUID().replaceAll("-", "")}`;
 const uri = process.env.MONGODB_TEST_URI ?? localMongoUri;
@@ -25,6 +27,11 @@ const content = {
 beforeAll(async () => {
   connection = await connectMongo({ uri, database });
   mapping = await createSkillMapping(connection.db);
+});
+
+beforeEach(async () => {
+  // Each test starts from empty collections in this file's database.
+  await clearCollections(connection!.db);
 });
 
 afterAll(async () => {
@@ -108,9 +115,7 @@ describe("SkillMapping draft discard", () => {
       const example = await makeDraft();
       await mapping.confirm({ owner: example.owner, skill: example.skill });
       if (status === "ARCHIVED") {
-        // Seed an archived fixture for this action's status checks.
-        await connection!.db.collection<{ _id: string; status: string }>("SkillMapping.skills")
-          .updateOne({ _id: example.skill }, { $set: { status } });
+        await mapping.archive({ owner: example.owner, skill: example.skill });
       }
       cases.push({ owner: example.owner, skill: example.skill });
     }
@@ -136,32 +141,45 @@ describe("SkillMapping draft discard", () => {
     expect(await savedState()).toEqual(before);
   });
 
-  test("rolls back the skill deletion when deleting its versions fails", async () => {
-    const instanceName = "DiscardRollback";
+  test("a failed version removal still hides the draft and its versions, and replay cannot recreate it", async () => {
+    const instanceName = "DiscardFailure";
     const concept = await createSkillMapping(connection!.db, instanceName);
-    const { owner, unit, skill } = await makeDraft(concept);
+    const owner = randomUUID();
+    const { course } = await concept.createCourse({ owner, title: "Linear Algebra" });
+    const { unit } = await concept.addUnit({ owner, course, title: "Matrices" });
+    const proposal = { proposalKey: randomUUID(), owner, unit, ...content };
+    const { skill } = await concept.propose(proposal);
+    const first = (await concept._skill({ skill }))[0]!.current;
     await concept.reviseDraft({ ...content, owner, unit, skill, gate: "Explain the dimensions." });
-    const before = await savedState(instanceName);
+    const latest = (await concept._skill({ skill }))[0]!.current;
     const versions = `${instanceName}.versions`;
     const backing = `${instanceName}.savedVersions`;
 
-    // A read-only view makes MongoDB reject the second delete. Only this test's
-    // namespace changes; its original version documents remain in the backing collection.
+    // A read-only view makes MongoDB reject the version removal, which runs
+    // after the skill removal. Only this test's namespace changes; its version
+    // documents remain in the backing collection.
     await connection!.db.collection(versions).rename(backing);
     await connection!.db.createCollection(versions, { viewOn: backing });
     try {
       const result = concept.discardDraft({ owner, skill });
       await expect(result).rejects.toBeInstanceOf(MongoServerError);
       await expect(result).rejects.toMatchObject({ code: 166 });
-      expect(await savedState(instanceName)).toEqual(before);
     } finally {
       await connection!.db.collection(versions).drop();
       await connection!.db.collection(backing).rename(versions);
     }
 
-    await concept.discardDraft({ owner, skill });
+    // The skill went first, so queries show no draft and no versions for it.
     expect(await concept._skill({ skill })).toEqual([]);
-    expect(await versionCount(skill, instanceName)).toBe(0);
+    expect(await concept._skills({ unit })).toEqual([]);
+    for (const version of [first, latest]) {
+      expect(await concept._version({ version })).toEqual([]);
+    }
+    // The draft is already gone, so a retry is refused, and the kept receipt
+    // still stops a replay of the original save from recreating it.
+    await expect(concept.discardDraft({ owner, skill })).rejects.toBeInstanceOf(DraftDiscardUnavailableError);
+    await expect(concept.propose(proposal)).rejects.toBeInstanceOf(SkillProposalDiscardedError);
+    expect(await concept._skills({ unit })).toEqual([]);
   });
 
   test("two concurrent discards produce one success and one refusal", async () => {

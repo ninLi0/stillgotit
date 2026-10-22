@@ -1,4 +1,4 @@
-import { InvalidLessonContent, InvalidLessonSources, InvalidTaskContent, InvalidTaskSources, ResponseSessionUnavailable, InvalidLearnerResponse, LessonAnswerUnavailable, InvalidLessonAnswer, FollowupTaskUnavailable, InvalidTaskProbe, ClarificationSessionUnavailable, InvalidInputClarification, HintRequestUnavailable, HintTaskUnavailable, InvalidHintText, HintNotRequested, TranscriptSessionUnavailable, TranscriptTurnUnavailable, InvalidConfirmedTranscript, AttemptReviewUnavailable, AttemptReviewChanged, SessionCloseUnavailable } from "./refusals.ts";
+import { InvalidLessonContent, InvalidLessonSources, InvalidTaskContent, InvalidTaskSources, ResponseSessionUnavailable, InvalidLearnerResponse, LessonAnswerUnavailable, InvalidLessonAnswer, HintRequestUnavailable, HintTaskUnavailable, InvalidHintText, HintNotRequested, TranscriptSessionUnavailable, TranscriptTurnUnavailable, InvalidConfirmedTranscript, AttemptReviewUnavailable, AttemptReviewChanged, SessionCloseUnavailable } from "./refusals.ts";
 import { registerConcept } from "@mit-sdg/sync-engine/assembly";
 import spec from "@design/concepts/GroundedTutoring.md" with { type: "text" };
 import type { User } from "../Registering/Registering.ts";
@@ -20,10 +20,6 @@ export const groundedTutoring = registerConcept({
     INVALID_LEARNER_RESPONSE: InvalidLearnerResponse,
     LESSON_ANSWER_UNAVAILABLE: LessonAnswerUnavailable,
     INVALID_LESSON_ANSWER: InvalidLessonAnswer,
-    FOLLOWUP_TASK_UNAVAILABLE: FollowupTaskUnavailable,
-    INVALID_TASK_PROBE: InvalidTaskProbe,
-    CLARIFICATION_SESSION_UNAVAILABLE: ClarificationSessionUnavailable,
-    INVALID_INPUT_CLARIFICATION: InvalidInputClarification,
     HINT_REQUEST_UNAVAILABLE: HintRequestUnavailable,
     HINT_TASK_UNAVAILABLE: HintTaskUnavailable,
     INVALID_HINT_TEXT: InvalidHintText,

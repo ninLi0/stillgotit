@@ -51,7 +51,12 @@ async function setup() {
     }
     async function ok(path: string, body: Record<string, unknown> | FormData = {}) { const result = await post(path, body); expect(result, path).toMatchObject({ status: 200 }); return result.body; }
     async function signIn(name: string) { const start = await ok("/auth/commons/start"); await ok("/auth/commons/finish", provider.approve(start.address, { subject: name, username: name })); const identity = await ok("/auth/commons/resume"); owners.push(identity.user); return identity; }
-    return { post, ok, signIn };
+    // Saved files come back as bytes, not JSON, so downloads read the raw response.
+    async function download(body: Record<string, unknown>) {
+      return runtime.handle(new Request(`${ORIGIN}/api/courses/materials/file`, { method: "POST", headers: { Origin: ORIGIN, "Content-Type": "application/json",
+        Cookie: [...jar].map(([key, value]) => `${key}=${value}`).join("; ") }, body: JSON.stringify(body) }));
+    }
+    return { post, ok, signIn, download };
   }
   return { browser, connection, get runtime() { return runtime; }, get generated() { return generated; }, duringGeneration: (work: () => Promise<void>) => { beforeGenerate = work; }, interruptGrade: () => { failGrade = true; }, slip: () => { independent = false; },
     restart: async () => { await runtime.gateway.beginDrain(); runtime = await open(); } };
@@ -82,7 +87,9 @@ test("P2 journey starts empty, imports, confirms, learns, reviews voice, assesse
   expect((await learner.post("/learning/assess", { studySession: task, reviewed: false, unseen: true, outsideHelp: false, dialogueLength: 1 })).status).toBe(400);
   app.interruptGrade();
   const review = { studySession: task, reviewed: true, unseen: true, outsideHelp: false, dialogueLength: 1 };
-  expect((await learner.post("/learning/assess", review)).status).toBe(400);
+  // A provider failure is explained and retryable, not "Check the field".
+  expect(await learner.post("/learning/assess", review)).toMatchObject({ status: 400,
+    body: { error: "INVALID_REQUEST", detail: "The tutor could not produce a usable answer. Try again. Your saved work is still available." } });
   await app.restart();
   await learner.ok("/learning/retry", { studySession: task });
   const result = await learner.ok("/learning/read", { skill });
@@ -104,6 +111,29 @@ test("P2 journey starts empty, imports, confirms, learns, reviews voice, assesse
   const revised = await learner.ok("/learning/read", { skill });
   expect(revised.cases[0].history).toHaveLength(2); expect(revised.estimate.value).toBeLessThan(45.01);
 }, 60_000);
+
+test("only the learner who uploaded a file can download it", async () => {
+  const app = await setup(), learner = app.browser(), other = app.browser(), anonymous = app.browser();
+  await learner.signIn("file-owner"); await other.signIn("file-outsider");
+  const { course } = await learner.ok("/courses/create", { title: "Matrices" });
+  const { material } = await learner.ok("/courses/materials/add", upload(course, crypto.randomUUID()));
+  const { originals } = await learner.ok("/courses/materials/read", { material }), file = originals[0].file;
+
+  const own = await learner.download({ material, file });
+  expect(own.status).toBe(200);
+  expect(own.headers.get("Content-Disposition")).toBe("attachment");
+  expect(await own.text()).toContain("Matrix multiplication is not commutative.");
+
+  // Knowing the exact material and file references is not enough for anyone else.
+  expect((await other.download({ material, file })).status).toBe(403);
+  expect((await anonymous.download({ material, file })).status).toBe(401);
+  // The owner can only fetch files saved with this material, and only for a material that exists.
+  expect((await learner.download({ material, file: "../other/notes.pdf" })).status).toBe(403);
+  expect((await learner.download({ material: crypto.randomUUID(), file })).status).toBe(403);
+  expect((await learner.download({ material })).status).toBe(403);
+  // Refused attempts change nothing: the owner can still download the same bytes.
+  expect(await (await learner.download({ material, file })).text()).toContain("Matrix multiplication is not commutative.");
+});
 
 test("skill draft saves recover lost replies through HTTP and preserve later edits", async () => {
   const app = await setup(), learner = app.browser(), other = app.browser();

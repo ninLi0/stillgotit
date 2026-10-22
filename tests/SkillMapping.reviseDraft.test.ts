@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { MongoServerError } from "mongodb";
@@ -10,6 +10,7 @@ import {
   type SkillMapping,
 } from "../src/concepts/SkillMapping.ts";
 import { connectMongo, localMongoUri } from "../src/storage/mongo.ts";
+import { clearCollections } from "./fixtures/clear-collections.ts";
 
 const database = `stillgotit_test_${randomUUID().replaceAll("-", "")}`;
 const uri = process.env.MONGODB_TEST_URI ?? localMongoUri;
@@ -26,6 +27,11 @@ const content = {
 beforeAll(async () => {
   connection = await connectMongo({ uri, database });
   mapping = await createSkillMapping(connection.db);
+});
+
+beforeEach(async () => {
+  // Each test starts from empty collections in this file's database.
+  await clearCollections(connection!.db);
 });
 
 afterAll(async () => {
@@ -142,9 +148,7 @@ describe("SkillMapping draft revision", () => {
       const example = await makeDraft();
       await mapping.confirm({ owner: example.owner, skill: example.skill });
       if (status === "ARCHIVED") {
-        // Seed an archived fixture for this action's status checks.
-        await connection!.db.collection<{ _id: string; status: string }>("SkillMapping.skills")
-          .updateOne({ _id: example.skill }, { $set: { status } });
+        await mapping.archive({ owner: example.owner, skill: example.skill });
       }
       cases.push({ owner: example.owner, skill: example.skill });
     }
@@ -197,8 +201,8 @@ describe("SkillMapping draft revision", () => {
     expect(await savedState()).toEqual(before);
   });
 
-  test.each(["versions", "skills"])("rolls back all edits if the %s write fails", async (collection) => {
-    const instanceName = `RevisionRollback_${collection}`;
+  test.each(["versions", "skills"])("a failed %s write leaves the draft unchanged and a retry saves the edit once", async (collection) => {
+    const instanceName = `RevisionFailure_${collection}`;
     const concept = await createSkillMapping(connection!.db, instanceName);
     const { owner, unit, skill, current } = await makeDraft(concept);
     const before = await savedState(instanceName);
@@ -211,16 +215,28 @@ describe("SkillMapping draft revision", () => {
       validationLevel: "strict",
       validationAction: "error",
     });
-    const result = concept.reviseDraft(revised);
-    await expect(result).rejects.toBeInstanceOf(MongoServerError);
-    await expect(result).rejects.toMatchObject({ code: 121 });
-    expect(await savedState(instanceName)).toEqual(before);
+    try {
+      const result = concept.reviseDraft(revised);
+      await expect(result).rejects.toBeInstanceOf(MongoServerError);
+      await expect(result).rejects.toMatchObject({ code: 121 });
+      // Queries still show the earlier details and requirements.
+      expect(await concept._skill({ skill })).toEqual([{ unit, title: content.title, current, status: "DRAFT" }]);
+      expect(await concept._version({ version: current })).toEqual([{
+        skill, outcome: content.outcome, gate: content.gate,
+      }]);
+      // A version saved before a rejected skill write never became current, so it is removed.
+      expect(await savedState(instanceName)).toEqual(before);
+    } finally {
+      await connection!.db.command({ collMod: `${instanceName}.${collection}`, validator: {} });
+    }
 
-    await connection!.db.command({ collMod: `${instanceName}.${collection}`, validator: {} });
-    await concept.reviseDraft(revised);
+    expect(await concept.reviseDraft(revised)).toEqual({});
     const [record] = await concept._skill({ skill });
     expect(record!.title).toBe(revised.title);
     expect(record!.current).not.toBe(current);
+    expect(await concept._version({ version: record!.current })).toEqual([{
+      skill, outcome: content.outcome, gate: revised.gate,
+    }]);
     expect(await versionCount(skill, instanceName)).toBe(2);
   });
 

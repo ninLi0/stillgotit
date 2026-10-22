@@ -19,10 +19,11 @@ import { composition as Courses } from "./compositions/courses.ts";
 import { TutorGenerating } from "./concepts/Generating/registry.ts";
 
 // Apply the same deadline to the interpreter and its HTTP gateway.
+// Cloudflare ends requests after about 100 s. Gemini calls stop at 80 s; this limit ends any request before Cloudflare does.
 export const executionLimits = {
   maxActiveRootFlows: 64, maxPendingRequests: 64,
   maxActionsPerFlow: 1000, maxFiringsPerFlow: 2000,
-  maxRowsPerEvaluation: 20000, maxRequestDurationMs: 240000,
+  maxRowsPerEvaluation: 20000, maxRequestDurationMs: 90_000,
 };
 
 export function assembleApplication(instances: {

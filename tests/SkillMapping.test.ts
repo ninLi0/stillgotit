@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import {
   createSkillMapping,
@@ -8,6 +8,7 @@ import {
   type SkillMapping,
 } from "../src/concepts/SkillMapping.ts";
 import { connectMongo, localMongoUri } from "../src/storage/mongo.ts";
+import { clearCollections } from "./fixtures/clear-collections.ts";
 
 // Only this generated database is removed. The app database is never used.
 const database = `stillgotit_test_${randomUUID().replaceAll("-", "")}`;
@@ -18,6 +19,11 @@ let skills: SkillMapping;
 beforeAll(async () => {
   connection = await connectMongo({ uri, database });
   skills = await createSkillMapping(connection.db);
+});
+
+beforeEach(async () => {
+  // Each test starts from empty collections in this file's database.
+  await clearCollections(connection!.db);
 });
 
 afterAll(async () => {

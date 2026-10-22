@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { MongoServerError } from "mongodb";
@@ -8,6 +8,7 @@ import {
   type SkillMapping,
 } from "../src/concepts/SkillMapping.ts";
 import { connectMongo, localMongoUri } from "../src/storage/mongo.ts";
+import { clearCollections } from "./fixtures/clear-collections.ts";
 
 const database = `stillgotit_test_${randomUUID().replaceAll("-", "")}`;
 const uri = process.env.MONGODB_TEST_URI ?? localMongoUri;
@@ -24,6 +25,11 @@ const content = {
 beforeAll(async () => {
   connection = await connectMongo({ uri, database });
   mapping = await createSkillMapping(connection.db);
+});
+
+beforeEach(async () => {
+  // Each test starts from empty collections in this file's database.
+  await clearCollections(connection!.db);
 });
 
 afterAll(async () => {
@@ -68,9 +74,7 @@ describe("SkillMapping material attachment", () => {
       materials: [...content.materials, material],
     });
     await mapping.confirm({ owner, skill: prerequisite.skill });
-    // Seed a valid prerequisite fixture only in this test DB.
-    await connection!.db.collection<{ _id: string; prerequisites: string[] }>("SkillMapping.skills")
-      .updateOne({ _id: skill }, { $set: { prerequisites: [prerequisite.skill] } });
+    await mapping.setPrerequisites({ owner, skill, prerequisites: [prerequisite.skill] });
     await makeConfirmed();
     const before = await savedState();
 
@@ -116,9 +120,7 @@ describe("SkillMapping material attachment", () => {
     const confirmed = await makeConfirmed();
     const draft = await makeDraft();
     const archived = await makeConfirmed();
-    // Seed an archived fixture for this action's status checks.
-    await connection!.db.collection<{ _id: string; status: string }>("SkillMapping.skills")
-      .updateOne({ _id: archived.skill }, { $set: { status: "ARCHIVED" } });
+    await mapping.archive({ owner: archived.owner, skill: archived.skill });
     const before = await savedState();
 
     for (const identity of [

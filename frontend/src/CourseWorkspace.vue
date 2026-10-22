@@ -1,16 +1,15 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { api, unwrap, errorMessage, type Course } from "./api.ts";
-import { hostRequest, uploadMaterial } from "./host-api.ts";
+import { aiStatus, uploadMaterial, type AIStatus } from "./host-api.ts";
 import { DraftSaveQueue } from "./draft-save-queue.ts";
 import SkillTree from "./SkillTree.vue";
 import SkillStudy from "./SkillStudy.vue";
 import StudyPlanner from "./StudyPlanner.vue";
 import type { StillGotItHttp } from "../../generated/wire.ts";
-import type { ModelChoice } from "../../src/host/chatgpt.ts";
 
 const props = defineProps<{ course: Course }>();
-const view = ref<"home" | "setup" | "chat">("home"), showSettings = ref(false);
+const view = ref<"home" | "setup" | "chat">("home");
 const viewKey = `stillgotit-view:${props.course.course}`;
 const sourceSelectionKey = `stillgotit-source:${props.course.course}`;
 const draftSaves = new DraftSaveQueue(sessionStorage, `stillgotit-draft-saves:${props.course.course}`);
@@ -18,18 +17,13 @@ const pendingDraftCount = ref(0);
 type CourseData = StillGotItHttp["/courses/read"]["output"];
 type MaterialId = CourseData["materials"][number]["material"];
 type Suggestion = { title: string; outcome: string; gate: string };
-type AIStatus = { connected: boolean; active: string | null; model: string; effort: string; accounts: { id: string; label: string; connected: boolean }[] };
 const data = ref<CourseData>({ materials: [], units: [], skills: [] });
 const busy = ref(false), message = ref(""), error = ref("");
 const materialTitle = ref("Matrix multiplication"), chosenFiles = ref<File[]>([]), requestId = ref(crypto.randomUUID());
 const material = ref<MaterialId | "">(""), selectedSkill = ref<string | null>(null), unit = ref(""), newUnit = ref("Matrix multiplication");
 const suggestions = ref<Suggestion[]>([]), preview = ref<{ title: string; content: string; originals: { file: string; name: string; limitations: string[] }[] } | null>(null);
-const ai = ref<AIStatus>({ connected: false, active: null, model: "", effort: "", accounts: [] });
-const models = ref<ModelChoice[]>([]), model = ref(""), effort = ref("");
-const selectedModel = computed(() => models.value.find((choice) => choice.slug === model.value));
-const efforts = computed(() => selectedModel.value?.supported_reasoning_levels ?? []);
-const effortDescription = computed(() => efforts.value.find((level) => level.effort === effort.value)?.description ?? "");
-const effortLabel = (value: string) => value === "xhigh" ? "Extra high" : value === "max" ? "Maximum" : value.charAt(0).toUpperCase() + value.slice(1);
+// Off until the server confirms it has a Gemini key.
+const ai = ref<AIStatus>({ available: false, reason: "" });
 const progress = ref<Record<string, number>>({}), revision = ref(0);
 const treeSkills = computed(() => data.value.skills.map((skill) => ({ ...skill, mastery: progress.value[skill.skill] })));
 const current = computed(() => data.value.skills.find((skill) => skill.skill === selectedSkill.value));
@@ -63,33 +57,8 @@ async function refreshProgress() {
   revision.value++;
 }
 async function refreshAI() {
-  ai.value = await hostRequest<AIStatus>("/ai/status");
-  if (ai.value.connected) {
-    models.value = (await hostRequest<{ models: typeof models.value }>("/ai/models")).models;
-    model.value = ai.value.model || models.value[0]?.slug || "";
-    effort.value = efforts.value.find((level) => level.effort === ai.value.effort)?.effort ?? selectedModel.value?.default_reasoning_level ?? "";
-  } else {
-    models.value = []; model.value = ""; effort.value = "";
-  }
-}
-async function saveModel() {
-  await task(async () => {
-    const validEffort = efforts.value.find((level) => level.effort === effort.value)?.effort ?? selectedModel.value?.default_reasoning_level ?? "";
-    try {
-      ai.value = await hostRequest<AIStatus>("/ai/model", { model: model.value, effort: validEffort });
-      model.value = ai.value.model; effort.value = ai.value.effort;
-      message.value = "Tutor settings saved. They apply to your next request.";
-    } catch (problem) {
-      await refreshAI();
-      throw problem;
-    }
-  });
-}
-async function connect(clientId?: string) {
-  await task(async () => {
-    const result = await hostRequest<{ address: string }>("/ai/connect/start", clientId ? { clientId } : {});
-    window.location.assign(result.address);
-  });
+  try { ai.value = await aiStatus(); }
+  catch { ai.value = { available: false, reason: "The app could not check the AI tutor. Reload the page to try again." }; }
 }
 function filesChanged(event: Event) {
   chosenFiles.value = Array.from((event.target as HTMLInputElement).files ?? []);
@@ -162,13 +131,9 @@ async function confirm(skill: string) {
     await refresh(); selectedSkill.value = skill; message.value = "Skill confirmed.";
   });
 }
-async function changeAccount(event: Event) {
-  await task(async () => { await hostRequest("/ai/account", { clientId: (event.target as HTMLSelectElement).value }); await refreshAI(); });
-}
 onMounted(() => task(async () => {
   try { const saved = JSON.parse(sessionStorage.getItem(viewKey) ?? "null"); if (saved && ["home", "setup", "chat"].includes(saved.view)) { view.value = saved.view; selectedSkill.value = typeof saved.skill === "string" ? saved.skill : null; } } catch { /* Open Home if there is no saved view. */ }
   pendingDraftCount.value = draftSaves.read().length; await refresh(); await refreshAI();
-  if (!ai.value.connected) showSettings.value = true;
 }));
 </script>
 
@@ -176,24 +141,8 @@ onMounted(() => task(async () => {
   <section class="course-space" :aria-busy="busy">
     <nav class="workspace-nav" aria-label="Study views">
       <div class="view-tabs"><button :class="{ active: view !== 'chat' }" :aria-current="view !== 'chat' ? 'page' : undefined" @click="view = 'home'">Home</button><button :class="{ active: view === 'chat' }" :disabled="!confirmed.length" :aria-current="view === 'chat' ? 'page' : undefined" @click="openChat">Learn</button></div>
-      <div class="workspace-actions"><button :class="{ current: view === 'setup' }" @click="view = 'setup'">Course materials<span v-if="drafts.length || pendingDraftCount" class="count-badge">{{ drafts.length + pendingDraftCount }}</span></button><button @click="showSettings = !showSettings"><span class="connection-dot" :class="{ connected: ai.connected }" aria-hidden="true"></span>{{ ai.connected ? 'Tutor settings' : 'Connect tutor' }}</button></div>
+      <div class="workspace-actions"><button :class="{ current: view === 'setup' }" @click="view = 'setup'">Course materials<span v-if="drafts.length || pendingDraftCount" class="count-badge">{{ drafts.length + pendingDraftCount }}</span></button></div>
     </nav>
-    <details v-if="showSettings" class="ai-settings" open>
-      <summary>{{ ai.connected ? 'Tutor settings' : 'Connect your AI tutor' }}</summary><button class="close-settings" aria-label="Close tutor settings" @click="showSettings = false">×</button>
-      <p v-if="!ai.connected">Use your ChatGPT plan for explanations and feedback. Your course stays with your Commons account.</p>
-      <div class="connection-controls">
-        <template v-if="ai.connected">
-          <label>ChatGPT account<select :value="ai.active" :disabled="busy" @change="changeAccount"><option v-for="account in ai.accounts.filter(a => a.connected)" :key="account.id" :value="account.id">{{ account.label }}</option></select></label>
-          <label>Model<select v-model="model" :disabled="busy" @change="saveModel"><option v-for="choice in models" :key="choice.slug" :value="choice.slug">{{ choice.display_name }}</option></select></label>
-          <label>Reasoning effort<select v-model="effort" :disabled="busy || !efforts.length" aria-describedby="effort-description" @change="saveModel"><option v-if="!efforts.length" value="">Model default</option><option v-for="level in efforts" :key="level.effort" :value="level.effort">{{ effortLabel(level.effort) }}</option></select></label>
-          <button class="quiet" :disabled="busy" @click="task(async () => { const result = await hostRequest<{ revoked: boolean }>('/ai/disconnect'); await refreshAI(); message = result.revoked ? 'ChatGPT disconnected.' : 'Disconnected locally. You can remove access in ChatGPT Settings.'; })">Disconnect</button>
-        </template>
-        <button class="primary" :disabled="busy" @click="connect()">Continue with ChatGPT</button>
-        <button v-for="account in ai.accounts.filter(a => !a.connected)" :key="account.id" class="quiet" :disabled="busy" @click="connect(account.id)">Reconnect {{ account.label }}</button>
-        <a v-if="ai.connected" href="https://chatgpt.com/settings/usage" target="_blank" rel="noreferrer">View plan usage</a>
-      </div>
-      <p v-if="ai.connected" id="effort-description" class="hint">{{ effortDescription || 'This model uses its default effort.' }} Higher effort can take longer and use more of your plan. Applies to your next request.</p>
-    </details>
 
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <section v-show="view === 'home'" class="home-view">
@@ -210,7 +159,7 @@ onMounted(() => task(async () => {
       </div>
     </section>
     <section v-show="view === 'setup'" class="setup-view">
-      <header class="setup-heading"><button class="back-home" @click="view = 'home'">← Back to your tree</button><h1 id="setup-title">Shape your course</h1><p>Bring your material, then choose the skills you want to build.</p></header>
+      <header class="setup-heading"><button class="back-home" @click="view = 'home'">← Back to your tree</button><h1 id="setup-title">Shape your course</h1><p>Bring your material, then choose the skills you want to build.</p><p class="hint ai-notice">Your files and answers are stored on the class server and sent to Google Gemini to create lessons and feedback. Don't upload anything private.</p></header>
       <p v-if="message" class="notice" role="status">{{ message }}</p>
       <div class="course-tools">
         <details :open="!data.materials.length" class="section-block">
@@ -218,13 +167,14 @@ onMounted(() => task(async () => {
           <form @submit.prevent="upload">
             <label for="lesson-title">Material title</label><input id="lesson-title" v-model="materialTitle" maxlength="160" required :disabled="busy" @input="resetImport" />
             <label for="lesson-files">Course files</label><input id="lesson-files" type="file" multiple :disabled="busy" @change="filesChanged" />
-            <p class="hint">Documents, PDFs, slides, sheets, text, images, audio, or ZIP files. Up to 25 MB total.</p>
+            <p class="hint">PDF, Word, PowerPoint, Excel, text, notebook, or image (PNG, JPEG, WebP) files. Up to 25 MB total.</p>
             <button class="primary" :disabled="busy || !chosenFiles.length">{{ busy ? 'Working…' : 'Import material' }}</button>
           </form>
         </details>
         <section v-if="data.materials.length" class="section-block">
           <label for="source">Study material</label><select id="source" v-model="material" :disabled="busy" @change="task(readMaterial)"><option v-for="source in data.materials" :key="source.material" :value="source.material">{{ source.title }}</option></select>
-          <div class="inline-actions"><button class="quiet" :disabled="busy" @click="task(readMaterial)">Inspect source</button><button class="primary" :disabled="busy || !ai.connected || pendingDraftCount > 0" @click="suggest">{{ busy ? 'Working…' : 'Suggest skills' }}</button></div>
+          <div class="inline-actions"><button class="quiet" :disabled="busy" @click="task(readMaterial)">Inspect source</button><button class="primary" :disabled="busy || !ai.available || pendingDraftCount > 0" :aria-describedby="ai.available ? undefined : 'ai-reason-setup'" @click="suggest">{{ busy ? 'Working…' : 'Suggest skills' }}</button></div>
+          <p v-if="!ai.available && ai.reason" id="ai-reason-setup" class="hint">{{ ai.reason }}</p>
           <details v-if="preview" class="source-preview"><summary>Readable content and originals</summary>
             <div v-for="file in preview.originals" :key="file.file" class="source-file"><button class="quiet" :disabled="busy" @click="download(file.file, file.name)">{{ file.name }}</button><p v-for="limit in file.limitations" :key="limit" class="hint">{{ limit }}</p></div>
             <pre>{{ preview.content || 'This source is available as readable images.' }}</pre>
@@ -254,15 +204,15 @@ onMounted(() => task(async () => {
       </div>
     </section>
     <div v-show="view === 'chat'" class="lesson-view">
-      <KeepAlive :max="12"><SkillStudy v-if="current?.status === 'CONFIRMED'" :key="current.skill" :skill="current.skill" :course="course.course" :connected="ai.connected" :active="view === 'chat'" @changed="task(refreshProgress)"><template #composer-settings><select v-if="ai.connected && efforts.length" v-model="effort" class="composer-effort" aria-label="Reasoning effort" :disabled="busy" @change="saveModel"><option v-for="level in efforts" :key="level.effort" :value="level.effort">{{ effortLabel(level.effort) }}</option></select></template></SkillStudy></KeepAlive>
+      <KeepAlive :max="12"><SkillStudy v-if="current?.status === 'CONFIRMED'" :key="current.skill" :skill="current.skill" :course="course.course" :ai-available="ai.available" :ai-reason="ai.reason" :active="view === 'chat'" @changed="task(refreshProgress)" /></KeepAlive>
       <div v-if="current?.status !== 'CONFIRMED'" class="no-lesson"><h2>Choose a leaf to begin.</h2><button class="primary" @click="view = 'home'">Go to your tree</button></div>
     </div>
   </section>
 </template>
 
 <style scoped>
-.composer-effort{width:auto;max-width:125px;border:0;background:transparent;color:#777;font-size:12px;padding:4px 20px 4px 5px;cursor:pointer}.course-space{position:relative}.workspace-nav{height:54px;display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid #e6e6e6}.view-tabs{display:flex;align-items:stretch;gap:28px;height:100%}.view-tabs button{position:relative;background:none;border:0;padding:0 3px;color:#888;font-size:14px}.view-tabs button.active{color:#181818;font-weight:600}.view-tabs button.active:after{content:"";position:absolute;bottom:-1px;left:0;right:0;height:2px;background:#222}.workspace-actions{display:flex;align-items:center;gap:24px}.workspace-actions>button{border:0;background:none;padding:8px 0;color:#666;font-size:12px;display:flex;align-items:center;gap:7px}.workspace-actions .current{color:#111}.connection-dot{width:6px;height:6px;border:1px solid #aaa;border-radius:50%}.connection-dot.connected{background:#444;border-color:#444}.count-badge{display:inline-grid;place-items:center;min-width:18px;height:18px;border-radius:10px;background:#eee;font-size:10px}.home-heading{display:flex;justify-content:space-between;align-items:center;padding:38px 0 12px}.course-context{font-size:12px;color:#777;margin:0 0 10px}.home-heading h1{font:46px/1.15 Georgia,serif;letter-spacing:-1.5px;margin:0}.home-subtitle{font-size:14px;color:#888;margin:10px 0 0}.home-count{display:flex;align-items:center;gap:12px}.home-count strong{font:40px Georgia,serif}.home-count span{font-size:12px;color:#888;max-width:55px;line-height:1.4}.home-canvas{display:grid;grid-template-columns:minmax(0,1fr) 286px;gap:48px;align-items:center;min-height:540px}.tree-stage{position:relative;padding:0 10px;min-width:0}.home-sidebar{border-left:1px solid #e9e9e9;padding-left:28px}.detail-caption{font-size:11px;color:#999}.selected-skill h2,.select-invitation h2{font:25px/1.3 Georgia,serif;letter-spacing:-.4px;margin:13px 0}.selected-skill p,.select-invitation p{font-size:13px;line-height:1.8;color:#777}.skill-estimate{display:flex;align-items:baseline;gap:10px;margin:24px 0}.skill-estimate strong{font:30px Georgia,serif}.skill-estimate span{font-size:11px;color:#999}.open-lesson{width:100%;display:flex;justify-content:space-between;align-items:center;min-height:44px;font-size:13px;padding:10px 16px;border-radius:8px}.skill-gate{margin-top:16px;font-size:11px;color:#777}.home-plan,.skill-index{border-top:1px solid #e3e3e3;padding-top:19px;margin-top:24px}.home-plan>summary,.skill-index>summary{font-size:13px;cursor:pointer}.home-plan :deep(.planner){border:0;margin:0;padding-top:18px}.home-plan :deep(.planner>h2),.home-plan :deep(.planner>p.hint){display:none}.skill-index button{display:block;width:100%;text-align:left;border:0;background:none;padding:10px 0;font-size:12px;color:#777}.empty-import{display:block;margin:0 auto 25px;font-size:13px}.draft-notice{display:flex;justify-content:space-between;gap:15px;background:#f5f5f5;border-radius:7px;padding:12px 16px;font-size:12px;margin:18px 0}.draft-notice button{border:0;background:none;font-size:12px;text-decoration:underline}.setup-view{max-width:760px;margin:auto;padding-bottom:40px}.setup-heading{padding:30px 0 10px}.back-home{background:none;border:0;color:#888;font-size:12px;padding:0;margin-bottom:25px}.setup-heading h1{font:38px Georgia,serif;margin:0 0 12px;letter-spacing:-1px}.setup-heading p{font-size:14px;color:#888}.ai-settings{position:absolute;z-index:20;right:0;top:58px;width:min(660px,100%);padding:24px;background:#fff;border:1px solid #ddd;border-radius:12px;box-shadow:0 12px 40px #00000013}.ai-settings summary{pointer-events:none;list-style:none;font-size:16px;font-weight:600}.close-settings{position:absolute;right:18px;top:16px;border:0;background:none;font-size:24px;color:#777}.connection-controls{display:flex;flex-wrap:wrap;gap:14px;align-items:end;margin-top:12px}.connection-controls label{flex:1;min-width:160px;font-size:12px}.connection-controls a{font-size:12px;color:#666}.ai-settings .hint{font-size:11px}.no-lesson{padding:80px;text-align:center}.no-lesson h2{font:28px Georgia,serif}
+.course-space{position:relative}.workspace-nav{height:54px;display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid #e6e6e6}.view-tabs{display:flex;align-items:stretch;gap:28px;height:100%}.view-tabs button{position:relative;background:none;border:0;padding:0 3px;color:#888;font-size:14px}.view-tabs button.active{color:#181818;font-weight:600}.view-tabs button.active:after{content:"";position:absolute;bottom:-1px;left:0;right:0;height:2px;background:#222}.workspace-actions{display:flex;align-items:center;gap:24px}.workspace-actions>button{border:0;background:none;padding:8px 0;color:#666;font-size:12px;display:flex;align-items:center;gap:7px}.workspace-actions .current{color:#111}.count-badge{display:inline-grid;place-items:center;min-width:18px;height:18px;border-radius:10px;background:#eee;font-size:10px}.home-heading{display:flex;justify-content:space-between;align-items:center;padding:38px 0 12px}.course-context{font-size:12px;color:#777;margin:0 0 10px}.home-heading h1{font:46px/1.15 Georgia,serif;letter-spacing:-1.5px;margin:0}.home-subtitle{font-size:14px;color:#888;margin:10px 0 0}.home-count{display:flex;align-items:center;gap:12px}.home-count strong{font:40px Georgia,serif}.home-count span{font-size:12px;color:#888;max-width:55px;line-height:1.4}.home-canvas{display:grid;grid-template-columns:minmax(0,1fr) 286px;gap:48px;align-items:center;min-height:540px}.tree-stage{position:relative;padding:0 10px;min-width:0}.home-sidebar{border-left:1px solid #e9e9e9;padding-left:28px}.detail-caption{font-size:11px;color:#999}.selected-skill h2,.select-invitation h2{font:25px/1.3 Georgia,serif;letter-spacing:-.4px;margin:13px 0}.selected-skill p,.select-invitation p{font-size:13px;line-height:1.8;color:#777}.skill-estimate{display:flex;align-items:baseline;gap:10px;margin:24px 0}.skill-estimate strong{font:30px Georgia,serif}.skill-estimate span{font-size:11px;color:#999}.open-lesson{width:100%;display:flex;justify-content:space-between;align-items:center;min-height:44px;font-size:13px;padding:10px 16px;border-radius:8px}.skill-gate{margin-top:16px;font-size:11px;color:#777}.home-plan,.skill-index{border-top:1px solid #e3e3e3;padding-top:19px;margin-top:24px}.home-plan>summary,.skill-index>summary{font-size:13px;cursor:pointer}.home-plan :deep(.planner){border:0;margin:0;padding-top:18px}.home-plan :deep(.planner>h2),.home-plan :deep(.planner>p.hint){display:none}.skill-index button{display:block;width:100%;text-align:left;border:0;background:none;padding:10px 0;font-size:12px;color:#777}.empty-import{display:block;margin:0 auto 25px;font-size:13px}.draft-notice{display:flex;justify-content:space-between;gap:15px;background:#f5f5f5;border-radius:7px;padding:12px 16px;font-size:12px;margin:18px 0}.draft-notice button{border:0;background:none;font-size:12px;text-decoration:underline}.setup-view{max-width:760px;margin:auto;padding-bottom:40px}.setup-heading{padding:30px 0 10px}.back-home{background:none;border:0;color:#888;font-size:12px;padding:0;margin-bottom:25px}.setup-heading h1{font:38px Georgia,serif;margin:0 0 12px;letter-spacing:-1px}.setup-heading p{font-size:14px;color:#888}.setup-heading .ai-notice{font-size:12px;color:#777}.no-lesson{padding:80px;text-align:center}.no-lesson h2{font:28px Georgia,serif}
 .section-block{padding:25px 0;border-bottom:1px solid #e6e6e6}.section-block>summary{font-size:18px;font-weight:600;cursor:pointer;margin-bottom:16px}.section-block form{max-width:none}.section-block h2{font:25px Georgia,serif;margin:0 0 10px}.section-block h3{font-size:16px}.course-tools label{margin:14px 0 7px;font-size:12px}.course-tools input[type=file]{padding:12px 0;border:0;font-size:13px}select,textarea{width:100%;font:inherit;padding:10px 12px;border:1px solid #ccc;border-radius:7px;background:white;color:#181818}textarea{resize:vertical}.inline-actions{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-top:15px}.skill-draft{padding:22px 0;border-top:1px solid #e4e4e4;margin-top:18px}.skill-draft p{font-size:13px;color:#777}.gate{white-space:pre-wrap}.source-preview{margin-top:20px}.source-preview summary{font-size:12px;cursor:pointer}.source-preview pre{max-height:240px;overflow:auto;white-space:pre-wrap;font-size:12px;background:#f7f7f7;padding:15px}.source-file{margin:12px 0}
 @media(max-width:900px){.home-canvas{grid-template-columns:minmax(0,1fr) 245px;gap:20px}.home-sidebar{padding-left:20px}.home-heading h1{font-size:38px}}
-@media(max-width:650px){.workspace-actions{gap:12px}.workspace-actions>button{font-size:11px}.view-tabs{gap:20px}.home-heading{padding-top:28px}.home-heading h1{font-size:34px}.home-count{display:none}.home-canvas{grid-template-columns:1fr;gap:0;min-height:0}.home-sidebar{border-left:0;border-top:1px solid #eee;padding:25px 0}.tree-stage{padding:0}.home-heading .home-subtitle{font-size:12px}.setup-heading h1{font-size:31px}.ai-settings{position:fixed;top:125px;left:16px;right:16px;width:auto;max-height:70vh;overflow:auto}.no-lesson{padding:50px 10px}.workspace-nav{height:48px}.view-tabs button{font-size:13px}}
+@media(max-width:650px){.workspace-actions{gap:12px}.workspace-actions>button{font-size:11px}.view-tabs{gap:20px}.home-heading{padding-top:28px}.home-heading h1{font-size:34px}.home-count{display:none}.home-canvas{grid-template-columns:1fr;gap:0;min-height:0}.home-sidebar{border-left:0;border-top:1px solid #eee;padding:25px 0}.tree-stage{padding:0}.home-heading .home-subtitle{font-size:12px}.setup-heading h1{font-size:31px}.no-lesson{padding:50px 10px}.workspace-nav{height:48px}.view-tabs button{font-size:13px}}
 </style>

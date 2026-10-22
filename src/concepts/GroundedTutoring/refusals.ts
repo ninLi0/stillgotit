@@ -31,22 +31,6 @@ export class InvalidLessonAnswer extends Error {
   readonly code = "INVALID_LESSON_ANSWER";
   constructor() { super("Provide an explanation with references to this lesson's sources."); this.name = "InvalidLessonAnswer"; }
 }
-export class FollowupTaskUnavailable extends Error {
-  readonly code = "FOLLOWUP_TASK_UNAVAILABLE";
-  constructor() { super("Choose one of your open practice tasks."); this.name = "FollowupTaskUnavailable"; }
-}
-export class InvalidTaskProbe extends Error {
-  readonly code = "INVALID_TASK_PROBE";
-  constructor() { super("Ask for reasoning without supplying feedback or a method."); this.name = "InvalidTaskProbe"; }
-}
-export class ClarificationSessionUnavailable extends Error {
-  readonly code = "CLARIFICATION_SESSION_UNAVAILABLE";
-  constructor() { super("Choose one of your open sessions."); this.name = "ClarificationSessionUnavailable"; }
-}
-export class InvalidInputClarification extends Error {
-  readonly code = "INVALID_INPUT_CLARIFICATION";
-  constructor() { super("Ask about the unclear input without supplying a solution."); this.name = "InvalidInputClarification"; }
-}
 export class HintRequestUnavailable extends Error {
   readonly code = "HINT_REQUEST_UNAVAILABLE";
   constructor() { super("Choose one of your open practice tasks."); this.name = "HintRequestUnavailable"; }

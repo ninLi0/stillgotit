@@ -54,13 +54,16 @@ a set of ProposalReceipts with
   a gate String
   a materials set of Materials
   a skillIdentity String
+  a versionIdentity String
+  a saved Flag
 Rule: each unit belongs to an existing course. Each skill belongs to an existing unit.
 Rule: a unit or skill belongs to the owner of its course. An unknown record belongs to no owner.
 Rule: a skill's current version belongs to that skill. Existing versions never change. Discarding a draft removes its versions; other actions preserve them.
 Rule: an outcome describes the ability. A gate describes the complete demonstration required for that ability.
 Rule: a confirmed skill's prerequisites are confirmed skills in the same course. A skill cannot require itself, and prerequisite links cannot form a cycle. Archived skills may retain links to archived prerequisites.
 Rule: blank text is empty or contains only whitespace. Titles, outcomes, and gates are not blank.
-Rule: proposal keys are nonblank strings of at most 100 characters. Each owner and key pair has at most one receipt. A receipt stores the original input and returned skill identity; its content never changes. Discarding a draft retains its receipt, so replay cannot recreate it.
+Rule: proposal keys are nonblank strings of at most 100 characters. Each owner and key pair has at most one receipt. A receipt stores the original input and the identities of the skill and first version it creates; this content never changes. A receipt is written before its version and skill, and it is marked saved after both exist. Discarding a draft marks its receipt saved and retains it, so replay cannot recreate the draft.
+Rule: each write changes one record, and writes happen in an order that never shows a partial result. A skill is created only after its first version exists. A new version becomes current only after it is saved. A version that never becomes current is removed when possible, and no action returns its identity. Discarding removes a skill before its versions, and a version whose skill no longer exists counts as discarded. If an action stops partway, repeating the same request finishes it or is refused, and no query returns a partial record.
 Rule: new identities are unique. A refused action changes no state. Unmentioned state stays unchanged.
 ```
 
@@ -101,19 +104,26 @@ propose(owner: User, unit: Unit, proposalKey: String, title: String, outcome: St
   where input is valid and owner's receipt for proposalKey has different original input
   then
     refuses SKILL_PROPOSAL_CONFLICT "Use the original skill details when retrying this save."
-  where input matches owner's receipt for proposalKey and its skill no longer exists
+  where input matches owner's saved receipt for proposalKey and its skill no longer exists
   then
     refuses SKILL_PROPOSAL_DISCARDED "This draft was discarded. Create a new proposal to save it again."
-  where input matches owner's receipt for proposalKey and its skill still exists
+  where input matches owner's saved receipt for proposalKey and its skill still exists
   then
     use the receipt's skill and keep its current content, version, and status unchanged
     returns skill
+  where input matches owner's receipt for proposalKey and the receipt is not yet marked saved
+  then
+    create the receipt's version with skill, outcome, and gate, unless it already exists
+    create the receipt's skill with unit, title, materials, an empty prerequisites set, that version as current, and status DRAFT, unless it already exists
+    keep any existing skill's current content, version, and status unchanged
+    mark the receipt saved
+    returns skill
   where input is valid and owner has no receipt for proposalKey
   then
-    create skill with unit, title, materials, an empty prerequisites set, and status DRAFT
-    create a version with skill, outcome, and gate, and make it the skill's current version
-    save a receipt with owner, proposalKey, the original input, and skill
-    commit skill, version, and receipt together
+    save a receipt with owner, proposalKey, the original input, and new skill and version identities, not yet marked saved
+    create the receipt's version with skill, outcome, and gate
+    create the receipt's skill with unit, title, materials, an empty prerequisites set, that version as current, and status DRAFT
+    mark the receipt saved
     returns skill
 
 reviseDraft(owner: User, skill: Skill, unit: Unit, title: String, outcome: String, gate: String, materials: MaterialSet) : returns ()
@@ -128,8 +138,8 @@ reviseDraft(owner: User, skill: Skill, unit: Unit, title: String, outcome: Strin
     refuses INVALID_DRAFT_CONTENT "Enter a skill title, outcome, and demonstration requirements."
   where skill is owner's draft, unit belongs to its course, and title, outcome, and gate are not blank
   then
-    replace the skill's unit, title, and materials
-    if outcome or gate differs from its current version, create a version with skill, outcome, and gate, and make it current
+    if outcome or gate differs from its current version, create a version with skill, outcome, and gate
+    replace the skill's unit, title, and materials, and make any new version current, in one write
     returns
 
 discardDraft(owner: User, skill: Skill) : returns ()
@@ -138,7 +148,8 @@ discardDraft(owner: User, skill: Skill) : returns ()
     refuses DRAFT_DISCARD_UNAVAILABLE "Only your draft skills can be discarded."
   where skill is owner's draft
   then
-    remove skill and all its versions
+    mark skill's receipt saved if it is not yet marked saved
+    remove skill, then remove all its versions
     returns
 
 confirm(owner: User, skill: Skill) : returns ()
@@ -181,7 +192,7 @@ reviseDefinition(owner: User, skill: Skill, outcome: String, gate: String) : ret
   where skill is owner's confirmed skill, outcome and gate are not blank, and at least one differs from its current version
   then
     save the skill's current version as previous
-    create version with skill, outcome, and gate, and make it current
+    create version with skill, outcome, and gate, then make it current
     returns previous, version
 
 attachMaterial(owner: User, skill: Skill, material: Material) : returns ()

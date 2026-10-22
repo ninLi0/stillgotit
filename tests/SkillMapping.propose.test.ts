@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { MongoServerError } from "mongodb";
@@ -12,6 +12,7 @@ import {
   SkillMapping,
 } from "../src/concepts/SkillMapping.ts";
 import { connectMongo, localMongoUri } from "../src/storage/mongo.ts";
+import { clearCollections } from "./fixtures/clear-collections.ts";
 
 const database = `stillgotit_test_${randomUUID().replaceAll("-", "")}`;
 const uri = process.env.MONGODB_TEST_URI ?? localMongoUri;
@@ -28,6 +29,11 @@ const content = {
 beforeAll(async () => {
   connection = await connectMongo({ uri, database });
   mapping = await createSkillMapping(connection.db);
+});
+
+beforeEach(async () => {
+  // Each test starts from empty collections in this file's database.
+  await clearCollections(connection!.db);
 });
 
 describe("SkillMapping proposal retries", () => {
@@ -109,18 +115,50 @@ describe("SkillMapping proposal retries", () => {
     expect(await mapping._skills({ unit })).toEqual(stored);
   });
 
-  test("a failed version write rolls back its receipt so the same key can succeed later", async () => {
-    const name = "RetryRollbackMapping", concept = await createSkillMapping(connection!.db, name);
+  test.each(["versions", "skills"])("a save stopped by a failed %s write shows no skill, and a retry finishes it once", async (collection) => {
+    const name = `UnfinishedSave_${collection}`, concept = await createSkillMapping(connection!.db, name);
     const { owner, unit } = await ownedUnit(concept), input = { owner, unit, proposalKey: randomUUID(), ...content };
-    await connection!.db.command({ collMod: `${name}.versions`, validator: { $jsonSchema: { required: ["testFailure"] } }, validationLevel: "strict", validationAction: "error" });
+    await connection!.db.command({ collMod: `${name}.${collection}`, validator: { $jsonSchema: { required: ["testFailure"] } }, validationLevel: "strict", validationAction: "error" });
     try {
       await expect(concept.propose(input)).rejects.toMatchObject({ code: 121 });
+      // The version may exist, but no skill is visible until the save finishes.
       expect(await concept._skills({ unit })).toEqual([]);
-      expect(await connection!.db.collection(`${name}.proposals`).countDocuments()).toBe(0);
-    } finally { await connection!.db.command({ collMod: `${name}.versions`, validator: {} }); }
+      // The key keeps its original input while the save is unfinished.
+      await expect(concept.propose({ ...input, title: "Different title" })).rejects.toBeInstanceOf(SkillProposalConflictError);
+    } finally { await connection!.db.command({ collMod: `${name}.${collection}`, validator: {} }); }
     const result = await concept.propose(input);
     expect(await concept.propose(input)).toEqual(result);
+    const [record] = await concept._skill(result);
+    expect(record).toEqual({ unit, title: content.title, current: expect.any(String), status: "DRAFT" });
+    expect(await concept._version({ version: record!.current })).toEqual([{ skill: result.skill, outcome: content.outcome, gate: content.gate }]);
     expect(await concept._skills({ unit })).toHaveLength(1);
+    expect(await connection!.db.collection(`${name}.versions`).countDocuments({ skill: result.skill })).toBe(1);
+  });
+
+  test("a draft whose save stopped before its receipt was marked saved can be replayed or discarded", async () => {
+    const name = "UnmarkedReceipt", concept = await createSkillMapping(connection!.db, name);
+    const { owner, unit } = await ownedUnit(concept);
+    const kept = { owner, unit, proposalKey: randomUUID(), ...content };
+    const removed = { owner, unit, proposalKey: randomUUID(), ...content, title: "Read matrix dimensions" };
+    // Accept new PENDING receipts, but reject the final write that marks one SAVED.
+    await connection!.db.command({ collMod: `${name}.proposals`, validator: { status: "PENDING" }, validationLevel: "strict", validationAction: "error" });
+    try {
+      for (const input of [kept, removed]) {
+        await expect(concept.propose(input)).rejects.toMatchObject({ code: 121 });
+      }
+    } finally { await connection!.db.command({ collMod: `${name}.proposals`, validator: {} }); }
+    // Each skill and its version were saved before the failed write.
+    const drafts = await concept._skills({ unit });
+    expect(drafts).toHaveLength(2);
+    for (const { current } of drafts) expect(await concept._version({ version: current })).toHaveLength(1);
+    const keptSkill = drafts.find((row) => row.title === kept.title)!.skill;
+    const removedSkill = drafts.find((row) => row.title === removed.title)!.skill;
+
+    expect(await concept.propose(kept)).toEqual({ skill: keptSkill });
+    await concept.discardDraft({ owner, skill: removedSkill });
+    await expect(concept.propose(removed)).rejects.toBeInstanceOf(SkillProposalDiscardedError);
+    expect((await concept._skills({ unit })).map((row) => row.skill)).toEqual([keptSkill]);
+    expect(await connection!.db.collection(`${name}.versions`).countDocuments()).toBe(1);
   });
 });
 
@@ -271,9 +309,9 @@ describe("SkillMapping proposals", () => {
     expect(await mapping._version({ version: unknown })).toEqual([]);
   });
 
-  test("rolls back the skill when its version write fails, then allows a fresh proposal", async () => {
+  test("saves no skill or version when the version write fails, then allows a fresh proposal", async () => {
     // Fault injection is limited to this test namespace in this generated database.
-    const instanceName = "RollbackSkillMapping";
+    const instanceName = "VersionFailureSkillMapping";
     const concept = await createSkillMapping(connection!.db, instanceName);
     const { owner, unit } = await ownedUnit(concept);
     await concept.propose({ proposalKey: crypto.randomUUID(), owner, unit, ...content });

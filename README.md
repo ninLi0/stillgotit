@@ -1,51 +1,69 @@
 # StillGotIt
 
-Learn course skills, test your understanding, and return before you forget.
+Learn course skills, check your understanding, and come back before you forget.
 
-The P2 learning and planning flows use sync-engine endpoints, views, formers, and reactions. The [implementation guide](design/README.md) links the specifications to source and generated read-back. External files and account tokens stay in the host layer.
+StillGotIt turns your course materials into a tree of skills. For each skill, an AI tutor teaches from your own sources, gives you fresh practice, and assesses your work. The app estimates how well you know each skill and plans short reviews before you are likely to forget it.
+
+The app is built from nine concepts, connected by sync-engine endpoints, views, formers, and reactions. The [implementation guide](design/README.md) links each specification to its source code and to the generated read-back, and [runtime responsibilities](design/runtime.md) explains what the server handles outside the concepts.
 
 ## Run locally
 
-Use Bun 1.4.2, Docker, and Python 3.11 or newer. LibreOffice adds document and slide rendering; text extraction still works for supported modern Office files when rendering is unavailable.
+You need Bun 1.4.2, Docker, and a Gemini API key from [Google AI Studio](https://aistudio.google.com/api-keys).
+
+1. Copy `.env.example` to `.env`, then add your key after `GEMINI_API_KEY=`. Bun reads `.env` automatically, and git ignores it.
+2. Install the packages, start MongoDB, build the interface, and start the server:
+
+   ```sh
+   bun install --frozen-lockfile
+   bun run db:up
+   bun run build
+   bun run start
+   ```
+
+3. Open **http://127.0.0.1:3000** and sign in with Commons.
+
+`bun run db:up` starts MongoDB 8.0 in Docker at `127.0.0.1:27017`. It runs as a single server, the same way as on the class platform, so it has no transactions. Its data lives in the `stillgotit_mongo_data` Docker volume. `bun run db:stop` stops the server and keeps the data.
+
+For development with automatic reloading, run `bun run dev:server` and `bun run dev:frontend` in two terminals, then open **http://localhost:5173**.
+
+Without S3 settings, uploaded files are kept in `.data/files`, which git also ignores.
+
+### Environment variables
+
+| Variable | Purpose |
+| --- | --- |
+| `MONGODB_URI` | The app's database. The database name is part of the address. |
+| `MONGODB_TEST_URI` | The server the tests use. If it is unset, tests use the local Docker server. |
+| `PUBLIC_ORIGIN` | The address people open, such as `https://<name>.mit-sdg.dev`. The server accepts changes only from this origin. |
+| `GEMINI_API_KEY` | The key for the AI tutor. Without it, the app still runs, but the AI features are turned off and say why. |
+| `GEMINI_MODEL` | Optional. The default is `gemini-3.8-flash`. |
+| `COMMONS_ORIGIN` | Optional. The Commons sign-in server. The default is `https://class.mit-sdg.dev`. |
+| `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_ENDPOINT`, `S3_REGION` | Optional. Where uploaded files are stored. The first three are required if any are set. |
+
+The class platform sets `HOST`, `PORT`, and `NODE_ENV` itself. [.env.example](.env.example) has the local defaults.
+
+## Run the tests
+
+The tests need the local MongoDB server from `bun run db:up`. Each test file creates its own database, named `stillgotit_test_<id>`, and drops it when it finishes, so the tests never touch the app's data. The tests never call Gemini; they use fake responses instead.
 
 ```sh
-bun install --frozen-lockfile
-python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
 bun run db:up
-bun run build
-bun run start
-```
-
-Open **http://localhost:5173**. Sign in with Commons. Create a course, then select **Continue with ChatGPT**. Review OpenAI's permission screen to connect your plan. No API key is required for this local connection. The loopback callback uses `127.0.0.1` and then returns to `localhost`.
-
-Voice recognition runs locally with Whisper. The first use downloads its base model. Microphone recordings are deleted after transcription. Uploaded lecture audio is retained as course material. The pinned PyAV version avoids a known incompatibility in faster-whisper 1.2.1.
-
-MongoDB stores learning records. `.data/` stores source files, the speech model, and protected OAuth credentials. `.env`, `.data/`, and `.venv/` are ignored by Git. Defaults are in [.env.example](.env.example). Back up MongoDB and `.data/files` together to preserve original attachments.
-
-## P2 flow
-
-**Home** shows the skill tree and study plan. **Course materials** opens import and skill review. Select a leaf and choose **Open lesson** to enter **Learn**, where text, voice, photos, and reasoning effort share one chat composer.
-
-Import material → review and confirm skills → report confidence → study a lesson → answer a fresh task → review the answer → receive assessment and a mastery estimate → set a review budget.
-
-The interface supports free questions, preset study requests, spoken answers, text, photos, transcript corrections, regrades, manual assessment corrections, and a leaf for each confirmed skill. Mastery and review intervals use initial test settings. They are not validated measurements of learning.
-
-Eight concepts are registered against their specifications. Domain writes run through ConceptBox-style endpoint chains, which generate `when / where / then` reactions. The host handles authentication, files, provider calls, and recovery. See the [checked P2 stage](design/stages/materials.md), [generated read-back](generated/stillgotit.md), and [runtime contract](design/runtime.md).
-
-```sh
 bun run check
-bun test --timeout 15000
+bun run test
 ```
 
-[The P2 plan](P2.md) separates completed checks from live-account and submission work. The automated journey uses real MongoDB and controlled provider responses. It does not establish live AI quality. The local app uses one Bun process; it is not a hosted, multi-server deployment.
+`bun run check` compares the concept specifications with the code, confirms the generated files are current, and type-checks the server and the interface. `bun run test` runs every test file.
+
+## Earlier milestones
+
+[P2: Alpha](P2.md) records the first working version and how it was checked. The P1 design submission is linked at the end of this page.
 
 ## Earlier implementation steps
 
 <details>
 <summary>Open the historical step-by-step record</summary>
 
-These entries describe the state at each earlier increment. Their pending-work notes are historical. Use the P2 plan above for current status.
+These entries describe the state at each earlier increment, and their pending-work notes are historical. Some of them describe MongoDB transactions and a replica set; the app no longer uses either, as [runtime responsibilities](design/runtime.md) explains.
 
 ### Step 1: save a course
 

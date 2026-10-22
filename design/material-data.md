@@ -14,11 +14,33 @@ Each `MediaValue` has these fields:
 | `renditions` | An ordered list of readable text or images derived from the original. It may be empty when extraction produced nothing usable. |
 | `limitations` | An ordered list of nonblank descriptions of extraction gaps. An empty list means the producer reported no gaps. |
 
-A text rendition has `kind: TEXT`, a nonblank `location`, and nonblank `text`. An image rendition has `kind: IMAGE`, a nonblank `location`, a retained `file` reference, and `mediaType` set to `image/png`, `image/jpeg`, or `image/webp`. The original may have a different format; the importer prepares a readable rendition. The current importer produces this representation; extraction tests verify representative files.
+A text rendition has `kind: TEXT`, a nonblank `location`, and nonblank `text`. An image rendition has `kind: IMAGE`, a nonblank `location`, a retained `file` reference, and `mediaType` set to `image/png`, `image/jpeg`, or `image/webp`. For an uploaded PNG, JPEG, or WebP image, the rendition refers to the original file itself. The importer produces this representation; extraction tests verify representative files.
 
-Locations are stable source labels, such as `lesson/page/2` or `lecture/time/00:30-00:45`. The importer assigns them consistently within a material. These methods preserve the supplied locations; tutoring citation checks use them. Multiple renditions can show the same source location, such as text and an image of one page.
+Locations are stable source labels, such as `lesson/page/2` or `lecture/time/00:30-00:45`. The importer assigns them consistently within a material. These methods preserve the supplied locations; tutoring citation checks use them. Multiple renditions can show the same source location.
 
-`MediaList` preserves original-file order and each file's rendition and limitation order. Unknown fields and malformed records are rejected. The stored values contain only the declared fields. Uploads of lecture audio can be retained originals. Temporary microphone recordings are not retained file references.
+`MediaList` preserves original-file order and each file's rendition and limitation order. Unknown fields and malformed records are rejected. The stored values contain only the declared fields. Temporary microphone recordings are not retained file references.
+
+## The importer
+
+The host reads each retained file in memory with TypeScript (`src/host/extract.ts`). It does not start other programs or write temporary files. Each location starts with a key: the first 16 hexadecimal characters of the SHA-256 digest of the file reference. The material's `content` joins every text rendition as `[location]` followed by its text.
+
+| File | Renditions and locations | Limitation |
+| --- | --- | --- |
+| PDF | Text for each page with text, at `key/page/N`. No page images are made; the original PDF stays retained. | Pages with no selectable text are listed. |
+| PNG, JPEG, WebP | One image rendition at `key/image` that refers to the original file. The type is checked from the file's bytes. | None. |
+| Text, Markdown, code | Text in blocks of 100 lines, at `key/lines/A-B`. Files must be UTF-8. | None. |
+| Notebook (`.ipynb`) | The source of each nonblank cell, at `key/cell/N`. | Code is not run, and saved outputs are not read. |
+| Word (`.docx`) | All document text, at `key/document`. | Images and charts are not included. |
+| PowerPoint (`.pptx`) | The text of each slide, at `key/slide/N`, in the presentation's slide order. | Images and charts are not included. |
+| Excel (`.xlsx`, `.xlsm`) | Each sheet's cell values as `A1: value`, at `key/sheet/NAME/rows/1-LAST`. Formulas appear as `=FORMULA = value`. | Images and charts are not included. |
+
+The importer refuses ZIP archives, audio, video, older Office formats, other image formats, and files that are not UTF-8 text. It also refuses locked or damaged files, PDFs or presentations over 50 pages, sheets over 20,000 rows or 200 columns, Office files that unpack to more than 50 MB, and imports with more than 500,000 characters of text. Each refusal is a complete sentence for the learner. Type refusals happen before any file is saved. An import still needs readable content, so a scanned PDF alone is refused.
+
+## Retained file storage
+
+Uploads are limited to 12 files and 25 MB in total. Retained files live in a file store under `SHA-256(owner)/importKey/SHA-256(bytes).ext`. When `S3_BUCKET`, `S3_ACCESS_KEY_ID`, and `S3_SECRET_ACCESS_KEY` are set, the store is S3-compatible object storage; `S3_ENDPOINT`, `S3_REGION`, and `S3_SESSION_TOKEN` are optional. Partial S3 settings stop startup. Without them, development uses `.data/files`. Each store call has a 30-second limit. Storage errors reach the learner as one plain message.
+
+A download first checks the learner's access to the material and the exact file reference. It then reads the bytes from the store.
 
 ## Readability and ownership
 
