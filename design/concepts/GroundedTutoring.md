@@ -270,7 +270,7 @@ _sourceSet(owner: Learner, scope: Scope) : one (sources: SourceRecords)
   Returns only this owner's sources in scope, or an empty list.
 
 _study(owner: Learner, topic: Topic) : one (sessions: StudyRecords)
-  Returns this owner's sessions for topic, with their own saved dialogue and review state, or an empty list.
+  Returns this owner's sessions for topic in the order they were started, with their own saved dialogue and review state, or an empty list.
 
 _sessionData(session: Session) : optional (data: StudyRecord)
   Returns the session and its own dialogue, source identities, and review state. Returns no row for an unknown session. The application checks ownership.

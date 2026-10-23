@@ -112,7 +112,7 @@ export type StillGotItWire = {
     output: {
       "course": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["createCourse"]>>, ["course"]>>;
     };
-    error: { error: AppWideError | "COURSE_EXISTS" | "INVALID_COURSE_TITLE" | "INVALID_INPUT" | "NOT_SIGNED_IN" };
+    error: { error: AppWideError | "INVALID_COURSE_TITLE" | "INVALID_INPUT" | "NOT_SIGNED_IN" };
   };
   "/courses/materials/read": {
     input: {
@@ -552,7 +552,7 @@ export type StillGotItHttp = {
     output: {
       "course": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["createCourse"]>>, ["course"]>>;
     };
-    error: { error: HttpAppWideError | "CONFLICT" | "INVALID_REQUEST" | "UNAUTHORIZED" };
+    error: { error: HttpAppWideError | "INVALID_REQUEST" | "UNAUTHORIZED" };
   };
   "/courses/materials/read": {
     input: {

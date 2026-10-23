@@ -144,7 +144,7 @@ export class GroundedTutoring<Learner extends string = string, Scope extends str
     const value = structuredClone(input);
     if (!nonblank(value.request) || !nonblank(value.explanation) || !nonblank(value.topic) || !nonblank(value.definition)) throw new refusal.InvalidLessonContent();
     if (!await this.#validSources(value.owner, value.materials, value.citations)) throw new refusal.InvalidLessonSources();
-    const lesson = crypto.randomUUID() as Session;
+    const lesson = timeOrderedId(this.clock()) as Session;
     await this.sessions.insertOne({ _id: lesson, ...value, materials: [...value.materials], citations: [...value.citations],
       kind: "LESSON", status: "OPEN", dialogue: [], checkedVoiceTurns: [], revision: 0 });
     return { lesson };
@@ -154,7 +154,7 @@ export class GroundedTutoring<Learner extends string = string, Scope extends str
     const value = structuredClone(input);
     if (!nonblank(value.question) || !nonblank(value.criteria) || !["GUIDED", "CHECK"].includes(value.mode) || typeof value.fresh !== "boolean") throw new refusal.InvalidTaskContent();
     if (!await this.#validSources(value.owner, value.materials, value.citations)) throw new refusal.InvalidTaskSources();
-    const task = crypto.randomUUID() as Session;
+    const task = timeOrderedId(this.clock()) as Session;
     await this.sessions.insertOne({ _id: task, ...value, materials: [...value.materials], citations: [...value.citations],
       kind: "PRACTICE", status: "OPEN", hintRequested: false, dialogue: [], checkedVoiceTurns: [], revision: 0 });
     return { task };
@@ -268,7 +268,11 @@ export class GroundedTutoring<Learner extends string = string, Scope extends str
   }
 
   async _study({ owner, topic }: { owner: Learner; topic: Topic }) {
-    return { sessions: (await this.sessions.find({ owner, topic }).sort({ _id: 1 }).toArray()).map((record) => this.#sessionData(record)) };
+    const records = await this.sessions.find({ owner, topic }).sort({ _id: 1 }).toArray();
+    // Session identities are time-ordered, so identity order is the order sessions were started. Sessions saved before
+    // that change have random identities. They stay first, in identity order, so a new session never moves them.
+    records.sort((a, b) => Number(isTimeOrdered(a._id)) - Number(isTimeOrdered(b._id)));
+    return { sessions: records.map((record) => this.#sessionData(record)) };
   }
 
   async _sessionData({ session }: { session: Session }) {
@@ -312,6 +316,14 @@ export class GroundedTutoring<Learner extends string = string, Scope extends str
     throw new Error("The conversation changed repeatedly. Read it again before continuing.");
   }
 }
+
+/** A UUID version 7: the creation time comes first, so identities sort in the order they were made. */
+function timeOrderedId(at: Date): string {
+  const time = Math.max(0, at.getTime()).toString(16).padStart(12, "0").slice(-12), random = crypto.randomUUID();
+  return `${time.slice(0, 8)}-${time.slice(8)}-7${random.slice(15, 18)}-${random.slice(19)}`;
+}
+
+function isTimeOrdered(id: string): boolean { return id[14] === "7"; }
 
 function requireIdentity(value: unknown): asserts value is string {
   if (!nonblank(value)) throw new TypeError("Provide a nonblank identity.");

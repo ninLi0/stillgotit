@@ -1,6 +1,6 @@
 # P2 learning journey
 
-This stage connects course materials, skill review, tutoring, assessment, mastery, and a study budget. Concept implementations use the full specifications. The P2 screen focuses on one course and daily review; exam planning is not exposed yet.
+This stage connects course materials, skill review, tutoring, assessment, mastery, and a study budget. Concept implementations use the full specifications. The screen shows one course at a time, and a menu in the header switches courses or starts a new one. Exam planning is not exposed yet.
 
 ```types
 concrete TutorRequest
@@ -80,7 +80,7 @@ reusable.accounts.leaving.SignOut at /auth/logout
 
 [ListCourses](reaction:Courses.ListCourses) calls `Sessioning.use` and returns [CourseList](former:Courses.CourseList). The list contains only the session user's courses. [OwnedCourse](view:Courses.OwnedCourse) relates a course to its owner and title. No request field can choose the owner.
 
-[CreateCourse](reaction:Courses.CreateCourse) calls `Sessioning.use`, requires that the user has no courses, and calls `SkillMapping.createCourse`. A nonempty course list returns `COURSE_EXISTS`. The host holds a per-user lock across this endpoint, including the final query and write. The lock covers the single Bun process used for P2; running multiple servers needs a database-level application constraint.
+[CreateCourse](reaction:Courses.CreateCourse) calls `Sessioning.use` and then `SkillMapping.createCourse`. A learner can have several courses. Each request makes a new course owned by the session user. The host runs this endpoint under a per-user lock, like other course changes.
 
 The course title must contain 1–160 characters after trimming. The Vue page shows the saved course without a page refresh. Reloading or restarting the server reads the same MongoDB records. It displays no invented skills or mastery values.
 

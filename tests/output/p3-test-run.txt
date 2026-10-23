@@ -1,0 +1,73 @@
+$ sync-engine check && sync-engine artifacts check && tsc --noEmit && bun run check:frontend
+Concept action/query source check passed for 9 concepts.
+Application diagnostic check passed with 40 advisories (use --show-advisories to list them).
+$ vue-tsc --noEmit -p frontend/tsconfig.json
+$ vite build --config frontend/vite.config.ts
+vite v8.3.4 building client environment for production...
+transforming...
+[plugin rolldown:vite-resolve] Module "node:util" has been externalized for browser compatibility, imported by "/Users/ericni/6.1040/projects/stillgotit/node_modules/@mit-sdg/sync-engine/dist/engine/utils/runtime.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[plugin rolldown:vite-resolve] Module "node:crypto" has been externalized for browser compatibility, imported by "/Users/ericni/6.1040/projects/stillgotit/node_modules/@mit-sdg/sync-engine/dist/engine/utils/runtime.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[plugin rolldown:vite-resolve] Module "node:crypto" has been externalized for browser compatibility, imported by "/Users/ericni/6.1040/projects/stillgotit/node_modules/@mit-sdg/sync-engine/dist/engine/reactions/concepts/concept-spec.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+✓ 215 modules transformed.
+rendering chunks...
+computing gzip size...
+frontend/dist/index.html                                                   0.49 kB │ gzip:  0.29 kB
+frontend/dist/assets/nunito-sans-vietnamese-400-normal-V2dSmW1H.woff2      5.28 kB
+frontend/dist/assets/nunito-sans-vietnamese-700-normal-CZwaiz_e.woff2      5.28 kB
+frontend/dist/assets/nunito-sans-vietnamese-600-normal-DD7cNabE.woff2      5.35 kB
+frontend/dist/assets/nunito-sans-cyrillic-700-normal-BJ2iHHyS.woff2        7.12 kB
+frontend/dist/assets/nunito-sans-cyrillic-400-normal-DUb-KqT8.woff2        7.18 kB
+frontend/dist/assets/nunito-sans-cyrillic-600-normal-D4TuIAT6.woff2        7.18 kB
+frontend/dist/assets/nunito-sans-vietnamese-700-normal-BwTSkH1V.woff       7.34 kB
+frontend/dist/assets/nunito-sans-vietnamese-400-normal-D5dwM7ZL.woff       7.37 kB
+frontend/dist/assets/nunito-sans-vietnamese-600-normal-BW3IEr32.woff       7.41 kB
+frontend/dist/assets/nunito-sans-cyrillic-ext-700-normal-GO46tfsI.woff2    8.89 kB
+frontend/dist/assets/nunito-sans-cyrillic-ext-400-normal-El6lRT8b.woff2    8.90 kB
+frontend/dist/assets/nunito-sans-cyrillic-ext-600-normal-CVjnjZn6.woff2    8.96 kB
+frontend/dist/assets/nunito-sans-cyrillic-700-normal-DG2UZxR9.woff         8.98 kB
+frontend/dist/assets/nunito-sans-cyrillic-400-normal-DDHmqnIJ.woff         9.04 kB
+frontend/dist/assets/nunito-sans-cyrillic-600-normal-CKMyzy87.woff         9.04 kB
+frontend/dist/assets/nunito-sans-cyrillic-ext-700-normal-Cqve7k0J.woff    11.38 kB
+frontend/dist/assets/nunito-sans-cyrillic-ext-400-normal-fk07B0hk.woff    11.42 kB
+frontend/dist/assets/nunito-sans-cyrillic-ext-600-normal-DZXkk6dX.woff    11.48 kB
+frontend/dist/assets/nunito-sans-latin-ext-400-normal-BoHsJHPR.woff2      13.70 kB
+frontend/dist/assets/nunito-sans-latin-ext-700-normal-DBq_Pukt.woff2      13.72 kB
+frontend/dist/assets/nunito-sans-latin-ext-600-normal-nHO2odcJ.woff2      13.76 kB
+frontend/dist/assets/nunito-sans-latin-700-normal-CICRJDmU.woff2          13.83 kB
+frontend/dist/assets/nunito-sans-latin-400-normal-AkRraKH2.woff2          13.89 kB
+frontend/dist/assets/nunito-sans-latin-600-normal-BtVRvDNj.woff2          14.00 kB
+frontend/dist/assets/nunito-sans-latin-700-normal-CLVG92B9.woff           17.40 kB
+frontend/dist/assets/nunito-sans-latin-400-normal-DY9yCUyQ.woff           17.51 kB
+frontend/dist/assets/nunito-sans-latin-600-normal-DLks-Kj1.woff           17.64 kB
+frontend/dist/assets/nunito-sans-latin-ext-700-normal-jHN8vCOt.woff       18.48 kB
+frontend/dist/assets/nunito-sans-latin-ext-400-normal-CHwj-NZB.woff       18.54 kB
+frontend/dist/assets/nunito-sans-latin-ext-600-normal-DEh-VjuY.woff       18.58 kB
+frontend/dist/assets/index-CvOf09Dr.css                                   46.71 kB │ gzip:  9.18 kB
+frontend/dist/assets/index-DuBkxf9B.js                                   145.37 kB │ gzip: 51.72 kB
+
+✓ built in 229ms
+$ bun test --timeout 15000
+bun test v1.4.2 (744846f84)
+
+tests/Gemini.http.test.ts:
+Gemini request failed: HTTP 429 RESOURCE_EXHAUSTED Resource has been exhausted.
+Gemini request failed: HTTP 403 PERMISSION_DENIED Permission denied.
+
+tests/Gemini.test.ts:
+Gemini request failed: HTTP 429 RESOURCE_EXHAUSTED You exceeded your current quota, please check your plan and billing details.
+Gemini request failed: HTTP 429 RESOURCE_EXHAUSTED Quota exceeded.
+Gemini request failed: HTTP 400 INVALID_ARGUMENT API key not valid. Please pass a valid API key.
+Gemini request failed: HTTP 403 PERMISSION_DENIED Method doesn't allow unregistered callers.
+Gemini request failed: HTTP 404 NOT_FOUND models/unknown is not found.
+Gemini request failed: HTTP 400 FAILED_PRECONDITION Please enable billing on your project.
+Gemini request failed: HTTP 400 INVALID_ARGUMENT Request contains an invalid argument.
+Gemini request failed: HTTP 503 UNAVAILABLE The model is overloaded.
+
+tests/Onboarding.http.test.ts:
+{"action":"link","actionId":"f43d3b83-b6a7-4d85-ac57-070a8e239a77","error":{"name":"MongoServerError"},"level":"error","message":"Consequence action faulted","timestamp":"2026-10-23T03:23:04.064Z"}
+
+ 472 pass
+ 0 fail
+ 3279 expect() calls
+Ran 472 tests across 45 files. [77.08s]
+exit 0

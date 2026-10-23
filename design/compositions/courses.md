@@ -10,7 +10,7 @@ These flows describe the current P2 application. The [P2 stage](../stages/materi
 
 ## Saving courses and materials
 
-[CreateCourse](reaction:Courses.CreateCourse) calls `SkillMapping.createCourse` only when the learner has no course. Otherwise it returns `COURSE_EXISTS`. The host holds the learner's lock across the check and write in the single-process P2 app. [AddUnit](reaction:Courses.AddUnit) calls `SkillMapping.addUnit`, which checks course ownership.
+[CreateCourse](reaction:Courses.CreateCourse) calls `SkillMapping.createCourse` for the signed-in learner. A learner can have several courses, so a new course never replaces or blocks another. Like other course changes, it runs under the learner's lock. [AddUnit](reaction:Courses.AddUnit) calls `SkillMapping.addUnit`, which checks course ownership.
 
 The public upload route at `/api/courses/materials/add` accepts multipart files. The host checks ownership, retains the files, and saves one import key and frozen prepared input. It then calls the private [AddMaterial](reaction:Courses.AddMaterial) endpoint. This endpoint rechecks session and course ownership before calling `GroundedTutoring.addMaterial`. A completed retry returns the saved material identity. Browser calls to `/api/internal/*` are refused. File processing and recovery-store writes run outside read-only `where` conditions. See the [import store](../material-import-store.md).
 

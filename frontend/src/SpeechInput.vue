@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { onBeforeUnmount, ref, watch } from "vue";
 import { hostRequest } from "./host-api.ts";
-const props = defineProps<{ disabled?: boolean; active?: boolean; compact?: boolean }>();
+// describedby names the element that explains why dictation is unavailable.
+const props = defineProps<{ disabled?: boolean; active?: boolean; compact?: boolean; describedby?: string }>();
 const emit = defineEmits<{ transcript: [text: string]; error: [message: string]; recording: [active: boolean] }>();
 const recording = ref(false), transcribing = ref(false);
 let recorder: MediaRecorder | null = null, stream: MediaStream | null = null, mounted = true;
@@ -33,11 +34,11 @@ watch([recording, transcribing], ([a, b]) => emit("recording", a || b));
 watch(() => props.active, (active) => { if (active === false && recorder?.state === "recording") recorder.stop(); });
 </script>
 <template>
-  <div class="voice-input" :class="{ compact }"><button type="button" class="record-button" :class="{ recording }" :disabled="(props.disabled && !recording) || transcribing" :aria-label="recording ? 'Stop recording' : transcribing ? 'Transcribing' : 'Dictate message'" :title="recording ? 'Stop recording' : 'Dictate a message'" @click="toggle">
+  <div class="voice-input" :class="{ compact }"><button type="button" class="record-button" :class="{ recording }" :disabled="(props.disabled && !recording) || transcribing" :aria-label="recording ? 'Stop recording' : transcribing ? 'Transcribing' : 'Dictate message'" :aria-describedby="describedby" :title="recording ? 'Stop recording' : 'Dictate a message'" @click="toggle">
     <span v-if="recording || transcribing" aria-hidden="true">{{ recording ? '■' : '…' }}</span><svg v-else aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v2a7 7 0 0 0 14 0v-2M12 19v3m-4 0h8"/></svg><span v-if="!compact">{{ recording ? 'Stop recording' : transcribing ? 'Transcribing…' : 'Speak your answer' }}</span>
   </button><p v-if="!compact" class="hint">{{ recording ? 'Recording. Stop when you finish.' : 'Review the transcript below. The microphone recording is discarded.' }}</p></div>
 </template>
 <style scoped>
-.record-button { display:flex; gap:10px; align-items:center; border:1px solid #181818; background:#fff; border-radius:6px; padding:11px 16px; font-weight:600; }.recording { background:#181818; color:#fff; }.voice-input { margin:18px 0; }
-.compact{margin:0}.compact .record-button{border:0;border-radius:50%;width:34px;height:34px;padding:7px;justify-content:center}.compact .record-button:hover:not(:disabled){background:#eee}.compact .record-button.recording{background:#222}
+.record-button { display:flex; gap:10px; align-items:center; border:2px solid var(--primary); background:var(--surface); border-radius:6px; padding:11px 16px; font-weight:600; }.recording { background:var(--primary); color:var(--surface); }.voice-input { margin:18px 0; }
+.compact{margin:0}.compact .record-button{border:0;border-radius:50%;width:34px;height:34px;padding:7px;justify-content:center}.compact .record-button:hover:not(:disabled){background:var(--light)}.compact .record-button.recording{background:var(--primary)}
 </style>

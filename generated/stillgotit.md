@@ -1125,7 +1125,7 @@ then
   Sessioning.use (session)
 ```
 
-### Courses.CreateCourse:existing#2
+### Courses.CreateCourse#2
 
 Authored path: `Courses.CreateCourse`.
 - Covered by [Courses, materials, and skill drafts](../design/compositions/courses.md), line 13.
@@ -1135,29 +1135,12 @@ Authored path: `Courses.CreateCourse`.
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Courses.CreateCourse
 where
-  SkillMapping._courses (owner)
-  earlier, RequestBoundary.request (path: "/courses/create", requestId, session, title)
-then
-  RequestBoundary.respond (error: "COURSE_EXISTS", requestId)
-```
-
-### Courses.CreateCourse:first#2
-
-Authored path: `Courses.CreateCourse`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/courses.md), line 13.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/courses.md), line 35.
-- Covered by [P2 learning journey](../design/stages/materials.md), line 83.
-
-```reaction
-when Sessioning.use (session, subject: owner), asked by Courses.CreateCourse
-where
-  no SkillMapping._courses (owner)
   earlier, RequestBoundary.request (path: "/courses/create", requestId, session, title)
 then
   SkillMapping.createCourse (owner, title)
 ```
 
-### Courses.CreateCourse:first#3
+### Courses.CreateCourse#3
 
 Authored path: `Courses.CreateCourse`.
 - Covered by [Courses, materials, and skill drafts](../design/compositions/courses.md), line 13.
@@ -1165,7 +1148,7 @@ Authored path: `Courses.CreateCourse`.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 83.
 
 ```reaction
-when SkillMapping.createCourse (owner, title, course), asked by Courses.CreateCourse:first#2
+when SkillMapping.createCourse (owner, title, course), asked by Courses.CreateCourse#2
 where
   earlier, RequestBoundary.request (path: "/courses/create", requestId, session, title)
 then

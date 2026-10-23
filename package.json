@@ -5,6 +5,7 @@
   "type": "module",
   "packageManager": "bun@1.4.2",
   "dependencies": {
+    "@fontsource/nunito-sans": "5.3.0",
     "@mit-sdg/sync-engine": "1.1.0",
     "@mit-sdg/sync-engine-http": "1.1.0",
     "fflate": "0.8.3",

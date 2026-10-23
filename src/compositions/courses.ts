@@ -26,15 +26,8 @@ const ListCourses = endpoint("/courses", ({ session, owner }) =>
 const CreateCourse = endpoint("/courses/create", ({ session, title, owner, course }) =>
   receive({ session, title })
     .then(Sessioning.use({ session }).responds({ subject: owner }))
-    .then(
-      where(no(SkillMapping._courses({ owner })))
-        .then(SkillMapping.createCourse({ owner, title }).responds({ course }))
-        .then(respond({ course }))
-        .named("first"),
-      where(SkillMapping._courses({ owner }))
-        .then(respond({ error: "COURSE_EXISTS" }))
-        .named("existing"),
-    ),
+    .then(SkillMapping.createCourse({ owner, title }).responds({ course }))
+    .then(respond({ course })),
   { validators: { ...validators, input: courseInput, output: recordOutput(["course"]) } },
 );
 

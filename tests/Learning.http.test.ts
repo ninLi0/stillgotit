@@ -318,15 +318,28 @@ test("HTTP and native learning requests share the learner lock without blocking 
   expect((await learner.ok("/learning/read", { skill })).sessions).toHaveLength(1);
 }, 15_000);
 
-test("native course creation preserves the single-course rule and rejects cancelled or expired requests", async () => {
-  const app = await setup(), learner = app.browser(), { user } = await learner.signIn("native-course");
+test("a learner can create, list, and use several courses that other learners cannot see", async () => {
+  const app = await setup(), learner = app.browser(), other = app.browser(), { user } = await learner.signIn("native-course");
+  await other.signIn("native-other");
   const signedIn = await app.runtime.application.concepts.Sessioning.start({ subject: user });
   if ("error" in signedIn) throw new Error("Test session was refused");
-  const input = { session: signedIn.session, title: "Linear algebra" };
-  const results = await Promise.all([app.runtime.gateway.invoke("/courses/create", input), app.runtime.gateway.invoke("/courses/create", input)]);
-  expect(results.filter((result) => result.ok)).toHaveLength(1);
-  expect(results.find((result) => !result.ok)).toMatchObject({ error: { kind: "domain", value: "COURSE_EXISTS" } });
-  expect(await app.runtime.application.concepts.SkillMapping._courses({ owner: user })).toHaveLength(1);
+  const results = await Promise.all([app.runtime.gateway.invoke("/courses/create", { session: signedIn.session, title: "Linear algebra" }),
+    learner.ok("/courses/create", { title: "Physics" })]);
+  expect(results[0]).toMatchObject({ ok: true });
+  const first = (results[0] as { value: { course: string } }).value.course, second = results[1].course;
+  expect(first).not.toBe(second);
+  expect(await app.runtime.application.concepts.SkillMapping._courses({ owner: user })).toHaveLength(2);
+  const { courses } = await learner.ok("/courses", {});
+  expect(courses.map((c: { title: string }) => c.title).sort()).toEqual(["Linear algebra", "Physics"]);
+  const { unit } = await learner.ok("/courses/units/add", { course: second, title: "Mechanics" });
+  const { material } = await learner.ok("/courses/materials/add", upload(second, crypto.randomUUID()));
+  expect(await learner.ok("/courses/read", { course: second })).toMatchObject({ units: [{ unit, title: "Mechanics" }], materials: [{ material }] });
+  expect(await learner.ok("/courses/read", { course: first })).toMatchObject({ units: [], materials: [] });
+  // Another learner sees none of these courses and cannot read or extend them by ID.
+  expect(await other.ok("/courses", {})).toEqual({ courses: [] });
+  expect((await other.post("/courses/read", { course: second })).status).toBe(403);
+  expect((await other.post("/courses/units/add", { course: second, title: "Stolen" })).status).toBe(403);
+  expect((await learner.ok("/courses/read", { course: second })).units).toHaveLength(1);
   const controller = new AbortController(); controller.abort();
   expect(await app.runtime.gateway.invoke("/learning/task", { session: signedIn.session, skill: "missing" }, { signal: controller.signal }))
     .toMatchObject({ error: { kind: "framework", code: "ABORTED" } });

@@ -35,7 +35,9 @@ export class MaterialFiles {
       }
       const reference = `${operation.importKey}/${hash}${safeExtension(file.name)}`;
       await this.store.put(this.key(operation.owner, reference), bytes);
-      result.push({ file: reference, name: file.name, mediaType: file.type || "application/octet-stream", renditions: [], limitations: [] });
+      // Bun reports text uploads as "text/plain;charset=utf-8". Saved media types keep only the type itself.
+      const mediaType = file.type.split(";")[0]!.trim().toLowerCase() || "application/octet-stream";
+      result.push({ file: reference, name: file.name, mediaType, renditions: [], limitations: [] });
     }
     return result;
   }

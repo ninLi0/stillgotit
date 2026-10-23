@@ -4,10 +4,13 @@ import type { TutorRequest, TutorAnswer } from "../learning-data.ts";
 import type { PassageSet } from "../concepts/GroundedTutoring/dialogue.ts";
 const text = { type: "string" };
 const cited = (field: string) => objectSchema({ [field]: text, citations: { type: "array", minItems: 1, items: objectSchema({ material: text, location: text }) } });
+// Learner-facing text is shown with its line breaks, so paragraphs need blank lines between them.
+const paragraphs = "Write short paragraphs separated by a blank line.";
 const prompts = {
-  LESSON: "Explain the selected skill in response to the learner's request. Give one worked example when useful. Cite exact supplied material/location pairs.",
-  TASK: "Create one fresh assessment containing the COMPLETE gate, normally two new problems plus a why/how question. Use different numbers and situations from worked examples and previous questions. Include all data needed to answer. Do not include solutions, hints, or criteria that reveal the method. Cite the source that supports the skill.",
-  REPLY: "Answer the latest learner question in this lesson. Cite exact supplied material/location pairs.",
+  LESSON: `Explain the selected skill in response to the learner's request. Give one worked example when useful. ${paragraphs} Cite exact supplied material/location pairs.`,
+  TASK: "Create one fresh assessment containing the COMPLETE gate, normally two new problems plus a why/how question. Use different numbers and situations from worked examples and previous questions. Include all data needed to answer. Do not include solutions, hints, or criteria that reveal the method. " +
+    "Number the problems (1., 2., and so on). Put each problem and the why/how question in its own paragraph, with a blank line between paragraphs. Cite the source that supports the skill.",
+  REPLY: `Answer the latest learner question in this lesson. ${paragraphs} Cite exact supplied material/location pairs.`,
   HINT: "Give one small hint for the practice task. Do not give the full answer. The learner explicitly requested help; the saved attempt records it.",
   GRADE: "Assess the saved work against ALL saved criteria. Do not solve missing parts for the learner. Check every result and the reasoning. Return INDEPENDENT only if help is NONE and the answer is correct. With help, a correct answer is SUPPORTED. SLIP is a small execution error with a sound method. GAP means missing or wrong understanding. Use UNCERTAIN when work cannot be read or judged. gateMet is true only if fresh is true, result is INDEPENDENT, and the complete saved demonstration gate is met. A manual clarification can explain original work but cannot count as a new solution. Explain the judgment in plain language. Address the learner directly. Say requirements, new problems, and without hints. Do not expose internal field names or uppercase status codes.",
 };

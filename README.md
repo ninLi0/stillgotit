@@ -6,6 +6,13 @@ StillGotIt turns your course materials into a tree of skills. For each skill, an
 
 The app is built from nine concepts, connected by sync-engine endpoints, views, formers, and reactions. The [implementation guide](design/README.md) links each specification to its source code and to the generated read-back, and [runtime responsibilities](design/runtime.md) explains what the server handles outside the concepts.
 
+## P3 beta
+
+- The app: **https://stillgotit.mit-sdg.dev**
+- [P3 status](P3.md): the journey, what changed, the validation, and the plan for P4
+- [Visual design study](design/visual-design.md)
+- [Saved test run](tests/output/p3-test-run.txt)
+
 ## Run locally
 
 You need Bun 1.4.2, Docker, and a Gemini API key from [Google AI Studio](https://aistudio.google.com/api-keys).

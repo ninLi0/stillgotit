@@ -7,6 +7,7 @@ import { strToU8 } from "fflate";
 import { MaterialFiles } from "../src/host/material-files.ts";
 import { DiskStore, S3Store, type FileStore } from "../src/host/file-store.ts";
 import type { ImportOperation } from "../src/storage/MaterialImportStore.ts";
+import { isMediaList } from "../src/concepts/GroundedTutoring/media.ts";
 import { pdf, png } from "./fixtures/office.ts";
 import { fakeS3 } from "./fixtures/fake-s3.ts";
 
@@ -94,6 +95,19 @@ describe("Upload checks", () => {
     await expect(files.describe(Array.from({ length: 13 }, small))).rejects.toThrow("Choose up to 12 files");
     await expect(files.describe([new File([new Uint8Array(25 * 1024 * 1024 + 1)], "big.md")])).rejects.toThrow("Choose up to 12 files");
     expect(await files.describe(Array.from({ length: 12 }, small))).toHaveLength(12);
+  });
+
+  test("a plain text upload keeps a media type without parameters, so the import can be saved", async () => {
+    // A browser upload parsed by Bun reports text files as "text/plain;charset=utf-8".
+    const form = new FormData(); form.append("file", new File([lesson], "notes.txt", { type: "text/plain" }));
+    const upload = (await new Response(form).formData()).get("file") as File;
+    expect(upload.type).toContain(";");
+    const files = new MaterialFiles(disk());
+    const operation: ImportOperation = { owner: "sam", requestId: crypto.randomUUID(), importKey: crypto.randomUUID(), kind: "MATERIAL_IMPORT",
+      request: { scope: "linear-algebra", title: "Notes", origin: "COURSE", sources: await files.describe([upload]) }, stage: "CREATED", revision: 0 };
+    const sources = await files.retain(operation, [upload]);
+    expect(sources[0]!.mediaType).toBe("text/plain");
+    expect(isMediaList(sources)).toBe(true);
   });
 
   test("changed bytes on a retry are refused", async () => {

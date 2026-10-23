@@ -65,4 +65,21 @@ describe("Grounded tutoring sessions", () => {
     const restarted = new GroundedTutoring(connection.db, name);
     expect((await restarted._dialogue({ session: task })).map(({ turn }) => turn.text).sort()).toEqual(["Reasoning 0", "Reasoning 1"]);
   });
+
+  test("study lists sessions in the order they were started, after sessions saved with older random identities", async () => {
+    // The interface numbers lessons and practice from this order, so a new session must never move an earlier one.
+    let now = Date.parse("2026-10-22T15:00:00Z");
+    const name = `Tutoring_${crypto.randomUUID()}`, tutoring = new GroundedTutoring(connection.db, name, () => new Date(now));
+    const { material } = await tutoring.addMaterial({ owner: "sam", importKey: "lesson", scope: "math", title: "Matrices", locator: "lesson", content: "Rows multiply columns.", originals: [], origin: "COURSE" });
+    const context = { owner: "sam", topic: "matrix-products", definition: "v1", materials: [material], citations: [{ material, location: "content" }] };
+    const lessonText = { request: "Show an example.", explanation: "Match each row to each column." };
+    const { lesson: first } = await tutoring.explain({ ...context, ...lessonText });
+    // A lesson saved before identities were time-ordered. Its random identity sorts after every new one.
+    const sessions = connection.db.collection<{ _id: string }>(`${name.toLowerCase()}.sessions`), legacy = "ffffffff-ffff-4fff-bfff-ffffffffffff";
+    await sessions.insertOne({ ...(await sessions.findOne({ _id: first }))!, _id: legacy });
+    now += 60_000; const { task } = await tutoring.prepareTask({ ...context, question: "Solve two new matrix products.", criteria: "Correct products.", mode: "CHECK", fresh: true });
+    now += 60_000; const { lesson: second } = await tutoring.explain({ ...context, ...lessonText });
+    expect([first, task, second].every((id) => /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(id))).toBe(true);
+    expect((await tutoring._study({ owner: "sam", topic: "matrix-products" })).sessions.map(({ session }): string => session)).toEqual([legacy, first, task, second]);
+  });
 });

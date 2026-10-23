@@ -118,12 +118,13 @@ describe("Commons and courses through HTTP reactions", () => {
     expect((await sam.post("/courses")).body.courses[0].title).toBe("Sam's course");
     expect((await leo.post("/courses")).body.courses[0].title).toBe("Leo's course");
   });
-  test("concurrent requests from separate sessions create only one course", async () => {
+  test("concurrent requests from separate sessions each create a course for the same learner", async () => {
     const app = await setup(), a = app.browser(), b = app.browser();
     await a.signIn(); await b.signIn();
     const results = await Promise.all([a.post("/courses/create", { title: "Linear algebra" }), b.post("/courses/create", { title: "Physics" })]);
-    expect(results.map((r) => r.status).sort()).toEqual([200, 409]);
-    expect(await app.db.collection("SkillMapping.courses").countDocuments()).toBe(1);
+    expect(results.map((r) => r.status)).toEqual([200, 200]);
+    expect(await app.db.collection("SkillMapping.courses").countDocuments()).toBe(2);
+    expect((await a.post("/courses")).body.courses.map((c: { title: string }) => c.title).sort()).toEqual(["Linear algebra", "Physics"]);
   });
   test("recovers a saved registration after linking fails and the server restarts", async () => {
     const app = await setup(), browser = app.browser();
