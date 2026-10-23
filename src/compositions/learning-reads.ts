@@ -16,14 +16,17 @@ export const OpenSession = view("(owner) can change session (studySession)", ({ 
 export const OwnedCase = view("(owner) owns assessment (assessment)", ({ owner, assessment }, { skill, course, definition, task }) => where(
   Assessment._case({ case: assessment }).is({ author: owner, subject: skill, definition, task }), OwnedSkill({ owner, skill }).is({ course }),
 )).optional();
-export const SkillContext = view("the current context of (skill) for (owner)", ({ owner, skill }, { context, skills, tracks, sources }, { course }) => where(
-  OwnedSkill({ owner, skill }).is({ course }), Mapping._map({ course }).is({ skills }), Mastery._progress({ learner: owner }).is({ tracks }),
+export const SkillContext = view("the current context of (skill) for (owner)", ({ owner, skill }, { context, definition, skills, tracks, sources }, { course }) => where(
+  OwnedSkill({ owner, skill }).is({ course, definition }), Mapping._map({ course }).is({ skills }), Mastery._progress({ learner: owner }).is({ tracks }),
   Tutoring._sourceSet({ owner, scope: course }).is({ sources }), compute(computations.selectSkill, { skills, skill }, context),
 )).optional();
-export const SkillData = former("study data for (owner) and (skill)", ({ owner, skill }, { context, tracks, sessions, cases, track, estimate }) => where(
-  SkillContext({ owner, skill }).is({ context, tracks }), Tutoring._study({ owner, topic: skill }).is({ sessions }),
+// `at` is the Read flow's instant. The explanation is an optional row: without one, `explanation` is null and the record is unchanged.
+export const SkillData = former("study data for (owner) and (skill) at (at)", ({ owner, skill, at }, { context, definition, tracks, sessions, cases, track, estimate, explanation, timeline }) => where(
+  SkillContext({ owner, skill }).is({ context, definition, tracks }), Tutoring._study({ owner, topic: skill }).is({ sessions }),
   Assessment._history({ author: owner, subject: skill }).is({ cases }), compute(computations.studyDetail, { context, tracks, sessions, cases }, { track, estimate }),
-).form({ skill: context, track, estimate, sessions, cases }));
+  whether(Mastery._explanation({ learner: owner, subject: skill, definition, at }).is({ explanation })),
+  compute(computations.estimateTimeline, { explanation, tracks }, timeline),
+).form({ skill: context, track, estimate, sessions, cases, explanation: timeline }));
 export const SessionData = former("saved study session (studySession)", ({ studySession }, { data }) => where(Tutoring._sessionData({ session: studySession }).is({ data })).form({ data }));
 export const Progress = former("skill estimates for (owner) in (course)", ({ owner, course }, { skills, tracks, estimates }) => where(
   Mapping._map({ course }).is({ skills }), Mastery._progress({ learner: owner }).is({ tracks }), compute(computations.progressRows, { skills, tracks }, estimates),

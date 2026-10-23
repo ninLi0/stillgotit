@@ -229,6 +229,25 @@ export type StillGotItWire = {
     };
     error: { error: AppWideError | "COURSE_UNAVAILABLE" | "INVALID_INPUT" | "INVALID_MATERIAL_IMPORT_KEY" | "INVALID_TUTORING_MATERIAL" | "MATERIAL_IMPORT_CONFLICT" | "NOT_SIGNED_IN" };
   };
+  "/learning/adjust": {
+    input: {
+      "adjustmentKey": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["adjust"]>[0], ["adjustmentKey"]>>;
+      "reason": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["adjust"]>[0], ["reason"]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+      "skill": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["adjust"]>[0], ["subject"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_skill"]>[0], ["skill"]>]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_track"]>[0], ["subject"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_skill"]>[0], ["skill"]>]>]>>;
+      "value": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["adjust"]>[0], ["value"]>>;
+    };
+    output: {
+      "adjustment": Jsonify<AllOf<[AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["adjust"]>>, ["adjustment"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_adjustments"]>>>, ["adjustment"]>]>>;
+    } | {
+      "adjustment": Jsonify<AllOf<[AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["adjust"]>>, ["adjustment"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_adjustments"]>>>, ["adjustment"]>]>>;
+    } | {
+      "adjustment": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_adjustments"]>>>, ["adjustment"]>>;
+    } | {
+      "adjustment": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_adjustments"]>>>, ["adjustment"]>>;
+    };
+    error: { error: AppWideError | "ADJUSTMENT_KEY_CONFLICT" | "ADJUSTMENT_TRACK_UNAVAILABLE" | "EXAM_TRADEOFF_CONFIRMATION_REQUIRED" | "INVALID_ADJUSTMENT_KEY" | "INVALID_INPUT" | "INVALID_MASTERY_ADJUSTMENT" | "INVALID_PLAN_INPUT" | "NOT_SIGNED_IN" | "PLAN_PREFERENCES_UNAVAILABLE" | "PLAN_SESSION_IN_PROGRESS" | "ROUTINE_PLAN_OUTDATED" | "ROUTINE_PLAN_UNAVAILABLE" | "ROUTINE_SESSION_IN_PROGRESS" | "SKILL_UNAVAILABLE" };
+  };
   "/learning/assess": {
     input: {
       "dialogueLength": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["confirmAttempt"]>[0], ["dialogueLength"]>>;
@@ -303,7 +322,7 @@ export type StillGotItWire = {
   };
   "/learning/question": {
     input: {
-      "attachment": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["responseInput"]["fn"]>[0], ["attachment"]>>;
+      "attachments": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["responseInput"]["fn"]>[0], ["attachments"]>>;
       "channel": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["respond"]>[0], ["channel"]>>;
       "dialogueLength": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["dialogueIsCurrent"]["fn"]>[0], ["dialogueLength"]>>;
       "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
@@ -316,12 +335,13 @@ export type StillGotItWire = {
   "/learning/read": {
     input: {
       "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
-      "skill": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["selectSkill"]["fn"]>[0], ["skill"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_history"]>[0], ["subject"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_study"]>[0], ["topic"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_skill"]>[0], ["skill"]>]>>;
+      "skill": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["selectSkill"]["fn"]>[0], ["skill"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_history"]>[0], ["subject"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_study"]>[0], ["topic"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_explanation"]>[0], ["subject"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_skill"]>[0], ["skill"]>]>>;
     };
     output: {
       "data": {
         "cases": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["studyDetail"]["fn"]>[0], ["cases"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_history"]>>>, ["cases"]>]>>;
         "estimate": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["studyDetail"]["fn"]>>, ["estimate"]>>;
+        "explanation": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["estimateTimeline"]["fn"]>>, []>>;
         "sessions": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["studyDetail"]["fn"]>[0], ["sessions"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_study"]>>>, ["sessions"]>]>>;
         "skill": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["studyDetail"]["fn"]>[0], ["context"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["selectSkill"]["fn"]>>, []>]>>;
         "track": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["studyDetail"]["fn"]>>, ["track"]>>;
@@ -351,7 +371,7 @@ export type StillGotItWire = {
   };
   "/learning/respond": {
     input: {
-      "attachment": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["responseInput"]["fn"]>[0], ["attachment"]>>;
+      "attachments": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["responseInput"]["fn"]>[0], ["attachments"]>>;
       "channel": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["respond"]>[0], ["channel"]>>;
       "dialogueLength": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["dialogueIsCurrent"]["fn"]>[0], ["dialogueLength"]>>;
       "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
@@ -661,6 +681,24 @@ export type StillGotItHttp = {
     };
     error: { error: HttpAppWideError | "CONFLICT" | "FORBIDDEN" | "INVALID_REQUEST" | "UNAUTHORIZED" };
   };
+  "/learning/adjust": {
+    input: {
+      "adjustmentKey": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["adjust"]>[0], ["adjustmentKey"]>>;
+      "reason": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["adjust"]>[0], ["reason"]>>;
+      "skill": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["adjust"]>[0], ["subject"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_skill"]>[0], ["skill"]>]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_track"]>[0], ["subject"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_skill"]>[0], ["skill"]>]>]>>;
+      "value": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["adjust"]>[0], ["value"]>>;
+    };
+    output: {
+      "adjustment": Jsonify<AllOf<[AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["adjust"]>>, ["adjustment"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_adjustments"]>>>, ["adjustment"]>]>>;
+    } | {
+      "adjustment": Jsonify<AllOf<[AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["adjust"]>>, ["adjustment"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_adjustments"]>>>, ["adjustment"]>]>>;
+    } | {
+      "adjustment": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_adjustments"]>>>, ["adjustment"]>>;
+    } | {
+      "adjustment": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_adjustments"]>>>, ["adjustment"]>>;
+    };
+    error: { error: HttpAppWideError | "CONFLICT" | "INVALID_REQUEST" | "UNAUTHORIZED" };
+  };
   "/learning/assess": {
     input: {
       "dialogueLength": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["confirmAttempt"]>[0], ["dialogueLength"]>>;
@@ -729,7 +767,7 @@ export type StillGotItHttp = {
   };
   "/learning/question": {
     input: {
-      "attachment": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["responseInput"]["fn"]>[0], ["attachment"]>>;
+      "attachments": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["responseInput"]["fn"]>[0], ["attachments"]>>;
       "channel": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["respond"]>[0], ["channel"]>>;
       "dialogueLength": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["dialogueIsCurrent"]["fn"]>[0], ["dialogueLength"]>>;
       "studySession": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["respond"]>[0], ["session"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["answerLesson"]>[0], ["lesson"]>]>>;
@@ -740,12 +778,13 @@ export type StillGotItHttp = {
   };
   "/learning/read": {
     input: {
-      "skill": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["selectSkill"]["fn"]>[0], ["skill"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_history"]>[0], ["subject"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_study"]>[0], ["topic"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_skill"]>[0], ["skill"]>]>>;
+      "skill": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["selectSkill"]["fn"]>[0], ["skill"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_history"]>[0], ["subject"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_study"]>[0], ["topic"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_explanation"]>[0], ["subject"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_skill"]>[0], ["skill"]>]>>;
     };
     output: {
       "data": {
         "cases": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["studyDetail"]["fn"]>[0], ["cases"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_history"]>>>, ["cases"]>]>>;
         "estimate": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["studyDetail"]["fn"]>>, ["estimate"]>>;
+        "explanation": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["estimateTimeline"]["fn"]>>, []>>;
         "sessions": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["studyDetail"]["fn"]>[0], ["sessions"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_study"]>>>, ["sessions"]>]>>;
         "skill": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["studyDetail"]["fn"]>[0], ["context"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["selectSkill"]["fn"]>>, []>]>>;
         "track": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["studyDetail"]["fn"]>>, ["track"]>>;
@@ -773,7 +812,7 @@ export type StillGotItHttp = {
   };
   "/learning/respond": {
     input: {
-      "attachment": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["responseInput"]["fn"]>[0], ["attachment"]>>;
+      "attachments": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["responseInput"]["fn"]>[0], ["attachments"]>>;
       "channel": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["respond"]>[0], ["channel"]>>;
       "dialogueLength": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["dialogueIsCurrent"]["fn"]>[0], ["dialogueLength"]>>;
       "studySession": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["respond"]>[0], ["session"]>>;

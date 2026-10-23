@@ -26,7 +26,7 @@ StartingBasis is SELF_REPORTED or PREVIOUS_DEFINITION
 opaque EstimateExplanation
   A computed explanation containing the policy version, starting confidence and basis, replay start, included evidence identities and revisions, ignored inputs and their reasons, ordered score changes, final estimate, and reasons for prerequisite readiness. Each change identifies its time and source, the values before and after it, and any time decay. It is a query result, not stored assessment history.
 opaque ProgressRows
-  A learner's tracks with effective inputs and current estimates.
+  A learner's tracks with effective inputs, manual adjustments, and current estimates.
 ```
 
 ## State
@@ -52,12 +52,15 @@ a set of Inputs with
   unique track and evidence
 a seq of Adjustments with
   a track Track
+  an adjustmentKey String
   a value Number
   a reason String
   an at DateTime
 Rule: a matching track has the supplied learner, subject, and definition. Track fields never change. Every input and adjustment belongs to an existing track.
 Rule: each Evidence identity belongs to at most one input and one track. Its identity, track, and performedAt never change. Replacement preserves the input identity and stores only the higher revision's signal, freshness, gateMet, and attribution.
 Rule: a valid score is a finite number from 0 through 100. Initial confidence and adjustment values are valid scores. Adjustments never change and retain their append order.
+Rule: every adjustment has a nonblank adjustmentKey supplied by the caller. One learner's adjustmentKey identifies at most one adjustment across all of that learner's tracks, and concurrent requests with one key create at most one adjustment. A retry matches when it names the same track, the same value, and exactly the same reason. The key grants no access and no query returns it.
+Rule: _progress reports each track's adjustments so that other readers can tell when a manual adjustment changed an estimate even though no evidence changed.
 Rule: valid evidence has a positive integer revision, performedAt no later than now, and nonblank attribution. If gateMet is true, signal must be INDEPENDENT and fresh must be true. A full gate means all saved demonstration requirements were met; this concept receives that judgment rather than assessing work again.
 Rule: all estimates use policy prototype-1. These are initial test settings, not validated measures of mastery. Parameters are halfLifeDays = 60, partialGain = 10, partialLimit = 79, fullGateFloor = 95, supportedGain = 5, supportedLimit = 79, slipLoss = 5, gapLoss = 20, readinessMinimum = 70, and readinessDays = 14. A calculation change requires a new policy version.
 Rule: an informative input is SLIP or GAP, or a fresh INDEPENDENT or SUPPORTED result. UNCERTAIN and successful reused work are not informative. They do not directly change the score, recovery reference, support cap, or readiness. Time decay still applies.
@@ -114,16 +117,26 @@ acceptEvidence(learner: Learner, subject: Subject, definition: Definition, evide
     keep the existing input identity as input and replace its revision, signal, fresh, gateMet, and attribution
     returns input
 
-adjust(learner: Learner, subject: Subject, definition: Definition, value: Number, reason: String) : returns (adjustment: Adjustment)
-  where no matching track exists
+adjust(learner: Learner, subject: Subject, definition: Definition, adjustmentKey: String, value: Number, reason: String) : returns (adjustment: Adjustment)
+  where adjustmentKey is blank
+  then
+    refuses INVALID_ADJUSTMENT_KEY "Provide a nonblank adjustment key."
+  where adjustmentKey is not blank, learner has an adjustment with adjustmentKey, and that adjustment's track is not the matching track or its value or reason differs from this request
+  then
+    refuses ADJUSTMENT_KEY_CONFLICT "Use the original skill, value, and reason when retrying this adjustment."
+  where adjustmentKey is not blank, learner has no adjustment with adjustmentKey, and no matching track exists
   then
     refuses ADJUSTMENT_TRACK_UNAVAILABLE "Choose a skill version with a starting estimate."
-  where a matching track exists and (value is not a valid score or reason is blank)
+  where adjustmentKey is not blank, learner has no adjustment with adjustmentKey, a matching track exists, and (value is not a valid score or reason is blank)
   then
     refuses INVALID_MASTERY_ADJUSTMENT "Enter a value from 0 to 100 and explain the adjustment."
-  where a matching track exists, value is a valid score, and reason is not blank
+  where adjustmentKey is not blank, learner has an adjustment with adjustmentKey on the matching track, and its value and reason equal this request's
   then
-    append a new adjustment with the matching track, value, reason, and at now
+    keep learner's adjustment with adjustmentKey as adjustment and change nothing
+    returns adjustment
+  where adjustmentKey is not blank, learner has no adjustment with adjustmentKey, a matching track exists, value is a valid score, and reason is not blank
+  then
+    append a new adjustment with the matching track, adjustmentKey, value, reason, and at now
     returns adjustment
 ```
 
@@ -149,5 +162,5 @@ _explanation(learner: Learner, subject: Subject, definition: Definition, at: Dat
   Returns the detailed replay used by _estimate for the same inputs, including reasons for ignored evidence and the readiness decision. Returns no row if the track is absent or at precedes initializedAt. The computation uses the current effective revisions even when at is in the past.
 
 _progress(learner: Learner) : one (tracks: ProgressRows)
-  Returns only this learner's tracks, effective inputs, and estimates at the live concept clock, or an empty list. Reads no other concept.
+  Returns only this learner's tracks, each with its effective inputs, its manual adjustments in append order with their identity, value, reason, and at, and its estimate at the live concept clock, or an empty list. Reads no other concept.
 ```

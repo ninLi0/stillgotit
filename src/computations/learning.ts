@@ -5,6 +5,7 @@ import type { SourceContext } from "../tutor-types.ts";
 import type { Candidate } from "../concepts/StudyPlanning/StudyPlanning.ts";
 import type { ResponseValue, Help } from "../concepts/AssessmentReviewing/AssessmentReviewing.ts";
 import type { Channel } from "../concepts/GroundedTutoring/dialogue.ts";
+import type { EstimateExplanation, ProgressRows, StartingBasis } from "../concepts/MasteryEstimating/MasteryEstimating.ts";
 const studyDate = (at: Date) => at.toLocaleDateString("en-CA", { timeZone: "America/New_York" });
 export function selectSkill({ skills, skill }: { skills: SkillRows; skill: string }): SkillInfo {
   const result = skills.find((row) => row.skill === skill);
@@ -18,6 +19,48 @@ export function selectSources({ sources, materials }: { sources: SourceContext[]
 export function studyDetail({ context, tracks, sessions, cases }: { context: SkillInfo; tracks: Tracks; sessions: Sessions; cases: Cases }) {
   const track = tracks.find((row) => row.subject === context.skill && row.definition === context.current) ?? null;
   return { skill: context, track, estimate: track?.estimate ?? null, sessions, cases };
+}
+/** One change to the estimate, as the skill page lists it. Values stay unrounded. */
+export interface TimelineChange {
+  at: Date; kind: "ATTEMPT" | "ADJUSTMENT" | "TIME"; source: string;
+  before: number; after: number; decay: number; days: number; reason: string;
+}
+/** What the skill page shows of the concept's explanation, in the concept's order. */
+export interface EstimateTimeline {
+  start: { at: Date; confidence: number; startingBasis: StartingBasis };
+  changes: TimelineChange[];
+  ignored: { evidence: string; reason: string }[];
+  provisional: boolean;
+  basis: string;
+}
+const wholeDays = (later: Date, earlier: Date) => Math.floor((later.getTime() - earlier.getTime()) / 86_400_000);
+/** Selects the explanation's rows for display. It recomputes no score, decay, or readiness. */
+export function estimateTimeline({ explanation, tracks }: { explanation?: EstimateExplanation | null; tracks: ProgressRows }): EstimateTimeline | null {
+  if (!explanation) return null;
+  const attempts = new Set(explanation.evidence.map((row) => row.evidence));
+  // Adjustment identities are unique, so every track's adjustments can be searched together.
+  const adjustments = new Map(tracks.flatMap((track) => track.adjustments.map((row) => [row.adjustment, row] as const)));
+  let previous = explanation.replayStart;
+  const changes = explanation.changes.map((change): TimelineChange => {
+    const days = wholeDays(change.at, previous);
+    previous = change.at;
+    if (attempts.has(change.source)) {
+      return { at: change.at, kind: "ATTEMPT", source: change.source, before: change.decayed, after: change.after, decay: change.before - change.decayed, days, reason: "" };
+    }
+    const adjustment = adjustments.get(change.source);
+    if (adjustment) {
+      return { at: change.at, kind: "ADJUSTMENT", source: change.source, before: change.decayed, after: change.after, decay: change.before - change.decayed, days, reason: adjustment.reason };
+    }
+    if (change.source === "time") {
+      return { at: change.at, kind: "TIME", source: "", before: change.before, after: change.after, decay: change.before - change.after, days, reason: "" };
+    }
+    throw new Error("The estimate explanation names a change source that is not an attempt, an adjustment, or time.");
+  });
+  return {
+    start: { at: explanation.replayStart, confidence: explanation.initialConfidence, startingBasis: explanation.startingBasis },
+    changes, ignored: explanation.ignored.map(({ evidence, reason }) => ({ evidence, reason })),
+    provisional: !changes.some((change) => change.kind === "ATTEMPT"), basis: explanation.basis,
+  };
 }
 export function progressRows({ skills, tracks }: { skills: SkillRows; tracks: Tracks }) {
   return skills.map((skill) => ({ skill: skill.skill, estimate: tracks.find((track) => track.subject === skill.skill && track.definition === skill.current)?.estimate ?? null }));
@@ -52,10 +95,17 @@ export function suggestRequest({ selected }: { selected: SourceContext[] }): Tut
   return { kind: "SUGGEST", sources: selected, context: {}, work: [] };
 }
 export function taskCriteria({ outcome, gate }: { outcome: string; gate: string }): string { return `${outcome}\nFull demonstration gate: ${gate}`; }
-export function responseInput({ data, text, channel, attachment, sources }: { data: StudySession; text: string; channel: Channel; attachment: string; sources: SourceContext[] }) {
-  const attached = attachment ? sources.find((source) => source.material === attachment) : undefined;
-  const valid = (!attachment || Boolean(attached)) && (Boolean(text.trim()) || Boolean(attached));
-  return { valid, text, channel, media: attached?.data.originals ?? [] };
+/** The material identities a learner attaches to one response, in the order attached. It may be empty. */
+export type AttachmentList = string[];
+/** Every listed material must be one of the supplied sources and appear once; one failing entry invalidates the whole response. */
+export function responseInput({ data, text, channel, attachments, sources }: { data: StudySession; text: string; channel: Channel; attachments: AttachmentList; sources: SourceContext[] }) {
+  const listed = Array.isArray(attachments) ? attachments : [];
+  const attached = listed.map((material) => sources.find((source) => source.material === material));
+  const found = attached.filter((source): source is SourceContext => source !== undefined);
+  const valid = Array.isArray(attachments) && found.length === listed.length && new Set(listed).size === listed.length &&
+    (Boolean(text.trim()) || listed.length > 0);
+  // Media follow the list order and keep each material's own file order.
+  return { valid, text, channel, media: valid ? found.flatMap((source) => source.data.originals) : [] };
 }
 export function dialogueIsCurrent({ data, dialogueLength }: { data: StudySession; dialogueLength: number }): boolean { return data.dialogue.length === dialogueLength; }
 export function hasLessonQuestion({ data }: { data: StudySession }): boolean { return Boolean(data.lesson && data.dialogue.at(-1)?.turn.speaker === "LEARNER"); }
@@ -73,6 +123,8 @@ export function evidenceUpdate({ data, tracks }: { data: CaseInfo; tracks: Track
   const previous = track?.inputs.find((input) => input.evidence === data.case);
   return { needed: Boolean(track && data.judgment && (!previous || previous.revision < data.judgment.revision)) };
 }
+/** A reusable key is the prefix followed only by the occasion date, so an adjusted key never matches an unadjusted prefix. */
+const occasionKey = (key: string, prefix: string) => key.startsWith(prefix) && /^\d{4}-\d{2}-\d{2}$/.test(key.slice(prefix.length));
 export function planRequest({ skills, tracks, schedule }: { skills: SkillRows; tracks: Tracks; schedule: Schedule }) {
   const day = schedule.today, horizonEnd = new Date(Date.parse(day) + 6 * 86_400_000).toISOString().slice(0, 10);
   const rows = skills.filter((skill) => skill.status === "CONFIRMED").map((skill) => ({ ...skill,
@@ -88,16 +140,28 @@ export function planRequest({ skills, tracks, schedule }: { skills: SkillRows; t
     const earliestDay = latest ? studyDate(new Date(latest.performedAt.getTime() + interval * 86_400_000)) : day;
     if (earliestDay > horizonEnd) continue;
     const occasion = earliestDay < day ? day : earliestDay;
-    const prefix = `${row.skill}:${row.current}:${latest?.evidence ?? "initial"}:${latest?.revision ?? 0}:`;
-    const key = prior.find((candidate) => candidate.key.startsWith(prefix) && candidate.latestDay >= day)?.key ?? `${prefix}${occasion}`;
-    if (done.has(key)) continue;
-    candidates.push(prior.find((candidate) => candidate.key === key) ?? { key, subject: row.skill, definition: row.current,
+    // The key names the evidence and, once the track has one, its latest adjustment; a reused key keeps its saved candidate.
+    const evidencePrefix = `${row.skill}:${row.current}:${latest?.evidence ?? "initial"}:${latest?.revision ?? 0}:`;
+    const adjustment = row.track?.adjustments.at(-1)?.adjustment;
+    const prefix = adjustment ? `${evidencePrefix}${adjustment}:` : evidencePrefix;
+    const key = prior.find((candidate) => occasionKey(candidate.key, prefix) && candidate.latestDay >= day)?.key ?? `${prefix}${occasion}`;
+    // An adjustment is not practice, so work already finished for this evidence within its window is not offered again.
+    if (done.has(key) || prior.some((candidate) => done.has(candidate.key) && candidate.key.startsWith(evidencePrefix) && candidate.latestDay >= day)) continue;
+    const saved = prior.find((candidate) => candidate.key === key);
+    if (saved) { candidates.push(saved); continue; }
+    const priority = 100 - (row.track?.estimate?.value ?? 0);
+    const reason = row.track?.estimate?.ready ? "A later fresh check will test retention." : "This skill needs fresh independent evidence.";
+    // An adjustment is not practice: a new adjusted candidate keeps the evidence's current window and changes only its key, priority, and reason.
+    const evidenced = adjustment ? prior.find((candidate) => occasionKey(candidate.key, evidencePrefix) && candidate.latestDay >= day) ??
+      prior.find((candidate) => candidate.key.startsWith(evidencePrefix) && candidate.latestDay >= day) : undefined;
+    candidates.push(evidenced ? { ...evidenced, key, priority, reason } : { key, subject: row.skill, definition: row.current,
       activity: row.track ? `Fresh check: ${row.title}` : `Set confidence and try ${row.title}`,
-      minutes: 10, priority: 100 - (row.track?.estimate?.value ?? 0), earliestDay: earliestDay > day ? earliestDay : day,
-      latestDay: horizonEnd, reason: row.track?.estimate?.ready ? "A later fresh check will test retention." : "This skill needs fresh independent evidence.", examRefs: [] });
+      minutes: 10, priority, earliestDay: earliestDay > day ? earliestDay : day, latestDay: horizonEnd, reason, examRefs: [] });
   }
   const basis = createHash("sha256").update(JSON.stringify({ day, skills: rows.map((row) => [row.skill, row.current, row.track && {
     track: row.track.track, inputs: row.track.inputs, initialConfidence: row.track.initialConfidence, startingBasis: row.track.startingBasis, initializedAt: row.track.initializedAt,
+    // Tracks without adjustments keep the fingerprint they had before adjustments existed.
+    ...(row.track.adjustments.length ? { adjustments: row.track.adjustments } : {}),
   }]) })).digest("hex");
   return { candidates, horizonEnd, basis, explanation: "Ten-minute activities ordered by estimated need. Successful independent practice on later days extends the review interval from one to three to seven days. These are prototype settings." };
 }

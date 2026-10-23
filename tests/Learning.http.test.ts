@@ -41,7 +41,7 @@ async function setup() {
   function browser() {
     const jar = new Map<string, string>();
     async function post(path: string, body: Record<string, unknown> | FormData = {}) {
-      if (["/learning/respond", "/learning/question"].includes(path) && !(body instanceof FormData)) body = { channel: "TEXT", attachment: "", ...body };
+      if (["/learning/respond", "/learning/question"].includes(path) && !(body instanceof FormData)) body = { channel: "TEXT", attachments: [], ...body };
       if (path === "/planning/configure" && !(body instanceof FormData)) body = { focusNote: "", ...body };
       const response = await runtime.handle(new Request(`${ORIGIN}/api${path}`, { method: "POST", headers: { Origin: ORIGIN,
         Cookie: [...jar].map(([key, value]) => `${key}=${value}`).join("; "), ...(body instanceof FormData ? {} : { "Content-Type": "application/json" }) }, body: body instanceof FormData ? body : JSON.stringify(body) }));
@@ -276,8 +276,8 @@ test("guarded learning and planning routes refuse missing state through HTTP and
   const cases: [string, Record<string, unknown>][] = [
     ["/learning/lesson", { skill: "missing", request: "Teach me" }],
     ["/learning/task", { skill }],
-    ["/learning/respond", { studySession: "missing", text: "My work", channel: "TEXT", attachment: "", dialogueLength: 0 }],
-    ["/learning/question", { studySession: "missing", text: "Why?", channel: "TEXT", attachment: "", dialogueLength: 0 }],
+    ["/learning/respond", { studySession: "missing", text: "My work", channel: "TEXT", attachments: [], dialogueLength: 0 }],
+    ["/learning/question", { studySession: "missing", text: "Why?", channel: "TEXT", attachments: [], dialogueLength: 0 }],
     ["/learning/reply", { studySession: "missing" }],
     ["/learning/hint", { studySession: "missing" }],
     ["/learning/transcript", { studySession: "missing", turnIndex: 0, text: "Corrected words" }],
@@ -285,6 +285,7 @@ test("guarded learning and planning routes refuse missing state through HTTP and
     ["/learning/retry", { studySession: "missing" }],
     ["/learning/regrade", { case: "missing", basedOn: "missing", reason: "Check my calculation" }],
     ["/learning/correct", { case: "missing", basedOn: "missing", result: "SLIP", gateMet: false, reason: "An arithmetic slip" }],
+    ["/learning/adjust", { skill: "missing", adjustmentKey: crypto.randomUUID(), value: 70, reason: "Prior coursework" }],
     ["/courses/skills/suggest", { material: "missing" }],
     ["/planning/configure", { course: "missing", dailyMinutes: 30, focusNote: "" }],
     ["/planning/propose", { course }],
