@@ -47,7 +47,7 @@ planDetail(schedule: StudyPlanning.ScheduleValue) : PlanDetail
   Selects the active plan and totals scheduled and deferred minutes.
 
 planRequest(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows, schedule: StudyPlanning.ScheduleValue) : ReviewProposal
-  Builds ten-minute review candidates within seven days. Independent success on distinct days extends review intervals from one to three to seven days. Missed activities do not change mastery. The fingerprint excludes continuous time decay but includes evidence revisions and requirement versions.
+  Builds ten-minute review candidates within seven days, or through the day before the nearest active exam when that is later. Independent success on distinct days extends review intervals from one to three to seven days. Missed activities do not change mastery. Reads the active exams and saved plans from the schedule. Marks preparation for the nearest active exam, including prerequisites of its covered skills, under separate exam keys, and carries its unfinished preparation forward unchanged, as the planning composition describes. The fingerprint excludes continuous time decay but includes evidence revisions, requirement versions, and prerequisites.
 
 prerequisitesReady(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows, skill: SkillMapping.Skill) : Flag
   Traverses prerequisite identities in the supplied map, requiring confirmed definitions and ready estimates. A visited set bounds cycles.

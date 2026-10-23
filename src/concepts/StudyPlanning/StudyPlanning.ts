@@ -159,7 +159,10 @@ export class StudyPlanning {
     const prefs = (await this.learners.findOne({ _id: learner }))?.preferences.find((p) => p.scope === scope);
     return { schedule: { preferences: prefs ? { preferences: prefs.preferences, dailyMinutes: prefs.dailyMinutes, focusNote: prefs.focusNote } : null,
       budget: (await this._budget({ learner, scope, day: this.today() })).at(0) ?? null,
-      next: (await this._next({ learner, scope })).at(0) ?? null, today: this.today(), plans: prefs?.plans ?? [] } };
+      next: (await this._next({ learner, scope })).at(0) ?? null, today: this.today(), plans: prefs?.plans ?? [],
+      // Active exams only, including ones whose date has passed; dates are unique within a scope.
+      exams: (prefs?.exams ?? []).filter((exam) => exam.active).sort((a, b) => a.date.localeCompare(b.date))
+        .map(({ exam, date, covered }) => ({ exam, date, covered })) } };
   }
   async _item({ item }: { item: Item }) {
     const record = await this.learners.findOne({ "preferences.plans.items.item": item });

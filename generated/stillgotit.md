@@ -378,7 +378,10 @@ Concrete types:
 ## Computations
 
 - `attemptIsReady(data: GroundedTutoring.StudyRecord, dialogueLength: Number, reviewed: Flag, unseen: Flag, outsideHelp: Flag) : Flag` — [Learning computations](../design/compositions/LearningComputations.md), line 91.
+- `beginAllowed(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows, skill: SkillMapping.Skill, urgent: Flag) : Flag` — [Daily planning flows](../design/compositions/Planning.md), line 106.
 - `correctionNote(reason: String) : AttemptClarification` — [Learning computations](../design/compositions/LearningComputations.md), line 19.
+- `coveredSkillsConfirmed(covered: StudyPlanning.SubjectSet, skills: SkillMapping.SkillMapRows) : Flag` — [Daily planning flows](../design/compositions/Planning.md), line 100.
+- `cutKey(cut: StudyPlanning.CutValue) : String` — [Daily planning flows](../design/compositions/Planning.md), line 112.
 - `dialogueIsCurrent(data: GroundedTutoring.StudyRecord, dialogueLength: Number) : Flag` — [Learning computations](../design/compositions/LearningComputations.md), line 22.
 - `evidenceAttribution(origin: AssessmentReviewing.Origin, rationale: String) : String` — [P2 learning journey](../design/stages/materials.md), line 113.
 - `evidenceUpdate(data: AssessmentReviewing.CaseRecord, tracks: MasteryEstimating.ProgressRows) : EvidenceUpdate` — [Learning computations](../design/compositions/LearningComputations.md), line 25.
@@ -386,6 +389,7 @@ Concrete types:
 - `generationFields(answer: TutorAnswer) : TutorAnswer` — [Learning computations](../design/compositions/LearningComputations.md), line 31.
 - `gradeRequest(selected: GroundedTutoring.SourceRecords, data: AssessmentReviewing.CaseRecord) : TutorRequest` — [Learning computations](../design/compositions/LearningComputations.md), line 34.
 - `hasLessonQuestion(data: GroundedTutoring.StudyRecord) : Flag` — [Learning computations](../design/compositions/LearningComputations.md), line 37.
+- `itemOrder(day: Date, candidate: StudyPlanning.Candidate) : String` — [Daily planning flows](../design/compositions/Planning.md), line 109.
 - `itemSubject(candidate: StudyPlanning.Candidate) : ItemSubject` — [Learning computations](../design/compositions/LearningComputations.md), line 40.
 - `lessonRequest(selected: GroundedTutoring.SourceRecords, context: SkillContext, request: String) : TutorRequest` — [Learning computations](../design/compositions/LearningComputations.md), line 43.
 - `planDetail(schedule: StudyPlanning.ScheduleValue) : PlanDetail` — [Learning computations](../design/compositions/LearningComputations.md), line 46.
@@ -405,6 +409,7 @@ Concrete types:
 - `submissionInput(data: GroundedTutoring.StudyRecord, unseen: Flag, outsideHelp: Flag) : SubmissionInput` — [Learning computations](../design/compositions/LearningComputations.md), line 82.
 - `suggestRequest(selected: GroundedTutoring.SourceRecords) : TutorRequest` — [Learning computations](../design/compositions/LearningComputations.md), line 85.
 - `taskRequest(selected: GroundedTutoring.SourceRecords, context: SkillContext, sessions: GroundedTutoring.StudyRecords) : TutorRequest` — [Learning computations](../design/compositions/LearningComputations.md), line 88.
+- `urgentExamItem(schedule: StudyPlanning.ScheduleValue, candidate: StudyPlanning.Candidate) : Flag` — [Daily planning flows](../design/compositions/Planning.md), line 103.
 
 ## Views
 
@@ -414,6 +419,7 @@ _Views name reusable conditions. Multiple `where` blocks are alternatives._
 
 Authored path: `Courses.OwnedCourse`.
 - Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 7.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 3.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 81.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 101.
 
@@ -464,6 +470,7 @@ Authored path: `Reads.OpenSession`.
 
 Authored path: `Reads.CanReplan`.
 - Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 9.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 31.
 
 ```view
 (owner) can refresh routine reviews in (course) — inputs (owner, course); outputs (); bindings ()
@@ -481,6 +488,37 @@ Authored path: `Reads.ActiveSkill`.
 ```view
 (owner) can study confirmed (skill) — inputs (owner, skill); outputs (course, definition); bindings () — answers at most one (course, definition)
   where view "(owner) owns study skill (skill)" with (owner, skill) has (course, definition, status: "CONFIRMED")
+```
+
+### (owner) has an activity in progress
+
+Authored path: `Planning.ActivityInProgress`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 29.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 31.
+
+```view
+(owner) has an activity in progress — inputs (owner); outputs (); bindings (course)
+  where
+    SkillMapping._courses (owner) has (course)
+    StudyPlanning._next (learner: owner, scope: course) has (status: "IN_PROGRESS")
+```
+
+### (owner) may start (item) in (course)
+
+Authored path: `Planning.StartAllowed`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 73.
+
+```view
+(owner) may start (item) in (course) — inputs (owner, course, item); outputs (); bindings (candidate, skill, definition, skills, tracks, schedule, urgent)
+  where
+    StudyPlanning._item (item) has (candidate, learner: owner, scope: course)
+    (definition, skill) is itemSubject (candidate)
+    view "(owner) can study confirmed (skill)" with (owner, skill) has (course, definition)
+    SkillMapping._map (course) has (skills)
+    MasteryEstimating._progress (learner: owner) has (tracks)
+    StudyPlanning._schedule (learner: owner, scope: course) has (schedule)
+    urgent is urgentExamItem (candidate, schedule)
+    beginAllowed (skill, skills, tracks, urgent)
 ```
 
 ### (owner) owns (unit) in (course)
@@ -553,6 +591,7 @@ assessment (assessment) needs evidence for (owner) — inputs (owner, assessment
 
 Authored path: `Reads.PlanContext`.
 - Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 9.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 11.
 
 ```view
 review inputs for (owner) in (course) — inputs (owner, course); outputs (candidates, horizonEnd, basis, explanation); bindings (skills, tracks, schedule) — answers exactly one (candidates, horizonEnd, basis, explanation)
@@ -772,15 +811,10 @@ Authored path: `Access.BeginReady`.
 - Covered by [Request admission](../design/compositions/LearningAccess.md), line 20.
 
 ```former
-Former "admit starting (item) in (course)" — inputs (owner, course, item); bindings (candidate, skill, definition, skills, tracks); promises at most one record — forms:
+Former "admit starting (item) in (course)" — inputs (owner, course, item); bindings (); promises at most one record — forms:
   a record of
     where view "(owner) owns (course) with (title)" with (course, owner)
-    where StudyPlanning._item (item) has (candidate, learner: owner, scope: course)
-    where (definition, skill) is itemSubject (candidate)
-    where view "(owner) can study confirmed (skill)" with (owner, skill) has (course, definition)
-    where SkillMapping._map (course) has (skills)
-    where MasteryEstimating._progress (learner: owner) has (tracks)
-    where prerequisitesReady (skill, skills, tracks)
+    where view "(owner) may start (item) in (course)" with (course, item, owner)
     allowed: true
 ```
 
@@ -846,6 +880,7 @@ Former "study data for (owner) and (skill)" — inputs (owner, skill); bindings 
 
 Authored path: `Reads.PlanData`.
 - Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 7.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 7.
 
 ```former
 Former "study plan for (owner) in (course)" — inputs (owner, course); bindings (schedule, preferences, budget, next, today, plan); promises exactly one record — forms:
@@ -857,6 +892,38 @@ Former "study plan for (owner) in (course)" — inputs (owner, course); bindings
     plan
     preferences
     today
+```
+
+### the active exams for (owner) in (course)
+
+Authored path: `Planning.Exams`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 7.
+
+```former
+Former "the active exams for (owner) in (course)" — inputs (owner, course); bindings (exam, date, covered); promises exactly one record — forms:
+  each StudyPlanning._exams (learner: owner, scope: course) has (active: true, covered, date, exam)
+    arranged by date
+    form a record of
+      covered
+      date
+      exam
+```
+
+### the activities of the proposal awaiting confirmation for (owner) in (course)
+
+Authored path: `Planning.PendingItems`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 7.
+
+```former
+Former "the activities of the proposal awaiting confirmation for (owner) in (course)" — inputs (owner, course); bindings (plan, item, candidate, day, order); promises exactly one record — forms:
+  each StudyPlanning._plans (learner: owner, scope: course) has (needsConfirmation: true, plan, status: "PROPOSED")
+    where StudyPlanning._items (plan) has (candidate, day, item)
+    where order is itemOrder (candidate, day)
+    arranged by order
+    form a record of
+      candidate
+      day
+      item
 ```
 
 ### the courses belonging to (owner)
@@ -873,6 +940,47 @@ Former "the courses belonging to (owner)" — inputs (owner); bindings (course, 
     form a record of
       course
       title
+```
+
+### the cuts of the proposal awaiting confirmation for (owner) in (course)
+
+Authored path: `Planning.PendingCuts`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 7.
+
+```former
+Former "the cuts of the proposal awaiting confirmation for (owner) in (course)" — inputs (owner, course); bindings (plan, cut, order); promises exactly one record — forms:
+  each StudyPlanning._plans (learner: owner, scope: course) has (needsConfirmation: true, plan, status: "PROPOSED")
+    where StudyPlanning._cuts (plan) has (cut)
+    where order is cutKey (cut)
+    arranged by order
+    form a record of
+      cut
+```
+
+### the proposal awaiting confirmation for (owner) in (course)
+
+Authored path: `Planning.PendingProposal`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 7.
+
+```former
+Former "the proposal awaiting confirmation for (owner) in (course)" — inputs (owner, course); bindings (plan, explanation, examUrgent, estimatedExamMinutes, availableExamMinutes, focusExam, focusExamDate, currentBasis, locallyCurrent, contextCurrent, sessionInProgress); promises exactly one record — forms:
+  each StudyPlanning._plans (learner: owner, scope: course) has (needsConfirmation: true, plan, status: "PROPOSED")
+    where StudyPlanning._plan (plan) has (availableExamMinutes, estimatedExamMinutes, examUrgent, explanation, focusExam)
+    where StudyPlanning._exams (learner: owner, scope: course) has (date: focusExamDate, exam: focusExam)
+    where view "review inputs for (owner) in (course)" with (course, owner) has (basis: currentBasis)
+    where StudyPlanning._proposalCheck (currentBasis, learner: owner, plan) has (contextCurrent, locallyCurrent, sessionInProgress)
+    arranged by plan
+    form a record of
+      availableExamMinutes
+      contextCurrent
+      estimatedExamMinutes
+      examUrgent
+      explanation
+      focusExam
+      focusExamDate
+      locallyCurrent
+      plan
+      sessionInProgress
 ```
 
 ### the skill definitions in (course)
@@ -2624,8 +2732,8 @@ then
 ### Planning.Begin
 
 Authored path: `Planning.Begin`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 7.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 17.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 73.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 89.
 
 ```reaction
 when RequestBoundary.request (course, item, path: "/planning/begin", requestId, session)
@@ -2633,35 +2741,45 @@ then
   Sessioning.use (session)
 ```
 
-### Planning.Begin#2
+### Planning.Begin:missing#2
 
 Authored path: `Planning.Begin`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 7.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 17.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 73.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 89.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Planning.Begin
 where
-  MasteryEstimating._progress (learner: owner) has (tracks)
+  earlier, RequestBoundary.request (course, item, path: "/planning/begin", requestId, session)
+  no view "(owner) owns (course) with (title)" with (course, owner)
+then
+  RequestBoundary.respond (detail: "Choose one of your own courses.", error: "COURSE_UNAVAILABLE", requestId)
+```
+
+### Planning.Begin:owned#2
+
+Authored path: `Planning.Begin`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 73.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 89.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Planning.Begin
+where
   earlier, RequestBoundary.request (course, item, path: "/planning/begin", requestId, session)
   view "(owner) owns (course) with (title)" with (course, owner)
-  StudyPlanning._item (item) has (candidate, learner: owner, scope: course)
-  (definition, skill) is itemSubject (candidate)
-  view "(owner) can study confirmed (skill)" with (owner, skill) has (course, definition)
-  SkillMapping._map (course) has (skills)
-  prerequisitesReady (skill, skills, tracks)
+  view "(owner) may start (item) in (course)" with (course, item, owner)
 then
   StudyPlanning.begin (item, learner: owner)
 ```
 
-### Planning.Begin#3
+### Planning.Begin:owned#3
 
 Authored path: `Planning.Begin`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 7.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 17.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 73.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 89.
 
 ```reaction
-when StudyPlanning.begin (item, learner: owner), asked by Planning.Begin#2
+when StudyPlanning.begin (item, learner: owner), asked by Planning.Begin:owned#2
 where
   earlier, RequestBoundary.request (course, item, path: "/planning/begin", requestId, session)
 then
@@ -2671,8 +2789,8 @@ then
 ### Planning.Configure
 
 Authored path: `Planning.Configure`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 3.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 15.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 19.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 87.
 
 ```reaction
 when RequestBoundary.request (course, dailyMinutes, focusNote, path: "/planning/configure", requestId, session)
@@ -2680,11 +2798,44 @@ then
   Sessioning.use (session)
 ```
 
-### Planning.Configure#2
+### Planning.Configure:missing#2
 
 Authored path: `Planning.Configure`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 3.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 15.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 19.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 87.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Planning.Configure
+where
+  earlier, RequestBoundary.request (course, dailyMinutes, focusNote, path: "/planning/configure", requestId, session)
+  no view "(owner) owns (course) with (title)" with (course, owner)
+then
+  RequestBoundary.respond (detail: "Choose one of your own courses.", error: "COURSE_UNAVAILABLE", requestId)
+```
+
+### Planning.Configure:missing#3
+
+Authored path: `Planning.Configure`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 19.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 87.
+
+```reaction
+when RequestBoundary.respond (detail: "Choose one of your own courses.", error: "COURSE_UNAVAILABLE", requestId), asked by Planning.Configure:missing#2
+at the flow's settlement frontier
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Planning.Configure
+  earlier, RequestBoundary.request (course, dailyMinutes, focusNote, path: "/planning/configure", requestId, session)
+  view "(owner) owns (course) with (title)" with (course, owner)
+  StudyPlanning._preferences (learner: owner, scope: course) has (dailyMinutes, focusNote, preferences)
+then
+  RequestBoundary.respond (preferences, requestId)
+```
+
+### Planning.Configure:owned#2
+
+Authored path: `Planning.Configure`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 19.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 87.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Planning.Configure
@@ -2695,26 +2846,175 @@ then
   StudyPlanning.configure (dailyMinutes, focusNote, learner: owner, scope: course)
 ```
 
-### Planning.Configure#3
+### Planning.Configure:owned#3
 
 Authored path: `Planning.Configure`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 3.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 15.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 19.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 87.
 
 ```reaction
-when StudyPlanning.configure (dailyMinutes, focusNote, learner: owner, scope: course, preferences), asked by Planning.Configure#2
+when StudyPlanning.configure (dailyMinutes, focusNote, learner: owner, scope: course), asked by Planning.Configure:owned#2
 at the flow's settlement frontier
 where
+  view "(owner) owns (course) with (title)" with (course, owner)
+  StudyPlanning._preferences (learner: owner, scope: course) has (dailyMinutes, focusNote, preferences)
   earlier, RequestBoundary.request (course, dailyMinutes, focusNote, path: "/planning/configure", requestId, session)
 then
   RequestBoundary.respond (preferences, requestId)
 ```
 
+### Planning.ConfirmTradeoffs
+
+Authored path: `Planning.ConfirmTradeoffs`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 65.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 95.
+
+```reaction
+when RequestBoundary.request (course, path: "/planning/tradeoffs/confirm", plan, requestId, session)
+then
+  Sessioning.use (session)
+```
+
+### Planning.ConfirmTradeoffs:missing#2
+
+Authored path: `Planning.ConfirmTradeoffs`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 65.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 95.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Planning.ConfirmTradeoffs
+where
+  earlier, RequestBoundary.request (course, path: "/planning/tradeoffs/confirm", plan, requestId, session)
+  no view "(owner) owns (course) with (title)" with (course, owner)
+then
+  RequestBoundary.respond (detail: "Choose one of your own courses.", error: "COURSE_UNAVAILABLE", requestId)
+```
+
+### Planning.ConfirmTradeoffs:owned#2
+
+Authored path: `Planning.ConfirmTradeoffs`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 65.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 95.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Planning.ConfirmTradeoffs
+where
+  earlier, RequestBoundary.request (course, path: "/planning/tradeoffs/confirm", plan, requestId, session)
+  view "(owner) owns (course) with (title)" with (course, owner)
+  StudyPlanning._plan (plan) has (learner: owner, scope: course)
+  view "review inputs for (owner) in (course)" with (course, owner) has (basis: currentBasis)
+then
+  StudyPlanning.confirmTradeoffs (currentBasis, learner: owner, plan)
+```
+
+### Planning.ConfirmTradeoffs:owned#3
+
+Authored path: `Planning.ConfirmTradeoffs`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 65.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 95.
+
+```reaction
+when StudyPlanning.confirmTradeoffs (currentBasis, learner: owner, plan), asked by Planning.ConfirmTradeoffs:owned#2
+where
+  earlier, RequestBoundary.request (course, path: "/planning/tradeoffs/confirm", plan, requestId, session)
+then
+  RequestBoundary.respond (plan, requestId)
+```
+
+### Planning.ConfirmTradeoffs:plan#2
+
+Authored path: `Planning.ConfirmTradeoffs`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 65.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 95.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Planning.ConfirmTradeoffs
+where
+  earlier, RequestBoundary.request (course, path: "/planning/tradeoffs/confirm", plan, requestId, session)
+  view "(owner) owns (course) with (title)" with (course, owner)
+  no StudyPlanning._plan (plan) has (learner: owner, scope: course)
+then
+  RequestBoundary.respond (detail: "Choose one of your proposed plans.", error: "PROPOSAL_UNAVAILABLE", requestId)
+```
+
+### Planning.DeclineTradeoffs
+
+Authored path: `Planning.DeclineTradeoffs`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 67.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 96.
+
+```reaction
+when RequestBoundary.request (course, path: "/planning/tradeoffs/decline", plan, requestId, session)
+then
+  Sessioning.use (session)
+```
+
+### Planning.DeclineTradeoffs:missing#2
+
+Authored path: `Planning.DeclineTradeoffs`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 67.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 96.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Planning.DeclineTradeoffs
+where
+  earlier, RequestBoundary.request (course, path: "/planning/tradeoffs/decline", plan, requestId, session)
+  no view "(owner) owns (course) with (title)" with (course, owner)
+then
+  RequestBoundary.respond (detail: "Choose one of your own courses.", error: "COURSE_UNAVAILABLE", requestId)
+```
+
+### Planning.DeclineTradeoffs:owned#2
+
+Authored path: `Planning.DeclineTradeoffs`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 67.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 96.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Planning.DeclineTradeoffs
+where
+  earlier, RequestBoundary.request (course, path: "/planning/tradeoffs/decline", plan, requestId, session)
+  view "(owner) owns (course) with (title)" with (course, owner)
+  StudyPlanning._plan (plan) has (learner: owner, scope: course)
+then
+  StudyPlanning.declineTradeoffs (learner: owner, plan)
+```
+
+### Planning.DeclineTradeoffs:owned#3
+
+Authored path: `Planning.DeclineTradeoffs`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 67.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 96.
+
+```reaction
+when StudyPlanning.declineTradeoffs (learner: owner, plan), asked by Planning.DeclineTradeoffs:owned#2
+where
+  earlier, RequestBoundary.request (course, path: "/planning/tradeoffs/decline", plan, requestId, session)
+then
+  RequestBoundary.respond (plan, requestId)
+```
+
+### Planning.DeclineTradeoffs:plan#2
+
+Authored path: `Planning.DeclineTradeoffs`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 67.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 96.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Planning.DeclineTradeoffs
+where
+  earlier, RequestBoundary.request (course, path: "/planning/tradeoffs/decline", plan, requestId, session)
+  view "(owner) owns (course) with (title)" with (course, owner)
+  no StudyPlanning._plan (plan) has (learner: owner, scope: course)
+then
+  RequestBoundary.respond (detail: "Choose one of your proposed plans.", error: "PROPOSAL_UNAVAILABLE", requestId)
+```
+
 ### Planning.Finish
 
 Authored path: `Planning.Finish`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 9.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 18.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 77.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 90.
 
 ```reaction
 when RequestBoundary.request (actualMinutes, course, item, path: "/planning/finish", requestId, session)
@@ -2722,32 +3022,67 @@ then
   Sessioning.use (session)
 ```
 
-### Planning.Finish#2
+### Planning.Finish:missing#2
 
 Authored path: `Planning.Finish`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 9.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 18.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 77.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 90.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Planning.Finish
 where
   earlier, RequestBoundary.request (actualMinutes, course, item, path: "/planning/finish", requestId, session)
-  StudyPlanning._item (item) has (learner: owner, scope: course)
+  no view "(owner) owns (course) with (title)" with (course, owner)
+then
+  RequestBoundary.respond (detail: "Choose one of your own courses.", error: "COURSE_UNAVAILABLE", requestId)
+```
+
+### Planning.Finish:missing#3
+
+Authored path: `Planning.Finish`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 77.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 90.
+
+```reaction
+when RequestBoundary.respond (detail: "Choose one of your own courses.", error: "COURSE_UNAVAILABLE", requestId), asked by Planning.Finish:missing#2
+at the flow's settlement frontier
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Planning.Finish
+  earlier, RequestBoundary.request (actualMinutes, course, item, path: "/planning/finish", requestId, session)
   view "(owner) owns (course) with (title)" with (course, owner)
+  StudyPlanning._item (item) has (learner: owner, scope: course, status: "DONE")
+then
+  RequestBoundary.respond (item, requestId)
+```
+
+### Planning.Finish:owned#2
+
+Authored path: `Planning.Finish`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 77.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 90.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Planning.Finish
+where
+  earlier, RequestBoundary.request (actualMinutes, course, item, path: "/planning/finish", requestId, session)
+  view "(owner) owns (course) with (title)" with (course, owner)
+  StudyPlanning._item (item) has (learner: owner, scope: course)
 then
   StudyPlanning.finish (actualMinutes, item, learner: owner)
 ```
 
-### Planning.Finish#3
+### Planning.Finish:owned#3
 
 Authored path: `Planning.Finish`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 9.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 18.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 77.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 90.
 
 ```reaction
-when StudyPlanning.finish (actualMinutes, item, learner: owner), asked by Planning.Finish#2
+when StudyPlanning.finish (actualMinutes, item, learner: owner), asked by Planning.Finish:owned#2
 at the flow's settlement frontier
 where
+  StudyPlanning._item (item) has (learner: owner, scope: course, status: "DONE")
+  view "(owner) owns (course) with (title)" with (course, owner)
   earlier, RequestBoundary.request (actualMinutes, course, item, path: "/planning/finish", requestId, session)
 then
   RequestBoundary.respond (item, requestId)
@@ -2756,8 +3091,8 @@ then
 ### Planning.Miss
 
 Authored path: `Planning.Miss`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 9.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 20.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 77.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 92.
 
 ```reaction
 when RequestBoundary.request (course, item, path: "/planning/miss", requestId, session)
@@ -2765,32 +3100,67 @@ then
   Sessioning.use (session)
 ```
 
-### Planning.Miss#2
+### Planning.Miss:missing#2
 
 Authored path: `Planning.Miss`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 9.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 20.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 77.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 92.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Planning.Miss
 where
   earlier, RequestBoundary.request (course, item, path: "/planning/miss", requestId, session)
-  StudyPlanning._item (item) has (learner: owner, scope: course)
+  no view "(owner) owns (course) with (title)" with (course, owner)
+then
+  RequestBoundary.respond (detail: "Choose one of your own courses.", error: "COURSE_UNAVAILABLE", requestId)
+```
+
+### Planning.Miss:missing#3
+
+Authored path: `Planning.Miss`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 77.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 92.
+
+```reaction
+when RequestBoundary.respond (detail: "Choose one of your own courses.", error: "COURSE_UNAVAILABLE", requestId), asked by Planning.Miss:missing#2
+at the flow's settlement frontier
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Planning.Miss
+  earlier, RequestBoundary.request (course, item, path: "/planning/miss", requestId, session)
   view "(owner) owns (course) with (title)" with (course, owner)
+  StudyPlanning._item (item) has (learner: owner, scope: course, status: "MISSED")
+then
+  RequestBoundary.respond (item, requestId)
+```
+
+### Planning.Miss:owned#2
+
+Authored path: `Planning.Miss`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 77.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 92.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Planning.Miss
+where
+  earlier, RequestBoundary.request (course, item, path: "/planning/miss", requestId, session)
+  view "(owner) owns (course) with (title)" with (course, owner)
+  StudyPlanning._item (item) has (learner: owner, scope: course)
 then
   StudyPlanning.miss (item, learner: owner)
 ```
 
-### Planning.Miss#3
+### Planning.Miss:owned#3
 
 Authored path: `Planning.Miss`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 9.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 20.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 77.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 92.
 
 ```reaction
-when StudyPlanning.miss (item, learner: owner), asked by Planning.Miss#2
+when StudyPlanning.miss (item, learner: owner), asked by Planning.Miss:owned#2
 at the flow's settlement frontier
 where
+  StudyPlanning._item (item) has (learner: owner, scope: course, status: "MISSED")
+  view "(owner) owns (course) with (title)" with (course, owner)
   earlier, RequestBoundary.request (course, item, path: "/planning/miss", requestId, session)
 then
   RequestBoundary.respond (item, requestId)
@@ -2799,8 +3169,8 @@ then
 ### Planning.Propose
 
 Authored path: `Planning.Propose`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 5.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 16.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 88.
 
 ```reaction
 when RequestBoundary.request (course, path: "/planning/propose", requestId, session)
@@ -2808,11 +3178,63 @@ then
   Sessioning.use (session)
 ```
 
-### Planning.Propose#2
+### Planning.Propose:missing#2
 
 Authored path: `Planning.Propose`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 5.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 16.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 88.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Planning.Propose
+where
+  earlier, RequestBoundary.request (course, path: "/planning/propose", requestId, session)
+  no view "(owner) owns (course) with (title)" with (course, owner)
+then
+  RequestBoundary.respond (detail: "Choose one of your own courses.", error: "COURSE_UNAVAILABLE", requestId)
+```
+
+### Planning.Propose:missing:active#3
+
+Authored path: `Planning.Propose`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 88.
+
+```reaction
+when RequestBoundary.respond (detail: "Choose one of your own courses.", error: "COURSE_UNAVAILABLE", requestId), asked by Planning.Propose:missing#2
+at the flow's settlement frontier
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Planning.Propose
+  earlier, RequestBoundary.request (course, path: "/planning/propose", requestId, session)
+  view "(owner) owns (course) with (title)" with (course, owner)
+  no StudyPlanning._plans (learner: owner, scope: course) has (status: "PROPOSED")
+  StudyPlanning._plans (learner: owner, scope: course) has (plan, status: "ACTIVE")
+then
+  RequestBoundary.respond (plan, requestId)
+```
+
+### Planning.Propose:missing:proposed#3
+
+Authored path: `Planning.Propose`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 88.
+
+```reaction
+when RequestBoundary.respond (detail: "Choose one of your own courses.", error: "COURSE_UNAVAILABLE", requestId), asked by Planning.Propose:missing#2
+at the flow's settlement frontier
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Planning.Propose
+  earlier, RequestBoundary.request (course, path: "/planning/propose", requestId, session)
+  view "(owner) owns (course) with (title)" with (course, owner)
+  StudyPlanning._plans (learner: owner, scope: course) has (plan, status: "PROPOSED")
+then
+  RequestBoundary.respond (plan, requestId)
+```
+
+### Planning.Propose:owned#2
+
+Authored path: `Planning.Propose`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 88.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Planning.Propose
@@ -2824,16 +3246,36 @@ then
   StudyPlanning.replan (basis, candidates, explanation, horizonEnd, learner: owner, scope: course, workloadComplete: false)
 ```
 
-### Planning.Propose#3
+### Planning.Propose:owned:active#3
 
 Authored path: `Planning.Propose`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 5.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 16.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 88.
 
 ```reaction
-when StudyPlanning.replan (basis, candidates, explanation, horizonEnd, learner: owner, scope: course, workloadComplete: false, plan), asked by Planning.Propose#2
+when StudyPlanning.replan (basis, candidates, explanation, horizonEnd, learner: owner, scope: course, workloadComplete: false), asked by Planning.Propose:owned#2
 at the flow's settlement frontier
 where
+  view "(owner) owns (course) with (title)" with (course, owner)
+  no StudyPlanning._plans (learner: owner, scope: course) has (status: "PROPOSED")
+  StudyPlanning._plans (learner: owner, scope: course) has (plan, status: "ACTIVE")
+  earlier, RequestBoundary.request (course, path: "/planning/propose", requestId, session)
+then
+  RequestBoundary.respond (plan, requestId)
+```
+
+### Planning.Propose:owned:proposed#3
+
+Authored path: `Planning.Propose`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 88.
+
+```reaction
+when StudyPlanning.replan (basis, candidates, explanation, horizonEnd, learner: owner, scope: course, workloadComplete: false), asked by Planning.Propose:owned#2
+at the flow's settlement frontier
+where
+  view "(owner) owns (course) with (title)" with (course, owner)
+  StudyPlanning._plans (learner: owner, scope: course) has (plan, status: "PROPOSED")
   earlier, RequestBoundary.request (course, path: "/planning/propose", requestId, session)
 then
   RequestBoundary.respond (plan, requestId)
@@ -2842,8 +3284,8 @@ then
 ### Planning.Read
 
 Authored path: `Planning.Read`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 3.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 14.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 7.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 86.
 
 ```reaction
 when RequestBoundary.request (course, path: "/planning/read", requestId, session)
@@ -2854,8 +3296,8 @@ then
 ### Planning.Read:missing#2
 
 Authored path: `Planning.Read`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 3.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 14.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 7.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 86.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Planning.Read
@@ -2863,14 +3305,14 @@ where
   earlier, RequestBoundary.request (course, path: "/planning/read", requestId, session)
   no view "(owner) owns (course) with (title)" with (course, owner)
 then
-  RequestBoundary.respond (error: "COURSE_UNAVAILABLE", requestId)
+  RequestBoundary.respond (detail: "Choose one of your own courses.", error: "COURSE_UNAVAILABLE", requestId)
 ```
 
 ### Planning.Read:owned#2
 
 Authored path: `Planning.Read`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 3.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 14.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 7.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 86.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Planning.Read
@@ -2878,14 +3320,353 @@ where
   earlier, RequestBoundary.request (course, path: "/planning/read", requestId, session)
   view "(owner) owns (course) with (title)" with (course, owner)
 then
-  RequestBoundary.respond (data: former "study plan for (owner) in (course)" with (course, owner), requestId)
+  RequestBoundary.respond (cuts: former "the cuts of the proposal awaiting confirmation for (owner) in (course)" with (course, owner), data: former "study plan for (owner) in (course)" with (course, owner), exams: former "the active exams for (owner) in (course)" with (course, owner), proposal: former "the proposal awaiting confirmation for (owner) in (course)" with (course, owner), proposalItems: former "the activities of the proposal awaiting confirmation for (owner) in (course)" with (course, owner), requestId)
+```
+
+### Planning.RemoveExam
+
+Authored path: `Planning.RemoveExam`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 27.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 94.
+
+```reaction
+when RequestBoundary.request (course, date, path: "/planning/exams/remove", requestId, session)
+then
+  Sessioning.use (session)
+```
+
+### Planning.RemoveExam:missing#2
+
+Authored path: `Planning.RemoveExam`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 27.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 94.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Planning.RemoveExam
+where
+  earlier, RequestBoundary.request (course, date, path: "/planning/exams/remove", requestId, session)
+  no view "(owner) owns (course) with (title)" with (course, owner)
+then
+  RequestBoundary.respond (detail: "Choose one of your own courses.", error: "COURSE_UNAVAILABLE", requestId)
+```
+
+### Planning.RemoveExam:missing:refreshed#3
+
+Authored path: `Planning.RemoveExam`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 27.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 94.
+
+```reaction
+when RequestBoundary.respond (detail: "Choose one of your own courses.", error: "COURSE_UNAVAILABLE", requestId), asked by Planning.RemoveExam:missing#2
+at the flow's settlement frontier
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Planning.RemoveExam
+  no view "(owner) has an activity in progress" with (owner)
+  earlier, RequestBoundary.request (course, date, path: "/planning/exams/remove", requestId, session)
+  view "(owner) owns (course) with (title)" with (course, owner)
+  StudyPlanning._exams (learner: owner, scope: course) has (active: false, date, exam)
+then
+  RequestBoundary.respond (exam, refreshed: true, requestId)
+```
+
+### Planning.RemoveExam:missing:waiting#3
+
+Authored path: `Planning.RemoveExam`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 27.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 94.
+
+```reaction
+when RequestBoundary.respond (detail: "Choose one of your own courses.", error: "COURSE_UNAVAILABLE", requestId), asked by Planning.RemoveExam:missing#2
+at the flow's settlement frontier
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Planning.RemoveExam
+  view "(owner) has an activity in progress" with (owner)
+  earlier, RequestBoundary.request (course, date, path: "/planning/exams/remove", requestId, session)
+  view "(owner) owns (course) with (title)" with (course, owner)
+  StudyPlanning._exams (learner: owner, scope: course) has (active: false, date, exam)
+then
+  RequestBoundary.respond (exam, notice: "Your plan will update when you finish or stop your current activity.", refreshed: false, requestId)
+```
+
+### Planning.RemoveExam:owned#2
+
+Authored path: `Planning.RemoveExam`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 27.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 94.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Planning.RemoveExam
+where
+  earlier, RequestBoundary.request (course, date, path: "/planning/exams/remove", requestId, session)
+  view "(owner) owns (course) with (title)" with (course, owner)
+then
+  StudyPlanning.removeExam (date, learner: owner, scope: course)
+```
+
+### Planning.RemoveExam:owned:refreshed#3
+
+Authored path: `Planning.RemoveExam`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 27.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 94.
+
+```reaction
+when StudyPlanning.removeExam (date, learner: owner, scope: course), asked by Planning.RemoveExam:owned#2
+at the flow's settlement frontier
+where
+  view "(owner) owns (course) with (title)" with (course, owner)
+  StudyPlanning._exams (learner: owner, scope: course) has (active: false, date, exam)
+  no view "(owner) has an activity in progress" with (owner)
+  earlier, RequestBoundary.request (course, date, path: "/planning/exams/remove", requestId, session)
+then
+  RequestBoundary.respond (exam, refreshed: true, requestId)
+```
+
+### Planning.RemoveExam:owned:waiting#3
+
+Authored path: `Planning.RemoveExam`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 27.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 94.
+
+```reaction
+when StudyPlanning.removeExam (date, learner: owner, scope: course), asked by Planning.RemoveExam:owned#2
+at the flow's settlement frontier
+where
+  view "(owner) owns (course) with (title)" with (course, owner)
+  StudyPlanning._exams (learner: owner, scope: course) has (active: false, date, exam)
+  view "(owner) has an activity in progress" with (owner)
+  earlier, RequestBoundary.request (course, date, path: "/planning/exams/remove", requestId, session)
+then
+  RequestBoundary.respond (exam, notice: "Your plan will update when you finish or stop your current activity.", refreshed: false, requestId)
+```
+
+### Planning.ReplanAfterExam
+
+Authored path: `Planning.ReplanAfterExam`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 31.
+
+```reaction
+when StudyPlanning.setExam (learner: owner, scope: course)
+where
+  view "(owner) can refresh routine reviews in (course)" with (course, owner)
+  no view "(owner) has an activity in progress" with (owner)
+  view "review inputs for (owner) in (course)" with (course, owner) has (basis, candidates, explanation, horizonEnd)
+then
+  StudyPlanning.replan (basis, candidates, explanation, horizonEnd, learner: owner, scope: course, workloadComplete: false)
+```
+
+### Planning.ReplanAfterExamRemoval
+
+Authored path: `Planning.ReplanAfterExamRemoval`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 33.
+
+```reaction
+when StudyPlanning.removeExam (learner: owner, scope: course)
+where
+  view "(owner) can refresh routine reviews in (course)" with (course, owner)
+  no view "(owner) has an activity in progress" with (owner)
+  view "review inputs for (owner) in (course)" with (course, owner) has (basis, candidates, explanation, horizonEnd)
+then
+  StudyPlanning.replan (basis, candidates, explanation, horizonEnd, learner: owner, scope: course, workloadComplete: false)
+```
+
+### Planning.SetExam
+
+Authored path: `Planning.SetExam`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 93.
+
+```reaction
+when RequestBoundary.request (course, covered, date, path: "/planning/exams/set", requestId, session)
+then
+  Sessioning.use (session)
+```
+
+### Planning.SetExam:missing#2
+
+Authored path: `Planning.SetExam`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 93.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Planning.SetExam
+where
+  earlier, RequestBoundary.request (course, covered, date, path: "/planning/exams/set", requestId, session)
+  no view "(owner) owns (course) with (title)" with (course, owner)
+then
+  RequestBoundary.respond (detail: "Choose one of your own courses.", error: "COURSE_UNAVAILABLE", requestId)
+```
+
+### Planning.SetExam:missing:refreshed#3
+
+Authored path: `Planning.SetExam`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 93.
+
+```reaction
+when RequestBoundary.respond (detail: "Choose one of your own courses.", error: "COURSE_UNAVAILABLE", requestId), asked by Planning.SetExam:missing#2
+at the flow's settlement frontier
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Planning.SetExam
+  no view "(owner) has an activity in progress" with (owner)
+  earlier, RequestBoundary.request (course, covered, date, path: "/planning/exams/set", requestId, session)
+  view "(owner) owns (course) with (title)" with (course, owner)
+  SkillMapping._map (course) has (skills)
+  confirmed is coveredSkillsConfirmed (covered, skills)
+  confirmed is among [true]
+  StudyPlanning._exams (learner: owner, scope: course) has (active: true, covered, date, exam)
+then
+  RequestBoundary.respond (exam, refreshed: true, requestId)
+```
+
+### Planning.SetExam:missing:waiting#3
+
+Authored path: `Planning.SetExam`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 93.
+
+```reaction
+when RequestBoundary.respond (detail: "Choose one of your own courses.", error: "COURSE_UNAVAILABLE", requestId), asked by Planning.SetExam:missing#2
+at the flow's settlement frontier
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Planning.SetExam
+  view "(owner) has an activity in progress" with (owner)
+  earlier, RequestBoundary.request (course, covered, date, path: "/planning/exams/set", requestId, session)
+  view "(owner) owns (course) with (title)" with (course, owner)
+  SkillMapping._map (course) has (skills)
+  confirmed is coveredSkillsConfirmed (covered, skills)
+  confirmed is among [true]
+  StudyPlanning._exams (learner: owner, scope: course) has (active: true, covered, date, exam)
+then
+  RequestBoundary.respond (exam, notice: "Your plan will update when you finish or stop your current activity.", refreshed: false, requestId)
+```
+
+### Planning.SetExam:owned#2
+
+Authored path: `Planning.SetExam`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 93.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Planning.SetExam
+where
+  earlier, RequestBoundary.request (course, covered, date, path: "/planning/exams/set", requestId, session)
+  view "(owner) owns (course) with (title)" with (course, owner)
+  SkillMapping._map (course) has (skills)
+  confirmed is coveredSkillsConfirmed (covered, skills)
+  confirmed is among [true]
+then
+  StudyPlanning.setExam (covered, date, learner: owner, scope: course)
+```
+
+### Planning.SetExam:owned:refreshed#3
+
+Authored path: `Planning.SetExam`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 93.
+
+```reaction
+when StudyPlanning.setExam (covered, date, learner: owner, scope: course), asked by Planning.SetExam:owned#2
+at the flow's settlement frontier
+where
+  view "(owner) owns (course) with (title)" with (course, owner)
+  SkillMapping._map (course) has (skills)
+  confirmed is coveredSkillsConfirmed (covered, skills)
+  confirmed is among [true]
+  StudyPlanning._exams (learner: owner, scope: course) has (active: true, covered, date, exam)
+  no view "(owner) has an activity in progress" with (owner)
+  earlier, RequestBoundary.request (course, covered, date, path: "/planning/exams/set", requestId, session)
+then
+  RequestBoundary.respond (exam, refreshed: true, requestId)
+```
+
+### Planning.SetExam:owned:waiting#3
+
+Authored path: `Planning.SetExam`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 93.
+
+```reaction
+when StudyPlanning.setExam (covered, date, learner: owner, scope: course), asked by Planning.SetExam:owned#2
+at the flow's settlement frontier
+where
+  view "(owner) owns (course) with (title)" with (course, owner)
+  SkillMapping._map (course) has (skills)
+  confirmed is coveredSkillsConfirmed (covered, skills)
+  confirmed is among [true]
+  StudyPlanning._exams (learner: owner, scope: course) has (active: true, covered, date, exam)
+  view "(owner) has an activity in progress" with (owner)
+  earlier, RequestBoundary.request (course, covered, date, path: "/planning/exams/set", requestId, session)
+then
+  RequestBoundary.respond (exam, notice: "Your plan will update when you finish or stop your current activity.", refreshed: false, requestId)
+```
+
+### Planning.SetExam:skills#2
+
+Authored path: `Planning.SetExam`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 93.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Planning.SetExam
+where
+  earlier, RequestBoundary.request (course, covered, date, path: "/planning/exams/set", requestId, session)
+  view "(owner) owns (course) with (title)" with (course, owner)
+  SkillMapping._map (course) has (skills)
+  confirmed is coveredSkillsConfirmed (covered, skills)
+  confirmed is among [false]
+then
+  RequestBoundary.respond (detail: "Choose confirmed skills from this course, each once.", error: "EXAM_SKILLS_UNAVAILABLE", requestId)
+```
+
+### Planning.SetExam:skills:refreshed#3
+
+Authored path: `Planning.SetExam`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 93.
+
+```reaction
+when RequestBoundary.respond (detail: "Choose confirmed skills from this course, each once.", error: "EXAM_SKILLS_UNAVAILABLE", requestId), asked by Planning.SetExam:skills#2
+at the flow's settlement frontier
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Planning.SetExam
+  no view "(owner) has an activity in progress" with (owner)
+  earlier, RequestBoundary.request (course, covered, date, path: "/planning/exams/set", requestId, session)
+  view "(owner) owns (course) with (title)" with (course, owner)
+  SkillMapping._map (course) has (skills)
+  confirmed is coveredSkillsConfirmed (covered, skills)
+  confirmed is among [true]
+  StudyPlanning._exams (learner: owner, scope: course) has (active: true, covered, date, exam)
+then
+  RequestBoundary.respond (exam, refreshed: true, requestId)
+```
+
+### Planning.SetExam:skills:waiting#3
+
+Authored path: `Planning.SetExam`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 93.
+
+```reaction
+when RequestBoundary.respond (detail: "Choose confirmed skills from this course, each once.", error: "EXAM_SKILLS_UNAVAILABLE", requestId), asked by Planning.SetExam:skills#2
+at the flow's settlement frontier
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Planning.SetExam
+  view "(owner) has an activity in progress" with (owner)
+  earlier, RequestBoundary.request (course, covered, date, path: "/planning/exams/set", requestId, session)
+  view "(owner) owns (course) with (title)" with (course, owner)
+  SkillMapping._map (course) has (skills)
+  confirmed is coveredSkillsConfirmed (covered, skills)
+  confirmed is among [true]
+  StudyPlanning._exams (learner: owner, scope: course) has (active: true, covered, date, exam)
+then
+  RequestBoundary.respond (exam, notice: "Your plan will update when you finish or stop your current activity.", refreshed: false, requestId)
 ```
 
 ### Planning.Stop
 
 Authored path: `Planning.Stop`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 9.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 19.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 77.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 91.
 
 ```reaction
 when RequestBoundary.request (actualMinutes, course, item, path: "/planning/stop", requestId, session)
@@ -2893,32 +3674,67 @@ then
   Sessioning.use (session)
 ```
 
-### Planning.Stop#2
+### Planning.Stop:missing#2
 
 Authored path: `Planning.Stop`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 9.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 19.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 77.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 91.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Planning.Stop
 where
   earlier, RequestBoundary.request (actualMinutes, course, item, path: "/planning/stop", requestId, session)
-  StudyPlanning._item (item) has (learner: owner, scope: course)
+  no view "(owner) owns (course) with (title)" with (course, owner)
+then
+  RequestBoundary.respond (detail: "Choose one of your own courses.", error: "COURSE_UNAVAILABLE", requestId)
+```
+
+### Planning.Stop:missing#3
+
+Authored path: `Planning.Stop`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 77.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 91.
+
+```reaction
+when RequestBoundary.respond (detail: "Choose one of your own courses.", error: "COURSE_UNAVAILABLE", requestId), asked by Planning.Stop:missing#2
+at the flow's settlement frontier
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Planning.Stop
+  earlier, RequestBoundary.request (actualMinutes, course, item, path: "/planning/stop", requestId, session)
   view "(owner) owns (course) with (title)" with (course, owner)
+  StudyPlanning._item (item) has (learner: owner, scope: course, status: "STOPPED")
+then
+  RequestBoundary.respond (item, requestId)
+```
+
+### Planning.Stop:owned#2
+
+Authored path: `Planning.Stop`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 77.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 91.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Planning.Stop
+where
+  earlier, RequestBoundary.request (actualMinutes, course, item, path: "/planning/stop", requestId, session)
+  view "(owner) owns (course) with (title)" with (course, owner)
+  StudyPlanning._item (item) has (learner: owner, scope: course)
 then
   StudyPlanning.stop (actualMinutes, item, learner: owner)
 ```
 
-### Planning.Stop#3
+### Planning.Stop:owned#3
 
 Authored path: `Planning.Stop`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 9.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 19.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 77.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 91.
 
 ```reaction
-when StudyPlanning.stop (actualMinutes, item, learner: owner), asked by Planning.Stop#2
+when StudyPlanning.stop (actualMinutes, item, learner: owner), asked by Planning.Stop:owned#2
 at the flow's settlement frontier
 where
+  StudyPlanning._item (item) has (learner: owner, scope: course, status: "STOPPED")
+  view "(owner) owns (course) with (title)" with (course, owner)
   earlier, RequestBoundary.request (actualMinutes, course, item, path: "/planning/stop", requestId, session)
 then
   RequestBoundary.respond (item, requestId)
@@ -2927,6 +3743,7 @@ then
 ### Progress.ActivateRoutine
 
 Authored path: `Progress.ActivateRoutine`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 35.
 - Covered by [Progress reactions](../design/compositions/Progress.md), line 13.
 
 ```reaction
@@ -3082,12 +3899,13 @@ then
 ### Progress.ReplanAfterFinish
 
 Authored path: `Progress.ReplanAfterFinish`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 37.
 - Covered by [Progress reactions](../design/compositions/Progress.md), line 15.
 
 ```reaction
-when StudyPlanning.finish (item, learner: owner)
+when StudyPlanning.finish (learner: owner)
 where
-  StudyPlanning._item (item) has (learner: owner, scope: course)
+  SkillMapping._courses (owner) has (course)
   view "(owner) can refresh routine reviews in (course)" with (course, owner)
   view "review inputs for (owner) in (course)" with (course, owner) has (basis, candidates, explanation, horizonEnd)
 then
@@ -3112,12 +3930,13 @@ then
 ### Progress.ReplanAfterStop
 
 Authored path: `Progress.ReplanAfterStop`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 37.
 - Covered by [Progress reactions](../design/compositions/Progress.md), line 15.
 
 ```reaction
-when StudyPlanning.stop (item, learner: owner)
+when StudyPlanning.stop (learner: owner)
 where
-  StudyPlanning._item (item) has (learner: owner, scope: course)
+  SkillMapping._courses (owner) has (course)
   view "(owner) can refresh routine reviews in (course)" with (course, owner)
   view "review inputs for (owner) in (course)" with (course, owner) has (basis, candidates, explanation, horizonEnd)
 then
@@ -3597,8 +4416,12 @@ not listed here have no explicit input contract.
 - `/learning/transcript` — requires `session`, `studySession`, `text`, `turnIndex`
 - `/planning/begin` — requires `course`, `item`, `session`
 - `/planning/configure` — requires `course`, `dailyMinutes`, `focusNote`, `session`
+- `/planning/exams/remove` — requires `course`, `date`, `session`
+- `/planning/exams/set` — requires `course`, `covered`, `date`, `session`
 - `/planning/finish` — requires `actualMinutes`, `course`, `item`, `session`
 - `/planning/miss` — requires `course`, `item`, `session`
 - `/planning/propose` — requires `course`, `session`
 - `/planning/read` — requires `course`, `session`
 - `/planning/stop` — requires `actualMinutes`, `course`, `item`, `session`
+- `/planning/tradeoffs/confirm` — requires `course`, `plan`, `session`
+- `/planning/tradeoffs/decline` — requires `course`, `plan`, `session`

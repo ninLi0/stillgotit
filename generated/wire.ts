@@ -391,66 +391,135 @@ export type StillGotItWire = {
   };
   "/planning/begin": {
     input: {
-      "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_map"]>[0], ["course"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_unit"]>>>, ["course"]>]>>;
+      "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_map"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_schedule"]>[0], ["scope"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_unit"]>>>, ["course"]>]>>;
       "item": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["begin"]>[0], ["item"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_item"]>[0], ["item"]>]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["begin"]>[0], ["item"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["begin"]>>, ["item"]>]>]>>;
       "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
     };
     output: {
       "item": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["begin"]>[0], ["item"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["begin"]>>, ["item"]>]>>;
     };
-    error: { error: AppWideError | "ACTIVITY_BEGIN_UNAVAILABLE" | "ACTIVITY_EXCEEDS_REMAINING_BUDGET" | "ACTIVITY_NOT_SCHEDULED_TODAY" | "ANOTHER_ACTIVITY_IN_PROGRESS" | "INVALID_INPUT" | "NOT_SIGNED_IN" };
+    error: { error: AppWideError | "ACTIVITY_BEGIN_UNAVAILABLE" | "ACTIVITY_EXCEEDS_REMAINING_BUDGET" | "ACTIVITY_NOT_SCHEDULED_TODAY" | "ANOTHER_ACTIVITY_IN_PROGRESS" | "COURSE_UNAVAILABLE" | "INVALID_INPUT" | "NOT_SIGNED_IN" };
   };
   "/planning/configure": {
     input: {
-      "course": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["configure"]>[0], ["scope"]>>;
-      "dailyMinutes": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["configure"]>[0], ["dailyMinutes"]>>;
-      "focusNote": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["configure"]>[0], ["focusNote"]>>;
+      "course": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_preferences"]>[0], ["scope"]>]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["configure"]>[0], ["scope"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>]>]>>;
+      "dailyMinutes": Jsonify<OneOf<[AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_preferences"]>>>, ["dailyMinutes"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["configure"]>[0], ["dailyMinutes"]>]>>;
+      "focusNote": Jsonify<OneOf<[AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_preferences"]>>>, ["focusNote"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["configure"]>[0], ["focusNote"]>]>>;
       "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
     };
     output: {
-      "preferences": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["configure"]>>, ["preferences"]>>;
+      "preferences": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_preferences"]>>>, ["preferences"]>>;
+    } | {
+      "preferences": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_preferences"]>>>, ["preferences"]>>;
     };
-    error: { error: AppWideError | "EXAM_TRADEOFF_CONFIRMATION_REQUIRED" | "INVALID_DAILY_BUDGET" | "INVALID_INPUT" | "INVALID_PLAN_INPUT" | "NOT_SIGNED_IN" | "PLAN_PREFERENCES_UNAVAILABLE" | "PLAN_SESSION_IN_PROGRESS" | "ROUTINE_PLAN_OUTDATED" | "ROUTINE_PLAN_UNAVAILABLE" | "ROUTINE_SESSION_IN_PROGRESS" };
+    error: { error: AppWideError | "COURSE_UNAVAILABLE" | "EXAM_TRADEOFF_CONFIRMATION_REQUIRED" | "INVALID_DAILY_BUDGET" | "INVALID_INPUT" | "INVALID_PLAN_INPUT" | "NOT_SIGNED_IN" | "PLAN_PREFERENCES_UNAVAILABLE" | "PLAN_SESSION_IN_PROGRESS" | "ROUTINE_PLAN_OUTDATED" | "ROUTINE_PLAN_UNAVAILABLE" | "ROUTINE_SESSION_IN_PROGRESS" };
+  };
+  "/planning/exams/remove": {
+    input: {
+      "course": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_exams"]>[0], ["scope"]>]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["removeExam"]>[0], ["scope"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>]>]>>;
+      "date": Jsonify<OneOf<[AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_exams"]>>>, ["date"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["removeExam"]>[0], ["date"]>]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+    };
+    output: {
+      "exam": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_exams"]>>>, ["exam"]>>;
+      "refreshed": true;
+    } | {
+      "exam": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_exams"]>>>, ["exam"]>>;
+      "notice": "Your plan will update when you finish or stop your current activity.";
+      "refreshed": false;
+    } | {
+      "exam": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_exams"]>>>, ["exam"]>>;
+      "refreshed": true;
+    } | {
+      "exam": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_exams"]>>>, ["exam"]>>;
+      "notice": "Your plan will update when you finish or stop your current activity.";
+      "refreshed": false;
+    };
+    error: { error: AppWideError | "COURSE_UNAVAILABLE" | "EXAM_REMOVE_UNAVAILABLE" | "EXAM_TRADEOFF_CONFIRMATION_REQUIRED" | "INVALID_INPUT" | "INVALID_PLAN_INPUT" | "NOT_SIGNED_IN" | "PLAN_PREFERENCES_UNAVAILABLE" | "PLAN_SESSION_IN_PROGRESS" | "ROUTINE_PLAN_OUTDATED" | "ROUTINE_PLAN_UNAVAILABLE" | "ROUTINE_SESSION_IN_PROGRESS" };
+  };
+  "/planning/exams/set": {
+    input: {
+      "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_map"]>[0], ["course"]>]>>;
+      "covered": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["coveredSkillsConfirmed"]["fn"]>[0], ["covered"]>>;
+      "date": Jsonify<OneOf<[AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_exams"]>>>, ["date"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["setExam"]>[0], ["date"]>]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+    };
+    output: {
+      "exam": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_exams"]>>>, ["exam"]>>;
+      "refreshed": true;
+    } | {
+      "exam": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_exams"]>>>, ["exam"]>>;
+      "notice": "Your plan will update when you finish or stop your current activity.";
+      "refreshed": false;
+    } | {
+      "exam": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_exams"]>>>, ["exam"]>>;
+      "refreshed": true;
+    } | {
+      "exam": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_exams"]>>>, ["exam"]>>;
+      "notice": "Your plan will update when you finish or stop your current activity.";
+      "refreshed": false;
+    } | {
+      "exam": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_exams"]>>>, ["exam"]>>;
+      "refreshed": true;
+    } | {
+      "exam": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_exams"]>>>, ["exam"]>>;
+      "notice": "Your plan will update when you finish or stop your current activity.";
+      "refreshed": false;
+    };
+    error: { error: AppWideError | "COURSE_UNAVAILABLE" | "EXAM_PREFERENCES_UNAVAILABLE" | "EXAM_SKILLS_UNAVAILABLE" | "EXAM_TRADEOFF_CONFIRMATION_REQUIRED" | "INVALID_EXAM_DETAILS" | "INVALID_INPUT" | "INVALID_PLAN_INPUT" | "NOT_SIGNED_IN" | "PLAN_PREFERENCES_UNAVAILABLE" | "PLAN_SESSION_IN_PROGRESS" | "ROUTINE_PLAN_OUTDATED" | "ROUTINE_PLAN_UNAVAILABLE" | "ROUTINE_SESSION_IN_PROGRESS" };
   };
   "/planning/finish": {
     input: {
       "actualMinutes": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["finish"]>[0], ["actualMinutes"]>>;
       "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_item"]>>>, ["scope"]>]>>;
-      "item": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["finish"]>[0], ["item"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_item"]>[0], ["item"]>]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["finish"]>[0], ["item"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["finish"]>>, ["item"]>]>]>>;
+      "item": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_item"]>[0], ["item"]>>;
       "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
     };
     output: {
-      "item": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["finish"]>[0], ["item"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["finish"]>>, ["item"]>]>>;
+      "item": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_item"]>[0], ["item"]>>;
+    } | {
+      "item": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["finish"]>[0], ["item"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["finish"]>>, ["item"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_item"]>[0], ["item"]>]>>;
     };
-    error: { error: AppWideError | "ACTIVITY_FINISH_UNAVAILABLE" | "EXAM_TRADEOFF_CONFIRMATION_REQUIRED" | "INVALID_FINISH_TIME" | "INVALID_INPUT" | "INVALID_PLAN_INPUT" | "NOT_SIGNED_IN" | "PLAN_PREFERENCES_UNAVAILABLE" | "PLAN_SESSION_IN_PROGRESS" | "ROUTINE_PLAN_OUTDATED" | "ROUTINE_PLAN_UNAVAILABLE" | "ROUTINE_SESSION_IN_PROGRESS" };
+    error: { error: AppWideError | "ACTIVITY_FINISH_UNAVAILABLE" | "COURSE_UNAVAILABLE" | "EXAM_TRADEOFF_CONFIRMATION_REQUIRED" | "INVALID_FINISH_TIME" | "INVALID_INPUT" | "INVALID_PLAN_INPUT" | "NOT_SIGNED_IN" | "PLAN_PREFERENCES_UNAVAILABLE" | "PLAN_SESSION_IN_PROGRESS" | "ROUTINE_PLAN_OUTDATED" | "ROUTINE_PLAN_UNAVAILABLE" | "ROUTINE_SESSION_IN_PROGRESS" };
   };
   "/planning/miss": {
     input: {
       "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_item"]>>>, ["scope"]>]>>;
-      "item": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["miss"]>[0], ["item"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_item"]>[0], ["item"]>]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["miss"]>[0], ["item"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["miss"]>>, ["item"]>]>]>>;
+      "item": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_item"]>[0], ["item"]>>;
       "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
     };
     output: {
-      "item": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["miss"]>[0], ["item"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["miss"]>>, ["item"]>]>>;
+      "item": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_item"]>[0], ["item"]>>;
+    } | {
+      "item": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["miss"]>[0], ["item"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["miss"]>>, ["item"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_item"]>[0], ["item"]>]>>;
     };
-    error: { error: AppWideError | "ACTIVITY_MISS_TOO_EARLY" | "ACTIVITY_MISS_UNAVAILABLE" | "EXAM_TRADEOFF_CONFIRMATION_REQUIRED" | "INVALID_INPUT" | "INVALID_PLAN_INPUT" | "NOT_SIGNED_IN" | "PLAN_PREFERENCES_UNAVAILABLE" | "PLAN_SESSION_IN_PROGRESS" | "ROUTINE_PLAN_OUTDATED" | "ROUTINE_PLAN_UNAVAILABLE" | "ROUTINE_SESSION_IN_PROGRESS" };
+    error: { error: AppWideError | "ACTIVITY_MISS_TOO_EARLY" | "ACTIVITY_MISS_UNAVAILABLE" | "COURSE_UNAVAILABLE" | "EXAM_TRADEOFF_CONFIRMATION_REQUIRED" | "INVALID_INPUT" | "INVALID_PLAN_INPUT" | "NOT_SIGNED_IN" | "PLAN_PREFERENCES_UNAVAILABLE" | "PLAN_SESSION_IN_PROGRESS" | "ROUTINE_PLAN_OUTDATED" | "ROUTINE_PLAN_UNAVAILABLE" | "ROUTINE_SESSION_IN_PROGRESS" };
   };
   "/planning/propose": {
     input: {
-      "course": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["replan"]>[0], ["scope"]>>;
+      "course": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_plans"]>[0], ["scope"]>]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["replan"]>[0], ["scope"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_map"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_next"]>[0], ["scope"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_preferences"]>[0], ["scope"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_schedule"]>[0], ["scope"]>]>]>>;
       "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
     };
     output: {
-      "plan": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["replan"]>>, ["plan"]>>;
+      "plan": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_plans"]>>>, ["plan"]>>;
+    } | {
+      "plan": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_plans"]>>>, ["plan"]>>;
+    } | {
+      "plan": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_plans"]>>>, ["plan"]>>;
+    } | {
+      "plan": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_plans"]>>>, ["plan"]>>;
     };
-    error: { error: AppWideError | "EXAM_TRADEOFF_CONFIRMATION_REQUIRED" | "INVALID_INPUT" | "INVALID_PLAN_INPUT" | "NOT_SIGNED_IN" | "PLAN_PREFERENCES_UNAVAILABLE" | "PLAN_SESSION_IN_PROGRESS" | "ROUTINE_PLAN_OUTDATED" | "ROUTINE_PLAN_UNAVAILABLE" | "ROUTINE_SESSION_IN_PROGRESS" };
+    error: { error: AppWideError | "COURSE_UNAVAILABLE" | "EXAM_TRADEOFF_CONFIRMATION_REQUIRED" | "INVALID_INPUT" | "INVALID_PLAN_INPUT" | "NOT_SIGNED_IN" | "PLAN_PREFERENCES_UNAVAILABLE" | "PLAN_SESSION_IN_PROGRESS" | "ROUTINE_PLAN_OUTDATED" | "ROUTINE_PLAN_UNAVAILABLE" | "ROUTINE_SESSION_IN_PROGRESS" };
   };
   "/planning/read": {
     input: {
-      "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_schedule"]>[0], ["scope"]>]>>;
+      "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_map"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_exams"]>[0], ["scope"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_plans"]>[0], ["scope"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_schedule"]>[0], ["scope"]>]>>;
       "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
     };
     output: {
+      "cuts": {
+        "cut": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["cutKey"]["fn"]>[0], ["cut"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_cuts"]>>>, ["cut"]>]>>;
+      }[];
       "data": {
         "budget": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["planDetail"]["fn"]>>, ["budget"]>>;
         "next": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["planDetail"]["fn"]>>, ["next"]>>;
@@ -458,6 +527,28 @@ export type StillGotItWire = {
         "preferences": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["planDetail"]["fn"]>>, ["preferences"]>>;
         "today": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["planDetail"]["fn"]>>, ["today"]>>;
       };
+      "exams": {
+        "covered": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_exams"]>>>, ["covered"]>>;
+        "date": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_exams"]>>>, ["date"]>>;
+        "exam": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_exams"]>>>, ["exam"]>>;
+      }[];
+      "proposal": {
+        "availableExamMinutes": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_plan"]>>>, ["availableExamMinutes"]>>;
+        "contextCurrent": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_proposalCheck"]>>>, ["contextCurrent"]>>;
+        "estimatedExamMinutes": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_plan"]>>>, ["estimatedExamMinutes"]>>;
+        "examUrgent": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_plan"]>>>, ["examUrgent"]>>;
+        "explanation": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_plan"]>>>, ["explanation"]>>;
+        "focusExam": Jsonify<AllOf<[AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_exams"]>>>, ["exam"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_plan"]>>>, ["focusExam"]>]>>;
+        "focusExamDate": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_exams"]>>>, ["date"]>>;
+        "locallyCurrent": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_proposalCheck"]>>>, ["locallyCurrent"]>>;
+        "plan": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_plan"]>[0], ["plan"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_proposalCheck"]>[0], ["plan"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_plans"]>>>, ["plan"]>]>>;
+        "sessionInProgress": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_proposalCheck"]>>>, ["sessionInProgress"]>>;
+      }[];
+      "proposalItems": {
+        "candidate": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["itemOrder"]["fn"]>[0], ["candidate"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_items"]>>>, ["candidate"]>]>>;
+        "day": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["itemOrder"]["fn"]>[0], ["day"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_items"]>>>, ["day"]>]>>;
+        "item": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_items"]>>>, ["item"]>>;
+      }[];
     };
     error: { error: AppWideError | "COURSE_UNAVAILABLE" | "INVALID_INPUT" | "NOT_SIGNED_IN" };
   };
@@ -465,13 +556,37 @@ export type StillGotItWire = {
     input: {
       "actualMinutes": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["stop"]>[0], ["actualMinutes"]>>;
       "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_item"]>>>, ["scope"]>]>>;
-      "item": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["stop"]>[0], ["item"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_item"]>[0], ["item"]>]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["stop"]>[0], ["item"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["stop"]>>, ["item"]>]>]>>;
+      "item": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_item"]>[0], ["item"]>>;
       "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
     };
     output: {
-      "item": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["stop"]>[0], ["item"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["stop"]>>, ["item"]>]>>;
+      "item": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_item"]>[0], ["item"]>>;
+    } | {
+      "item": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["stop"]>[0], ["item"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["stop"]>>, ["item"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_item"]>[0], ["item"]>]>>;
     };
-    error: { error: AppWideError | "ACTIVITY_STOP_UNAVAILABLE" | "EXAM_TRADEOFF_CONFIRMATION_REQUIRED" | "INVALID_INPUT" | "INVALID_PLAN_INPUT" | "INVALID_STOP_TIME" | "NOT_SIGNED_IN" | "PLAN_PREFERENCES_UNAVAILABLE" | "PLAN_SESSION_IN_PROGRESS" | "ROUTINE_PLAN_OUTDATED" | "ROUTINE_PLAN_UNAVAILABLE" | "ROUTINE_SESSION_IN_PROGRESS" };
+    error: { error: AppWideError | "ACTIVITY_STOP_UNAVAILABLE" | "COURSE_UNAVAILABLE" | "EXAM_TRADEOFF_CONFIRMATION_REQUIRED" | "INVALID_INPUT" | "INVALID_PLAN_INPUT" | "INVALID_STOP_TIME" | "NOT_SIGNED_IN" | "PLAN_PREFERENCES_UNAVAILABLE" | "PLAN_SESSION_IN_PROGRESS" | "ROUTINE_PLAN_OUTDATED" | "ROUTINE_PLAN_UNAVAILABLE" | "ROUTINE_SESSION_IN_PROGRESS" };
+  };
+  "/planning/tradeoffs/confirm": {
+    input: {
+      "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_plan"]>>>, ["scope"]>]>>;
+      "plan": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["confirmTradeoffs"]>[0], ["plan"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["confirmTradeoffs"]>>, ["plan"]>]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_plan"]>[0], ["plan"]>]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+    };
+    output: {
+      "plan": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["confirmTradeoffs"]>[0], ["plan"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["confirmTradeoffs"]>>, ["plan"]>]>>;
+    };
+    error: { error: AppWideError | "COURSE_UNAVAILABLE" | "INVALID_INPUT" | "NOT_SIGNED_IN" | "PROPOSAL_UNAVAILABLE" | "TRADEOFF_CONFIRMATION_NOT_NEEDED" | "TRADEOFF_PLAN_OUTDATED" | "TRADEOFF_PLAN_UNAVAILABLE" | "TRADEOFF_SESSION_IN_PROGRESS" };
+  };
+  "/planning/tradeoffs/decline": {
+    input: {
+      "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_plan"]>>>, ["scope"]>]>>;
+      "plan": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["declineTradeoffs"]>[0], ["plan"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["declineTradeoffs"]>>, ["plan"]>]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_plan"]>[0], ["plan"]>]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+    };
+    output: {
+      "plan": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["declineTradeoffs"]>[0], ["plan"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["declineTradeoffs"]>>, ["plan"]>]>>;
+    };
+    error: { error: AppWideError | "COURSE_UNAVAILABLE" | "INVALID_INPUT" | "NOT_SIGNED_IN" | "PLAN_DECLINE_UNAVAILABLE" | "PROPOSAL_UNAVAILABLE" };
   };
 };
 
@@ -809,60 +924,127 @@ export type StillGotItHttp = {
   };
   "/planning/begin": {
     input: {
-      "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_map"]>[0], ["course"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_unit"]>>>, ["course"]>]>>;
+      "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_map"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_schedule"]>[0], ["scope"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_unit"]>>>, ["course"]>]>>;
       "item": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["begin"]>[0], ["item"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_item"]>[0], ["item"]>]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["begin"]>[0], ["item"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["begin"]>>, ["item"]>]>]>>;
     };
     output: {
       "item": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["begin"]>[0], ["item"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["begin"]>>, ["item"]>]>>;
     };
-    error: { error: HttpAppWideError | "INVALID_REQUEST" | "UNAUTHORIZED" };
+    error: { error: HttpAppWideError | "FORBIDDEN" | "INVALID_REQUEST" | "UNAUTHORIZED" };
   };
   "/planning/configure": {
     input: {
-      "course": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["configure"]>[0], ["scope"]>>;
-      "dailyMinutes": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["configure"]>[0], ["dailyMinutes"]>>;
-      "focusNote": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["configure"]>[0], ["focusNote"]>>;
+      "course": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_preferences"]>[0], ["scope"]>]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["configure"]>[0], ["scope"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>]>]>>;
+      "dailyMinutes": Jsonify<OneOf<[AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_preferences"]>>>, ["dailyMinutes"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["configure"]>[0], ["dailyMinutes"]>]>>;
+      "focusNote": Jsonify<OneOf<[AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_preferences"]>>>, ["focusNote"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["configure"]>[0], ["focusNote"]>]>>;
     };
     output: {
-      "preferences": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["configure"]>>, ["preferences"]>>;
+      "preferences": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_preferences"]>>>, ["preferences"]>>;
+    } | {
+      "preferences": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_preferences"]>>>, ["preferences"]>>;
     };
-    error: { error: HttpAppWideError | "INVALID_REQUEST" | "UNAUTHORIZED" };
+    error: { error: HttpAppWideError | "FORBIDDEN" | "INVALID_REQUEST" | "UNAUTHORIZED" };
+  };
+  "/planning/exams/remove": {
+    input: {
+      "course": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_exams"]>[0], ["scope"]>]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["removeExam"]>[0], ["scope"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>]>]>>;
+      "date": Jsonify<OneOf<[AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_exams"]>>>, ["date"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["removeExam"]>[0], ["date"]>]>>;
+    };
+    output: {
+      "exam": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_exams"]>>>, ["exam"]>>;
+      "refreshed": true;
+    } | {
+      "exam": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_exams"]>>>, ["exam"]>>;
+      "notice": "Your plan will update when you finish or stop your current activity.";
+      "refreshed": false;
+    } | {
+      "exam": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_exams"]>>>, ["exam"]>>;
+      "refreshed": true;
+    } | {
+      "exam": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_exams"]>>>, ["exam"]>>;
+      "notice": "Your plan will update when you finish or stop your current activity.";
+      "refreshed": false;
+    };
+    error: { error: HttpAppWideError | "FORBIDDEN" | "INVALID_REQUEST" | "UNAUTHORIZED" };
+  };
+  "/planning/exams/set": {
+    input: {
+      "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_map"]>[0], ["course"]>]>>;
+      "covered": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["coveredSkillsConfirmed"]["fn"]>[0], ["covered"]>>;
+      "date": Jsonify<OneOf<[AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_exams"]>>>, ["date"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["setExam"]>[0], ["date"]>]>>;
+    };
+    output: {
+      "exam": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_exams"]>>>, ["exam"]>>;
+      "refreshed": true;
+    } | {
+      "exam": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_exams"]>>>, ["exam"]>>;
+      "notice": "Your plan will update when you finish or stop your current activity.";
+      "refreshed": false;
+    } | {
+      "exam": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_exams"]>>>, ["exam"]>>;
+      "refreshed": true;
+    } | {
+      "exam": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_exams"]>>>, ["exam"]>>;
+      "notice": "Your plan will update when you finish or stop your current activity.";
+      "refreshed": false;
+    } | {
+      "exam": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_exams"]>>>, ["exam"]>>;
+      "refreshed": true;
+    } | {
+      "exam": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_exams"]>>>, ["exam"]>>;
+      "notice": "Your plan will update when you finish or stop your current activity.";
+      "refreshed": false;
+    };
+    error: { error: HttpAppWideError | "FORBIDDEN" | "INVALID_REQUEST" | "UNAUTHORIZED" };
   };
   "/planning/finish": {
     input: {
       "actualMinutes": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["finish"]>[0], ["actualMinutes"]>>;
       "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_item"]>>>, ["scope"]>]>>;
-      "item": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["finish"]>[0], ["item"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_item"]>[0], ["item"]>]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["finish"]>[0], ["item"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["finish"]>>, ["item"]>]>]>>;
+      "item": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_item"]>[0], ["item"]>>;
     };
     output: {
-      "item": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["finish"]>[0], ["item"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["finish"]>>, ["item"]>]>>;
+      "item": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_item"]>[0], ["item"]>>;
+    } | {
+      "item": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["finish"]>[0], ["item"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["finish"]>>, ["item"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_item"]>[0], ["item"]>]>>;
     };
-    error: { error: HttpAppWideError | "INVALID_REQUEST" | "UNAUTHORIZED" };
+    error: { error: HttpAppWideError | "FORBIDDEN" | "INVALID_REQUEST" | "UNAUTHORIZED" };
   };
   "/planning/miss": {
     input: {
       "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_item"]>>>, ["scope"]>]>>;
-      "item": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["miss"]>[0], ["item"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_item"]>[0], ["item"]>]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["miss"]>[0], ["item"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["miss"]>>, ["item"]>]>]>>;
+      "item": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_item"]>[0], ["item"]>>;
     };
     output: {
-      "item": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["miss"]>[0], ["item"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["miss"]>>, ["item"]>]>>;
+      "item": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_item"]>[0], ["item"]>>;
+    } | {
+      "item": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["miss"]>[0], ["item"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["miss"]>>, ["item"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_item"]>[0], ["item"]>]>>;
     };
-    error: { error: HttpAppWideError | "INVALID_REQUEST" | "UNAUTHORIZED" };
+    error: { error: HttpAppWideError | "FORBIDDEN" | "INVALID_REQUEST" | "UNAUTHORIZED" };
   };
   "/planning/propose": {
     input: {
-      "course": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["replan"]>[0], ["scope"]>>;
+      "course": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_plans"]>[0], ["scope"]>]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["replan"]>[0], ["scope"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_map"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_next"]>[0], ["scope"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_preferences"]>[0], ["scope"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_schedule"]>[0], ["scope"]>]>]>>;
     };
     output: {
-      "plan": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["replan"]>>, ["plan"]>>;
+      "plan": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_plans"]>>>, ["plan"]>>;
+    } | {
+      "plan": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_plans"]>>>, ["plan"]>>;
+    } | {
+      "plan": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_plans"]>>>, ["plan"]>>;
+    } | {
+      "plan": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_plans"]>>>, ["plan"]>>;
     };
-    error: { error: HttpAppWideError | "INVALID_REQUEST" | "UNAUTHORIZED" };
+    error: { error: HttpAppWideError | "FORBIDDEN" | "INVALID_REQUEST" | "UNAUTHORIZED" };
   };
   "/planning/read": {
     input: {
-      "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_schedule"]>[0], ["scope"]>]>>;
+      "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_map"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_exams"]>[0], ["scope"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_plans"]>[0], ["scope"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_schedule"]>[0], ["scope"]>]>>;
     };
     output: {
+      "cuts": {
+        "cut": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["cutKey"]["fn"]>[0], ["cut"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_cuts"]>>>, ["cut"]>]>>;
+      }[];
       "data": {
         "budget": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["planDetail"]["fn"]>>, ["budget"]>>;
         "next": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["planDetail"]["fn"]>>, ["next"]>>;
@@ -870,6 +1052,28 @@ export type StillGotItHttp = {
         "preferences": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["planDetail"]["fn"]>>, ["preferences"]>>;
         "today": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["planDetail"]["fn"]>>, ["today"]>>;
       };
+      "exams": {
+        "covered": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_exams"]>>>, ["covered"]>>;
+        "date": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_exams"]>>>, ["date"]>>;
+        "exam": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_exams"]>>>, ["exam"]>>;
+      }[];
+      "proposal": {
+        "availableExamMinutes": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_plan"]>>>, ["availableExamMinutes"]>>;
+        "contextCurrent": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_proposalCheck"]>>>, ["contextCurrent"]>>;
+        "estimatedExamMinutes": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_plan"]>>>, ["estimatedExamMinutes"]>>;
+        "examUrgent": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_plan"]>>>, ["examUrgent"]>>;
+        "explanation": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_plan"]>>>, ["explanation"]>>;
+        "focusExam": Jsonify<AllOf<[AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_exams"]>>>, ["exam"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_plan"]>>>, ["focusExam"]>]>>;
+        "focusExamDate": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_exams"]>>>, ["date"]>>;
+        "locallyCurrent": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_proposalCheck"]>>>, ["locallyCurrent"]>>;
+        "plan": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_plan"]>[0], ["plan"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_proposalCheck"]>[0], ["plan"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_plans"]>>>, ["plan"]>]>>;
+        "sessionInProgress": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_proposalCheck"]>>>, ["sessionInProgress"]>>;
+      }[];
+      "proposalItems": {
+        "candidate": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["itemOrder"]["fn"]>[0], ["candidate"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_items"]>>>, ["candidate"]>]>>;
+        "day": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["itemOrder"]["fn"]>[0], ["day"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_items"]>>>, ["day"]>]>>;
+        "item": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_items"]>>>, ["item"]>>;
+      }[];
     };
     error: { error: HttpAppWideError | "FORBIDDEN" | "INVALID_REQUEST" | "UNAUTHORIZED" };
   };
@@ -877,11 +1081,33 @@ export type StillGotItHttp = {
     input: {
       "actualMinutes": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["stop"]>[0], ["actualMinutes"]>>;
       "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_item"]>>>, ["scope"]>]>>;
-      "item": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["stop"]>[0], ["item"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_item"]>[0], ["item"]>]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["stop"]>[0], ["item"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["stop"]>>, ["item"]>]>]>>;
+      "item": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_item"]>[0], ["item"]>>;
     };
     output: {
-      "item": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["stop"]>[0], ["item"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["stop"]>>, ["item"]>]>>;
+      "item": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_item"]>[0], ["item"]>>;
+    } | {
+      "item": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["stop"]>[0], ["item"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["stop"]>>, ["item"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_item"]>[0], ["item"]>]>>;
     };
-    error: { error: HttpAppWideError | "INVALID_REQUEST" | "UNAUTHORIZED" };
+    error: { error: HttpAppWideError | "FORBIDDEN" | "INVALID_REQUEST" | "UNAUTHORIZED" };
+  };
+  "/planning/tradeoffs/confirm": {
+    input: {
+      "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_plan"]>>>, ["scope"]>]>>;
+      "plan": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["confirmTradeoffs"]>[0], ["plan"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["confirmTradeoffs"]>>, ["plan"]>]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_plan"]>[0], ["plan"]>]>>;
+    };
+    output: {
+      "plan": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["confirmTradeoffs"]>[0], ["plan"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["confirmTradeoffs"]>>, ["plan"]>]>>;
+    };
+    error: { error: HttpAppWideError | "FORBIDDEN" | "INVALID_REQUEST" | "UNAUTHORIZED" };
+  };
+  "/planning/tradeoffs/decline": {
+    input: {
+      "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_plan"]>>>, ["scope"]>]>>;
+      "plan": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["declineTradeoffs"]>[0], ["plan"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["declineTradeoffs"]>>, ["plan"]>]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_plan"]>[0], ["plan"]>]>>;
+    };
+    output: {
+      "plan": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["declineTradeoffs"]>[0], ["plan"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["declineTradeoffs"]>>, ["plan"]>]>>;
+    };
+    error: { error: HttpAppWideError | "FORBIDDEN" | "INVALID_REQUEST" | "UNAUTHORIZED" };
   };
 };

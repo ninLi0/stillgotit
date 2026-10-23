@@ -1,6 +1,6 @@
 # P2 learning journey
 
-This stage connects course materials, skill review, tutoring, assessment, mastery, and a study budget. Concept implementations use the full specifications. The screen shows one course at a time, and a menu in the header switches courses or starts a new one. Exam planning is not exposed yet.
+This stage connects course materials, skill review, tutoring, assessment, mastery, and a study budget. Concept implementations use the full specifications. The screen shows one course at a time, and a menu in the header switches courses or starts a new one. Learners can record exam dates for a course and confirm or decline a proposed plan that would cut exam preparation.
 
 ```types
 concrete TutorRequest

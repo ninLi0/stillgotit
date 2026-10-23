@@ -8,7 +8,7 @@ import { sessioning } from "./concepts/Sessioning/registry.ts";
 import { skillMapping } from "./concepts/SkillMapping.registry.ts";
 import { groundedTutoring } from "./concepts/GroundedTutoring/registry.ts";
 import { singleMaterial, evidenceAttribution } from "./computations.ts";
-import { sessionSubject, attemptIsReady, correctionNote, dialogueIsCurrent, evidenceUpdate, generationDefinition, generationFields, gradeRequest, hasLessonQuestion, itemSubject, lessonRequest, planDetail, planRequest, prerequisitesReady, progressRows, responseInput, reviewApproved, selectSkill, selectSkillMaterials, selectSources, sessionMaterials, sessionRequest, studyDetail, submissionInput, suggestRequest, taskRequest } from "./computations/learning.ts";
+import { sessionSubject, attemptIsReady, beginAllowed, correctionNote, coveredSkillsConfirmed, cutKey, dialogueIsCurrent, evidenceUpdate, generationDefinition, generationFields, gradeRequest, hasLessonQuestion, itemOrder, itemSubject, lessonRequest, planDetail, planRequest, prerequisitesReady, progressRows, responseInput, reviewApproved, selectSkill, selectSkillMaterials, selectSources, sessionMaterials, sessionRequest, studyDetail, submissionInput, suggestRequest, taskRequest, urgentExamItem } from "./computations/learning.ts";
 import { generating } from "./concepts/Generating/registry.ts";
 
 export const applicationConceptSet = conceptSet({
@@ -21,5 +21,5 @@ export const applicationConceptSet = conceptSet({
   StudyPlanning: studyPlanning,
   GroundedTutoring: groundedTutoring,
   TutorGenerating: generating,
-}, { singleMaterial, evidenceAttribution, sessionSubject, attemptIsReady, correctionNote, dialogueIsCurrent, evidenceUpdate, generationDefinition, generationFields, gradeRequest, hasLessonQuestion, itemSubject, lessonRequest, planDetail, planRequest, prerequisitesReady, progressRows, responseInput, reviewApproved, selectSkill, selectSkillMaterials, selectSources, sessionMaterials, sessionRequest, studyDetail, submissionInput, suggestRequest, taskRequest });
+}, { singleMaterial, evidenceAttribution, sessionSubject, attemptIsReady, beginAllowed, correctionNote, coveredSkillsConfirmed, cutKey, dialogueIsCurrent, evidenceUpdate, generationDefinition, generationFields, gradeRequest, hasLessonQuestion, itemOrder, itemSubject, lessonRequest, planDetail, planRequest, prerequisitesReady, progressRows, responseInput, reviewApproved, selectSkill, selectSkillMaterials, selectSources, sessionMaterials, sessionRequest, studyDetail, submissionInput, suggestRequest, taskRequest, urgentExamItem });
 export const { concepts, computations } = applicationConceptSet;

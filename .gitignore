@@ -13,3 +13,6 @@ __pycache__/
 
 # Claude Code's local files: helper worktrees and session notes.
 .claude/
+
+# The sync-engine skill's local work records (briefs, prompts, reports) stay out of the repository.
+.sync-engine/work/

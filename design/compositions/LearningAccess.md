@@ -20,3 +20,5 @@ The adapter performs no domain writes and sequences no learning actions. The eng
 [BeginReady](former:Access.BeginReady) checks the corresponding command against current owned state.
 
 [QuestionReady](former:Access.QuestionReady) requires an open lesson, current dialogue length, and valid learner content.
+
+Exam and tradeoff commands are admitted on course ownership alone, with the detail "Choose one of your own courses.", the same answer the planning endpoints give for a course that is not the learner's. The planning concept's own refusals then reach the learner with its messages. Begin admission uses the planning composition's StartAllowed view, so admission and the endpoint apply the same urgent-mode rule.

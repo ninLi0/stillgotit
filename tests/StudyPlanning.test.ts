@@ -222,6 +222,68 @@ describe("StudyPlanning", () => {
     expect(await planning._exams(sam)).toEqual([{ exam, date: "2026-10-16", covered: ["vectors", "matrices"], active: true }]);
   });
 
+  test("the schedule lists the course's active exams by date, leaving out removed exams and other courses' and learners' exams", async () => {
+    const { planning, setToday } = setup();
+    const physics = { learner: "sam", scope: "physics" };
+    const leo = { learner: "leo", scope: "linear-algebra" };
+    // Without preferences, every part of the schedule is empty.
+    expect(await planning._schedule(sam)).toEqual({ schedule: { preferences: null, budget: null, next: null, today: "2026-10-13", plans: [], exams: [] } });
+
+    const { preferences } = await planning.configure({ ...sam, dailyMinutes: 30, focusNote: "Midterm first." });
+    await planning.configure({ ...physics, dailyMinutes: 30, focusNote: "" });
+    await planning.configure({ ...leo, dailyMinutes: 30, focusNote: "" });
+    expect((await planning._schedule(sam)).schedule.exams).toEqual([]);
+
+    // The later exam is set first, so the order comes from the dates.
+    const { exam: final } = await planning.setExam({ ...sam, date: "2026-10-20", covered: ["matrices"] });
+    const { exam: midterm } = await planning.setExam({ ...sam, date: "2026-10-16", covered: ["vectors", "matrices"] });
+    const { exam: physicsExam } = await planning.setExam({ ...physics, date: "2026-10-15", covered: ["forces"] });
+    const { exam: leoExam } = await planning.setExam({ ...leo, date: "2026-10-14", covered: ["vectors"] });
+    expect((await planning._schedule(sam)).schedule.exams).toEqual([
+      { exam: midterm, date: "2026-10-16", covered: ["vectors", "matrices"] },
+      { exam: final, date: "2026-10-20", covered: ["matrices"] },
+    ]);
+    expect((await planning._schedule(physics)).schedule.exams).toEqual([{ exam: physicsExam, date: "2026-10-15", covered: ["forces"] }]);
+    expect((await planning._schedule(leo)).schedule.exams).toEqual([{ exam: leoExam, date: "2026-10-14", covered: ["vectors"] }]);
+
+    // The other parts of the schedule keep their shape and values.
+    const work = [candidate("vectors", { priority: 2, latestDay: "2026-10-15", examRefs: [midterm] }), candidate("determinants", { minutes: 10 })];
+    const plan = await planning.replan({ ...sam, candidates: work, ...proposal });
+    await planning.activateRoutine({ learner: "sam", plan: plan.plan, currentBasis: "skills-v1" });
+    const before = await savedState();
+    const { schedule } = await planning._schedule(sam);
+    expect(await savedState()).toEqual(before);
+    expect(Object.keys(schedule).sort()).toEqual(["budget", "exams", "next", "plans", "preferences", "today"]);
+    expect(schedule).toMatchObject({
+      preferences: { preferences, dailyMinutes: 30, focusNote: "Midterm first." }, today: "2026-10-13",
+      budget: (await planning._budget({ ...sam, day: "2026-10-13" }))[0]!, next: (await planning._next(sam))[0]!,
+    });
+    expect(schedule.plans.map(({ plan, status, horizonEnd, needsConfirmation }) => ({ plan, status, horizonEnd, needsConfirmation }))).toEqual(await planning._plans(sam));
+    expect(schedule.plans[0]!.items.slice().sort((a, b) => a.item.localeCompare(b.item)))
+      .toEqual((await planning._items(plan)).sort((a, b) => a.item.localeCompare(b.item)));
+    // The plan's focus exam is the first listed exam.
+    expect(schedule.plans[0]!.focusExam).toBe(schedule.exams[0]!.exam);
+
+    // Setting a date again replaces its covered skills and keeps its identity.
+    await planning.setExam({ ...sam, date: "2026-10-20", covered: ["determinants"] });
+    expect((await planning._schedule(sam)).schedule.exams).toEqual([
+      { exam: midterm, date: "2026-10-16", covered: ["vectors", "matrices"] },
+      { exam: final, date: "2026-10-20", covered: ["determinants"] },
+    ]);
+
+    // A removed exam leaves the schedule, though _exams still records it.
+    await planning.removeExam({ ...sam, date: "2026-10-16" });
+    expect((await planning._schedule(sam)).schedule.exams).toEqual([{ exam: final, date: "2026-10-20", covered: ["determinants"] }]);
+    expect((await planning._exams(sam)).map(({ exam, active }) => [exam, active])).toEqual([[midterm, false], [final, true]]);
+    expect((await planning._schedule(physics)).schedule.exams).toEqual([{ exam: physicsExam, date: "2026-10-15", covered: ["forces"] }]);
+
+    // An active exam stays listed after its date until it is removed.
+    setToday("2026-10-21");
+    expect((await planning._schedule(sam)).schedule.exams).toEqual([{ exam: final, date: "2026-10-20", covered: ["determinants"] }]);
+    await planning.removeExam({ ...sam, date: "2026-10-20" });
+    expect((await planning._schedule(sam)).schedule.exams).toEqual([]);
+  });
+
   test("refuses invalid budgets, exam details, and plan inputs without changing saved plans", async () => {
     const { planning } = setup();
     // Leo has no preferences, so nothing is stored for him.

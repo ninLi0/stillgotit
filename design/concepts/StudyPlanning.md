@@ -34,7 +34,7 @@ opaque CutValue
 opaque PlanInputs
   A fixed copy of the planning date, budget, focus note, active exam records, and DONE, STOPPED, or MISSED items with their time records for the same preferences. It excludes proposal records and unstarted items. It contains only this concept's state and is captured by replan, not supplied by the learner.
 opaque ScheduleValue
-  Preferences, today's budget, next item, and saved plans in one scope.
+  Preferences, today's date and budget, next item, saved plans, and active exams in one scope.
 ```
 
 ## State
@@ -285,7 +285,7 @@ _proposalCheck(learner: Learner, plan: Plan, currentBasis: String) : optional (l
   Returns no row unless plan is learner's PROPOSED plan. Compares saved local inputs with current values and basis with currentBasis. canActivate is true only when both comparisons match and the learner has no IN_PROGRESS item. needsConfirmation determines which activation action is required; this query does not grant consent or replace the action's checks.
 
 _schedule(learner: Learner, scope: Scope) : one (schedule: ScheduleValue)
-  Returns the learner's schedule in scope using the concept clock. Missing preferences, budget, and next item are null, and missing plans are an empty list.
+  Returns the learner's schedule in scope using the concept clock. It includes the scope's active exams, each with its identity, date, and covered skills, ordered by date. Missing preferences, budget, and next item are null, and missing plans or exams are empty lists.
 
 _item(item: Item) : optional (learner: Learner, scope: Scope, item: Item, candidate: Candidate, day: String, status: ItemStatus, actualMinutes: Number, spentOn?: String)
   Returns the item and its owning learner and scope. Returns no row for an unknown item.

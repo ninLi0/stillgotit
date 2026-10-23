@@ -2,7 +2,8 @@ import { compute, former, no, where } from "@mit-sdg/sync-engine/language";
 import { concepts, computations as C } from "../concepts.ts";
 import { composition as Courses } from "./courses.ts";
 import * as R from "./learning-reads.ts";
-const { SkillMapping: Mapping, GroundedTutoring: Tutoring, AssessmentReviewing: Assessment, MasteryEstimating: Mastery, StudyPlanning: Planning } = concepts;
+import { composition as PlanningFlows } from "./planning.ts";
+const { GroundedTutoring: Tutoring, AssessmentReviewing: Assessment, MasteryEstimating: Mastery, StudyPlanning: Planning } = concepts;
 
 const LessonReady = former("admit a lesson for (owner) and (skill)", ({ owner, skill }, { context, sources, materials }) => where(
   R.ActiveSkill({ owner, skill }), R.SkillContext({ owner, skill }).is({ context, sources }), compute(C.selectSkillMaterials, { context }, materials),
@@ -48,10 +49,9 @@ const PlanReady = former("admit a routine plan in (course)", ({ owner, course })
 const ItemReady = former("admit progress on (item) in (course)", ({ owner, course, item }) => where(
   Courses.OwnedCourse({ owner, course }), Planning._item({ item }).is({ learner: owner, scope: course }),
 ).form({ allowed: true })).optional();
-const BeginReady = former("admit starting (item) in (course)", ({ owner, course, item }, { candidate, skill, definition, skills, tracks }) => where(
-  Courses.OwnedCourse({ owner, course }), Planning._item({ item }).is({ learner: owner, scope: course, candidate }), compute(C.itemSubject, { candidate }, { skill, definition }),
-  R.ActiveSkill({ owner, skill }).is({ course, definition }), Mapping._map({ course }).is({ skills }), Mastery._progress({ learner: owner }).is({ tracks }),
-  C.prerequisitesReady({ skills, tracks, skill }),
+// The same view as the Begin endpoint, so admission applies the same urgent-mode prerequisite rule.
+const BeginReady = former("admit starting (item) in (course)", ({ owner, course, item }) => where(
+  Courses.OwnedCourse({ owner, course }), PlanningFlows.StartAllowed({ owner, course, item }),
 ).form({ allowed: true })).optional();
 export const composition = { LessonReady, TaskReady, ResponseReady, QuestionReady, ReplyReady, HintReady, TranscriptReady, AssessmentReady, RetryReady, RegradeReady, SuggestionReady, CourseReady, PlanReady, ItemReady, BeginReady };
 
@@ -75,4 +75,9 @@ export const admissions = {
   "/planning/finish": { check: ItemReady, fields: ["course", "item"], detail: "Choose an activity from your own course." },
   "/planning/stop": { check: ItemReady, fields: ["course", "item"], detail: "Choose an activity from your own course." },
   "/planning/miss": { check: ItemReady, fields: ["course", "item"], detail: "Choose an activity from your own course." },
+  // Exam and tradeoff commands are admitted on course ownership alone; the planning concept explains its own refusals.
+  "/planning/exams/set": { check: CourseReady, fields: ["course"], detail: "Choose one of your own courses." },
+  "/planning/exams/remove": { check: CourseReady, fields: ["course"], detail: "Choose one of your own courses." },
+  "/planning/tradeoffs/confirm": { check: CourseReady, fields: ["course"], detail: "Choose one of your own courses." },
+  "/planning/tradeoffs/decline": { check: CourseReady, fields: ["course"], detail: "Choose one of your own courses." },
 } as const;
