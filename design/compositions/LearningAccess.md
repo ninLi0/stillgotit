@@ -1,8 +1,12 @@
 # Request admission
 
-Before dispatching a learning or planning command, HTTP and the exported runtime gateway evaluate the same registered admission former under the same learner lock. A declined result produces an immediate explanation. This avoids waiting for an endpoint whose conditions cannot hold. Identity always comes from the session; request fields cannot select another owner. The endpoint repeats its guards, and each concept still enforces its own state rules.
+Before dispatching a learning or planning command, HTTP and the exported runtime gateway evaluate the same registered admission formers under the same learner lock. A command that asks the tutor passes two formers, as described below; every other command passes one. A declined result produces an immediate explanation. This avoids waiting for an endpoint whose conditions cannot hold. Identity always comes from the session; request fields cannot select another owner. The endpoint repeats its guards, and each concept still enforces its own state rules.
 
 The adapter performs no domain writes and sequences no learning actions. The engine evaluates the formers. Native callers use the runtime's exported `gateway`; the raw assembled invoker bypasses this admission layer. The [advisory review](../advisory-review.md) records the P2 decision to keep this boundary.
+
+A command that asks the tutor first passes [TutorReady](former:Settings.TutorReady), before its own former. These are the commands at `/learning/lesson`, `/learning/task`, `/learning/question`, `/learning/reply`, `/learning/hint`, `/learning/assess`, `/learning/retry`, `/learning/regrade`, and `/courses/skills/suggest`. TutorReady admits the command when the learner has no saved tutor choice, or has a saved choice that is still offered. A declined result explains: "The tutor model or thinking level you chose is no longer offered. Choose another one in the Tutor panel." The [tutor settings](Settings.md) describe the choice.
+
+`/learning/correct` shares RegradeReady but makes no AI call, so it does not pass TutorReady.
 
 [LessonReady](former:Access.LessonReady) checks the corresponding command against current owned state.
 [TaskReady](former:Access.TaskReady) checks the corresponding command against current owned state.

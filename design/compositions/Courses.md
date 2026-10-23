@@ -16,7 +16,7 @@ The public upload route at `/api/courses/materials/add` accepts multipart files.
 
 ## Reviewing skills
 
-[Suggest](reaction:Learning.Suggest) requests editable suggestions from one owned course material. It does not save skills. [ProposeSkill](reaction:Courses.ProposeSkill) saves one accepted suggestion through `SkillMapping.propose`. Its unit and material must belong to the same owned course. [singleMaterial](computation:singleMaterial) creates the source set; one material may contain several files.
+[Suggest](reaction:Learning.Suggest) requests editable suggestions from one owned course material with the learner's [tutor choice](Settings.md), and returns the model and thinking level that produced them. It does not save skills. [ProposeSkill](reaction:Courses.ProposeSkill) saves one accepted suggestion through `SkillMapping.propose`. Its unit and material must belong to the same owned course. [singleMaterial](computation:singleMaterial) creates the source set; one material may contain several files.
 
 Each draft save carries a `proposalKey`. SkillMapping writes one record at a time, in a fixed order. It first saves a receipt with the original input and the identities of the new skill and its first requirements version. It then saves that version, then the skill, and finally marks the receipt saved. A skill therefore never appears without its version. If a save stops partway, repeating the same key and input finishes it. Repeating the same key and input returns the same skill. Different content with that key is refused. Keys are scoped to the learner and grant no access. A retry preserves later edits or confirmation. If the draft was discarded, the saved receipt prevents its recreation and the retry is refused.
 

@@ -1,7 +1,7 @@
 import { studyPlanning } from "./concepts/StudyPlanning/registry.ts";
 import { masteryEstimating } from "./concepts/MasteryEstimating/registry.ts";
 import { assessmentReviewing } from "./concepts/AssessmentReviewing/registry.ts";
-import { conceptSet } from "@mit-sdg/sync-engine/assembly";
+import { conceptSet, registerConcept } from "@mit-sdg/sync-engine/assembly";
 import { commonsFederating } from "./concepts/Federating/registry.ts";
 import { registering } from "./concepts/Registering/registry.ts";
 import { sessioning } from "./concepts/Sessioning/registry.ts";
@@ -10,6 +10,15 @@ import { groundedTutoring } from "./concepts/GroundedTutoring/registry.ts";
 import { singleMaterial, evidenceAttribution } from "./computations.ts";
 import { sessionSubject, attemptIsReady, beginAllowed, correctionNote, coveredSkillsConfirmed, cutKey, dialogueIsCurrent, evidenceUpdate, generationDefinition, generationFields, gradeRequest, hasLessonQuestion, itemOrder, itemSubject, lessonRequest, planDetail, planRequest, prerequisitesReady, progressRows, responseInput, reviewApproved, selectSkill, selectSkillMaterials, selectSources, sessionMaterials, sessionRequest, studyDetail, submissionInput, suggestRequest, taskRequest, urgentExamItem, estimateTimeline } from "./computations/learning.ts";
 import { generating } from "./concepts/Generating/registry.ts";
+import preferringSpec from "@design/concepts/Preferring.md" with { type: "text" };
+import { Preferring } from "./concepts/Preferring/Preferring.ts";
+import type { User } from "./concepts/Registering/Registering.ts";
+import type { TutorChoice } from "./tutor-types.ts";
+import { choiceOffered, defaultChoice, levelSupported, modelOffered, offeredChoice, requestChoice, tutorCatalog, tutorStatus, withChoice } from "./computations/tutor.ts";
+
+/** Preferring bound as the stage's TutorPreferring instance: User is Registering.User, Option is TutorChoice. */
+export class TutorPreferring extends Preferring<User, TutorChoice> {}
+const tutorPreferring = registerConcept({ class: TutorPreferring, spec: preferringSpec, refusals: {} });
 
 export const applicationConceptSet = conceptSet({
   Registering: registering,
@@ -21,5 +30,7 @@ export const applicationConceptSet = conceptSet({
   StudyPlanning: studyPlanning,
   GroundedTutoring: groundedTutoring,
   TutorGenerating: generating,
-}, { singleMaterial, evidenceAttribution, sessionSubject, attemptIsReady, beginAllowed, correctionNote, coveredSkillsConfirmed, cutKey, dialogueIsCurrent, evidenceUpdate, generationDefinition, generationFields, gradeRequest, hasLessonQuestion, itemOrder, itemSubject, lessonRequest, planDetail, planRequest, prerequisitesReady, progressRows, responseInput, reviewApproved, selectSkill, selectSkillMaterials, selectSources, sessionMaterials, sessionRequest, studyDetail, submissionInput, suggestRequest, taskRequest, urgentExamItem, estimateTimeline });
+  TutorPreferring: tutorPreferring,
+}, { singleMaterial, evidenceAttribution, sessionSubject, attemptIsReady, beginAllowed, correctionNote, coveredSkillsConfirmed, cutKey, dialogueIsCurrent, evidenceUpdate, generationDefinition, generationFields, gradeRequest, hasLessonQuestion, itemOrder, itemSubject, lessonRequest, planDetail, planRequest, prerequisitesReady, progressRows, responseInput, reviewApproved, selectSkill, selectSkillMaterials, selectSources, sessionMaterials, sessionRequest, studyDetail, submissionInput, suggestRequest, taskRequest, urgentExamItem, estimateTimeline,
+  tutorCatalog, defaultChoice, modelOffered, levelSupported, offeredChoice, choiceOffered, withChoice, requestChoice, tutorStatus });
 export const { concepts, computations } = applicationConceptSet;

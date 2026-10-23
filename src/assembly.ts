@@ -3,11 +3,13 @@ import { composition as Reads } from "./compositions/learning-reads.ts";
 import { composition as Progress } from "./compositions/progress.ts";
 import { composition as Planning } from "./compositions/planning.ts";
 import { composition as Learning } from "./compositions/learning.ts";
+import { composition as Settings } from "./compositions/settings.ts";
 import type { StudyPlanning } from "./concepts/StudyPlanning/StudyPlanning.ts";
 import type { MasteryEstimating } from "./concepts/MasteryEstimating/MasteryEstimating.ts";
 import type { AssessmentReviewing } from "./concepts/AssessmentReviewing/AssessmentReviewing.ts";
 import { assemble, type ConceptImplementation } from "@mit-sdg/sync-engine/assembly";
-import { applicationConceptSet } from "./concepts.ts";
+import { applicationConceptSet, TutorPreferring } from "./concepts.ts";
+import type { Db } from "mongodb";
 import type { FederatingConcept } from "./concepts/Federating/Federating.ts";
 import type { RegisteringConcept, User } from "./concepts/Registering/Registering.ts";
 import type { SessioningConcept } from "./concepts/Sessioning/Sessioning.ts";
@@ -36,13 +38,23 @@ export function assembleApplication(instances: {
   SkillMapping: ConceptImplementation<typeof SkillMapping>;
   GroundedTutoring: ConceptImplementation<typeof GroundedTutoring<User, string>>;
   TutorGenerating?: ConceptImplementation<typeof TutorGenerating>;
+  TutorPreferring?: ConceptImplementation<typeof TutorPreferring>;
 }, clock = () => new Date()) {
   return assemble({
     conceptSet: applicationConceptSet,
-    instances: { ...instances, TutorGenerating: instances.TutorGenerating ?? new TutorGenerating() },
-    composition: { reusable: { accounts, commons }, Courses, Learning, Reads, Progress, Planning, Access },
+    instances: { ...instances, TutorGenerating: instances.TutorGenerating ?? new TutorGenerating(),
+      TutorPreferring: instances.TutorPreferring ?? new TutorPreferring(unconfiguredDatabase, "TutorPreferring") },
+    composition: { reusable: { accounts, commons }, Courses, Learning, Reads, Progress, Planning, Access, Settings },
     queryCache: "none",
     executionLimits,
     clock,
   });
 }
+
+/**
+ * Assemblies built only for account or course checks may omit TutorPreferring, as they may omit TutorGenerating's provider.
+ * Its stand-in store refuses every read and write, so a tutor choice is never saved to or read from an unintended database.
+ */
+const unconfiguredDatabase = { collection: () => new Proxy({}, {
+  get: () => () => Promise.reject(new Error("TutorPreferring has no database in this assembly.")),
+}) } as unknown as Db;

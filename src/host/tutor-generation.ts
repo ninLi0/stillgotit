@@ -41,11 +41,12 @@ function validated(tutor: Pick<CourseTutor, "generate" | "suggest">) {
     const answer: TutorAnswer = { text: "", citations: [], materials: request.sources.map((source) => source.material),
       result: "UNCERTAIN", gateMet: false, rationale: "", suggestions: { unitTitle: "", skills: [] } };
     if (!request.sources.length || request.sources.some((source) => source.data.owner !== owner)) throw new Error("Invalid sources");
-    if (request.kind === "SUGGEST") { answer.suggestions = await tutor.suggest(owner, request.sources[0]!); return answer; }
+    // The transport refuses a request that carries no validated model and level (src/host/tutor.ts).
+    if (request.kind === "SUGGEST") { answer.suggestions = await tutor.suggest(owner, request.sources[0]!, request.tutor); return answer; }
     const field = request.kind === "LESSON" ? "explanation" : request.kind === "TASK" ? "question" : "text";
     const schema = request.kind === "GRADE" ? objectSchema({ result: { type: "string", enum: ["INDEPENDENT", "SUPPORTED", "SLIP", "GAP", "UNCERTAIN"] }, gateMet: { type: "boolean" }, rationale: text })
       : request.kind === "HINT" ? objectSchema({ text }) : cited(field);
-    const result = await tutor.generate(owner, request.sources, prompts[request.kind], request.context, schema, request.work) as Record<string, unknown>;
+    const result = await tutor.generate(owner, request.sources, prompts[request.kind], request.context, schema, request.work, request.tutor) as Record<string, unknown>;
     if (request.kind === "GRADE") {
       const context = request.context as { help: string; fresh: boolean };
       if (typeof result.rationale !== "string" || !result.rationale.trim() || typeof result.gateMet !== "boolean" ||

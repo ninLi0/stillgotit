@@ -5,6 +5,7 @@ import { GroundedTutoring } from "./src/concepts/GroundedTutoring/GroundedTutori
 import { MongoClient } from "mongodb";
 import { httpWire } from "@mit-sdg/sync-engine-http/tooling";
 import { assembleApplication } from "./src/assembly.ts";
+import { TutorPreferring } from "./src/concepts.ts";
 import { FederatingConcept } from "./src/concepts/Federating/Federating.ts";
 import { MemoryProvider } from "./src/concepts/Federating/provider.ts";
 import { RegisteringConcept, type User } from "./src/concepts/Registering/Registering.ts";
@@ -28,6 +29,7 @@ function assembleForChecks() {
     MasteryEstimating: new MasteryEstimating(client.db("stillgotit_spec_check")),
     StudyPlanning: new StudyPlanning(client.db("stillgotit_spec_check")),
     GroundedTutoring: new GroundedTutoring(client.db("stillgotit_spec_check")),
+    TutorPreferring: new TutorPreferring(client.db("stillgotit_spec_check"), "TutorPreferring"),
   });
 }
 
@@ -39,6 +41,6 @@ export default {
   design: {
     version: 1,
     documents: [new URL("./design/stages/materials.md", import.meta.url),
-      ...["Courses", "Learning", "LearningReads", "Progress", "Planning", "LearningComputations", "LearningAccess"].map((name) => new URL(`./design/compositions/${name}.md`, import.meta.url))],
+      ...["Courses", "Learning", "LearningReads", "Progress", "Planning", "LearningComputations", "LearningAccess", "Settings"].map((name) => new URL(`./design/compositions/${name}.md`, import.meta.url))],
   },
 };

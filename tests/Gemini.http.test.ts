@@ -11,9 +11,9 @@ afterAll(async () => { for (const cleanup of cleanups.reverse()) await cleanup()
 /** The real tutor and HTTP host, with Google's endpoint replaced by `reply`. */
 async function setup(key = "test-key-not-real") {
   const connection = await connectMongo({ uri: process.env.MONGODB_TEST_URI ?? localMongoUri, database: `stillgotit_test_${crypto.randomUUID().replaceAll("-", "")}` });
-  const provider = new MemoryProvider(), requests: Record<string, any>[] = [];
+  const provider = new MemoryProvider(), requests: Record<string, any>[] = [], urls: string[] = [];
   let reply: () => Response = () => Response.json({});
-  const fetch = (async (_url: unknown, init: RequestInit) => { requests.push(JSON.parse(String(init.body))); return reply(); }) as typeof globalThis.fetch;
+  const fetch = (async (url: unknown, init: RequestInit) => { urls.push(String(url)); requests.push(JSON.parse(String(init.body))); return reply(); }) as typeof globalThis.fetch;
   const runtime = await createRuntime({ database: connection.db, provider, providerOrigin: "https://commons.example", publicOrigin: ORIGIN, gemini: new Gemini({ key, fetch }) });
   cleanups.push(async () => { await runtime.gateway.beginDrain(); await connection.db.dropDatabase(); await connection.client.close(); });
   const jar = new Map<string, string>();
@@ -31,7 +31,7 @@ async function setup(key = "test-key-not-real") {
   const { body: { course } } = await post("/courses/create", { title: "Linear algebra" });
   const { material } = await runtime.application.concepts.GroundedTutoring.addMaterial({ owner: user, importKey: crypto.randomUUID(), scope: course,
     title: "Matrix multiplication", locator: "upload:test", content: "Multiply rows by columns. Inner dimensions must match.", originals: [], origin: "COURSE" });
-  return { runtime, post, material, requests, respond: (next: () => Response) => { reply = next; } };
+  return { runtime, post, material, requests, urls, respond: (next: () => Response) => { reply = next; } };
 }
 const answer = (value: unknown) => Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify(value) }] }, finishReason: "STOP" }] });
 
@@ -73,4 +73,33 @@ test("without a Gemini key the status explains why and AI requests fail without 
   const refused = await app.post("/courses/skills/suggest", { material: app.material });
   expect(refused).toMatchObject({ status: 400, body: { detail: expect.stringContaining("not set up on this server") } });
   expect(app.requests).toHaveLength(0);
+}, 15_000);
+
+test("a tutor request reaches Google with the learner's choice, and a refusal naming that model sends the learner to the Tutor panel", async () => {
+  const app = await setup();
+  const suggestions = { unitTitle: "Products", skills: [{ title: "Multiply matrices", outcome: "Compute products.", gate: "Solve two new products and explain why order matters." }] };
+  expect((await app.post("/settings/tutor/choose", { model: "gemini-3.1-pro-preview", level: "LOW" })).body.settings.status).toBe("SAVED");
+  app.respond(() => answer(suggestions));
+  expect(await app.post("/courses/skills/suggest", { material: app.material })).toEqual({ status: 200,
+    body: { suggestions, tutor: { model: "gemini-3.1-pro-preview", level: "LOW" } } });
+  expect(app.urls.at(-1)).toBe("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent");
+  expect(app.requests.at(-1)!.generationConfig.thinkingConfig).toEqual({ thinkingLevel: "low" });
+
+  // The 404 Google returns for a model it cannot find names that model (live probe, 2026-10-23).
+  app.respond(() => Response.json({ error: { code: 404, status: "NOT_FOUND", message: "models/gemini-3.1-pro-preview is not found for API version v1beta, or is not supported for generateContent. Call ModelService.ListModels to see the list of available models and their supported methods." } }, { status: 404 }));
+  expect((await app.post("/courses/skills/suggest", { material: app.material })).body).toEqual({ error: "INVALID_REQUEST",
+    detail: "Gemini 3.1 Pro (preview) isn't available to this app right now. Choose another model in the Tutor panel and try again. Your saved work is still available." });
+  // A refusal about the key keeps the setup sentence, and an unclear refusal keeps the current sentence. The server never retries another model.
+  app.respond(() => Response.json({ error: { code: 400, status: "INVALID_ARGUMENT", message: "API key not valid. Please pass a valid API key.", details: [{ reason: "API_KEY_INVALID" }] } }, { status: 400 }));
+  expect((await app.post("/courses/skills/suggest", { material: app.material })).body.detail).toBe("The AI service isn't set up correctly, so the tutor can't answer. Ask the app owner to check the Gemini API key. Your saved work is still available.");
+  app.respond(() => Response.json({ error: { code: 400, status: "INVALID_ARGUMENT", message: "Request contains an invalid argument." } }, { status: 400 }));
+  expect((await app.post("/courses/skills/suggest", { material: app.material })).body.detail).toBe("The AI service could not accept this request. Try again. If it keeps failing, use fewer or smaller course files. Your saved work is still available.");
+  expect(app.urls.filter((url) => !url.includes("gemini-3.1-pro-preview"))).toEqual([]);
+
+  // After choosing another model, the next request uses it.
+  await app.post("/settings/tutor/choose", { model: "gemini-3.5-flash-lite", level: "MINIMAL" });
+  app.respond(() => answer(suggestions));
+  expect((await app.post("/courses/skills/suggest", { material: app.material })).body.tutor).toEqual({ model: "gemini-3.5-flash-lite", level: "MINIMAL" });
+  expect(app.urls.at(-1)).toEndWith("/models/gemini-3.5-flash-lite:generateContent");
+  expect(app.requests.at(-1)!.generationConfig.thinkingConfig).toEqual({ thinkingLevel: "minimal" });
 }, 15_000);

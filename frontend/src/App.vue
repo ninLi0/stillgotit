@@ -3,6 +3,8 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import { api, failureText, type Course } from "./api.ts";
 import TreeMark from "./TreeMark.vue";
 import CourseWorkspace from "./CourseWorkspace.vue";
+import TutorPanel from "./TutorPanel.vue";
+import { levelName, modelName, tutorSettings } from "./tutor-choice.ts";
 
 const loading = ref(true), busy = ref(false), choosing = ref(false), canResume = ref(false);
 const username = ref<string | null>(null), chosenName = ref("");
@@ -93,6 +95,13 @@ async function createCourse() {
 }
 
 const settingsDialog = ref<HTMLDialogElement | null>(null);
+// The header names the choice in the latest tutor settings record the page received. It reads only "Tutor" until one arrives.
+const tutorPanel = ref<InstanceType<typeof TutorPanel> | null>(null);
+const tutorChoice = computed(() => {
+  const record = tutorSettings.value;
+  if (!record) return "";
+  return record.status === "RETIRED" ? "choose again" : `${modelName(record.choice.model, record)}, ${levelName(record.choice.level)}`;
+});
 async function signOut() {
   busy.value = true; error.value = "";
   const result = await api.auth.logout({});
@@ -141,15 +150,16 @@ onMounted(async () => {
           </div>
         </div>
       </div>
-      <div v-if="username" class="account"><button class="settings-open" aria-haspopup="dialog" @click="settingsDialog?.showModal()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Settings</button></div>
+      <div v-if="username" class="account"><button class="tutor-open" type="button" aria-haspopup="dialog" @click="tutorPanel?.open()">Tutor<span v-if="tutorChoice" class="tutor-choice">: {{ tutorChoice }}</span></button><button class="settings-open" aria-haspopup="dialog" @click="settingsDialog?.showModal()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span class="settings-label">Settings</span></button></div>
       <dialog v-if="username" ref="settingsDialog" class="app-settings" aria-labelledby="app-settings-title">
         <h2 id="app-settings-title">Settings</h2>
         <section><h3>Account</h3><p>Signed in as <strong>{{ username }}</strong> with your 6.1040 Commons account.</p><button class="small-button" :disabled="busy" @click="settingsDialog?.close(); signOut()">Sign out</button></section>
-        <section><h3>AI tutor</h3><p>Lessons, practice, and feedback come from Google Gemini. Your files and answers are sent to Google to create them.</p></section>
+        <section><h3>AI tutor</h3><p>Lessons, practice, and feedback come from Google Gemini. Your files and answers are sent to Google to create them.</p><button class="small-button" aria-haspopup="dialog" @click="tutorPanel?.open()">Choose the model</button></section>
         <div class="settings-actions"><button class="primary" @click="settingsDialog?.close()">Done</button></div>
       </dialog>
       <span v-else class="header-note">Keep what you learn.</span>
     </header>
+    <TutorPanel v-if="username" ref="tutorPanel" />
 
     <main :class="{ 'course-main': inCourse }" :aria-busy="loading || busy">
       <p v-if="loading" class="loading" role="status">Opening your study space…</p>
@@ -221,5 +231,10 @@ onMounted(async () => {
 .row:hover, .row.current { background: var(--light); }
 .row:focus-visible, .switch:focus-visible { outline-offset: 1px; }
 .settings-open{display:flex;align-items:center;gap:7px;border:0;background:transparent;color:var(--muted);font-size:13px;padding:6px 10px;border-radius:10px}.settings-open:hover{background:var(--light);color:var(--ink)}
+/* The Tutor button stays on one line. A long model name is shortened with an ellipsis rather than wrapping the header. */
+.tutor-open{position:relative;display:flex;align-items:center;min-width:0;max-width:min(300px,34vw);border:0;background:transparent;color:var(--muted);font-size:13px;padding:6px 10px;border-radius:10px;white-space:nowrap}.tutor-open:hover{background:var(--light);color:var(--ink)}.tutor-choice{min-width:0;overflow:hidden;text-overflow:ellipsis}
+/* Narrow screens show only "Tutor", and phones show only the Settings icon. Screen readers still hear the full names. */
+@media(max-width:760px){.tutor-choice{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}}
+@media(max-width:480px){.account{gap:6px}.settings-label{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}.settings-open{position:relative;padding:8px}}
 .app-settings{border:0;border-radius:18px;padding:24px;width:min(420px,calc(100vw - 32px));box-shadow:0 20px 50px rgba(23,35,64,.25);color:var(--ink);background:var(--surface)}.app-settings::backdrop{background:rgba(23,35,64,.35)}.app-settings h2{font:26px Georgia,serif;margin:0 0 6px}.app-settings section{padding:14px 0;border-bottom:1px solid var(--line)}.app-settings h3{font-size:14px;margin:0 0 4px}.app-settings p{font-size:13px;color:var(--muted);margin:0 0 10px}.app-settings .small-button{padding:7px 14px;font-size:13px}.settings-actions{display:flex;justify-content:flex-end;margin-top:16px}.settings-actions .primary{min-height:40px;padding:6px 20px;font-size:14px}
 </style>

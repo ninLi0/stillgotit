@@ -1,5 +1,7 @@
 import { admissions, composition as Access } from "../compositions/access.ts";
-import { learningInput, structuredInput } from "../compositions/reusable/inputs.ts";
+import { tutorRefusals } from "../compositions/settings.ts";
+import { learningInput, structuredInput, tutorChoiceInput } from "../compositions/reusable/inputs.ts";
+import { levelSupported, modelOffered } from "../computations/tutor.ts";
 import { createHttpHandler } from "@mit-sdg/sync-engine-http/handler";
 import { createGateway, type Invoker, type InvocationResult } from "@mit-sdg/sync-engine/boundary";
 import { executionLimits, type assembleApplication } from "../assembly.ts";
@@ -33,12 +35,15 @@ export function createApplicationHttp({ application, recovery, publicOrigin, clo
   const locks = new KeyedLocks();
   const { CommonsFederating, Registering, Sessioning } = application.concepts;
 
+  /** Evaluates the path's admission formers in order and returns the first that declines, or null when all admit. */
   async function admission(path: string, body: Record<string, unknown>, owner: string) {
-    const entry = admissions[path as keyof typeof admissions];
-    if (!entry) return null;
-    const values = Object.fromEntries(entry.fields.map((field) => [field, field === "assessment" ? body.case : body[field]]));
-    return Object.values(values).some((value) => value === undefined) || !await application.form(entry.check({ ...values, owner }))
-      ? entry : null;
+    const entries: readonly { check: (input: Record<string, unknown>) => Parameters<Application["form"]>[0]; fields: readonly string[]; detail: string }[] =
+      admissions[path as keyof typeof admissions] ?? [];
+    for (const entry of entries) {
+      const values = Object.fromEntries(entry.fields.map((field) => [field, field === "assessment" ? body.case : body[field]]));
+      if (Object.values(values).some((value) => value === undefined) || !await application.form(entry.check({ ...values, owner }))) return entry;
+    }
+    return null;
   }
 
   // Native callers use the same declared admission checks and learner lock as HTTP.
@@ -231,12 +236,12 @@ export function createApplicationHttp({ application, recovery, publicOrigin, clo
         const owner = await learner(request);
         if (!owner) return failure("UNAUTHORIZED", 401);
         return locks.run(`user:${owner}`, async () => {
-          const entry = admissions[path.slice(4) as keyof typeof admissions];
-          if (entry) {
+          if (path.slice(4) in admissions) {
             const body = await readBody(request.clone());
             if (!body || !learningInput(body).ok) return failure("INVALID_REQUEST", 400);
-            if (await admission(path.slice(4), body, owner)) {
-              return Response.json({ error: "INVALID_REQUEST", detail: entry.detail }, { status: 400, headers: { "Cache-Control": "no-store" } });
+            const declined = await admission(path.slice(4), body, owner);
+            if (declined) {
+              return Response.json({ error: "INVALID_REQUEST", detail: declined.detail }, { status: 400, headers: { "Cache-Control": "no-store" } });
             }
           }
           failures?.take(owner);
@@ -248,6 +253,17 @@ export function createApplicationHttp({ application, recovery, publicOrigin, clo
           return reason && response.status === 400
             ? Response.json({ error: "INVALID_REQUEST", detail: reason }, { status: 400, headers: { "Cache-Control": "no-store" } }) : response;
         });
+      }
+      // Tutor settings take no learner lock, so saving a choice never waits behind a running lesson.
+      if (path === "/api/settings/tutor/choose") {
+        const body = await readBody(request.clone());
+        const response = await inner(request);
+        // The adapter reports either ChooseTutor refusal as INVALID_REQUEST. The same declared computations name which
+        // one the flow returned; the catalog is fixed while the server runs, so they always agree with the flow.
+        if (response.status !== 400 || !body || !tutorChoiceInput(body).ok) return response;
+        const { model, level } = body as { model: string; level: string };
+        const code = !modelOffered({ model }) ? "UNKNOWN_TUTOR_MODEL" : !levelSupported({ model, level }) ? "UNSUPPORTED_THINKING_LEVEL" : null;
+        return code ? Response.json({ error: "INVALID_REQUEST", detail: tutorRefusals[code] }, { status: 400, headers: { "Cache-Control": "no-store" } }) : response;
       }
       if (path.startsWith("/api/ai/") || path === "/api/courses/materials/file") {
         return await providerRequest(request, path);

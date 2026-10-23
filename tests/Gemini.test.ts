@@ -133,7 +133,7 @@ test("the tutor sends source text, original PDFs and images inline, and text onl
     { file: "huge.pdf", name: "Huge.pdf", mediaType: "application/pdf", limitations: ["Page 9 had no text."], renditions: [{ kind: "TEXT", location: "Huge.pdf/page/1", text: "Long notes." }] },
   ] };
   const work = [{ file: "work.png", name: "My work.png", mediaType: "image/png", limitations: [], renditions: [] }];
-  await tutor.generate("sam", [{ material: "m1" as Material, data }], "Explain.", { request: "Teach me" }, schema, work);
+  await tutor.generate("sam", [{ material: "m1" as Material, data }], "Explain.", { request: "Teach me" }, schema, work, { model: DEFAULT_MODEL, level: "MEDIUM" });
   const { systemInstruction, contents: [{ parts }] } = calls[0]!.body;
   expect(systemInstruction.parts[0].text).toContain("careful course tutor");
   expect(systemInstruction.parts[0].text).toEndWith("Explain.");
@@ -152,5 +152,5 @@ test("the tutor sends source text, original PDFs and images inline, and text onl
   expect(parts.some((part: { text?: string }) => part.text?.includes("Huge.pdf") && !part.text.startsWith("{"))).toBe(false);
   expect(parts.at(-1)).toEqual({ text: JSON.stringify({ request: "Teach me" }) });
   expect(reads.sort()).toEqual(["huge.pdf", "lesson.pdf", "page.png", "photo.jpg", "work.png"]);
-  await expect(tutor.generate("leo", [{ material: "m1" as Material, data }], "Explain.", {}, schema)).rejects.toThrow("Choose one of your materials.");
+  await expect(tutor.generate("leo", [{ material: "m1" as Material, data }], "Explain.", {}, schema, [], { model: DEFAULT_MODEL, level: "MEDIUM" })).rejects.toThrow("Choose one of your materials.");
 });

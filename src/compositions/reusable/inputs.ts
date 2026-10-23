@@ -72,6 +72,16 @@ export const materialInput: EndpointValidator = (value) => {
     isMediaList(record.originals) && (record.origin === "COURSE" || record.origin === "REFERENCE") };
 };
 
+/** A tutor choice names a model and a level, each a string of at most 100 characters. The flow checks them against the catalog. */
+export const tutorChoiceInput: EndpointValidator = (value) => {
+  if (!structuredInput(value).ok) return { ok: false };
+  const record = value as Record<string, unknown>;
+  const ok = Object.entries(record).every(([key, field]) => key === "session" ? field === null || typeof field === "string"
+    : (key === "model" || key === "level") && typeof field === "string" && field.length <= 100) &&
+    typeof record.model === "string" && typeof record.level === "string";
+  return ok ? { ok: true } : { ok: false, detail: "Choose a model and a thinking level." };
+};
+
 /** JSON commands carry learner input only. Definitions and provider output are server-owned. */
 export const learningInput: EndpointValidator = (value) => {
   if (!structuredInput(value).ok) return { ok: false };
