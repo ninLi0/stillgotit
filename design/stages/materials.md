@@ -84,7 +84,7 @@ reusable.accounts.leaving.SignOut at /auth/logout
 
 The course title must contain 1–160 characters after trimming. The Vue page shows the saved course without a page refresh. Reloading or restarting the server reads the same MongoDB records. It displays no invented skills or mastery values.
 
-The [course composition](../compositions/courses.md) declares the course endpoints and their ownership rules.
+The [course composition](../compositions/Courses.md) declares the course endpoints and their ownership rules.
 
 ## HTTP and UI
 
@@ -114,7 +114,7 @@ evidenceAttribution(origin: AssessmentReviewing.Origin, rationale: String) : Str
   Identifies an AI assessment or learner correction alongside its saved explanation.
 ```
 
-The [course composition](../compositions/courses.md) declares these endpoints and the saved request keys used to recover draft saves.
+The [course composition](../compositions/Courses.md) declares these endpoints and the saved request keys used to recover draft saves.
 
 ## Provider and file transport
 
@@ -126,4 +126,4 @@ Uploads accept up to 12 files and 25 MB in total. PDF pages are read as text, an
 
 ## Learning application
 
-[Learning flows](../compositions/learning.md), [shared reads](../compositions/learning-reads.md), [progress reactions](../compositions/progress.md), and [planning endpoints](../compositions/planning.md) define the rest of this stage. The host forwards JSON requests to these declared endpoints. It does not sequence tutoring, assessment, mastery, or planning actions.
+[Learning flows](../compositions/Learning.md), [shared reads](../compositions/LearningReads.md), [progress reactions](../compositions/Progress.md), and [planning endpoints](../compositions/Planning.md) define the rest of this stage. The host forwards JSON requests to these declared endpoints. It does not sequence tutoring, assessment, mastery, or planning actions.

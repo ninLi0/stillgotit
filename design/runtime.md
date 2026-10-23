@@ -34,7 +34,7 @@ SkillMapping follows these rules:
 - **Confirming, editing details, and attaching material.** Each is one conditional update on the skill. If another change got there first, the concept reads again and either retries or refuses.
 - **Prerequisites, archiving, and restoring.** These rules involve two skills at once. For example, a cycle needs both A→B and B→A, and an active skill must not require an archived one. A condition on one skill cannot see a change to the other. So these actions briefly claim the course record, run their checks, make one update, and release the claim. The claim expires after 10 seconds, so a stopped process cannot lock a course for long.
 
-The browser stores pending draft requests before it sends them and removes each one only after the server acknowledges it. The [course flows](compositions/courses.md) describe these requests.
+The browser stores pending draft requests before it sends them and removes each one only after the server acknowledges it. The [course flows](compositions/Courses.md) describe these requests.
 
 The other concepts keep related data in one document, so a single write is enough. AssessmentReviewing stores a case and its append-only judgments together. StudyPlanning stores a learner's plans together, which makes replacing a plan and the one-activity-at-a-time rule a single write. MasteryEstimating keeps one effective input per piece of evidence and accepts a replacement only when its revision number is higher.
 

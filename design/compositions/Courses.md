@@ -22,13 +22,13 @@ Each draft save carries a `proposalKey`. SkillMapping writes one record at a tim
 
 After choosing an existing unit or receiving a new unit's identity, the browser saves a frozen queue in session storage before sending any draft. Each queue entry has its own key and source. An acknowledged save removes that entry. A failed or lost reply leaves it available to retry, including after a page reload or server restart. A retry sends the original input.
 
-[EditDraft](reaction:Courses.EditDraft) checks the chosen unit and material, then calls `SkillMapping.reviseDraft`. The action checks that the skill is an owned draft and stays within its course. [ConfirmSkill](reaction:Courses.ConfirmSkill) requires an owned skill with no [UnavailableSkillMaterial](view:Courses.UnavailableSkillMaterial), then calls `SkillMapping.confirm`. The action requires draft status and at least one source. Confirmation assigns no mastery score; confidence is recorded through the [learning flow](learning.md).
+[EditDraft](reaction:Courses.EditDraft) checks the chosen unit and material, then calls `SkillMapping.reviseDraft`. The action checks that the skill is an owned draft and stays within its course. [ConfirmSkill](reaction:Courses.ConfirmSkill) requires an owned skill with no [UnavailableSkillMaterial](view:Courses.UnavailableSkillMaterial), then calls `SkillMapping.confirm`. The action requires draft status and at least one source. Confirmation assigns no mastery score; confidence is recorded through the [learning flow](Learning.md).
 
 Editing confirmed requirements is implemented in the concept but has no P2 endpoint or screen.
 
 ## Endpoints
 
-The HTTP adapter adds `/api` to these paths. Skill suggestions belong to the [learning composition](learning.md).
+The HTTP adapter adds `/api` to these paths. Skill suggestions belong to the [learning composition](Learning.md).
 
 ```endpoints
 Courses.ListCourses at /courses

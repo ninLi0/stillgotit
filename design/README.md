@@ -20,7 +20,7 @@ The eight domain concepts own their MongoDB collections. Generating has no durab
 
 ## Application boundary
 
-[The P2 stage](stages/materials.md) is selected by `generated.config.ts`. It binds nine instances. The selected [course flows](compositions/courses.md), learning, progress, planning, read, admission, and computation documents describe the current engine flows. [Generated read-back](../generated/stillgotit.md) shows the resulting `when / where / then` rules.
+[The P2 stage](stages/materials.md) is selected by `generated.config.ts`. It binds nine instances. The selected [course flows](compositions/Courses.md), learning, progress, planning, read, admission, and computation documents describe the current engine flows. [Generated read-back](../generated/stillgotit.md) shows the resulting `when / where / then` rules.
 
 The selected composition documents match the current implementation. Unselected access and identity sketches describe broader P3 work. The selected P2 stage and its linked flow documents identify the implemented paths. [The onboarding stage](stages/onboarding.md) preserves an earlier increment.
 
