@@ -2,10 +2,12 @@ import { createHash } from "node:crypto";
 import type { SkillRows, SkillInfo, Sessions, StudySession, Cases, CaseInfo, Tracks, Schedule, TutorRequest } from "../learning-data.ts";
 import { isMediaList } from "../concepts/GroundedTutoring/media.ts";
 import type { SourceContext } from "../tutor-types.ts";
-import type { Candidate } from "../concepts/StudyPlanning/StudyPlanning.ts";
+import type { Candidate, CutValue } from "../concepts/StudyPlanning/StudyPlanning.ts";
 import type { ResponseValue, Help } from "../concepts/AssessmentReviewing/AssessmentReviewing.ts";
 import type { Channel } from "../concepts/GroundedTutoring/dialogue.ts";
 const studyDate = (at: Date) => at.toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+// Study dates are YYYY-MM-DD strings, so whole days can be added in UTC.
+const addDays = (day: string, days: number) => new Date(Date.parse(day) + days * 86_400_000).toISOString().slice(0, 10);
 export function selectSkill({ skills, skill }: { skills: SkillRows; skill: string }): SkillInfo {
   const result = skills.find((row) => row.skill === skill);
   if (!result) throw new Error("Unavailable skill");
@@ -73,33 +75,115 @@ export function evidenceUpdate({ data, tracks }: { data: CaseInfo; tracks: Track
   const previous = track?.inputs.find((input) => input.evidence === data.case);
   return { needed: Boolean(track && data.judgment && (!previous || previous.revision < data.judgment.revision)) };
 }
+/** The exam the planning concept plans for: the earliest active exam dated today or later. */
+function focusExam(schedule: Schedule) {
+  return schedule.exams.find((exam) => exam.date >= schedule.today) ?? null;
+}
+/** Covered skills and their prerequisites, followed through the course map. The visited set stops cycles. */
+function examSkills(skills: SkillRows, covered: readonly string[]) {
+  const visited = new Set<string>(), pending = [...covered];
+  while (pending.length > 0) {
+    const skill = pending.pop()!;
+    if (visited.has(skill)) continue;
+    visited.add(skill);
+    pending.push(...(skills.find((row) => row.skill === skill)?.prerequisites ?? []));
+  }
+  return visited;
+}
+// Exam preparation runs before every unrelated review. Routine priorities stay from 0 to 100.
+const EXAM_PRIORITY = 1000;
 export function planRequest({ skills, tracks, schedule }: { skills: SkillRows; tracks: Tracks; schedule: Schedule }) {
-  const day = schedule.today, horizonEnd = new Date(Date.parse(day) + 6 * 86_400_000).toISOString().slice(0, 10);
+  const day = schedule.today, focus = focusExam(schedule), weekEnd = addDays(day, 6);
+  // Exam work must end before the exam day, because no exam time is stored.
+  const lastStudyDay = focus ? addDays(focus.date, -1) : null;
+  const horizonEnd = lastStudyDay && lastStudyDay > weekEnd ? lastStudyDay : weekEnd;
   const rows = skills.filter((skill) => skill.status === "CONFIRMED").map((skill) => ({ ...skill,
     track: tracks.find((track) => track.subject === skill.skill && track.definition === skill.current) ?? null }));
   const prior = schedule.plans.flatMap((plan) => [...plan.items.map((item) => item.candidate), ...plan.deferred]);
   const done = new Set(schedule.plans.flatMap((plan) => plan.items.filter((item) => item.status === "DONE").map((item) => item.candidate.key)));
+  // A key keeps the content it was first proposed with.
+  const saved = (key: string) => prior.find((candidate) => candidate.key === key);
+  const forFocus = (candidate: Candidate) => focus !== null && candidate.examRefs.includes(focus.exam);
+  // Carried work: unfinished preparation for the focus exam from any saved plan, once per key, unchanged.
   const candidates: Candidate[] = [];
+  for (const candidate of prior) {
+    if (forFocus(candidate) && !done.has(candidate.key) && !candidates.some((other) => other.key === candidate.key)) candidates.push(candidate);
+  }
+  const preparing = focus ? examSkills(skills, focus.covered) : new Set<string>();
   for (const row of rows) {
     const informative = row.track?.inputs.filter((input) => input.signal === "SLIP" || input.signal === "GAP" || (input.fresh && ["INDEPENDENT", "SUPPORTED"].includes(input.signal))) ?? [];
     const latest = informative.at(-1), successfulDays = new Set<string>();
     for (const input of informative) { if (input.signal === "SLIP" || input.signal === "GAP") successfulDays.clear(); if (input.signal === "INDEPENDENT") successfulDays.add(studyDate(input.performedAt)); }
     const interval = latest?.signal === "INDEPENDENT" ? [1, 3, 7][Math.min(2, Math.max(0, successfulDays.size - 1))]! : 1;
     const earliestDay = latest ? studyDate(new Date(latest.performedAt.getTime() + interval * 86_400_000)) : day;
-    if (earliestDay > horizonEnd) continue;
     const occasion = earliestDay < day ? day : earliestDay;
     const prefix = `${row.skill}:${row.current}:${latest?.evidence ?? "initial"}:${latest?.revision ?? 0}:`;
-    const key = prior.find((candidate) => candidate.key.startsWith(prefix) && candidate.latestDay >= day)?.key ?? `${prefix}${occasion}`;
-    if (done.has(key)) continue;
-    candidates.push(prior.find((candidate) => candidate.key === key) ?? { key, subject: row.skill, definition: row.current,
-      activity: row.track ? `Fresh check: ${row.title}` : `Set confidence and try ${row.title}`,
-      minutes: 10, priority: 100 - (row.track?.estimate?.value ?? 0), earliestDay: earliestDay > day ? earliestDay : day,
-      latestDay: horizonEnd, reason: row.track?.estimate?.ready ? "A later fresh check will test retention." : "This skill needs fresh independent evidence.", examRefs: [] });
+    // Routine key reuse skips earlier work that names an exam, so a routine key never takes on exam content.
+    const routineKey = prior.find((candidate) => candidate.examRefs.length === 0 && candidate.key.startsWith(prefix) && candidate.latestDay >= day)?.key ?? `${prefix}${occasion}`;
+    const need = 100 - (row.track?.estimate?.value ?? 0);
+    const activity = row.track ? `Fresh check: ${row.title}` : `Set confidence and try ${row.title}`;
+    const reason = row.track?.estimate?.ready ? "A later fresh check will test retention." : "This skill needs fresh independent evidence.";
+    if (focus && lastStudyDay && preparing.has(row.skill) && occasion < focus.date) {
+      // The exam activity, carried or new, stands for this review. Earlier work for this exam covers the skill when
+      // it is unfinished for the current version, or finished for the current version and latest evidence.
+      const covered = prior.some((candidate) => forFocus(candidate) && candidate.subject === row.skill && candidate.definition === row.current &&
+        (!done.has(candidate.key) || candidate.key.startsWith(prefix)));
+      const key = `${routineKey}:exam:${focus.exam}`;
+      if (covered || done.has(key)) continue;
+      candidates.push(saved(key) ?? { key, subject: row.skill, definition: row.current, activity, minutes: 10, priority: EXAM_PRIORITY + need,
+        earliestDay: occasion, latestDay: lastStudyDay, reason: `Preparation for the exam on ${focus.date}. ${reason}`, examRefs: [focus.exam] });
+      continue;
+    }
+    // Routine review, including maintenance of an exam skill whose review falls on or after the exam date.
+    if (earliestDay > horizonEnd || done.has(routineKey)) continue;
+    candidates.push(saved(routineKey) ?? { key: routineKey, subject: row.skill, definition: row.current, activity,
+      minutes: 10, priority: need, earliestDay: occasion, latestDay: horizonEnd, reason, examRefs: [] });
   }
-  const basis = createHash("sha256").update(JSON.stringify({ day, skills: rows.map((row) => [row.skill, row.current, row.track && {
+  // Exam records stay out of the fingerprint; the concept's local check covers them. Prerequisites decide the exam skills.
+  const basis = createHash("sha256").update(JSON.stringify({ day, skills: rows.map((row) => [row.skill, row.current, row.prerequisites, row.track && {
     track: row.track.track, inputs: row.track.inputs, initialConfidence: row.track.initialConfidence, startingBasis: row.track.startingBasis, initializedAt: row.track.initializedAt,
   }]) })).digest("hex");
-  return { candidates, horizonEnd, basis, explanation: "Ten-minute activities ordered by estimated need. Successful independent practice on later days extends the review interval from one to three to seven days. These are prototype settings." };
+  const explanation = "Ten-minute activities ordered by estimated need. Successful independent practice on later days extends the review interval from one to three to seven days. These are prototype settings." +
+    (focus ? ` Preparation for the exam on ${focus.date} comes first.` : "");
+  return { candidates, horizonEnd, basis, explanation };
+}
+/** True when every covered identity names a confirmed skill of the course map and none repeats. An empty set is left to the planning concept. */
+export function coveredSkillsConfirmed({ covered, skills }: { covered: string[]; skills: SkillRows }): boolean {
+  return new Set(covered).size === covered.length && covered.every((skill) => skills.some((row) => row.skill === skill && row.status === "CONFIRMED"));
+}
+/** True when the ACTIVE plan is exam-urgent, its focus exam is still active, and the candidate prepares for that exam. */
+export function urgentExamItem({ schedule, candidate }: { schedule: Schedule; candidate: Candidate }): boolean {
+  const active = schedule.plans.find((plan) => plan.status === "ACTIVE"), focus = active?.focusExam;
+  return Boolean(active?.examUrgent && focus && schedule.exams.some((exam) => exam.exam === focus) && candidate.examRefs.includes(focus));
+}
+/** Urgent exam preparation may skip the prerequisite check; every other activity keeps it. */
+export function beginAllowed({ skills, tracks, skill, urgent }: { skills: SkillRows; tracks: Tracks; skill: string; urgent: boolean }): boolean {
+  return urgent === true || prerequisitesReady({ skills, tracks, skill });
+}
+// Sort keys built from fixed-width hexadecimal compare the same way under any string ordering.
+/** A finite number as 16 hex digits whose string order is the number's decreasing order. -0 counts as 0, as in the concept. */
+function decreasing(value: number) {
+  const bits = new DataView(new ArrayBuffer(8));
+  bits.setFloat64(0, value === 0 ? 0 : value);
+  let high = bits.getUint32(0), low = bits.getUint32(4);
+  // Raw IEEE 754 bits of a negative number already sort after every nonnegative number, with larger magnitudes later.
+  // A nonnegative number keeps a clear sign bit and flips the rest, so larger values come first.
+  if (high < 0x8000_0000) { high = ~high & 0x7fff_ffff; low = ~low >>> 0; }
+  return high.toString(16).padStart(8, "0") + low.toString(16).padStart(8, "0");
+}
+/** Each UTF-16 code unit as four hex digits, so the result keeps JavaScript's < order of the original strings. */
+function codeUnits(value: string) {
+  let result = "";
+  for (let index = 0; index < value.length; index++) result += value.charCodeAt(index).toString(16).padStart(4, "0");
+  return result;
+}
+/** Day, then decreasing priority, then candidate key: the order of StudyPlanning._items. */
+export function itemOrder({ day, candidate }: { day: string; candidate: Candidate }): string {
+  return `${day}${decreasing(candidate.priority)}${codeUnits(candidate.key)}`;
+}
+/** Exam identity, then candidate key: the order of StudyPlanning._cuts. */
+export function cutKey({ cut }: { cut: CutValue }): string {
+  return `${codeUnits(cut.exam)}${codeUnits(cut.candidateKey)}`;
 }
 export function planDetail({ schedule }: { schedule: Schedule }) {
   const active = schedule.plans.find((plan) => plan.status === "ACTIVE");

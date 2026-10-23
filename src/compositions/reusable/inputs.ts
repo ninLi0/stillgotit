@@ -81,6 +81,8 @@ export const learningInput: EndpointValidator = (value) => {
   const ok = Object.entries(record).every(([key, field]) => key === "session" ? field === null || typeof field === "string"
     : numeric.has(key) ? typeof field === "number" && Number.isFinite(field) && field >= 0
     : flags.has(key) ? typeof field === "boolean"
+    // An exam's covered skills are identities. An empty or repeated list is left to the planning checks.
+    : key === "covered" ? Array.isArray(field) && field.every((skill) => typeof skill === "string" && skill.length <= 300)
     : typeof field === "string" && field.length <= (key === "text" || key === "request" || key === "reason" ? 12000 : 300));
   return ok ? { ok: true } : { ok: false, detail: "Check the supplied text, numbers, and review choices." };
 };
