@@ -14,15 +14,16 @@ const TaskReady = former("admit practice for (owner) and (skill)", ({ owner, ski
   Mastery._track({ learner: owner, subject: skill, definition }), C.prerequisitesReady({ skills, tracks, skill }),
   compute(C.selectSkillMaterials, { context }, materials), compute(C.selectSources, { sources, materials }, { valid: true }),
 ).form({ allowed: true })).optional();
-const ResponseReady = former("admit learner work in (studySession)", ({ owner, studySession, text, channel, attachment, dialogueLength }, { course, data, sources }) => where(
+// Every attachment must be listed once and be the learner's own material in the session's course.
+const ResponseReady = former("admit learner work in (studySession)", ({ owner, studySession, text, channel, attachments, dialogueLength }, { course, data, sources }) => where(
   R.OpenSession({ owner, studySession }).is({ course }), Tutoring._sessionData({ session: studySession }).is({ data }),
   Tutoring._sourceSet({ owner, scope: course }).is({ sources }), C.dialogueIsCurrent({ data, dialogueLength }),
-  compute(C.responseInput, { data, text, channel, attachment, sources }, { valid: true }),
+  compute(C.responseInput, { data, text, channel, attachments, sources }, { valid: true }),
 ).form({ allowed: true })).optional();
-const QuestionReady = former("admit a question in (studySession)", ({ owner, studySession, text, channel, attachment, dialogueLength }, { course, data, sources }) => where(
+const QuestionReady = former("admit a question in (studySession)", ({ owner, studySession, text, channel, attachments, dialogueLength }, { course, data, sources }) => where(
   R.OpenSession({ owner, studySession }).is({ course }), Tutoring._lesson({ lesson: studySession }), Tutoring._sessionData({ session: studySession }).is({ data }),
   Tutoring._sourceSet({ owner, scope: course }).is({ sources }), C.dialogueIsCurrent({ data, dialogueLength }),
-  compute(C.responseInput, { data, text, channel, attachment, sources }, { valid: true }),
+  compute(C.responseInput, { data, text, channel, attachments, sources }, { valid: true }),
 ).form({ allowed: true })).optional();
 const ReplyReady = former("admit a tutor reply in (studySession)", ({ owner, studySession }, { data }) => where(
   R.OpenSession({ owner, studySession }), Tutoring._sessionData({ session: studySession }).is({ data }), C.hasLessonQuestion({ data }),
@@ -41,6 +42,8 @@ const RetryReady = former("admit retry of (studySession)", ({ owner, studySessio
 const RegradeReady = former("admit revision of (assessment)", ({ owner, assessment, basedOn }) => where(
   R.OwnedCase({ owner, assessment }), Assessment._effectiveJudgment({ case: assessment }).is({ judgment: basedOn }),
 ).form({ allowed: true })).optional();
+// Only the skill is checked; the concept explains a bad key, value, or reason.
+const AdjustReady = former("admit an estimate adjustment for (owner) and (skill)", ({ owner, skill }) => where(R.ActiveSkill({ owner, skill })).form({ allowed: true })).optional();
 const SuggestionReady = former("admit suggestions from (material)", ({ owner, material }, { course }) => where(
   Tutoring._material({ material }).is({ owner, scope: course }), Courses.OwnedCourse({ owner, course }),
 ).form({ allowed: true })).optional();
@@ -53,14 +56,14 @@ const ItemReady = former("admit progress on (item) in (course)", ({ owner, cours
 const BeginReady = former("admit starting (item) in (course)", ({ owner, course, item }) => where(
   Courses.OwnedCourse({ owner, course }), PlanningFlows.StartAllowed({ owner, course, item }),
 ).form({ allowed: true })).optional();
-export const composition = { LessonReady, TaskReady, ResponseReady, QuestionReady, ReplyReady, HintReady, TranscriptReady, AssessmentReady, RetryReady, RegradeReady, SuggestionReady, CourseReady, PlanReady, ItemReady, BeginReady };
+export const composition = { LessonReady, TaskReady, ResponseReady, QuestionReady, ReplyReady, HintReady, TranscriptReady, AssessmentReady, RetryReady, RegradeReady, AdjustReady, SuggestionReady, CourseReady, PlanReady, ItemReady, BeginReady };
 
 // Transport admission uses these same declared reads before starting a causal flow.
 export const admissions = {
   "/learning/lesson": { check: LessonReady, fields: ["skill"], detail: "Confirm the skill and attach sources from this course before requesting a lesson." },
   "/learning/task": { check: TaskReady, fields: ["skill"], detail: "Set starting confidence and check the prerequisites before starting fresh practice." },
-  "/learning/respond": { check: ResponseReady, fields: ["studySession", "text", "channel", "attachment", "dialogueLength"], detail: "Choose an open session, check the latest dialogue, and attach only your own course work." },
-  "/learning/question": { check: QuestionReady, fields: ["studySession", "text", "channel", "attachment", "dialogueLength"], detail: "Choose an open lesson and check the latest dialogue before sending a question." },
+  "/learning/respond": { check: ResponseReady, fields: ["studySession", "text", "channel", "attachments", "dialogueLength"], detail: "Choose an open session, check the latest dialogue, and attach only your own work from this course, each file once." },
+  "/learning/question": { check: QuestionReady, fields: ["studySession", "text", "channel", "attachments", "dialogueLength"], detail: "Choose an open lesson, check the latest dialogue, and attach only your own work from this course, each file once." },
   "/learning/reply": { check: ReplyReady, fields: ["studySession"], detail: "Send a question in an open lesson before asking for a reply." },
   "/learning/hint": { check: HintReady, fields: ["studySession"], detail: "Choose an open practice task to request a hint." },
   "/learning/transcript": { check: TranscriptReady, fields: ["studySession"], detail: "Choose an open session before correcting a transcript." },
@@ -68,6 +71,7 @@ export const admissions = {
   "/learning/retry": { check: RetryReady, fields: ["studySession"], detail: "Choose a saved attempt that is still awaiting assessment." },
   "/learning/regrade": { check: RegradeReady, fields: ["assessment", "basedOn"], detail: "Choose your own assessment and review its latest judgment before requesting a regrade." },
   "/learning/correct": { check: RegradeReady, fields: ["assessment", "basedOn"], detail: "Choose your own assessment and review its latest judgment before correcting it." },
+  "/learning/adjust": { check: AdjustReady, fields: ["skill"], detail: "Choose one of your confirmed skills before adjusting its estimate." },
   "/courses/skills/suggest": { check: SuggestionReady, fields: ["material"], detail: "Choose a source from your own course." },
   "/planning/configure": { check: CourseReady, fields: ["course"], detail: "Choose your own course before setting its study budget." },
   "/planning/propose": { check: PlanReady, fields: ["course"], detail: "Set a daily budget and finish or stop the current activity before updating the plan." },

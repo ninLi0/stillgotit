@@ -1,15 +1,15 @@
 import { endpoint, receive, respond } from "@mit-sdg/sync-engine/boundary";
-import { compute, no, is, where } from "@mit-sdg/sync-engine/language";
+import { compute, no, is, now, reaction, when, where } from "@mit-sdg/sync-engine/language";
 import { concepts, computations as C } from "../concepts.ts";
 import { composition as Courses } from "./courses.ts";
 import * as R from "./learning-reads.ts";
 import { learningInput, structuredOutput, validators } from "./reusable/inputs.ts";
-const { Sessioning, GroundedTutoring: Tutoring, AssessmentReviewing: Assessment, MasteryEstimating: Mastery, TutorGenerating: AI } = concepts;
+const { Sessioning, GroundedTutoring: Tutoring, AssessmentReviewing: Assessment, MasteryEstimating: Mastery, StudyPlanning: Planning, TutorGenerating: AI } = concepts;
 const options = { validators: { ...validators, input: learningInput, output: structuredOutput } };
 
-const Read = endpoint("/learning/read", ({ session, skill, owner }) => receive({ session, skill })
+const Read = endpoint("/learning/read", ({ session, skill, owner, at }) => receive({ session, skill })
   .then(Sessioning.use({ session }).responds({ subject: owner })).afterFlowSettles().then(
-    where(R.OwnedSkill({ owner, skill })).then(respond({ data: R.SkillData({ owner, skill }) })).named("owned"),
+    where(R.OwnedSkill({ owner, skill }), now(at)).then(respond({ data: R.SkillData({ owner, skill, at }) })).named("owned"),
     where(no(R.OwnedSkill({ owner, skill }))).then(respond({ error: "SKILL_UNAVAILABLE" })).named("missing"),
   ), options);
 const Progress = endpoint("/learning/progress", ({ session, course, owner }) => receive({ session, course })
@@ -54,18 +54,18 @@ const Task = endpoint("/learning/task", ({ session, skill, owner, definition, co
       .then(respond({ error: "SKILL_CHANGED" })).named("changed"),
   ), options);
 
-const Respond = endpoint("/learning/respond", ({ session, studySession, text, channel, attachment, dialogueLength, owner, course, data, sources, media, currentDialogue }) => receive({ session, studySession, text, channel, attachment, dialogueLength })
+const Respond = endpoint("/learning/respond", ({ session, studySession, text, channel, attachments, dialogueLength, owner, course, data, sources, media, currentDialogue }) => receive({ session, studySession, text, channel, attachments, dialogueLength })
   .then(Sessioning.use({ session }).responds({ subject: owner }))
   .then(where(R.OpenSession({ owner, studySession }).is({ course }), Tutoring._sessionData({ session: studySession }).is({ data }),
     Tutoring._sourceSet({ owner, scope: course }).is({ sources }), compute(C.dialogueIsCurrent, { data, dialogueLength }, currentDialogue), is.among(currentDialogue, [true]),
-    compute(C.responseInput, { data, text, channel, attachment, sources }, { valid: true, media }))
+    compute(C.responseInput, { data, text, channel, attachments, sources }, { valid: true, media }))
     .then(Tutoring.respond({ owner, session: studySession, text, channel, media }).responds({})))
   .then(respond({})), options);
-const Question = endpoint("/learning/question", ({ session, studySession, text, channel, attachment, dialogueLength, owner, course, data, sources, media, currentDialogue, materials, selected, prepared, answer, reply, citations }) => receive({ session, studySession, text, channel, attachment, dialogueLength })
+const Question = endpoint("/learning/question", ({ session, studySession, text, channel, attachments, dialogueLength, owner, course, data, sources, media, currentDialogue, materials, selected, prepared, answer, reply, citations }) => receive({ session, studySession, text, channel, attachments, dialogueLength })
   .then(Sessioning.use({ session }).responds({ subject: owner }))
   .then(where(R.OpenSession({ owner, studySession }).is({ course }), Tutoring._lesson({ lesson: studySession }), Tutoring._sessionData({ session: studySession }).is({ data }),
     Tutoring._sourceSet({ owner, scope: course }).is({ sources }), compute(C.dialogueIsCurrent, { data, dialogueLength }, currentDialogue), is.among(currentDialogue, [true]),
-    compute(C.responseInput, { data, text, channel, attachment, sources }, { valid: true, media }))
+    compute(C.responseInput, { data, text, channel, attachments, sources }, { valid: true, media }))
     .then(Tutoring.respond({ owner, session: studySession, text, channel, media }).responds({})))
   .then(where(R.OpenSession({ owner, studySession }).is({ course }), Tutoring._sessionData({ session: studySession }).is({ data }),
     Tutoring._sourceSet({ owner, scope: course }).is({ sources }), compute(C.sessionMaterials, { data }, materials),
@@ -150,6 +150,27 @@ const Regrade = endpoint("/learning/regrade", ({ session, case: assessment, base
   .then(where(compute(C.generationFields, { answer }, { result, gateMet, rationale }))
     .then(Assessment.revise({ author: owner, case: assessment, basedOn, result, gateMet, rationale, origin: "AI" }).responds({ judgment })))
   .afterFlowSettles().then(respond({ judgment })), options);
+// The learner sets the estimate by hand. The settled stage answers only in a terminal state of ReplanAfterAdjustment:
+// no replan can run, or a proposed or active plan carries the current fingerprint, which includes this adjustment.
+// Until then it does not answer, so a refused replan reaches the learner as the answer.
+// It reads the saved adjustment again; the missing path never reaches it because ActiveSkill does not hold there.
+const Adjust = endpoint("/learning/adjust", ({ session, skill, adjustmentKey, value, reason, owner, course, definition, track, adjustment, basis, plan, status }) => receive({ session, skill, adjustmentKey, value, reason })
+  .then(Sessioning.use({ session }).responds({ subject: owner })).then(
+    where(R.ActiveSkill({ owner, skill }).is({ definition }))
+      .then(Mastery.adjust({ learner: owner, subject: skill, definition, adjustmentKey, value, reason }).responds({ adjustment })).named("active"),
+    where(no(R.ActiveSkill({ owner, skill })))
+      .then(respond({ error: "SKILL_UNAVAILABLE", detail: "Choose one of your confirmed skills before adjusting its estimate." })).named("missing"),
+  ).afterFlowSettles().then(
+    where(R.ActiveSkill({ owner, skill }).is({ course, definition }), Mastery._track({ learner: owner, subject: skill, definition }).is({ track }),
+      Mastery._adjustments({ track }).is({ adjustment }), no(R.CanReplan({ owner, course }))).then(respond({ adjustment })).named("unplanned"),
+    where(R.ActiveSkill({ owner, skill }).is({ course, definition }), Mastery._track({ learner: owner, subject: skill, definition }).is({ track }),
+      Mastery._adjustments({ track }).is({ adjustment }), R.CanReplan({ owner, course }), R.PlanContext({ owner, course }).is({ basis }),
+      Planning._plans({ learner: owner, scope: course }).is({ plan, status }), is.among(status, ["PROPOSED", "ACTIVE"]), Planning._plan({ plan }).is({ basis }))
+      .then(respond({ adjustment })).named("planned"),
+  ), options);
+const ReplanAfterAdjustment = reaction(({ owner, skill, course, candidates, horizonEnd, basis, explanation }) => when(Mastery.adjust({ learner: owner, subject: skill }).responds({}))
+  .afterFlowSettles().where(R.OwnedSkill({ owner, skill }).is({ course }), R.CanReplan({ owner, course }), R.PlanContext({ owner, course }).is({ candidates, horizonEnd, basis, explanation }))
+  .then(Planning.replan({ learner: owner, scope: course, candidates, horizonEnd, basis, explanation, workloadComplete: false })));
 const Suggest = endpoint("/courses/skills/suggest", ({ session, material, owner, course, sources, selected, materials, prepared, answer, suggestions }) => receive({ session, material })
   .then(Sessioning.use({ session }).responds({ subject: owner }))
   .then(where(Tutoring._material({ material }).is({ owner, scope: course }), Courses.OwnedCourse({ owner, course }),
@@ -158,4 +179,4 @@ const Suggest = endpoint("/courses/skills/suggest", ({ session, material, owner,
     .then(AI.generate({ owner, request: prepared }).responds({ answer })))
   .then(Sessioning.use({ session }).responds({ subject: owner }))
   .then(where(compute(C.generationFields, { answer }, { suggestions })).then(respond({ suggestions }))), options);
-export const composition = { Read, Progress, Confidence, Lesson, Task, Respond, Question, Reply, Hint, Transcript, Assess, RetryAssessment, Correct, Regrade, Suggest };
+export const composition = { Read, Progress, Confidence, Lesson, Task, Respond, Question, Reply, Hint, Transcript, Assess, RetryAssessment, Correct, Regrade, Adjust, ReplanAfterAdjustment, Suggest };

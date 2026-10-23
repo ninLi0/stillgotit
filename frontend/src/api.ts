@@ -14,7 +14,7 @@ export type Course = StillGotItHttp["/courses"]["output"]["courses"][number];
 export function errorMessage(code: string): string {
   switch (code) {
     case "UNAUTHORIZED": return "Your session ended. Sign in again.";
-    case "FORBIDDEN": return "This sign-in could not be completed. Start again with Commons.";
+    case "FORBIDDEN": return "This item is not in one of your courses. Choose one of your own.";
     case "INVALID_REQUEST": return "Check the field and try again.";
     case "CONFLICT": return "This request conflicts with saved work. Reload to see the latest version.";
     case "NETWORK_ERROR": case "BAD_JSON": case "BAD_STATUS": case "RESPONSE_TOO_LARGE": case "HEADER_RESOLUTION_FAILED":

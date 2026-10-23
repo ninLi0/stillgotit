@@ -12,6 +12,8 @@ export const masteryEstimating = registerConcept({
     EVIDENCE_TRACK_MISMATCH: refusal.EvidenceTrackMismatch,
     EVIDENCE_DATE_MISMATCH: refusal.EvidenceDateMismatch,
     EVIDENCE_REVISION_NOT_NEW: refusal.EvidenceRevisionNotNew,
+    INVALID_ADJUSTMENT_KEY: refusal.InvalidAdjustmentKey,
+    ADJUSTMENT_KEY_CONFLICT: refusal.AdjustmentKeyConflict,
     ADJUSTMENT_TRACK_UNAVAILABLE: refusal.AdjustmentTrackUnavailable,
     INVALID_MASTERY_ADJUSTMENT: refusal.InvalidMasteryAdjustment,
   },

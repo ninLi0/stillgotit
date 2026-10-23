@@ -22,7 +22,7 @@ function skill(id: string, overrides: Partial<SkillRow> = {}): SkillRow {
 }
 function track(row: SkillRow, inputs: Track["inputs"] = [], estimate: Track["estimate"] = { value: 40, basis: "Provisional", ready: false }): Track {
   return { track: `track-${row.skill}`, subject: row.skill, definition: row.current, initialConfidence: 40, startingBasis: "SELF_REPORTED",
-    initializedAt: at(addDays(TODAY, -30)), inputs, estimate };
+    initializedAt: at(addDays(TODAY, -30)), inputs, estimate, adjustments: [] };
 }
 function independent(evidence: string, day: string, revision = 1): Track["inputs"][number] {
   return { input: `input-${evidence}`, evidence, revision, performedAt: at(day), signal: "INDEPENDENT", fresh: true, gateMet: true, attribution: "AI assessment" };

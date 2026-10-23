@@ -80,6 +80,10 @@ export const learningInput: EndpointValidator = (value) => {
   const flags = new Set(["reviewed", "unseen", "outsideHelp", "gateMet"]);
   const ok = Object.entries(record).every(([key, field]) => key === "session" ? field === null || typeof field === "string"
     : numeric.has(key) ? typeof field === "number" && Number.isFinite(field) && field >= 0
+    // An adjustment's range is the concept's rule, so its refusal message explains a value outside 0 to 100.
+    : key === "value" ? typeof field === "number" && Number.isFinite(field)
+    // Material identities in attached order; admission checks ownership, course, and duplicates.
+    : key === "attachments" ? Array.isArray(field) && field.every((material) => typeof material === "string" && material.length <= 300)
     : flags.has(key) ? typeof field === "boolean"
     // An exam's covered skills are identities. An empty or repeated list is left to the planning checks.
     : key === "covered" ? Array.isArray(field) && field.every((skill) => typeof skill === "string" && skill.length <= 300)

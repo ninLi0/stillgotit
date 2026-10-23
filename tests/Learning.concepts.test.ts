@@ -76,7 +76,7 @@ describe("Mastery replay", () => {
   test("regrading replaces the old event and replays a later manual adjustment", async () => {
     const m = await mastery(50);
     const first = await m.evidence("attempt", "GAP");
-    m.advance(1); await m.concept.adjust({ ...identity, value: 85, reason: "Prior coursework." });
+    m.advance(1); await m.concept.adjust({ ...identity, adjustmentKey: "prior-coursework", value: 85, reason: "Prior coursework." });
     m.advance(2); await m.evidence("later", "SLIP");
     const before = await m.estimate();
     const replacement = await m.evidence("attempt", "INDEPENDENT", { revision: 2, performedAt: start, gateMet: true });

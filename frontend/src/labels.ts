@@ -12,6 +12,12 @@ export function planDay(day: string): string {
   return Number.isNaN(time) ? day : dayFormat.format(new Date(time));
 }
 
+/** Assessment results as the learner reads them. */
+export const resultLabels: Record<string, string> = {
+  INDEPENDENT: "Independent success", SUPPORTED: "Success with help", SLIP: "Small execution error",
+  GAP: "Needs more understanding", UNCERTAIN: "More evidence needed",
+};
+
 /** "Today" for the current plan day; otherwise the readable date. */
 export function planDayLabel(day: string, today: string): string {
   return day === today ? "Today" : planDay(day);

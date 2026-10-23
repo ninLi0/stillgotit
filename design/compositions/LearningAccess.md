@@ -6,19 +6,20 @@ The adapter performs no domain writes and sequences no learning actions. The eng
 
 [LessonReady](former:Access.LessonReady) checks the corresponding command against current owned state.
 [TaskReady](former:Access.TaskReady) checks the corresponding command against current owned state.
-[ResponseReady](former:Access.ResponseReady) checks the corresponding command against current owned state.
+[ResponseReady](former:Access.ResponseReady) requires an open session, the current dialogue length, and text or at least one attachment. Every attachment must be listed once and be the learner's own material in the session's course; otherwise the whole response is declined, with a detail that does not name the attachment.
 [ReplyReady](former:Access.ReplyReady) checks the corresponding command against current owned state.
 [HintReady](former:Access.HintReady) checks the corresponding command against current owned state.
 [TranscriptReady](former:Access.TranscriptReady) checks the corresponding command against current owned state.
 [AssessmentReady](former:Access.AssessmentReady) checks the corresponding command against current owned state.
 [RetryReady](former:Access.RetryReady) checks the corresponding command against current owned state.
 [RegradeReady](former:Access.RegradeReady) checks the corresponding command against current owned state.
+[AdjustReady](former:Access.AdjustReady) requires a confirmed skill that the learner owns. It declines an unknown skill, another learner's skill, and a draft skill with the same detail as the endpoint's `SKILL_UNAVAILABLE`, "Choose one of your confirmed skills before adjusting its estimate." It does not check the key, value, or reason, so the concept's message explains those refusals.
 [SuggestionReady](former:Access.SuggestionReady) checks the corresponding command against current owned state.
 [CourseReady](former:Access.CourseReady) checks the corresponding command against current owned state.
 [PlanReady](former:Access.PlanReady) checks the corresponding command against current owned state.
 [ItemReady](former:Access.ItemReady) checks the corresponding command against current owned state.
 [BeginReady](former:Access.BeginReady) checks the corresponding command against current owned state.
 
-[QuestionReady](former:Access.QuestionReady) requires an open lesson, current dialogue length, and valid learner content.
+[QuestionReady](former:Access.QuestionReady) requires an open lesson, current dialogue length, and valid learner content, with the same attachment rule as ResponseReady.
 
 Exam and tradeoff commands are admitted on course ownership alone, with the detail "Choose one of your own courses.", the same answer the planning endpoints give for a course that is not the learner's. The planning concept's own refusals then reach the learner with its messages. Begin admission uses the planning composition's StartAllowed view, so admission and the endpoint apply the same urgent-mode rule.
