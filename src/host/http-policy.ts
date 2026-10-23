@@ -84,6 +84,9 @@ export function stillGotItPolicy(publicOrigin: string, requestBodyBytes = BODY_L
       TRADEOFF_SESSION_IN_PROGRESS: "INVALID_REQUEST",
       TRANSCRIPT_SESSION_UNAVAILABLE: "INVALID_REQUEST",
       TRANSCRIPT_TURN_UNAVAILABLE: "INVALID_REQUEST",
+      // ChooseTutor refusals. Nothing is saved; the learner chooses again from the Tutor panel.
+      UNKNOWN_TUTOR_MODEL: "INVALID_REQUEST",
+      UNSUPPORTED_THINKING_LEVEL: "INVALID_REQUEST",
 
       NOT_SIGNED_IN: "UNAUTHORIZED",
       SIGN_IN_EXPIRED: "FORBIDDEN",

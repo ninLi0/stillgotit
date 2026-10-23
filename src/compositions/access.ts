@@ -1,6 +1,7 @@
 import { compute, former, no, where } from "@mit-sdg/sync-engine/language";
 import { concepts, computations as C } from "../concepts.ts";
 import { composition as Courses } from "./courses.ts";
+import { composition as Settings } from "./settings.ts";
 import * as R from "./learning-reads.ts";
 const { SkillMapping: Mapping, GroundedTutoring: Tutoring, AssessmentReviewing: Assessment, MasteryEstimating: Mastery, StudyPlanning: Planning } = concepts;
 
@@ -55,24 +56,27 @@ const BeginReady = former("admit starting (item) in (course)", ({ owner, course,
 ).form({ allowed: true })).optional();
 export const composition = { LessonReady, TaskReady, ResponseReady, QuestionReady, ReplyReady, HintReady, TranscriptReady, AssessmentReady, RetryReady, RegradeReady, SuggestionReady, CourseReady, PlanReady, ItemReady, BeginReady };
 
-// Transport admission uses these same declared reads before starting a causal flow.
+// Transport admission uses these same declared reads before starting a causal flow. Each path lists its formers in the
+// order they run; a command that asks the tutor passes TutorReady first, so a retired choice is refused before any write.
+const tutorReady = { check: Settings.TutorReady, fields: [], detail: "The tutor model or thinking level you chose is no longer offered. Choose another one in the Tutor panel." } as const;
 export const admissions = {
-  "/learning/lesson": { check: LessonReady, fields: ["skill"], detail: "Confirm the skill and attach sources from this course before requesting a lesson." },
-  "/learning/task": { check: TaskReady, fields: ["skill"], detail: "Set starting confidence and check the prerequisites before starting fresh practice." },
-  "/learning/respond": { check: ResponseReady, fields: ["studySession", "text", "channel", "attachment", "dialogueLength"], detail: "Choose an open session, check the latest dialogue, and attach only your own course work." },
-  "/learning/question": { check: QuestionReady, fields: ["studySession", "text", "channel", "attachment", "dialogueLength"], detail: "Choose an open lesson and check the latest dialogue before sending a question." },
-  "/learning/reply": { check: ReplyReady, fields: ["studySession"], detail: "Send a question in an open lesson before asking for a reply." },
-  "/learning/hint": { check: HintReady, fields: ["studySession"], detail: "Choose an open practice task to request a hint." },
-  "/learning/transcript": { check: TranscriptReady, fields: ["studySession"], detail: "Choose an open session before correcting a transcript." },
-  "/learning/assess": { check: AssessmentReady, fields: ["studySession", "dialogueLength", "reviewed", "unseen", "outsideHelp"], detail: "Review your complete answer and transcripts. If it was already submitted, use its saved assessment or retry." },
-  "/learning/retry": { check: RetryReady, fields: ["studySession"], detail: "Choose a saved attempt that is still awaiting assessment." },
-  "/learning/regrade": { check: RegradeReady, fields: ["assessment", "basedOn"], detail: "Choose your own assessment and review its latest judgment before requesting a regrade." },
-  "/learning/correct": { check: RegradeReady, fields: ["assessment", "basedOn"], detail: "Choose your own assessment and review its latest judgment before correcting it." },
-  "/courses/skills/suggest": { check: SuggestionReady, fields: ["material"], detail: "Choose a source from your own course." },
-  "/planning/configure": { check: CourseReady, fields: ["course"], detail: "Choose your own course before setting its study budget." },
-  "/planning/propose": { check: PlanReady, fields: ["course"], detail: "Set a daily budget and finish or stop the current activity before updating the plan." },
-  "/planning/begin": { check: BeginReady, fields: ["course", "item"], detail: "Choose your own current activity and check its prerequisites. Update the plan if requirements changed." },
-  "/planning/finish": { check: ItemReady, fields: ["course", "item"], detail: "Choose an activity from your own course." },
-  "/planning/stop": { check: ItemReady, fields: ["course", "item"], detail: "Choose an activity from your own course." },
-  "/planning/miss": { check: ItemReady, fields: ["course", "item"], detail: "Choose an activity from your own course." },
+  "/learning/lesson": [tutorReady, { check: LessonReady, fields: ["skill"], detail: "Confirm the skill and attach sources from this course before requesting a lesson." }],
+  "/learning/task": [tutorReady, { check: TaskReady, fields: ["skill"], detail: "Set starting confidence and check the prerequisites before starting fresh practice." }],
+  "/learning/respond": [{ check: ResponseReady, fields: ["studySession", "text", "channel", "attachment", "dialogueLength"], detail: "Choose an open session, check the latest dialogue, and attach only your own course work." }],
+  "/learning/question": [tutorReady, { check: QuestionReady, fields: ["studySession", "text", "channel", "attachment", "dialogueLength"], detail: "Choose an open lesson and check the latest dialogue before sending a question." }],
+  "/learning/reply": [tutorReady, { check: ReplyReady, fields: ["studySession"], detail: "Send a question in an open lesson before asking for a reply." }],
+  "/learning/hint": [tutorReady, { check: HintReady, fields: ["studySession"], detail: "Choose an open practice task to request a hint." }],
+  "/learning/transcript": [{ check: TranscriptReady, fields: ["studySession"], detail: "Choose an open session before correcting a transcript." }],
+  "/learning/assess": [tutorReady, { check: AssessmentReady, fields: ["studySession", "dialogueLength", "reviewed", "unseen", "outsideHelp"], detail: "Review your complete answer and transcripts. If it was already submitted, use its saved assessment or retry." }],
+  "/learning/retry": [tutorReady, { check: RetryReady, fields: ["studySession"], detail: "Choose a saved attempt that is still awaiting assessment." }],
+  "/learning/regrade": [tutorReady, { check: RegradeReady, fields: ["assessment", "basedOn"], detail: "Choose your own assessment and review its latest judgment before requesting a regrade." }],
+  // Correcting makes no AI call, so it does not pass TutorReady.
+  "/learning/correct": [{ check: RegradeReady, fields: ["assessment", "basedOn"], detail: "Choose your own assessment and review its latest judgment before correcting it." }],
+  "/courses/skills/suggest": [tutorReady, { check: SuggestionReady, fields: ["material"], detail: "Choose a source from your own course." }],
+  "/planning/configure": [{ check: CourseReady, fields: ["course"], detail: "Choose your own course before setting its study budget." }],
+  "/planning/propose": [{ check: PlanReady, fields: ["course"], detail: "Set a daily budget and finish or stop the current activity before updating the plan." }],
+  "/planning/begin": [{ check: BeginReady, fields: ["course", "item"], detail: "Choose your own current activity and check its prerequisites. Update the plan if requirements changed." }],
+  "/planning/finish": [{ check: ItemReady, fields: ["course", "item"], detail: "Choose an activity from your own course." }],
+  "/planning/stop": [{ check: ItemReady, fields: ["course", "item"], detail: "Choose an activity from your own course." }],
+  "/planning/miss": [{ check: ItemReady, fields: ["course", "item"], detail: "Choose an activity from your own course." }],
 } as const;

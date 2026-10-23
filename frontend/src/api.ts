@@ -1,5 +1,6 @@
 import { createHttpClient } from "@mit-sdg/sync-engine-http/client";
 import type { StillGotItHttp } from "../../generated/wire.ts";
+import { noteTutor } from "./tutor-choice.ts";
 
 // The host supplies this field. All other types come from the generated HTTP contract.
 type BrowserWire = {
@@ -32,7 +33,9 @@ export function failureText(result: { error: unknown; detail?: unknown }): strin
   return !clientFailures.has(code) && typeof result.detail === "string" && result.detail.trim() ? result.detail : errorMessage(code);
 }
 
+/** The successful result. A failure throws its message instead. A tutor answer's model and level are noted for its label. */
 export function unwrap<T extends object>(result: T): Exclude<T, { error: unknown }> {
   if ("error" in result) throw new Error(failureText(result as { error: unknown }));
+  noteTutor(result);
   return result as Exclude<T, { error: unknown }>;
 }

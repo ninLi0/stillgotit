@@ -6,6 +6,7 @@ import { api, unwrap } from "./api.ts";
 import { sessionLabels, sourceLabel } from "./labels.ts";
 import { focusedControl, restoreFocus } from "./focus.ts";
 import type { StillGotItHttp } from "../../generated/wire.ts";
+import { answerKey, newAnswers, takeTutor, tutorLabel, type TutorUsed } from "./tutor-choice.ts";
 type SkillData = StillGotItHttp["/learning/read"]["output"]["data"];
 type StudySession = SkillData["sessions"][number];
 // aiReason explains why AI features are off when aiAvailable is false. materials gives titles for cited sources.
@@ -104,6 +105,10 @@ watch(selected, (next, previous) => {
 });
 watch(() => [current.value?.dialogue.length, busy.value], scrollToLatest);
 watch(current, (session) => { speechEdits.value = Object.fromEntries(session?.voice.map((voice) => [voice.turnIndex, voice.text]) ?? []); });
+// Each tutor answer names the model and thinking level that wrote it. The read after it shows which answers are new, and they get that label.
+const answeredBy = ref<Record<string, TutorUsed>>({});
+function answerLabel(...key: Parameters<typeof answerKey>) { const tutor = answeredBy.value[answerKey(...key)]; return tutor ? tutorLabel(tutor) : ""; }
+watch(data, (next, previous) => { const tutor = takeTutor(); if (tutor && next && previous) for (const key of newAnswers(previous, next)) answeredBy.value[key] = tutor; }, { flush: "sync" });
 onBeforeUnmount(() => { if ("speechSynthesis" in window) window.speechSynthesis.cancel(); });
 </script>
 
@@ -134,9 +139,10 @@ onBeforeUnmount(() => { if ("speechSynthesis" in window) window.speechSynthesis.
         <template v-if="current">
           <div v-if="current.lesson" class="message from-you"><span class="speaker">You</span><p class="prose">{{ current.lesson.request }}</p></div>
           <article class="message from-tutor"><div class="speaker-row"><span class="speaker"><span aria-hidden="true">✳</span> StillGotIt</span><button v-if="current.lesson" class="message-action" @click="listen(current.lesson.explanation)">Listen</button></div><div class="prose">{{ current.lesson?.explanation || current.task?.question }}</div>
+            <p v-if="answerLabel('session', current.session)" class="tutor-label">{{ answerLabel('session', current.session) }}</p>
             <details v-if="current.citations.length" class="sources"><summary>Sources used</summary><ul><li v-for="source in current.citations" :key="`${source.material}:${source.location}`">{{ sourceLabel(source.location, materialTitles[source.material]) }}</li></ul></details>
           </article>
-          <article v-for="item in current.dialogue" :key="item.turnIndex" class="message" :class="item.turn.speaker === 'LEARNER' ? 'from-you' : 'from-tutor'"><span class="speaker">{{ item.turn.speaker === 'LEARNER' ? 'You' : 'StillGotIt' }}{{ item.turn.purpose === 'HINT' ? ' · hint' : item.turn.purpose === 'CORRECTION' ? ' · transcript correction' : '' }}</span><p class="prose">{{ item.turn.text }}</p><p v-for="file in item.turn.media" :key="file.name" class="attachment-label">Attachment · {{ file.name }}</p></article>
+          <article v-for="item in current.dialogue" :key="item.turnIndex" class="message" :class="item.turn.speaker === 'LEARNER' ? 'from-you' : 'from-tutor'"><span class="speaker">{{ item.turn.speaker === 'LEARNER' ? 'You' : 'StillGotIt' }}{{ item.turn.purpose === 'HINT' ? ' · hint' : item.turn.purpose === 'CORRECTION' ? ' · transcript correction' : '' }}</span><p class="prose">{{ item.turn.text }}</p><p v-for="file in item.turn.media" :key="file.name" class="attachment-label">Attachment · {{ file.name }}</p><p v-if="answerLabel('turn', current.session, item.turnIndex)" class="tutor-label">{{ answerLabel('turn', current.session, item.turnIndex) }}</p></article>
           <button v-if="current.lesson && current.dialogue.at(-1)?.turn.speaker === 'LEARNER'" class="message-action" :disabled="busy || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="retryReply">Retry tutor reply</button>
           <div v-if="current.task && current.status === 'OPEN' && current.dialogue.some(item => item.turn.speaker === 'LEARNER' && item.turn.purpose === 'RESPONSE')" class="review-step">
             <button class="practice-button" :disabled="busy || recording" @click="reviewOpen = !reviewOpen">{{ reviewOpen ? 'Close review' : 'Review and assess my work' }}</button>
@@ -150,6 +156,7 @@ onBeforeUnmount(() => { if ("speechSynthesis" in window) window.speechSynthesis.
           <button v-if="current.status === 'CLOSED' && !currentCases.some(item => item.judgment)" class="practice-button" :disabled="busy || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="assess">Retry saved assessment</button>
           <article v-for="item in currentCases" :key="item.case" class="assessment">
             <template v-if="item.judgment"><span class="speaker">Your assessment</span><h3>{{ resultLabels[item.judgment.result] }}</h3><p class="prose">{{ item.judgment.rationale }}</p>
+              <p v-if="answerLabel('judgment', item.judgment.judgment)" class="tutor-label">{{ answerLabel('judgment', item.judgment.judgment) }}</p>
               <details><summary>Review or correct this assessment</summary><label>Reason<textarea v-model="reason" rows="3" /></label><p v-if="!reason.trim()" :id="`reason-needed-${item.case}`" class="hint reason">Write a reason to request a regrade or save a correction.</p><button class="message-action" :disabled="busy || !aiAvailable || !reason.trim()" :aria-describedby="describedBy(!reason.trim() && `reason-needed-${item.case}`, !aiAvailable && 'ai-reason-chat')" @click="requestRegrade(item.case, item.judgment.judgment)">Request regrade</button>
               <label>Manual correction<select v-model="correction"><option v-for="(label,value) in resultLabels" :key="value" :value="value">{{ label }}</option></select></label><label class="check"><input v-model="fullGate" type="checkbox" /> All requirements were met in fresh independent work.</label><button class="message-action" :disabled="busy || !reason.trim()" :aria-describedby="reason.trim() ? undefined : `reason-needed-${item.case}`" @click="saveCorrection(item.case, item.judgment.judgment)">Save correction</button><ol><li v-for="judgment in item.history" :key="judgment.judgment">{{ resultLabels[judgment.result] }} · {{ judgment.origin === 'AI' ? 'Tutor' : 'Your correction' }}<p>{{ judgment.rationale }}</p></li></ol></details>
             </template><p v-else>Your answer is saved. Assessment is pending.</p>

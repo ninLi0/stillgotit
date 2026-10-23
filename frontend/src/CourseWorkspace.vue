@@ -8,6 +8,7 @@ import SkillTree from "./SkillTree.vue";
 import SkillStudy from "./SkillStudy.vue";
 import StudyPlanner from "./StudyPlanner.vue";
 import type { StillGotItHttp } from "../../generated/wire.ts";
+import { takeTutor, tutorLabel, type TutorUsed } from "./tutor-choice.ts";
 
 const props = defineProps<{ course: Course }>();
 const view = ref<"home" | "setup" | "chat">("home");
@@ -35,6 +36,9 @@ const drafts = computed(() => data.value.skills.filter((skill) => skill.status =
 // Why a disabled action is unavailable. Empty when the action is available.
 const aiOff = computed(() => ai.value.available ? "" : ai.value.reason || "Checking whether the AI tutor is available…");
 const suggestReason = computed(() => pendingDraftCount.value ? "Finish saving your skill drafts first." : aiOff.value);
+// New suggestions show the model and thinking level that wrote them.
+const suggestedBy = ref<TutorUsed | null>(null);
+watch(suggestions, () => { suggestedBy.value = takeTutor(); }, { flush: "sync" });
 
 function openSkill(skill: string) { selectedSkill.value = skill; view.value = "chat"; }
 function openChat() { const skill = selectedSkill.value ?? confirmed.value[0]?.skill; if (skill) openSkill(skill); }
@@ -238,6 +242,7 @@ onMounted(() => task(async () => {
         </section>
         <section v-if="suggestions.length" class="suggest-panel">
           <h2>Suggested skills from {{ materialName }}</h2><p class="hint">Edit these to match what your course expects, then save them as drafts.</p>
+          <p v-if="suggestedBy" class="tutor-label">{{ tutorLabel(suggestedBy) }}</p>
           <label>Unit<select v-model="unit" :disabled="busy"><option value="">Create a unit</option><option v-for="item in data.units" :key="item.unit" :value="item.unit">{{ item.title }}</option></select></label>
           <label v-if="!unit">New unit name<input v-model="newUnit" maxlength="160" :disabled="busy" /></label>
           <div v-for="(suggestion, index) in suggestions" :key="index" class="skill-draft">

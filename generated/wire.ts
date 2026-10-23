@@ -199,6 +199,10 @@ export type StillGotItWire = {
     };
     output: {
       "suggestions": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["generationFields"]["fn"]>>, ["suggestions"]>>;
+      "tutor": {
+        "level": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["requestChoice"]["fn"]>>, ["level"]>>;
+        "model": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["requestChoice"]["fn"]>>, ["model"]>>;
+      };
     };
     error: { error: AppWideError | "GENERATION_FAILED" | "INVALID_INPUT" | "NOT_SIGNED_IN" };
   };
@@ -240,6 +244,10 @@ export type StillGotItWire = {
     };
     output: {
       "studySession": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["confirmAttempt"]>[0], ["task"]>>;
+      "tutor": {
+        "level": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["requestChoice"]["fn"]>>, ["level"]>>;
+        "model": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["requestChoice"]["fn"]>>, ["model"]>>;
+      };
     };
     error: { error: AppWideError | "ASSESSMENT_ALREADY_JUDGED" | "ASSESSMENT_CASE_UNAVAILABLE" | "ASSESSMENT_SOURCE_USED" | "ASSESSMENT_TASK_USED" | "ATTEMPT_REVIEW_CHANGED" | "ATTEMPT_REVIEW_UNAVAILABLE" | "EVIDENCE_DATE_MISMATCH" | "EVIDENCE_REVISION_NOT_NEW" | "EVIDENCE_TRACK_MISMATCH" | "EVIDENCE_TRACK_UNAVAILABLE" | "EXAM_TRADEOFF_CONFIRMATION_REQUIRED" | "GENERATION_FAILED" | "INVALID_ASSESSMENT_WORK" | "INVALID_INITIAL_JUDGMENT" | "INVALID_INPUT" | "INVALID_MASTERY_EVIDENCE" | "INVALID_PLAN_INPUT" | "NOT_SIGNED_IN" | "PLAN_PREFERENCES_UNAVAILABLE" | "PLAN_SESSION_IN_PROGRESS" | "ROUTINE_PLAN_OUTDATED" | "ROUTINE_PLAN_UNAVAILABLE" | "ROUTINE_SESSION_IN_PROGRESS" | "SESSION_CLOSE_UNAVAILABLE" };
   };
@@ -275,7 +283,12 @@ export type StillGotItWire = {
       "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
       "studySession": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["requestHint"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["giveHint"]>[0], ["task"]>]>>;
     };
-    output: Record<string, never>;
+    output: {
+      "tutor": {
+        "level": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["requestChoice"]["fn"]>>, ["level"]>>;
+        "model": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["requestChoice"]["fn"]>>, ["model"]>>;
+      };
+    };
     error: { error: AppWideError | "GENERATION_FAILED" | "HINT_NOT_REQUESTED" | "HINT_REQUEST_UNAVAILABLE" | "HINT_TASK_UNAVAILABLE" | "INVALID_HINT_TEXT" | "INVALID_INPUT" | "NOT_SIGNED_IN" | "SESSION_CHANGED" };
   };
   "/learning/lesson": {
@@ -286,6 +299,10 @@ export type StillGotItWire = {
     };
     output: {
       "lesson": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["explain"]>>, ["lesson"]>>;
+      "tutor": {
+        "level": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["requestChoice"]["fn"]>>, ["level"]>>;
+        "model": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["requestChoice"]["fn"]>>, ["model"]>>;
+      };
     };
     error: { error: AppWideError | "GENERATION_FAILED" | "INVALID_INPUT" | "INVALID_LESSON_CONTENT" | "INVALID_LESSON_SOURCES" | "NOT_SIGNED_IN" | "SKILL_CHANGED" };
   };
@@ -310,7 +327,12 @@ export type StillGotItWire = {
       "studySession": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["respond"]>[0], ["session"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["answerLesson"]>[0], ["lesson"]>]>>;
       "text": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["respond"]>[0], ["text"]>>;
     };
-    output: Record<string, never>;
+    output: {
+      "tutor": {
+        "level": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["requestChoice"]["fn"]>>, ["level"]>>;
+        "model": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["requestChoice"]["fn"]>>, ["model"]>>;
+      };
+    };
     error: { error: AppWideError | "GENERATION_FAILED" | "INVALID_INPUT" | "INVALID_LEARNER_RESPONSE" | "INVALID_LESSON_ANSWER" | "LESSON_ANSWER_UNAVAILABLE" | "NOT_SIGNED_IN" | "RESPONSE_SESSION_UNAVAILABLE" | "SESSION_CHANGED" };
   };
   "/learning/read": {
@@ -338,6 +360,10 @@ export type StillGotItWire = {
     };
     output: {
       "judgment": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["revise"]>>, ["judgment"]>>;
+      "tutor": {
+        "level": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["requestChoice"]["fn"]>>, ["level"]>>;
+        "model": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["requestChoice"]["fn"]>>, ["model"]>>;
+      };
     };
     error: { error: AppWideError | "CLARIFICATION_CASE_UNAVAILABLE" | "EVIDENCE_DATE_MISMATCH" | "EVIDENCE_REVISION_NOT_NEW" | "EVIDENCE_TRACK_MISMATCH" | "EVIDENCE_TRACK_UNAVAILABLE" | "EXAM_TRADEOFF_CONFIRMATION_REQUIRED" | "GENERATION_FAILED" | "INVALID_INPUT" | "INVALID_MASTERY_EVIDENCE" | "INVALID_PLAN_INPUT" | "INVALID_REVISED_JUDGMENT" | "INVALID_WORK_CLARIFICATION" | "JUDGMENT_REVISION_OUTDATED" | "NOT_SIGNED_IN" | "PLAN_PREFERENCES_UNAVAILABLE" | "PLAN_SESSION_IN_PROGRESS" | "REVISION_CASE_UNAVAILABLE" | "ROUTINE_PLAN_OUTDATED" | "ROUTINE_PLAN_UNAVAILABLE" | "ROUTINE_SESSION_IN_PROGRESS" };
   };
@@ -346,7 +372,12 @@ export type StillGotItWire = {
       "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
       "studySession": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_byTask"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_session"]>[0], ["session"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_sessionData"]>[0], ["session"]>]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["answerLesson"]>[0], ["lesson"]>]>>;
     };
-    output: Record<string, never>;
+    output: {
+      "tutor": {
+        "level": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["requestChoice"]["fn"]>>, ["level"]>>;
+        "model": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["requestChoice"]["fn"]>>, ["model"]>>;
+      };
+    };
     error: { error: AppWideError | "GENERATION_FAILED" | "INVALID_INPUT" | "INVALID_LESSON_ANSWER" | "LESSON_ANSWER_UNAVAILABLE" | "NOT_SIGNED_IN" | "SESSION_CHANGED" };
   };
   "/learning/respond": {
@@ -366,7 +397,12 @@ export type StillGotItWire = {
       "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
       "studySession": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_byTask"]>[0], ["task"]>>;
     };
-    output: Record<string, never>;
+    output: {
+      "tutor": {
+        "level": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["requestChoice"]["fn"]>>, ["level"]>>;
+        "model": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["requestChoice"]["fn"]>>, ["model"]>>;
+      };
+    };
     error: { error: AppWideError | "ASSESSMENT_ALREADY_JUDGED" | "ASSESSMENT_CASE_UNAVAILABLE" | "EVIDENCE_DATE_MISMATCH" | "EVIDENCE_REVISION_NOT_NEW" | "EVIDENCE_TRACK_MISMATCH" | "EVIDENCE_TRACK_UNAVAILABLE" | "EXAM_TRADEOFF_CONFIRMATION_REQUIRED" | "GENERATION_FAILED" | "INVALID_INITIAL_JUDGMENT" | "INVALID_INPUT" | "INVALID_MASTERY_EVIDENCE" | "INVALID_PLAN_INPUT" | "NOT_SIGNED_IN" | "PLAN_PREFERENCES_UNAVAILABLE" | "PLAN_SESSION_IN_PROGRESS" | "ROUTINE_PLAN_OUTDATED" | "ROUTINE_PLAN_UNAVAILABLE" | "ROUTINE_SESSION_IN_PROGRESS" };
   };
   "/learning/task": {
@@ -376,6 +412,10 @@ export type StillGotItWire = {
     };
     output: {
       "task": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["prepareTask"]>>, ["task"]>>;
+      "tutor": {
+        "level": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["requestChoice"]["fn"]>>, ["level"]>>;
+        "model": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["requestChoice"]["fn"]>>, ["model"]>>;
+      };
     };
     error: { error: AppWideError | "GENERATION_FAILED" | "INVALID_INPUT" | "INVALID_TASK_CONTENT" | "INVALID_TASK_SOURCES" | "NOT_SIGNED_IN" | "SKILL_CHANGED" };
   };
@@ -472,6 +512,50 @@ export type StillGotItWire = {
       "item": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["stop"]>[0], ["item"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["stop"]>>, ["item"]>]>>;
     };
     error: { error: AppWideError | "ACTIVITY_STOP_UNAVAILABLE" | "EXAM_TRADEOFF_CONFIRMATION_REQUIRED" | "INVALID_INPUT" | "INVALID_PLAN_INPUT" | "INVALID_STOP_TIME" | "NOT_SIGNED_IN" | "PLAN_PREFERENCES_UNAVAILABLE" | "PLAN_SESSION_IN_PROGRESS" | "ROUTINE_PLAN_OUTDATED" | "ROUTINE_PLAN_UNAVAILABLE" | "ROUTINE_SESSION_IN_PROGRESS" };
+  };
+  "/settings/tutor": {
+    input: {
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+    };
+    output: {
+      "settings": {
+        "choice": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["choiceOffered"]["fn"]>[0], ["choice"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TutorPreferring"]["_choice"]>>>, ["option"]>]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["defaultChoice"]["fn"]>>, []>]>>;
+        "defaultChoice": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["defaultChoice"]["fn"]>>, []>>;
+        "models": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["tutorCatalog"]["fn"]>>, []>>;
+        "status": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["tutorStatus"]["fn"]>>, []>>;
+      };
+    };
+    error: { error: AppWideError | "INVALID_INPUT" | "NOT_SIGNED_IN" };
+  };
+  "/settings/tutor/choose": {
+    input: {
+      "level": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["levelSupported"]["fn"]>[0], ["level"]>>;
+      "model": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["modelOffered"]["fn"]>[0], ["model"]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+    };
+    output: {
+      "settings": {
+        "choice": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["choiceOffered"]["fn"]>[0], ["choice"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TutorPreferring"]["_choice"]>>>, ["option"]>]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["defaultChoice"]["fn"]>>, []>]>>;
+        "defaultChoice": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["defaultChoice"]["fn"]>>, []>>;
+        "models": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["tutorCatalog"]["fn"]>>, []>>;
+        "status": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["tutorStatus"]["fn"]>>, []>>;
+      };
+    };
+    error: { error: AppWideError | "INVALID_INPUT" | "NOT_SIGNED_IN" | "UNKNOWN_TUTOR_MODEL" | "UNSUPPORTED_THINKING_LEVEL" };
+  };
+  "/settings/tutor/clear": {
+    input: {
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+    };
+    output: {
+      "settings": {
+        "choice": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["choiceOffered"]["fn"]>[0], ["choice"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TutorPreferring"]["_choice"]>>>, ["option"]>]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["defaultChoice"]["fn"]>>, []>]>>;
+        "defaultChoice": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["defaultChoice"]["fn"]>>, []>>;
+        "models": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["tutorCatalog"]["fn"]>>, []>>;
+        "status": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["tutorStatus"]["fn"]>>, []>>;
+      };
+    };
+    error: { error: AppWideError | "INVALID_INPUT" | "NOT_SIGNED_IN" };
   };
 };
 
@@ -633,6 +717,10 @@ export type StillGotItHttp = {
     };
     output: {
       "suggestions": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["generationFields"]["fn"]>>, ["suggestions"]>>;
+      "tutor": {
+        "level": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["requestChoice"]["fn"]>>, ["level"]>>;
+        "model": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["requestChoice"]["fn"]>>, ["model"]>>;
+      };
     };
     error: { error: HttpAppWideError | "INVALID_REQUEST" | "UNAUTHORIZED" };
   };
@@ -671,6 +759,10 @@ export type StillGotItHttp = {
     };
     output: {
       "studySession": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["confirmAttempt"]>[0], ["task"]>>;
+      "tutor": {
+        "level": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["requestChoice"]["fn"]>>, ["level"]>>;
+        "model": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["requestChoice"]["fn"]>>, ["model"]>>;
+      };
     };
     error: { error: HttpAppWideError | "INVALID_REQUEST" | "UNAUTHORIZED" };
   };
@@ -703,7 +795,12 @@ export type StillGotItHttp = {
     input: {
       "studySession": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["requestHint"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["giveHint"]>[0], ["task"]>]>>;
     };
-    output: Record<string, never>;
+    output: {
+      "tutor": {
+        "level": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["requestChoice"]["fn"]>>, ["level"]>>;
+        "model": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["requestChoice"]["fn"]>>, ["model"]>>;
+      };
+    };
     error: { error: HttpAppWideError | "CONFLICT" | "INVALID_REQUEST" | "UNAUTHORIZED" };
   };
   "/learning/lesson": {
@@ -713,6 +810,10 @@ export type StillGotItHttp = {
     };
     output: {
       "lesson": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["explain"]>>, ["lesson"]>>;
+      "tutor": {
+        "level": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["requestChoice"]["fn"]>>, ["level"]>>;
+        "model": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["requestChoice"]["fn"]>>, ["model"]>>;
+      };
     };
     error: { error: HttpAppWideError | "CONFLICT" | "INVALID_REQUEST" | "UNAUTHORIZED" };
   };
@@ -735,7 +836,12 @@ export type StillGotItHttp = {
       "studySession": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["respond"]>[0], ["session"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["answerLesson"]>[0], ["lesson"]>]>>;
       "text": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["respond"]>[0], ["text"]>>;
     };
-    output: Record<string, never>;
+    output: {
+      "tutor": {
+        "level": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["requestChoice"]["fn"]>>, ["level"]>>;
+        "model": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["requestChoice"]["fn"]>>, ["model"]>>;
+      };
+    };
     error: { error: HttpAppWideError | "CONFLICT" | "INVALID_REQUEST" | "UNAUTHORIZED" };
   };
   "/learning/read": {
@@ -761,6 +867,10 @@ export type StillGotItHttp = {
     };
     output: {
       "judgment": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["revise"]>>, ["judgment"]>>;
+      "tutor": {
+        "level": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["requestChoice"]["fn"]>>, ["level"]>>;
+        "model": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["requestChoice"]["fn"]>>, ["model"]>>;
+      };
     };
     error: { error: HttpAppWideError | "INVALID_REQUEST" | "UNAUTHORIZED" };
   };
@@ -768,7 +878,12 @@ export type StillGotItHttp = {
     input: {
       "studySession": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_byTask"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_session"]>[0], ["session"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_sessionData"]>[0], ["session"]>]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["answerLesson"]>[0], ["lesson"]>]>>;
     };
-    output: Record<string, never>;
+    output: {
+      "tutor": {
+        "level": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["requestChoice"]["fn"]>>, ["level"]>>;
+        "model": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["requestChoice"]["fn"]>>, ["model"]>>;
+      };
+    };
     error: { error: HttpAppWideError | "CONFLICT" | "INVALID_REQUEST" | "UNAUTHORIZED" };
   };
   "/learning/respond": {
@@ -786,7 +901,12 @@ export type StillGotItHttp = {
     input: {
       "studySession": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_byTask"]>[0], ["task"]>>;
     };
-    output: Record<string, never>;
+    output: {
+      "tutor": {
+        "level": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["requestChoice"]["fn"]>>, ["level"]>>;
+        "model": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["requestChoice"]["fn"]>>, ["model"]>>;
+      };
+    };
     error: { error: HttpAppWideError | "INVALID_REQUEST" | "UNAUTHORIZED" };
   };
   "/learning/task": {
@@ -795,6 +915,10 @@ export type StillGotItHttp = {
     };
     output: {
       "task": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["prepareTask"]>>, ["task"]>>;
+      "tutor": {
+        "level": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["requestChoice"]["fn"]>>, ["level"]>>;
+        "model": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["requestChoice"]["fn"]>>, ["model"]>>;
+      };
     };
     error: { error: HttpAppWideError | "CONFLICT" | "INVALID_REQUEST" | "UNAUTHORIZED" };
   };
@@ -881,6 +1005,45 @@ export type StillGotItHttp = {
     };
     output: {
       "item": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["stop"]>[0], ["item"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["stop"]>>, ["item"]>]>>;
+    };
+    error: { error: HttpAppWideError | "INVALID_REQUEST" | "UNAUTHORIZED" };
+  };
+  "/settings/tutor": {
+    input: Record<string, never>;
+    output: {
+      "settings": {
+        "choice": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["choiceOffered"]["fn"]>[0], ["choice"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TutorPreferring"]["_choice"]>>>, ["option"]>]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["defaultChoice"]["fn"]>>, []>]>>;
+        "defaultChoice": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["defaultChoice"]["fn"]>>, []>>;
+        "models": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["tutorCatalog"]["fn"]>>, []>>;
+        "status": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["tutorStatus"]["fn"]>>, []>>;
+      };
+    };
+    error: { error: HttpAppWideError | "INVALID_REQUEST" | "UNAUTHORIZED" };
+  };
+  "/settings/tutor/choose": {
+    input: {
+      "level": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["levelSupported"]["fn"]>[0], ["level"]>>;
+      "model": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["modelOffered"]["fn"]>[0], ["model"]>>;
+    };
+    output: {
+      "settings": {
+        "choice": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["choiceOffered"]["fn"]>[0], ["choice"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TutorPreferring"]["_choice"]>>>, ["option"]>]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["defaultChoice"]["fn"]>>, []>]>>;
+        "defaultChoice": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["defaultChoice"]["fn"]>>, []>>;
+        "models": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["tutorCatalog"]["fn"]>>, []>>;
+        "status": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["tutorStatus"]["fn"]>>, []>>;
+      };
+    };
+    error: { error: HttpAppWideError | "INVALID_REQUEST" | "UNAUTHORIZED" };
+  };
+  "/settings/tutor/clear": {
+    input: Record<string, never>;
+    output: {
+      "settings": {
+        "choice": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["choiceOffered"]["fn"]>[0], ["choice"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TutorPreferring"]["_choice"]>>>, ["option"]>]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["defaultChoice"]["fn"]>>, []>]>>;
+        "defaultChoice": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["defaultChoice"]["fn"]>>, []>>;
+        "models": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["tutorCatalog"]["fn"]>>, []>>;
+        "status": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["tutorStatus"]["fn"]>>, []>>;
+      };
     };
     error: { error: HttpAppWideError | "INVALID_REQUEST" | "UNAUTHORIZED" };
   };

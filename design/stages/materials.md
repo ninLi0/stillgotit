@@ -4,9 +4,11 @@ This stage connects course materials, skill review, tutoring, assessment, master
 
 ```types
 concrete TutorRequest
-  A server-prepared generation request containing its purpose, owned sources, saved context, and optional learner work.
+  A server-prepared generation request containing its purpose, owned sources, saved context, and optional learner work. Once withChoice has added it, the request also carries the validated tutor model and thinking level; the Gemini transport refuses a tutor request without that pair.
 concrete TutorAnswer
   Validated generated text, citations, material identities, optional judgment values, and skill suggestions.
+concrete TutorChoice
+  One offered tutor model name and one thinking level that model supports, validated on the server against the tutor catalog.
 ```
 
 ```instances
@@ -50,6 +52,10 @@ instantiate Generating as TutorGenerating with
   Owner is Registering.User
   Request is TutorRequest
   Answer is TutorAnswer
+
+instantiate Preferring as TutorPreferring with
+  User is Registering.User
+  Option is TutorChoice
 
 ```
 
@@ -118,7 +124,7 @@ The [course composition](../compositions/Courses.md) declares these endpoints an
 
 ## Provider and file transport
 
-The host calls Google's Gemini API with one server-side key, which never reaches the browser. Every learner uses the same model, so there is no per-learner account to connect. Gemini returns JSON that matches a schema, and the host still checks each answer and its citations. When a call fails, the learner sees a plain reason, such as a busy service or a missing key, and the server log keeps Google's own message for the app owner. [Runtime responsibilities](../runtime.md) describe the details.
+The host calls Google's Gemini API with one server-side key, which never reaches the browser. Every learner uses the same server key, so there is no per-learner account to connect. Each learner chooses the tutor model and thinking level in the Tutor panel; the [tutor settings](../compositions/Settings.md) describe the catalog, the saved choice, and how every tutor request uses it. Gemini returns JSON that matches a schema, and the host still checks each answer and its citations. When a call fails, the learner sees a plain reason, such as a busy service or a missing key, and the server log keeps Google's own message for the app owner. [Runtime responsibilities](../runtime.md) describe the details.
 
 /api/ai/status reports whether the AI tutor is available and, if not, why. /api/courses/skills/suggest asks the tutor for skills without changing any. /api/courses/materials/file checks the owner and the material's exact file references before returning saved bytes. /api/learning/transcribe sends a microphone recording to Gemini and returns the transcript; the recording is never stored. These host services do not replace the declared concept mutations or perform file and provider work inside where conditions.
 
@@ -126,4 +132,4 @@ Uploads accept up to 12 files and 25 MB in total. PDF pages are read as text, an
 
 ## Learning application
 
-[Learning flows](../compositions/Learning.md), [shared reads](../compositions/LearningReads.md), [progress reactions](../compositions/Progress.md), and [planning endpoints](../compositions/Planning.md) define the rest of this stage. The host forwards JSON requests to these declared endpoints. It does not sequence tutoring, assessment, mastery, or planning actions.
+[Learning flows](../compositions/Learning.md), [shared reads](../compositions/LearningReads.md), [progress reactions](../compositions/Progress.md), [planning endpoints](../compositions/Planning.md), and [tutor settings](../compositions/Settings.md) define the rest of this stage. The host forwards JSON requests to these declared endpoints. It does not sequence tutoring, assessment, mastery, or planning actions.

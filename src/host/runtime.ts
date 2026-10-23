@@ -16,6 +16,7 @@ import { MaterialFiles } from "./material-files.ts";
 import { MaterialImportStore } from "../storage/MaterialImportStore.ts";
 import { CourseTutor } from "./tutor.ts";
 import { TutorGenerating } from "../concepts/Generating/registry.ts";
+import { TutorPreferring } from "../concepts.ts";
 import { TutorFailures, tutorGenerator } from "./tutor-generation.ts";
 
 export async function createRuntime({ database, provider, providerOrigin, publicOrigin, clock = () => new Date(), tutor: suppliedTutor, gemini = new Gemini() }: {
@@ -26,6 +27,7 @@ export async function createRuntime({ database, provider, providerOrigin, public
   const tutor = suppliedTutor ?? new CourseTutor(gemini, files);
   const application = assembleApplication({
     TutorGenerating: new TutorGenerating(tutorGenerator(tutor, failures)),
+    TutorPreferring: new TutorPreferring(database, "TutorPreferring"),
     Registering: new RegisteringConcept(database),
     CommonsFederating: new FederatingConcept<User>(database, provider, "CommonsFederating", clock),
     Sessioning: new SessioningConcept<User>(database, "Sessioning", clock),
