@@ -1,5 +1,5 @@
 <!-- Generated from the StillGotIt assembly. Do not edit. -->
-<!-- Manifest producer: @mit-sdg/sync-engine@1.1.0; concept specification: sync-engine.concept-specification@1; renderer: @mit-sdg/sync-engine@1.1.0. -->
+<!-- Manifest producer: @mit-sdg/sync-engine@1.2.0; concept specification: sync-engine.concept-specification@1; renderer: @mit-sdg/sync-engine@1.2.0. -->
 
 # StillGotIt — assembled read-back
 

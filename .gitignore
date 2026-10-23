@@ -11,5 +11,5 @@ __pycache__/
 .env.*
 !.env.example
 
-# Worktrees that Claude Code creates for helper agents.
-.claude/worktrees/
+# Claude Code's local files: helper worktrees and session notes.
+.claude/
