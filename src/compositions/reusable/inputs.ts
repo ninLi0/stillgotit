@@ -109,6 +109,15 @@ export const tutorChoiceInput: EndpointValidator = (value) => {
   return ok ? { ok: true } : { ok: false, detail: "Choose a model and a thinking level." };
 };
 
+/** A home view choice names one view, a string of at most 100 characters. The flow checks it against the offered views. */
+export const homeViewInput: EndpointValidator = (value) => {
+  if (!structuredInput(value).ok) return { ok: false };
+  const record = value as Record<string, unknown>;
+  const ok = Object.entries(record).every(([key, field]) => key === "session" ? field === null || typeof field === "string"
+    : key === "view" && typeof field === "string" && field.length <= 100) && typeof record.view === "string";
+  return ok ? { ok: true } : { ok: false, detail: "Choose the skill tree or the task list." };
+};
+
 /** JSON commands carry learner input only. Definitions and provider output are server-owned. */
 export const learningInput: EndpointValidator = (value) => {
   if (!structuredInput(value).ok) return { ok: false };

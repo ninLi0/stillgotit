@@ -8,7 +8,7 @@ import type { StudyPlanning } from "./concepts/StudyPlanning/StudyPlanning.ts";
 import type { MasteryEstimating } from "./concepts/MasteryEstimating/MasteryEstimating.ts";
 import type { AssessmentReviewing } from "./concepts/AssessmentReviewing/AssessmentReviewing.ts";
 import { assemble, type ConceptImplementation } from "@mit-sdg/sync-engine/assembly";
-import { applicationConceptSet, TutorPreferring } from "./concepts.ts";
+import { applicationConceptSet, TutorPreferring, ViewPreferring } from "./concepts.ts";
 import type { Db } from "mongodb";
 import type { FederatingConcept } from "./concepts/Federating/Federating.ts";
 import type { RegisteringConcept, User } from "./concepts/Registering/Registering.ts";
@@ -40,11 +40,13 @@ export function assembleApplication(instances: {
   GroundedTutoring: ConceptImplementation<typeof GroundedTutoring<User, string>>;
   TutorGenerating?: ConceptImplementation<typeof TutorGenerating>;
   TutorPreferring?: ConceptImplementation<typeof TutorPreferring>;
+  ViewPreferring?: ConceptImplementation<typeof ViewPreferring>;
 }, clock = () => new Date()) {
   return assemble({
     conceptSet: applicationConceptSet,
     instances: { ...instances, TutorGenerating: instances.TutorGenerating ?? new TutorGenerating(),
-      TutorPreferring: instances.TutorPreferring ?? new TutorPreferring(unconfiguredDatabase, "TutorPreferring") },
+      TutorPreferring: instances.TutorPreferring ?? new TutorPreferring(unconfiguredDatabase("TutorPreferring"), "TutorPreferring"),
+      ViewPreferring: instances.ViewPreferring ?? new ViewPreferring(unconfiguredDatabase("ViewPreferring"), "ViewPreferring") },
     composition: { reusable: { accounts, commons }, Courses, Learning, Importing, Reads, Progress, Planning, Access, Settings },
     queryCache: "none",
     executionLimits,
@@ -53,9 +55,9 @@ export function assembleApplication(instances: {
 }
 
 /**
- * Assemblies built only for account or course checks may omit TutorPreferring, as they may omit TutorGenerating's provider.
- * Its stand-in store refuses every read and write, so a tutor choice is never saved to or read from an unintended database.
+ * Assemblies built only for account or course checks may omit TutorPreferring and ViewPreferring, as they may omit TutorGenerating's provider.
+ * Each stand-in store refuses every read and write, so a tutor choice or home view is never saved to or read from an unintended database.
  */
-const unconfiguredDatabase = { collection: () => new Proxy({}, {
-  get: () => () => Promise.reject(new Error("TutorPreferring has no database in this assembly.")),
-}) } as unknown as Db;
+const unconfiguredDatabase = (instance: string) => ({ collection: () => new Proxy({}, {
+  get: () => () => Promise.reject(new Error(`${instance} has no database in this assembly.`)),
+}) }) as unknown as Db;

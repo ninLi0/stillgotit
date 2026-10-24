@@ -2,8 +2,11 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import { api, failureText } from "./api.ts";
 import { focusedControl, restoreFocus } from "./focus.ts";
+import InfoBubble from "./InfoBubble.vue";
 import { levelName, modelName, orderedLevels, tutorSettings, type TutorModel, type TutorSettings } from "./tutor-choice.ts";
 
+// `inline` renders the same form as a section inside the Settings modal instead of its own dialog.
+const props = defineProps<{ inline?: boolean }>();
 const dialog = ref<HTMLDialogElement | null>(null), heading = ref<HTMLElement | null>(null), statusLine = ref<HTMLElement | null>(null);
 const noticeBox = ref<HTMLElement | null>(null), errorBox = ref<HTMLElement | null>(null);
 const reading = ref(false), working = ref<"" | "save" | "clear">(""), error = ref(""), notice = ref("");
@@ -68,12 +71,12 @@ async function open() {
   if (!element) return;
   error.value = ""; notice.value = "";
   if (settings.value) selectFrom(settings.value);
-  if (!element.open) element.showModal();
+  if (!props.inline && !element.open) element.showModal();
   await nextTick();
   // A choice that is no longer offered opens on the status line that asks the learner to choose again.
   (settings.value?.status === "RETIRED" ? statusLine.value : heading.value)?.focus();
   const problem = await read();
-  if (!element.open) return;
+  if (!props.inline && !element.open) return;
   if (problem) { error.value = problem; return; }
   await nextTick();
   if (settings.value?.status === "RETIRED" && document.activeElement === heading.value) statusLine.value?.focus();
@@ -111,7 +114,7 @@ async function change(action: "save" | "clear") {
 
 // The panel stays open while a change is saving, so the learner sees its result.
 function cancel(event: Event) { if (busy.value) event.preventDefault(); }
-function close() { if (!busy.value) dialog.value?.close(); }
+function close() { if (!busy.value && !props.inline) dialog.value?.close(); }
 
 // The panel exists only while someone is signed in, so mounting it is the read after sign-in.
 onMounted(() => { void read(); });
@@ -120,9 +123,8 @@ defineExpose({ open });
 </script>
 
 <template>
-  <dialog ref="dialog" class="tutor-panel" aria-labelledby="tutor-title" @cancel="cancel">
-    <h2 id="tutor-title" ref="heading" tabindex="-1">Tutor</h2>
-    <p class="tutor-intro">Choose which Gemini model writes your lessons, practice tasks, feedback, and skill suggestions, and how much it thinks before answering. Your choice is saved to your account and applies on every device.</p>
+  <component :is="inline ? 'section' : 'dialog'" ref="dialog" class="tutor-panel" :class="{ inline }" aria-labelledby="tutor-title" @cancel="cancel">
+    <div class="tutor-head"><h2 id="tutor-title" ref="heading" tabindex="-1">Tutor</h2><InfoBubble label="About the tutor" text="Choose which Gemini model writes your lessons, practice tasks, feedback, and skill suggestions, and how much it thinks before answering. Your choice is saved to your account and applies on every device. Your files and answers are sent to Google to create lessons and feedback." /></div>
     <p v-if="settings" ref="statusLine" class="tutor-status" :class="{ retired: settings.status === 'RETIRED' }" tabindex="-1">{{ statusText }}</p>
     <div role="status"><p v-if="!settings && reading" class="tutor-status">Loading your tutor choice…</p></div>
     <template v-if="settings">
@@ -150,29 +152,28 @@ defineExpose({ open });
       <div role="status"><p v-if="slow && selected" class="tutor-warning">{{ levelName(level) }} thinking on {{ selected.name }} can take longer than the tutor's 80-second limit on long materials. If a request times out, choose a lower level or a Flash model.</p></div>
     </template>
     <div class="tutor-actions">
-      <span v-if="settings" class="save-action"><button class="primary" type="button" :disabled="busy || !canSave" :aria-describedby="canSave ? undefined : 'tutor-save-reason'" @click="change('save')">{{ working === 'save' ? 'Saving…' : 'Save' }}</button><p v-if="!canSave" id="tutor-save-reason" class="hint reason">Choose a model and a thinking level first.</p></span>
-      <button v-if="hasSaved" class="small-button" type="button" :disabled="busy" @click="change('clear')">{{ working === 'clear' ? 'Saving…' : 'Use app default' }}</button>
-      <button class="small-button" type="button" :disabled="busy" @click="close">Close</button>
+      <span v-if="settings" class="save-action"><button class="primary meadow" type="button" :disabled="busy || !canSave" :aria-describedby="canSave ? undefined : 'tutor-save-reason'" @click="change('save')">{{ working === 'save' ? 'Saving…' : 'Save' }}</button><p v-if="!canSave" id="tutor-save-reason" class="hint reason">Choose a model and a thinking level first.</p></span>
+      <button v-if="hasSaved" class="secondary meadow" type="button" :disabled="busy" @click="change('clear')">{{ working === 'clear' ? 'Saving…' : 'Use app default' }}</button>
+      <button v-if="!inline" class="secondary meadow" type="button" :disabled="busy" @click="close">Close</button>
     </div>
     <div role="status"><p v-if="notice" ref="noticeBox" class="notice" tabindex="-1">{{ notice }}</p></div>
     <div role="alert"><p v-if="error" ref="errorBox" class="error" tabindex="-1">{{ error }}</p></div>
-    <p class="tutor-privacy">Your files and answers are sent to Google to create lessons and feedback.</p>
-  </dialog>
+  </component>
 </template>
 
 <style scoped>
-.tutor-panel{border:0;border-radius:18px;padding:24px;width:min(560px,calc(100vw - 32px));box-shadow:0 20px 50px rgba(23,35,64,.25);color:var(--ink);background:var(--surface)}.tutor-panel::backdrop{background:rgba(23,35,64,.35)}
-.tutor-panel h2{font:26px Georgia,serif;margin:0 0 6px}.tutor-intro{font-size:13px;color:var(--muted);margin:0 0 14px}
-.tutor-status{margin:0;padding:10px 12px;border-left:3px solid var(--primary);border-radius:0 10px 10px 0;background:var(--wash);font-size:14px}.tutor-status.retired{border-left-color:var(--error)}
+.tutor-panel{border:0;border-radius:22px;padding:24px;width:min(560px,calc(100vw - 32px));box-shadow:0 20px 50px rgba(0,0,0,.18);color:var(--ink);background:#fff}.tutor-panel::backdrop{background:rgba(21,21,21,.35)}
+.tutor-head{display:flex;align-items:center;gap:6px;margin:0 0 10px}.tutor-panel h2{font:500 22px var(--font-display);margin:0}.tutor-panel.inline{padding:0;width:auto;box-shadow:none;border-radius:0}.tutor-intro{font-size:13px;color:var(--muted);margin:0 0 14px}
+.tutor-status{margin:0;padding:10px 12px;border-left:3px solid var(--strong);border-radius:0 10px 10px 0;background:var(--inset);font-size:14px}.tutor-status.retired{border-left-color:var(--error)}
 .tutor-group{min-width:0;margin:18px 0 0;padding:0;border:0}.tutor-group legend{padding:0;margin:0 0 8px;font-size:14px;font-weight:600}.tutor-group .hint{margin:8px 0 0}
-.model-option{display:flex;align-items:flex-start;gap:12px;margin:0 0 8px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;font-size:14px;font-weight:400;cursor:pointer}.model-option:hover{border-color:var(--accent)}.model-option.chosen{border-color:var(--primary);background:var(--light)}
-.tutor-panel input[type=radio]{flex:none;width:18px;height:18px;min-height:0;margin:2px 0 0;padding:0;accent-color:var(--primary);cursor:pointer}
+.model-option{display:flex;align-items:flex-start;gap:12px;margin:0 0 8px;padding:12px 14px;border:1px solid var(--ring);border-radius:14px;font-size:14px;font-weight:400;cursor:pointer}.model-option:hover{border-color:var(--meadow-edge)}.model-option.chosen{border-color:var(--meadow-edge);background:var(--meadow-soft);box-shadow:0 0 0 1px var(--meadow-edge)}
+.tutor-panel input[type=radio]{flex:none;width:18px;height:18px;min-height:0;margin:2px 0 0;padding:0;accent-color:var(--meadow-edge);cursor:pointer}
 .option-text{display:flex;flex-direction:column;gap:2px;min-width:0}.option-name{font-weight:600}.option-about{font-size:13px}.option-tradeoff{font-size:13px;color:var(--muted)}
-.option-tag{display:inline-block;margin-left:8px;padding:1px 8px;border-radius:10px;background:var(--light);color:var(--primary);font-size:11px;font-weight:600;line-height:1.6;vertical-align:1px}.chosen .option-tag{background:var(--surface)}
-.level-options{display:flex;flex-wrap:wrap;gap:8px}.level-option{display:flex;align-items:center;gap:8px;margin:0;padding:8px 14px 8px 12px;border:1px solid var(--line);border-radius:999px;font-size:14px;font-weight:400;cursor:pointer}.level-option:hover{border-color:var(--accent)}.level-option.chosen{border-color:var(--primary);background:var(--light)}.tutor-panel .level-option input[type=radio]{margin:0}
-.tutor-warning{margin:14px 0 0;padding:10px 12px;border-left:3px solid var(--accent);background:var(--wash);font-size:13px}
+.option-tag{display:inline-block;margin-left:8px;padding:1px 8px;border-radius:10px;background:var(--meadow-soft);color:var(--strong);font-size:11px;font-weight:600;line-height:1.6;vertical-align:1px}.chosen .option-tag{background:#fff}
+.level-options{display:flex;flex-wrap:wrap;gap:8px}.level-option{display:flex;align-items:center;gap:8px;margin:0;padding:8px 14px 8px 12px;border:1px solid var(--line);border-radius:999px;font-size:14px;font-weight:400;cursor:pointer}.level-option:hover{border-color:var(--meadow-edge)}.level-option.chosen{border-color:var(--meadow-edge);background:var(--meadow-nav);font-weight:700}.tutor-panel .level-option input[type=radio]{margin:0}
+.tutor-warning{margin:14px 0 0;padding:10px 12px;border-left:3px solid var(--meadow-edge);background:var(--inset);font-size:13px}
 .tutor-actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:20px}.tutor-actions button{min-height:40px;padding:6px 18px;font-size:14px}.save-action{display:inline-flex;flex-direction:column}.save-action .reason{margin:6px 0 0;font-size:12px}
-.tutor-panel .notice,.tutor-panel .error{margin:14px 0 0}.tutor-panel .error{background:var(--wash)}
+.tutor-panel .notice,.tutor-panel .error{margin:14px 0 0}.tutor-panel .error{background:var(--inset)}
 .tutor-privacy{margin:18px 0 0;padding-top:12px;border-top:1px solid var(--line);font-size:13px;color:var(--muted)}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 @media(max-width:480px){.tutor-panel{padding:20px 16px}.model-option{padding:10px 12px}}

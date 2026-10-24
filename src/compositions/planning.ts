@@ -7,7 +7,7 @@ import { learningInput, structuredOutput, validators } from "./reusable/inputs.t
 const { Sessioning, StudyPlanning: Planning, SkillMapping: Mapping, MasteryEstimating: Mastery } = concepts;
 const options = { validators: { ...validators, input: learningInput, output: structuredOutput } };
 // A missing course and another learner's course get the same answer, before any other refusal.
-// The engine's answer currently carries only the error code; HTTP admission gives the learner this sentence.
+// The host adds each refusal's sentence from the design (src/host/http-policy.ts); this one is spelled out here so a caller that skips the host still gets it.
 const courseUnavailable = () => respond({ error: "COURSE_UNAVAILABLE", detail: "Choose one of your own courses." });
 const WAITING = "Your plan will update when you finish or stop your current activity.";
 

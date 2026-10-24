@@ -4,13 +4,17 @@ import { api, errorMessage, failureText } from "./api.ts";
 import { materialFile } from "./host-api.ts";
 import { sourceLabel } from "./labels.ts";
 import type { StillGotItHttp } from "../../generated/wire.ts";
+import type { OpenSource } from "./revamp-types.ts";
 type Citation = StillGotItHttp["/learning/read"]["output"]["data"]["sessions"][number]["citations"][number];
 type MaterialData = StillGotItHttp["/courses/materials/read"]["output"];
 type Rendition = MaterialData["originals"][number]["renditions"][number];
 type Loaded<T> = { state: "loading" } | { state: "ready"; value: T } | { state: "failed"; message: string };
 type Part = { kind: "TEXT"; text: string } | { kind: "IMAGE"; image: Loaded<string> };
 // `titles` names each course material, for labels before its passage is opened. `idPrefix` keeps element ids unique.
-const props = defineProps<{ citations: readonly Citation[]; titles: Record<string, string>; idPrefix: string }>();
+// `variant` picks the look: "chips" under a tutor answer ("From <source> ↗"), or "rail" for the Taught from card.
+// Choosing a source opens its passage here, as before, and also emits `open` so the shell can show it in Materials.
+const props = withDefaults(defineProps<{ citations: readonly Citation[]; titles: Record<string, string>; idPrefix: string; variant?: "chips" | "rail" }>(), { variant: "chips" });
+const emit = defineEmits<{ open: [source: OpenSource] }>();
 const open = reactive(new Set<string>());
 const reads = reactive(new Map<string, Loaded<MaterialData>>());
 const images = reactive(new Map<string, Loaded<string>>());
@@ -79,17 +83,18 @@ function toggle(citation: Citation) {
   const key = keyOf(citation);
   if (open.has(key)) { open.delete(key); return; }
   open.add(key);
+  emit("open", { material: citation.material, location: citation.location });
   void show(citation);
 }
 onBeforeUnmount(() => objectUrls.forEach((url) => URL.revokeObjectURL(url)));
 </script>
 
 <template>
-  <details class="sources">
-    <summary>Sources used</summary>
-    <ul class="source-list">
+  <div class="sources" :class="variant">
+    <ul class="source-list" :aria-label="variant === 'rail' ? 'Sources this skill is taught from' : 'Sources used'">
       <li v-for="entry in entries" :key="entry.key">
-        <button type="button" class="source-toggle" :aria-expanded="entry.open" :aria-controls="entry.id" @click="toggle(entry.citation)">{{ entry.label }}</button>
+        <span v-if="variant === 'chips'" class="from" aria-hidden="true">From</span>
+        <button type="button" class="source-toggle" :aria-expanded="entry.open" :aria-controls="entry.id" @click="toggle(entry.citation)"><span v-if="variant === 'rail'" class="file-tag" aria-hidden="true">FILE</span><span class="source-name">{{ entry.label }}</span><span aria-hidden="true"> ↗</span></button>
         <div v-show="entry.open" :id="entry.id" class="passage" role="region" :aria-label="entry.label">
           <template v-if="entry.open">
             <p v-if="entry.read.state === 'loading'" class="hint" role="status">Opening the passage…</p>
@@ -119,23 +124,29 @@ onBeforeUnmount(() => objectUrls.forEach((url) => URL.revokeObjectURL(url)));
         </div>
       </li>
     </ul>
-  </details>
+  </div>
 </template>
 
 <style scoped>
-summary{cursor:pointer}
-.source-list{list-style:none;margin:10px 0 0;padding:0}
-.source-list li{margin:0 0 6px}
-.source-toggle{border:0;background:transparent;padding:4px 0;color:var(--primary);font-size:12px;text-align:left;text-decoration:underline;text-underline-offset:3px}
-.source-toggle[aria-expanded="true"]{font-weight:600}
-.passage{margin:6px 0 14px;padding:12px 14px;border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:8px;background:var(--surface);color:var(--ink)}
+.source-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.chips .source-list{margin-top:12px}
+.chips li{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.chips .source-toggle{padding:3px 10px;border:1px solid var(--line);border-radius:999px;background:#FFFFFF;color:var(--ink);font-size:12px;font-weight:600;text-align:left;max-width:100%;overflow-wrap:anywhere}
+.chips .source-toggle:hover{background:var(--inset)}
+.rail .source-toggle{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:0;border-radius:10px;background:#F7F5FD;padding:8px 10px;font-size:13px;font-weight:600;color:var(--dawn-soft-text)}
+.rail .source-toggle:hover{background:var(--dawn-soft)}
+.source-name{flex:1;min-width:0;overflow-wrap:anywhere}
+.chips .source-name{flex:initial}
+.file-tag{flex:none;font-size:9px;font-weight:800;padding:2px 5px;border-radius:5px;background:var(--coral-wash);color:#B5502B}
+.source-toggle[aria-expanded="true"]{box-shadow:0 0 0 2px var(--dawn-edge)}
+.passage{flex-basis:100%;margin:2px 0 10px;padding:12px 14px;border:1px solid var(--line);border-left:3px solid var(--dawn-edge);border-radius:10px;background:#FFFFFF;color:var(--ink)}
 .passage-label{margin:0 0 8px;font-size:12px;font-weight:600;color:var(--muted)}
 .passage-text{margin:0 0 8px;max-height:260px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;line-height:1.7}
-.passage-text:focus-visible{outline:3px solid var(--primary);outline-offset:2px}
+.passage-text:focus-visible{outline:3px solid var(--dawn-edge);outline-offset:2px}
 .passage .hint{font-size:12px;margin:0 0 8px}
 .passage-figure{margin:0 0 8px}
-.passage-figure img{display:block;max-width:100%;max-height:420px;height:auto;border-radius:6px;border:1px solid var(--line);background:var(--wash)}
-.passage-problem{font-size:13px;border-left:3px solid var(--error);padding:4px 0 4px 10px;margin:0 0 8px}
+.passage-figure img{display:block;max-width:100%;max-height:420px;height:auto;border-radius:6px;border:1px solid var(--line);background:var(--inset)}
+.passage-problem{font-size:13px;border-left:3px solid var(--coral);padding:4px 0 4px 10px;margin:0 0 8px}
 .passage-problem p{margin:0 0 4px}
 .source-retry{border:0;background:transparent;padding:4px 0;font-size:12px;color:var(--ink);text-decoration:underline;text-underline-offset:3px}
 </style>

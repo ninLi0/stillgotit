@@ -825,6 +825,25 @@ export type StillGotItWire = {
     };
     error: { error: AppWideError | "INVALID_INPUT" | "NOT_SIGNED_IN" };
   };
+  "/settings/view": {
+    input: {
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+    };
+    output: {
+      "view": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["homeViewOffered"]["fn"]>[0], ["view"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ViewPreferring"]["_choice"]>>>, ["option"]>]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["defaultHomeView"]["fn"]>>, []>]>>;
+    };
+    error: { error: AppWideError | "INVALID_INPUT" | "NOT_SIGNED_IN" };
+  };
+  "/settings/view/set": {
+    input: {
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+      "view": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["homeViewOffered"]["fn"]>[0], ["view"]>>;
+    };
+    output: {
+      "view": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ViewPreferring"]["set"]>[0], ["option"]>>;
+    };
+    error: { error: AppWideError | "INVALID_INPUT" | "NOT_SIGNED_IN" | "UNKNOWN_HOME_VIEW" };
+  };
 };
 
 export type HttpAppWideError = never;
@@ -1565,6 +1584,22 @@ export type StillGotItHttp = {
         "models": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["tutorCatalog"]["fn"]>>, []>>;
         "status": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["tutorStatus"]["fn"]>>, []>>;
       };
+    };
+    error: { error: HttpAppWideError | "INVALID_REQUEST" | "UNAUTHORIZED" };
+  };
+  "/settings/view": {
+    input: Record<string, never>;
+    output: {
+      "view": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["homeViewOffered"]["fn"]>[0], ["view"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ViewPreferring"]["_choice"]>>>, ["option"]>]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["defaultHomeView"]["fn"]>>, []>]>>;
+    };
+    error: { error: HttpAppWideError | "INVALID_REQUEST" | "UNAUTHORIZED" };
+  };
+  "/settings/view/set": {
+    input: {
+      "view": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["homeViewOffered"]["fn"]>[0], ["view"]>>;
+    };
+    output: {
+      "view": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ViewPreferring"]["set"]>[0], ["option"]>>;
     };
     error: { error: HttpAppWideError | "INVALID_REQUEST" | "UNAUTHORIZED" };
   };

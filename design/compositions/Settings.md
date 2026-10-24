@@ -1,6 +1,8 @@
-# Tutor settings
+# Settings
 
-A learner chooses which Gemini model the tutor uses and how much it thinks before answering, which Gemini calls the thinking level. `TutorPreferring`, an instance of [Preferring](../concepts/Preferring.md), keeps that choice on the server for the signed-in learner, so it follows them to every browser. Every tutor request reads the choice on the server and sends that model and level to Gemini. No request uses a model name or level from the browser until the server has checked it against its own catalog. Dictation is the one exception: it keeps the server's configured model with no thinking level and its current error sentences, as before. The [P2 stage](../stages/materials.md) binds the instance.
+A learner chooses which Gemini model the tutor uses and how much it thinks before answering, which Gemini calls the thinking level. `TutorPreferring`, an instance of [Preferring](../concepts/Preferring.md), keeps that choice on the server for the signed-in learner, so it follows them to every browser. Every tutor request reads the choice on the server and sends that model and level to Gemini. No request uses a model name or level from the browser until the server has checked it against its own catalog. Dictation is the one exception: it keeps the server's configured model with no thinking level and its own error sentences. The [application stage](../stages/materials.md) binds the instance.
+
+The learner also chooses which view Home shows: the skill tree or the task list. `ViewPreferring`, a second instance of Preferring, keeps that choice on the server in the same way, so it also follows the learner to every browser. [The home view](#the-home-view) describes it.
 
 ## The model catalog
 
@@ -12,9 +14,9 @@ The server offers a fixed table of models. Each entry has the Gemini model name,
 | `gemini-3.8-flash` | Gemini 3.8 Flash | A fast general model for lessons, practice, and feedback. | Low, Medium, High | Medium | None | It balances speed, cost, and care; raise the level for harder problems. |
 | `gemini-3.1-pro-preview` | Gemini 3.1 Pro (preview) | The most careful model offered, for difficult material and grading. | Low, Medium, High | High | High | It is slower and costs more, and as a preview Google may change or withdraw it. |
 
-The "May not finish in time" column is set from measured timings before the catalog ships. Each measurement is one request at the app's maximum inline size, 30 MB in total with PDFs up to 15 MB, made at each model's highest level and at Pro's Medium. Until then, only Pro at High is marked. High is also Pro's default level, so a learner who chooses Pro lands on the marked level and sees the warning. If the app owner makes Pro the default, every learner without a choice runs at High.
+The "May not finish in time" column is meant to come from measured timings: one request at the app's maximum inline size, 30 MB in total with PDFs up to 15 MB, made at each model's highest level and at Pro's Medium. These timings have not been measured yet, so only Pro at High is marked. High is also Pro's default level, so a learner who chooses Pro lands on the marked level and sees the warning. If the app owner makes Pro the default, every learner without a choice runs at High.
 
-`GEMINI_MODEL` names the default entry, after the server trims it and removes a leading `models/`, as it does today. When `GEMINI_MODEL` is unset, the default is `gemini-3.8-flash`. If `GEMINI_MODEL` names a model that is not in the table, the server stops at startup with a message that names the offered models, because it cannot know which levels an unlisted model accepts. This keeps the default choice valid for as long as the server runs. Before deploying this change, the app owner checks that the platform's `GEMINI_MODEL` is unset or is one of the three offered names. A learner who has made no choice gets the default model at that model's default level.
+`GEMINI_MODEL` names the default entry, after the server trims it and removes a leading `models/`. When `GEMINI_MODEL` is unset, the default is `gemini-3.8-flash`. If `GEMINI_MODEL` names a model that is not in the table, the server stops at startup with a message that names the offered models, because it cannot know which levels an unlisted model accepts. This keeps the default choice valid for as long as the server runs. Before each deploy, the app owner checks that the platform's `GEMINI_MODEL` is unset or is one of the three offered names. A learner who has made no choice gets the default model at that model's default level.
 
 When the server has a Gemini key, it checks the table once at startup, before it accepts requests, against Gemini's model list: `GET v1beta/models?pageSize=200`, with the key in the request header and never in the address. It drops an entry when the list has no `models/<name>` record for it, or when that record's `supportedGenerationMethods` lacks `generateContent`. It drops nothing when the call fails, takes longer than 5 seconds, returns a malformed list, or returns a `nextPageToken`, because an incomplete list cannot show that a model is gone. It never drops the default entry. If the list lacks the default, the server logs a warning, and requests that use the default meet the provider refusal described below. The list's `thinking` field is not used, because its form is not confirmed; the table stays the only source of levels. The server logs one line naming any dropped models. The app therefore works the same whether or not this check succeeds.
 
@@ -87,9 +89,9 @@ requestChoice(request: TutorRequest) : TutorChoice
 
 Admission refuses a RETIRED choice before any write. Before a tutor command is dispatched, HTTP and the runtime gateway evaluate [TutorReady](former:Settings.TutorReady) under the learner's lock, ahead of the command's own admission former. TutorReady admits the command when TutorStatus is SAVED or DEFAULT. Otherwise the command is declined with "The tutor model or thinking level you chose is no longer offered. Choose another one in the Tutor panel." Because this check runs first, a hint is not recorded, a question is not saved, and an attempt is not closed for a request that could not be sent.
 
-The Gemini transport sends each tutor request to `models/<model>:generateContent` for the request's model. It puts `thinkingConfig: { thinkingLevel: "<level>" }` inside `generationConfig`, beside `responseMimeType` and `responseJsonSchema`, with the level in lowercase. The coordinator's live call on 2026-10-23 confirmed this field: `"low"` was accepted, while the same value placed directly in `generationConfig` was rejected. The transport refuses a tutor request that carries no model or level before contacting Google, so no tutor request can quietly fall back to a fixed model.
+The Gemini transport sends each tutor request to `models/<model>:generateContent` for the request's model. It puts `thinkingConfig: { thinkingLevel: "<level>" }` inside `generationConfig`, beside `responseMimeType` and `responseJsonSchema`, with the level in lowercase. A live call to Gemini on October 23, 2026, confirmed this field: `"low"` was accepted, while the same value placed directly in `generationConfig` was rejected. The transport refuses a tutor request that carries no model or level before contacting Google, so no tutor request can quietly fall back to a fixed model.
 
-The same rule covers AI calls outside these nine flows. Every Gemini call made in answer to a learner's request uses the validated pair: the saved choice when TutorStatus is SAVED, the default when it is DEFAULT, and a refusal before any work when it is RETIRED. This includes graded-work extraction, which the graded-import work item adds. Dictation is the one exception, as the brief allows. Work done at import time with no learner waiting, such as the import-anything work item's transcription, uses the server's configured model.
+The same rule covers AI calls outside these nine flows. Every Gemini call made in answer to a learner's request uses the validated pair: the saved choice when TutorStatus is SAVED, the default when it is DEFAULT, and a refusal before any work when it is RETIRED. This includes graded-work extraction. Dictation is the one exception, as the introduction says. Work done at import time, with no learner waiting, uses the server's configured model.
 
 Each successful tutor response also returns `tutor`, the model and level that produced the answer, which [requestChoice](computation:requestChoice) reads from the sent request. [SentTutor](former:Settings.SentTutor) forms that value from the sent request with requestChoice after the action, so each response can carry it. Lesson returns it beside the lesson, Task beside the task, Assess beside the attempt, Regrade beside the judgment, and Suggest beside the suggestions. Question, Reply, Hint, and RetryAssessment return it alone. It is not stored. `Generating` keeps no durable state, and the GroundedTutoring and AssessmentReviewing records have no fields for a model or level. The page therefore labels answers produced while it is open; after a reload, earlier answers have no label.
 
@@ -103,11 +105,11 @@ The three sentences that send the learner to the Tutor panel apply only when Goo
 - When a quota limit that names the chosen model is used up, including a quota of zero for this key: "{model} has used up its quota for now. Choose another model in the Tutor panel, or try again later."
 - When Google refuses the chosen level for that model: "{model} doesn't accept {level} thinking. Choose another level in the Tutor panel."
 
-A refusal about the key, the project, or billing as a whole keeps its current sentence, because choosing another model would not help. A busy service, a safety block, and an incomplete answer also keep their current sentences. When it is unclear whether a refusal concerns the chosen model, the current sentence is used. The implementation grounds these signals in Google's actual responses, which live calls capture before implementation: one for an unknown model and one for a model that this key has no quota for. A timeout on a tutor request now reads: "The tutor took too long to answer. Try again with a shorter request, less material, or a lower thinking level."
+A refusal about the key, the project, or billing as a whole keeps its current sentence, because choosing another model would not help. A busy service, a safety block, and an incomplete answer also keep their current sentences. When it is unclear whether a refusal concerns the chosen model, the current sentence is used. The implementation grounds these signals in Google's actual responses, which live calls capture before implementation: one for an unknown model and one for a model that this key has no quota for. A timeout on a tutor request reads: "The tutor took too long to answer. Try again with a shorter request, less material, or a lower thinking level."
 
 Dictation keeps its current sentences, because it does not use the learner's choice. Its timeout sentence gives no thinking-level advice. A model problem on the dictation path is reported as a setup problem for the app owner, not as a choice for the learner.
 
-These refusals arrive after a flow's earlier saves, like other provider failures. Hint keeps the recorded hint, Question keeps the saved question for Reply, and Assess keeps the closed attempt for RetryAssessment. After choosing another model or level, the learner uses those same retries. Regrade saves the learner's clarification before it asks for a judgment. After a refusal, the learner's retry is another Regrade, which appends the same clarification a second time. This is existing behavior that the new refusals make more likely; removing the repeat is a separate change.
+These refusals arrive after a flow's earlier saves, like other provider failures. Hint keeps the recorded hint, Question keeps the saved question for Reply, and Assess keeps the closed attempt for RetryAssessment. After choosing another model or level, the learner uses those same retries. Regrade saves the learner's clarification before it asks for a judgment. After a refusal, the learner's retry is another Regrade, which appends the same clarification a second time. Model refusals make this repeat more likely, and Regrade does not prevent it.
 
 The 80-second limit for one Gemini call stays, and it cannot grow for higher levels. The engine allows each request 90 seconds, and Cloudflare ends a request after about 100 seconds.
 
@@ -127,9 +129,43 @@ The panel contains, in order:
 - After a save, the status message "Saved. Your next tutor request will use {model} with {level} thinking.", with the model and level taken from the returned record rather than from the form. After a refusal, the server's sentence.
 - The privacy line from the settings dialog: "Your files and answers are sent to Google to create lessons and feedback."
 
-Both groups are radio groups with visible labels. The warning, the status message, and refusals are announced to screen readers. The existing Settings dialog's "AI tutor" section adds a "Choose the model" button that opens the Tutor panel. When the server has no Gemini key, the panel still opens and saves a choice, and the existing reason beside the AI buttons still explains why the tutor is off.
+Both groups are radio groups with visible labels. The warning, the status message, and refusals are announced to screen readers. The Settings dialog's "AI tutor" section has a "Choose the model" button that opens the Tutor panel. When the server has no Gemini key, the panel still opens and saves a choice, and the reason beside the AI buttons still explains why the tutor is off.
 
 Each answer produced while the page is open shows the label "{model} · {level} thinking" in the secondary text style, below the answer. This covers a lesson explanation, a lesson reply, a practice task, a hint, an assessment judgment, and the heading of the suggested-skills panel.
+
+## The home view
+
+Home shows the learner's course in one of two views: the skill tree or the task list. The browser and the server name them `tree` and `tasks`. The two views are fixed in the server's code, so they do not change while the server runs. A learner who has chosen no view sees the skill tree.
+
+```computations
+homeViewOffered(view: String) : Flag
+  Holds when view is exactly `tree` or `tasks`, including case.
+
+offeredHomeView(view: String) : HomeView
+  Names an offered home view. Flows use it only after homeViewOffered holds.
+
+defaultHomeView() : HomeView
+  Produces `tree`, the skill tree.
+```
+
+[AppliedHomeView](view:Settings.AppliedHomeView) relates a learner to the view that applies to them. Exactly one case holds for each learner:
+
+- `ViewPreferring._choice` returns a view, and [homeViewOffered](computation:homeViewOffered) holds for it. The saved view applies.
+- `ViewPreferring._choice` returns a view that is no longer offered. The view from [defaultHomeView](computation:defaultHomeView) applies. Preferring leaves it to the application to check a remembered option again before using it, so a view that a later version of the code removes never reaches the browser.
+- `ViewPreferring._choice` returns no row. The view from defaultHomeView applies.
+
+Both home view endpoints call `Sessioning.use` and use the returned user, like the tutor endpoints. No input names a learner, so one learner can neither read nor change another learner's view. A missing or ended session is refused with `NOT_SIGNED_IN`.
+
+[ReadHomeView](reaction:Settings.ReadHomeView) takes only the session. It responds with `view`, the view from AppliedHomeView, and changes nothing.
+
+[SetHomeView](reaction:Settings.SetHomeView) takes the session and `view`. The boundary first checks that `view` is a string of at most 100 characters and that no other field is sent, and refuses any other input as invalid before the flow starts. Then exactly one case applies:
+
+- When homeViewOffered holds, [offeredHomeView](computation:offeredHomeView) names the view, `ViewPreferring.set` saves it, and the endpoint responds with `view`, the view it saved.
+- When homeViewOffered does not hold, the endpoint refuses with `UNKNOWN_HOME_VIEW`: "Choose the skill tree or the task list."
+
+A refusal saves nothing, so the learner's earlier view, or the lack of one, stays as it was. Saving is one write keyed by the learner, and the endpoint responds only after that write is saved. Saving the same view again changes nothing and succeeds, so a browser whose reply was lost can send it again. Across devices the later write wins. Choosing the skill tree saves it as the learner's own choice. No endpoint clears the view, because Home always shows one of the two views and choosing the skill tree has the same effect as having no choice.
+
+Like choosing or clearing the tutor model, saving the home view does not take the learner's lock, so it never waits behind a running lesson; this is safe because no learning flow reads the view.
 
 ## Tests
 
@@ -142,7 +178,8 @@ The tests use a fake `fetch` and the controlled tutor responses described in the
 - one learner's choosing and clearing leave another learner's choice unchanged;
 - a refusal that names the chosen model produces the model sentence, a key-wide refusal keeps the setup sentence, and an unclear refusal keeps the current sentence;
 - a dictation timeout and a dictation model problem keep their current sentences;
-- a tutor request without a pair, and a suggestion request without a pair, are each refused without contacting Google.
+- a tutor request without a pair, and a suggestion request without a pair, are each refused without contacting Google;
+- the home view: the skill tree when nothing is saved, a saved view read on a second browser, a refused view with its sentence over HTTP and through the runtime gateway, a repeated save, and another learner's isolation.
 
 ## Endpoints
 
@@ -152,4 +189,6 @@ The HTTP adapter adds `/api` to these paths.
 Settings.ReadTutor at /settings/tutor
 Settings.ChooseTutor at /settings/tutor/choose
 Settings.ClearTutor at /settings/tutor/clear
+Settings.ReadHomeView at /settings/view
+Settings.SetHomeView at /settings/view/set
 ```

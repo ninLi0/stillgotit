@@ -5,7 +5,7 @@ import { GroundedTutoring } from "./src/concepts/GroundedTutoring/GroundedTutori
 import { MongoClient } from "mongodb";
 import { httpWire } from "@mit-sdg/sync-engine-http/tooling";
 import { assembleApplication } from "./src/assembly.ts";
-import { TutorPreferring } from "./src/concepts.ts";
+import { TutorPreferring, ViewPreferring } from "./src/concepts.ts";
 import { FederatingConcept } from "./src/concepts/Federating/Federating.ts";
 import { MemoryProvider } from "./src/concepts/Federating/provider.ts";
 import { RegisteringConcept, type User } from "./src/concepts/Registering/Registering.ts";
@@ -30,6 +30,7 @@ function assembleForChecks() {
     StudyPlanning: new StudyPlanning(client.db("stillgotit_spec_check")),
     GroundedTutoring: new GroundedTutoring(client.db("stillgotit_spec_check")),
     TutorPreferring: new TutorPreferring(client.db("stillgotit_spec_check"), "TutorPreferring"),
+    ViewPreferring: new ViewPreferring(client.db("stillgotit_spec_check"), "ViewPreferring"),
   });
 }
 

@@ -13,9 +13,10 @@ export type CourseUnit = CourseRead["units"][number];
 export type ExamInput = { date: string; covered: string[] };
 
 /**
- * The planning concept's and the planning composition's own sentences. Over HTTP most planning refusals arrive as a
- * bare INVALID_REQUEST without their reason, so the planner checks inputs before sending and, after a refusal,
- * reads the plan again to tell which rule applied. It then shows the rule's sentence from this list.
+ * The planning concept's and the planning composition's own sentences. Over HTTP the host now adds a refusal's
+ * sentence as `detail` (src/host/http-policy.ts), and `settle` shows it. A refusal that still arrives bare is
+ * explained the old way: the planner checks inputs before sending and, after a refusal, reads the plan again to tell
+ * which rule applied, then shows the rule's sentence from this list.
  */
 export const sentences = {
   courseUnavailable: "Choose one of your own courses.",

@@ -1,61 +1,212 @@
 <script setup lang="ts">
-import { computed } from "vue";
-import TreeMark from "./TreeMark.vue";
-const props = defineProps<{ skills: { skill: string; title: string; status: string; mastery?: number }[]; selected: string | null }>();
-const emit = defineEmits<{ select: [skill: string] }>();
-type Slot = { path: string; cx: number; cy: number; lx: number; ly: number; anchor: "start" | "middle" | "end"; above?: boolean };
-// A small leaf growing from a twig tip at the given angle (degrees clockwise from straight up).
-function leafAt(x: number, y: number, angle: number): Slot {
-  const turn = (angle * Math.PI) / 180, point = (px: number, py: number): [number, number] => [x + px * Math.cos(turn) - py * Math.sin(turn), y + px * Math.sin(turn) + py * Math.cos(turn)];
-  const at = (px: number, py: number) => point(px, py).map((value) => value.toFixed(1)).join(" "), tip = point(4, -42), mid = point(3, -21);
-  return { path: `M${at(0, 0)}C${at(-10, -15)} ${at(-7, -31)} ${at(4, -42)}C${at(15, -27)} ${at(11, -11)} ${at(0, 0)}Z`, cx: mid[0], cy: mid[1],
-    lx: tip[0] + (tip[0] < 200 ? -8 : 8), ly: tip[1], anchor: tip[0] < 200 ? "end" : "start" };
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import InfoBubble from "./InfoBubble.vue";
+import PixelIcon from "./PixelIcon.vue";
+import { STAGE_LABELS, type Stage } from "./pixel-art.ts";
+import { CELL, GROUND, HEIGHT, PLOT, average, drawGrove, growGrove, leafNear, shiftGrove, type GroveLeaf, type GroveTopic } from "./GroveScene.ts";
+
+// The grove: one pixel tree per topic, each confirmed skill a leaf at a branch tip (design/revamp/README.md,
+// "Tree view"). The canvas is decoration; every leaf is also a real button laid over it, so the grove works from the
+// keyboard and with a screen reader. `units` names the topics, `due` lists the skills due today, and `courseId` keys
+// the saved design seed; all three are optional.
+const props = defineProps<{
+  skills: { skill: string; title: string; status: string; mastery?: number; unit?: string }[];
+  selected: string | null;
+  units?: readonly { unit: string; title: string }[];
+  due?: readonly string[];
+  courseId?: string;
+}>();
+const emit = defineEmits<{ select: [skill: string]; plant: [] }>();
+
+const INFO = "Each topic grows its own tree. Each confirmed skill is a leaf that grows as you master it: bud, sprout, leaf, then blossom. A coral flag means it’s due today. Select a leaf to see the skill.";
+const legend = computed<Stage[]>(() => props.due === undefined ? ["bud", "sprout", "leaf", "full", "bloom"] : ["bud", "sprout", "leaf", "full", "bloom", "flag"]);
+
+// Topics in course order, then any skill whose unit the `units` list does not name.
+const topics = computed<GroveTopic[]>(() => {
+  const due = new Set(props.due ?? []), confirmed = props.skills.filter((skill) => skill.status === "CONFIRMED");
+  const titles = new Map((props.units ?? []).map((unit) => [unit.unit, unit.title]));
+  const order = (props.units ?? []).map((unit) => unit.unit);
+  for (const skill of confirmed) if (!order.includes(skill.unit ?? "")) order.push(skill.unit ?? "");
+  let unnamed = 0;
+  return order.map((id) => ({ id, skills: confirmed.filter((skill) => (skill.unit ?? "") === id) })).filter((topic) => topic.skills.length).map((topic) => ({
+    id: topic.id || "grove",
+    title: titles.get(topic.id) || (topic.id ? `Topic ${++unnamed}` : "Other skills"),
+    skills: topic.skills.map((skill) => ({ skill: skill.skill, title: skill.title, mastery: skill.mastery ?? undefined, due: due.has(skill.skill) })),
+  }));
+});
+const leafCount = computed(() => topics.value.reduce((sum, topic) => sum + topic.skills.length, 0));
+const summary = computed(() => {
+  const n = leafCount.value, m = topics.value.length;
+  if (!n) return "No skills yet";
+  const avg = average(topics.value.flatMap((topic) => topic.skills));
+  return `${n} ${n === 1 ? "skill" : "skills"} in ${m} ${m === 1 ? "topic" : "topics"}${avg === undefined ? "" : ` · ${avg}%`}`;
+});
+
+// The design seed, saved per course so the grove looks the same after a reload.
+const storageKey = computed(() => {
+  const id = props.courseId ?? props.units?.[0]?.unit ?? props.skills.find((skill) => skill.unit)?.unit;
+  return id ? `stillgotit.grove.${id}` : null;
+});
+const design = ref(1);
+watch(storageKey, (key) => {
+  let saved = NaN;
+  try { if (key) saved = Number.parseInt(localStorage.getItem(key) ?? "", 10); } catch { /* storage unavailable */ }
+  design.value = Number.isInteger(saved) && saved > 0 ? saved : 1;
+}, { immediate: true });
+function regrow() {
+  design.value += 1;
+  try { if (storageKey.value) localStorage.setItem(storageKey.value, String(design.value)); } catch { /* storage unavailable */ }
 }
-// Leaf slots on the home page's tree drawing: its six large leaves first, then leaves at the twig tips.
-const slots: Slot[] = [
-  { path: "M201 106C189 79 193 61 208 45C221 67 216 90 201 106Z", cx: 204, cy: 76, lx: 206, ly: 34, anchor: "middle", above: true },
-  { path: "M139 138C119 133 109 116 111 96C131 105 141 120 139 138Z", cx: 125, cy: 117, lx: 104, ly: 102, anchor: "end" },
-  { path: "M274 166C273 142 285 126 305 122C301 145 288 159 274 166Z", cx: 289, cy: 144, lx: 312, ly: 130, anchor: "start" },
-  { path: "M128 232C107 224 101 203 107 186C126 197 134 214 128 232Z", cx: 117, cy: 209, lx: 98, ly: 196, anchor: "end" },
-  { path: "M291 253C286 230 295 212 314 204C317 228 306 245 291 253Z", cx: 302, cy: 229, lx: 322, ly: 222, anchor: "start" },
-  { path: "M242 96C233 76 239 57 256 44C264 65 255 84 242 96Z", cx: 249, cy: 70, lx: 266, ly: 52, anchor: "start" },
-  leafAt(75, 234, -105), leafAt(339, 250, 100), leafAt(99, 113, -55), leafAt(320, 157, 70), leafAt(276, 77, 35),
-];
-const leaves = computed(() => props.skills.filter((skill) => skill.status === "CONFIRMED").slice(0, slots.length).map((skill, index) => {
-  const slot = slots[index]!, lines = [...wrap(skill.title), skill.mastery === undefined ? "new" : `${Math.round(skill.mastery)}%`];
-  // Labels above a leaf grow upward; side labels are centered on the leaf tip.
-  const top = slot.above ? slot.ly - (lines.length - 1) * 18 : slot.ly - ((lines.length - 1) * 18) / 2;
-  return { ...skill, ...slot, lines, top };
-}));
-const empty = computed(() => slots.slice(leaves.value.length));
-function wrap(title: string) {
-  const words = title.split(" "), lines: string[] = []; let line = "";
-  for (const word of words) { if (line.length + word.length > 18 && line) { lines.push(line); line = word; } else line += (line ? " " : "") + word; }
-  if (line) lines.push(line); return lines;
+
+// Planks need to know their text width so a long topic name widens its slot instead of overlapping a neighbour.
+// The widths are measured once the fonts have loaded.
+const PLANK_MAX = 280;
+const fontsVersion = ref(0);
+let measure: CanvasRenderingContext2D | null | undefined;
+function textWidth(text: string, font: string) {
+  measure ??= document.createElement("canvas").getContext("2d");
+  if (!measure) return text.length * 8;
+  measure.font = font;
+  return measure.measureText(text).width;
 }
+function plankCells(title: string, meta: string) {
+  const text = Math.max(textWidth(title, '13px "Pixelify Sans", monospace'), textWidth(meta, '600 12px "Instrument Sans", sans-serif'));
+  // 10px padding either side, then the 2px outline either side and a little air.
+  return Math.ceil((Math.min(PLANK_MAX, Math.ceil(text) + 20) + 4 + 8) / CELL);
+}
+const grown = computed(() => { void fontsVersion.value; return growGrove(topics.value, design.value, plankCells); });
+
+// Measured size of the scroll area; the grove fills it and scrolls when it is wider.
+const scroller = ref<HTMLElement | null>(null), canvas = ref<HTMLCanvasElement | null>(null);
+const containerWidth = ref(0), dpr = ref(1);
+const placed = computed(() => {
+  const available = containerWidth.value || 760, cells = Math.floor(available / CELL), grove = grown.value;
+  const fits = grove.width <= cells;
+  return { grove: fits ? shiftGrove(grove, Math.floor((cells - grove.width) / 2)) : grove, cssWidth: fits ? available : grove.width * CELL };
+});
+const leaves = computed(() => placed.value.grove.trees.flatMap((tree) => tree.leaves));
+
+const hover = ref<string | null>(null), focused = ref<string | null>(null);
+const hot = computed(() => hover.value ?? focused.value);
+const tagLeaf = computed<GroveLeaf | undefined>(() => {
+  const id = hot.value ?? props.selected;
+  return id ? leaves.value.find((leaf) => leaf.skill.skill === id) : undefined;
+});
+const percent = (skill: GroveLeaf["skill"]) => skill.mastery === undefined ? "new" : `${Math.round(skill.mastery)}%`;
+const leafLabel = (skill: GroveLeaf["skill"]) =>
+  `${skill.title}${skill.mastery === undefined ? ", no estimate yet" : `, estimated mastery ${Math.round(skill.mastery)} percent`}${skill.due ? ", due today" : ""}`;
+
+// The hover tag sits above the leaf, below it when the leaf is near the top, and stays inside the grove.
+const tagEl = ref<HTMLElement | null>(null), tagWidth = ref(0);
+const tagStyle = computed(() => {
+  const leaf = tagLeaf.value;
+  if (!leaf) return {};
+  const half = tagWidth.value / 2, width = placed.value.cssWidth;
+  const left = half ? Math.min(Math.max(leaf.x * CELL + 2, half + 4), width - half - 4) : leaf.x * CELL + 2;
+  const below = (leaf.y - 6) * CELL < 36;
+  return { left: `${left}px`, top: `${(below ? leaf.y + 6 : leaf.y - 6) * CELL}px`, transform: below ? "translateX(-50%)" : "translate(-50%, -100%)" };
+});
+watch(tagLeaf, async () => { await nextTick(); tagWidth.value = tagEl.value?.offsetWidth ?? 0; }, { immediate: true });
+
+function draw() {
+  if (canvas.value) drawGrove(canvas.value, placed.value.grove, placed.value.cssWidth, dpr.value, props.selected, hot.value);
+}
+watch([placed, () => props.selected, hot, dpr], draw, { flush: "post" });
+
+// Hit-testing happens in cell space: the nearest leaf within about five cells.
+function leafAtPointer(event: MouseEvent) {
+  const box = (event.currentTarget as HTMLElement).getBoundingClientRect();
+  return leafNear(placed.value.grove, (event.clientX - box.left) / CELL, (event.clientY - box.top) / CELL);
+}
+function onMove(event: MouseEvent) { const id = leafAtPointer(event)?.skill.skill ?? null; if (id !== hover.value) hover.value = id; }
+function onClick(event: MouseEvent) { const leaf = leafAtPointer(event); if (leaf) emit("select", leaf.skill.skill); }
+
+// When the selection changes from elsewhere (for example "Show on tree"), scroll its leaf into view.
+watch([() => props.selected, placed], async () => {
+  await nextTick();
+  const box = scroller.value, leaf = leaves.value.find((item) => item.skill.skill === props.selected);
+  if (!box || !leaf) return;
+  const x = leaf.x * CELL;
+  if (x - 24 < box.scrollLeft || x + 24 > box.scrollLeft + box.clientWidth) box.scrollLeft = Math.max(0, x - box.clientWidth / 2);
+});
+
+let observer: ResizeObserver | undefined;
+function measureBox() { containerWidth.value = scroller.value?.clientWidth ?? 0; dpr.value = window.devicePixelRatio || 1; }
+function fontsLoaded() { fontsVersion.value++; }
+onMounted(() => {
+  measureBox();
+  if (typeof ResizeObserver !== "undefined" && scroller.value) { observer = new ResizeObserver(measureBox); observer.observe(scroller.value); }
+  window.addEventListener("resize", measureBox);
+  const fonts = document.fonts;
+  if (fonts) {
+    void Promise.all([fonts.load('13px "Pixelify Sans"'), fonts.load('600 12px "Instrument Sans"')]).then(fontsLoaded, () => undefined);
+    fonts.addEventListener?.("loadingdone", fontsLoaded);
+  }
+  draw();
+});
+onBeforeUnmount(() => {
+  observer?.disconnect();
+  window.removeEventListener("resize", measureBox);
+  document.fonts?.removeEventListener?.("loadingdone", fontsLoaded);
+});
 </script>
+
 <template>
-  <figure class="living-tree">
-    <div v-if="!leaves.length" class="empty-tree"><TreeMark /><p>Your next skill starts here.</p><slot name="empty" /></div>
-    <template v-else>
-      <svg viewBox="-100 -30 600 482" xmlns="http://www.w3.org/2000/svg" role="group" aria-label="Your skill tree. Each filled leaf is a confirmed skill.">
-        <g class="drawing" fill="none" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M201 410C205 358 193 316 200 269C204 226 190 181 202 107" stroke-width="3" />
-          <path d="M201 313C165 298 142 271 128 232M198 271C236 241 262 215 274 166M199 224C170 205 143 181 139 137M202 180C232 158 242 130 242 96M195 356C241 326 277 297 291 253" stroke-width="2" />
-          <path d="M142 263C114 269 90 252 75 234M155 281C149 242 159 221 167 205M255 210C284 202 312 181 320 157M265 191C248 176 249 154 258 139M164 186C166 158 159 143 151 128M143 155C117 147 103 131 99 113M234 142C217 126 213 112 217 94M240 121C262 109 274 93 276 77M273 288C309 285 329 269 339 250M276 282C261 260 256 241 262 226" stroke-width="1.4" />
-          <path d="M196 382C178 401 160 410 142 414M204 396C221 407 239 416 260 420M199 406L193 431M194 354C184 368 180 377 179 389" stroke-width="1.4" />
-          <path v-for="slot in empty" :key="slot.path" :d="slot.path" class="empty-leaf" />
-        </g>
-        <g v-for="leaf in leaves" :key="leaf.skill" role="button" tabindex="0" :aria-label="`${leaf.title}${leaf.mastery === undefined ? ', no estimate yet' : `, estimated mastery ${Math.round(leaf.mastery)} percent`}`" :aria-pressed="selected === leaf.skill" class="skill-leaf" :class="{ selected: selected === leaf.skill }" @click="emit('select', leaf.skill)" @keydown.enter.prevent="emit('select', leaf.skill)" @keydown.space.prevent="emit('select', leaf.skill)">
-          <title>{{ leaf.title }}</title><circle :cx="leaf.cx" :cy="leaf.cy" r="31" class="leaf-focus"/>
-          <path :d="leaf.path" :fill="leaf.mastery === undefined ? '#d6e4f5' : `rgba(40,84,154,${(0.22 + leaf.mastery * 0.0078).toFixed(3)})`" class="leaf-shape"/>
-          <text :x="leaf.lx" :y="leaf.top" :text-anchor="leaf.anchor"><tspan v-for="(line, i) in leaf.lines" :key="i" :x="leaf.lx" :dy="i ? 18 : 0" :class="{ 'leaf-score': i === leaf.lines.length - 1 }">{{ line }}</tspan></text>
-        </g>
-      </svg>
-      <figcaption>Each filled leaf is a skill. Darker leaves are stronger. Select one to begin.</figcaption>
-    </template>
-  </figure>
+  <section class="grove" aria-label="Your skill grove">
+    <header class="grove-head">
+      <span class="grove-summary"><span class="eyebrow">{{ summary }}</span><InfoBubble :text="INFO" label="How the grove works" /></span>
+      <div class="grove-tools">
+        <ul class="legend" aria-label="Leaf key">
+          <li v-for="stage in legend" :key="stage"><PixelIcon :sprite="stage" :size="14" />{{ STAGE_LABELS[stage] }}</li>
+        </ul>
+        <button v-if="leafCount" type="button" class="regrow" title="Draw new trees. Your skills stay the same." @click="regrow">Regrow · design {{ design }}</button>
+      </div>
+    </header>
+    <div ref="scroller" class="grove-scroll">
+      <div class="grove-stage" role="group" aria-label="Each leaf is a confirmed skill. Select one to see it." :style="{ width: `${placed.cssWidth}px`, height: `${HEIGHT * CELL}px` }">
+        <canvas ref="canvas" aria-hidden="true" :style="{ width: `${placed.cssWidth}px`, height: `${HEIGHT * CELL}px`, cursor: hover ? 'pointer' : 'default' }"
+          @mousemove="onMove" @mouseleave="hover = null" @click="onClick" />
+        <span v-for="tree in placed.grove.trees" :key="`plank-${tree.key}`" class="plank" aria-hidden="true" :style="{ left: `${tree.cx * CELL}px`, top: `${(GROUND + 4) * CELL}px`, maxWidth: '280px' }">
+          <span class="plank-title">{{ tree.title }}</span><span class="plank-meta">{{ tree.meta }}</span>
+        </span>
+        <div v-for="tree in placed.grove.trees" :key="`leaves-${tree.key}`" role="group" :aria-label="`${tree.title}, ${tree.meta}`">
+          <button v-for="leaf in tree.leaves" :key="leaf.skill.skill" type="button" class="leaf-button" :aria-label="leafLabel(leaf.skill)" :aria-pressed="selected === leaf.skill.skill"
+            :style="{ left: `${(leaf.x - 5) * CELL}px`, top: `${(leaf.y - 5) * CELL}px` }"
+            @click="emit('select', leaf.skill.skill)" @focus="focused = leaf.skill.skill" @blur="focused = null" />
+        </div>
+        <span v-if="tagLeaf" ref="tagEl" class="leaf-tag" aria-hidden="true" :style="tagStyle">{{ tagLeaf.skill.title }}<span class="leaf-tag-pct">{{ percent(tagLeaf.skill) }}</span></span>
+        <button type="button" class="plant-plot" :style="{ left: `${placed.grove.plot * CELL}px`, top: `${(GROUND - PLOT) * CELL}px`, width: `${PLOT * CELL}px`, height: `${PLOT * CELL}px` }"
+          @click="emit('plant')">+ Plant a topic</button>
+      </div>
+    </div>
+    <div v-if="!leafCount && $slots.empty" class="grove-empty"><slot name="empty" /></div>
+  </section>
 </template>
+
 <style scoped>
-.living-tree{margin:0 auto;position:relative;background:var(--surface);border-radius:310px 310px 24px 24px;padding:40px 16px 20px;box-shadow:0 1px 2px rgba(23,35,64,.04),0 12px 32px rgba(23,35,64,.06)}.living-tree svg{display:block;width:100%;max-height:600px;overflow:visible}.drawing{stroke:var(--ink)}.empty-leaf{stroke-width:1.2;opacity:.4}.skill-leaf{cursor:pointer;outline:none}.leaf-shape{stroke:var(--ink);stroke-width:1.3}.leaf-focus{fill:transparent;stroke:transparent}.skill-leaf:hover .leaf-focus{fill:var(--wash)}.skill-leaf.selected .leaf-focus{fill:var(--light)}.skill-leaf:focus-visible .leaf-focus{fill:var(--light);stroke:var(--primary);stroke-width:1.5;stroke-dasharray:3 3}.skill-leaf.selected .leaf-shape{stroke:var(--primary);stroke-width:2}text{fill:var(--ink);font:600 16px "Avenir Next","Nunito Sans",sans-serif;paint-order:stroke;stroke:var(--surface);stroke-width:5px;stroke-linejoin:round}.leaf-score{font-weight:500;fill:var(--primary)}.selected text{fill:var(--primary)}figcaption{text-align:center;font-size:12px;color:var(--muted);margin:10px 0 0}.empty-tree{max-width:340px;margin:0 auto;text-align:center;color:var(--ink)}.empty-tree :deep(svg){height:400px;max-width:100%}.empty-tree p{font-size:13px;color:var(--muted)}@media(max-width:650px){.living-tree{padding:28px 4px 14px;border-radius:200px 200px 18px 18px}.empty-tree :deep(svg){height:300px}text{font-size:15px}}
+.grove { min-width: 0; border-radius: 24px; background: #FFFFFF; box-shadow: 0 0 0 1px rgba(20, 20, 20, .05), 0 12px 22px rgba(20, 20, 20, .06); padding: 14px; }
+.grove-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 2px 6px 12px; }
+.grove-summary { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.grove-summary .eyebrow { font-size: 12px; white-space: nowrap; }
+.grove-tools { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.legend { display: flex; align-items: center; gap: 6px 14px; flex-wrap: wrap; margin: 0; padding: 0; list-style: none; font-size: 12px; color: var(--muted); }
+.legend li { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+.regrow { display: flex; align-items: center; gap: 6px; border: 0; border-radius: 999px; background: var(--inset); color: var(--ink); padding: 6px 12px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.regrow:hover { background: #D6EFDF; }
+.grove-scroll { overflow-x: auto; overflow-y: hidden; border-radius: 18px; }
+.grove-stage { position: relative; }
+.grove-stage canvas { display: block; image-rendering: pixelated; }
+.plank { position: absolute; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; padding: 4px 10px 5px; background: #E9D6A8;
+  box-shadow: inset 0 -2px 0 #CDB884, 0 0 0 2px #C08324; white-space: nowrap; pointer-events: none; }
+.plank-title { max-width: 100%; overflow: hidden; text-overflow: ellipsis; font: 400 13px/16px var(--font-display); color: var(--ink); }
+.plank-meta { font: 600 12px/15px var(--font-body); color: var(--soft); font-variant-numeric: tabular-nums; }
+/* Leaf buttons sit over their leaves for keyboard and screen-reader use; the pointer goes through to the canvas. */
+.leaf-button { position: absolute; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 6px; background: transparent; pointer-events: none; }
+.leaf-tag { position: absolute; z-index: 2; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 8px; background: #1C1C1D; color: #FFFFFF;
+  font-size: 12px; font-weight: 600; line-height: 1.3; white-space: nowrap; pointer-events: none; box-shadow: 0 6px 14px rgba(20, 20, 20, .2); font-variant-numeric: tabular-nums; }
+.leaf-tag-pct { color: #86D6AC; }
+.plant-plot { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding: 0 4px 32px; border: 2px dashed rgba(20, 20, 20, .25);
+  border-radius: 14px; background: rgba(255, 255, 255, .35); font: 400 13px/16px var(--font-display); color: var(--soft); white-space: nowrap; }
+.plant-plot:hover { background: rgba(255, 255, 255, .6); }
+.grove-empty { display: flex; justify-content: center; padding: 12px 6px 2px; }
 </style>

@@ -18,6 +18,7 @@ onBeforeUnmount(() => { if (playing.value) stopSpeaking(); });
 </template>
 
 <style scoped>
-.listen-button{white-space:nowrap;flex:none}
-.playing{color:var(--primary);font-weight:600}
+.listen-button{white-space:nowrap;flex:none;border:0;background:transparent;padding:2px 8px;border-radius:8px;font-size:12px;font-weight:600;color:var(--faint);text-decoration:none}
+.listen-button:hover:not(:disabled){background:var(--inset);color:var(--ink)}
+.playing{color:var(--dawn-soft-text);background:var(--dawn-soft)}
 </style>

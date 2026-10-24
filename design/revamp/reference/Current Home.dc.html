@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#f5f7fa;font-family:"Avenir Next",Avenir,"Nunito Sans","Segoe UI",sans-serif;color:#172340;line-height:1.55;font-synthesis:none}
+*{box-sizing:border-box}
+button{font:inherit;cursor:pointer}
+a{color:#28549a}a:hover{color:#173a73}
+summary::-webkit-details-marker{display:none}
+</style>
+</helmet>
+<div style="max-width:1440px;min-height:100dvh;margin:0 auto;padding:0 42px;display:flex;flex-direction:column">
+  <header style="min-height:70px;display:flex;align-items:center;justify-content:space-between;gap:20px">
+    <div style="display:flex;align-items:center;gap:14px;min-width:0">
+      <a href="#" style="color:inherit;text-decoration:none;font-size:20px;font-weight:650;letter-spacing:-.7px;display:flex;align-items:center;gap:10px"><span style="font-size:30px;font-weight:400">✳</span> StillGotIt</a>
+      <button style="display:flex;align-items:center;gap:6px;padding:6px 10px;border:0;border-radius:10px;background:transparent;color:#172340;font-size:14px;font-weight:550" style-hover="background:#d6e4f5"><span>MIT 18.06SC Linear Algebra</span><svg viewBox="0 0 12 12" width="12" height="12" style="color:#4a5670"><path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+    </div>
+    <div style="display:flex;align-items:center;gap:24px;color:#4a5670;font-size:12px">
+      <button style="display:flex;align-items:center;border:0;background:transparent;color:#4a5670;font-size:13px;padding:6px 10px;border-radius:10px;white-space:nowrap" style-hover="background:#d6e4f5;color:#172340">Tutor<span>: Gemini 3.8 Flash, Medium</span></button>
+      <button style="display:flex;align-items:center;gap:7px;border:0;background:transparent;color:#4a5670;font-size:13px;padding:6px 10px;border-radius:10px" style-hover="background:#d6e4f5;color:#172340"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"></path></svg><span>Settings</span></button>
+    </div>
+  </header>
+  <main style="flex:1;display:block;padding:0">
+    <nav style="height:54px;display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid #d3dce8">
+      <div style="display:flex;align-items:stretch;gap:28px;height:100%">
+        <button style="position:relative;background:none;border:0;padding:0 3px;color:#172340;font-size:14px;font-weight:600;box-shadow:inset 0 -2px 0 #28549a">Home</button>
+        <button style="position:relative;background:none;border:0;padding:0 3px;color:#4a5670;font-size:14px">Learn</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:24px"><button style="border:0;background:none;padding:8px 0;color:#4a5670;font-size:12px;display:flex;align-items:center;gap:7px">Course materials<span style="display:inline-grid;place-items:center;min-width:18px;height:18px;border-radius:10px;background:#d6e4f5;font-size:10px">2</span></button></div>
+    </nav>
+    <section>
+      <header style="display:flex;justify-content:space-between;align-items:center;padding:38px 0 12px">
+        <div style="min-width:0"><h1 style="font:46px/1.15 Georgia,serif;letter-spacing:-1.5px;margin:0;color:#172340">Your skill tree</h1><p style="font-size:14px;color:#4a5670;margin:10px 0 0">Choose a skill. Grow your understanding.</p></div>
+        <div style="display:flex;align-items:center;gap:12px"><strong style="font:40px Georgia,serif">6</strong><span style="font-size:12px;color:#4a5670;max-width:55px;line-height:1.4">skills to grow</span></div>
+      </header>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:15px;background:#fff;border:1px solid #d3dce8;border-left:5px solid #28549a;border-radius:14px;padding:12px 12px 12px 18px;font-size:14px;margin:18px 0;box-shadow:0 1px 2px rgba(23,35,64,.05),0 8px 22px rgba(23,35,64,.06)"><span><strong style="font-weight:650">2 draft skills are waiting.</strong> Confirm them to add leaves to your tree.</span><button style="border:0;border-radius:10px;color:#173a73;font-weight:600;background:#d6e4f5;padding:1px 6px" style-hover="background:#c4d7f0">Confirm drafts</button></div>
+      <div style="display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:48px;align-items:start;padding-top:8px">
+        <div style="position:relative;padding:0 10px;min-width:0;display:flex;justify-content:center">
+          <figure style="width:100%;max-width:620px;margin:0 auto;position:relative;background:#fff;border-radius:310px 310px 24px 24px;padding:40px 16px 20px;box-shadow:0 1px 2px rgba(23,35,64,.04),0 12px 32px rgba(23,35,64,.06)">
+            <svg viewBox="-100 -30 600 482" xmlns="http://www.w3.org/2000/svg" style="display:block;width:100%;max-height:600px;overflow:visible">
+              <g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke="#172340">
+                <path d="M201 410C205 358 193 316 200 269C204 226 190 181 202 107" stroke-width="3"></path>
+                <path d="M201 313C165 298 142 271 128 232M198 271C236 241 262 215 274 166M199 224C170 205 143 181 139 137M202 180C232 158 242 130 242 96M195 356C241 326 277 297 291 253" stroke-width="2"></path>
+                <path d="M142 263C114 269 90 252 75 234M155 281C149 242 159 221 167 205M255 210C284 202 312 181 320 157M265 191C248 176 249 154 258 139M164 186C166 158 159 143 151 128M143 155C117 147 103 131 99 113M234 142C217 126 213 112 217 94M240 121C262 109 274 93 276 77M273 288C309 285 329 269 339 250M276 282C261 260 256 241 262 226" stroke-width="1.4"></path>
+                <path d="M196 382C178 401 160 410 142 414M204 396C221 407 239 416 260 420M199 406L193 431M194 354C184 368 180 377 179 389" stroke-width="1.4"></path>
+                <sc-for list="{{ empty }}" as="e" hint-placeholder-count="5"><path d="{{ e.path }}" stroke-width="1.2" opacity="0.4"></path></sc-for>
+              </g>
+              <sc-for list="{{ leaves }}" as="leaf" hint-placeholder-count="0">
+                <g style="cursor:pointer" onClick="{{ leaf.onSelect }}">
+                  <circle cx="{{ leaf.cx }}" cy="{{ leaf.cy }}" r="31" fill="{{ leaf.haloFill }}"></circle>
+                  <path d="{{ leaf.path }}" fill="{{ leaf.fill }}" stroke="{{ leaf.stroke }}" stroke-width="{{ leaf.strokeW }}"></path>
+                </g>
+              </sc-for>
+            </svg>
+            <div style="position:absolute;left:16px;right:16px;top:40px;aspect-ratio:600/482;pointer-events:none;container-type:inline-size">
+              <sc-for list="{{ labels }}" as="t" hint-placeholder-count="0">
+                <span style="position:absolute;left:{{ t.left }};top:{{ t.top }};transform:{{ t.tf }};white-space:nowrap;font-size:2.667cqw;line-height:1;font-weight:{{ t.weight }};color:{{ t.color }};text-shadow:0 0 2px #fff,0 0 2px #fff,2px 0 1px #fff,-2px 0 1px #fff,0 2px 1px #fff,0 -2px 1px #fff">{{ t.text }}</span>
+              </sc-for>
+            </div>
+            <figcaption style="text-align:center;font-size:12px;color:#4a5670;margin:10px 0 0">Each filled leaf is a skill. Darker leaves are stronger. Select one to begin.</figcaption>
+          </figure>
+        </div>
+        <aside style="border-left:1px solid #d3dce8;padding-left:28px">
+          <section>
+            <h2 style="font:27px/1.25 Georgia,serif;letter-spacing:-.4px;margin:0 0 10px;color:#172340">{{ sel.title }}</h2>
+            <p style="font-size:13px;line-height:1.8;color:#4a5670">{{ sel.outcome }}</p>
+            <div style="position:relative;display:flex;align-items:center;gap:14px;margin:22px 0">
+              <svg viewBox="0 0 64 64" style="width:64px;height:64px;transform:rotate(-90deg);flex:none"><circle cx="32" cy="32" r="27" fill="none" stroke="#d6e4f5" stroke-width="7"></circle><circle cx="32" cy="32" r="27" fill="none" stroke="#28549a" stroke-width="7" stroke-linecap="round" stroke-dasharray="{{ sel.dash }}"></circle></svg>
+              <strong style="position:absolute;left:0;width:64px;text-align:center;font:17px Georgia,serif">{{ sel.pct }}</strong>
+              <span style="font-size:13px;color:#4a5670">{{ sel.estLabel }}</span>
+            </div>
+            <button style="width:100%;display:flex;justify-content:space-between;align-items:center;min-height:44px;font-size:13px;padding:10px 16px;border-radius:8px;border:0;background:#28549a;color:#fff;font-weight:600;box-shadow:0 1px 2px rgba(23,35,64,.18)" style-hover="background:#173a73">Open lesson <span>›</span></button>
+            <details style="margin-top:14px;font-size:13px;color:#4a5670"><summary style="list-style:none;display:flex;justify-content:space-between;align-items:center;cursor:pointer;padding:8px 10px;border-radius:10px">What counts as mastery?<span style="font-size:18px;line-height:1">›</span></summary><p style="padding:0 10px">{{ sel.gate }}</p></details>
+          </section>
+          <details open="{{ true }}" style="margin-top:14px">
+            <summary style="list-style:none;display:flex;justify-content:space-between;align-items:center;cursor:pointer;padding:8px 10px;border-radius:10px;font-size:13px;font-weight:500;color:#4a5670">Today's plan<span style="font-size:18px;line-height:1;transform:rotate(90deg)">›</span></summary>
+            <section style="padding:4px 10px 8px;overflow-wrap:anywhere">
+              <p style="margin:2px 0 10px;font-size:13px;line-height:1.5;color:#4a5670">30 min a day for this course <button style="border:0;background:none;padding:0;font:inherit;color:#28549a;text-decoration:underline;text-underline-offset:3px">Change</button></p>
+              <p style="font-weight:600;padding-top:4px;font-size:13px">22 min left today <span style="font-weight:400;color:#4a5670;font-size:12px">· 8 min recorded</span></p>
+              <div style="background:#edf2f8;padding:14px;border-radius:12px">
+                <p style="text-transform:uppercase;font-size:11px;letter-spacing:1px;color:#4a5670;margin:4px 0">Today</p>
+                <h3 style="font-size:15px;margin:2px 0 6px">Fresh check: Check matrix product dimensions</h3>
+                <p style="font-size:13px;margin:4px 0">Your last attempt used a hint. A fresh problem shows whether it holds without one.</p>
+                <p style="font-size:13px;margin:4px 0;color:#4a5670">About 12 minutes</p>
+                <div style="display:flex;flex-wrap:wrap;align-items:center;gap:14px;margin-top:16px"><button style="border:0;border-radius:10px;background:#28549a;color:#fff;min-height:36px;padding:6px 14px;font-size:14px;font-weight:600;box-shadow:0 1px 2px rgba(23,35,64,.18)">Start review</button><button style="border:0;padding:6px 0;color:#172340;background:transparent;font-size:14px;text-decoration:underline;text-underline-offset:4px">Missed today</button></div>
+              </div>
+              <button style="margin:14px 0;border:0;border-radius:10px;color:#173a73;font-weight:600;background:#d6e4f5;padding:1px 6px">Update plan</button>
+              <section style="margin-top:18px;padding-top:14px;border-top:1px solid #d3dce8">
+                <h3 style="font-size:15px;margin:0 0 6px">Exams</h3>
+                <ul style="list-style:none;padding:0;margin:0"><li style="padding:8px 0;border-bottom:1px solid #edf2f8"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px"><p style="margin:0;font-size:13px"><strong>In 6 days</strong> <span style="color:#4a5670">· Thu, Oct 29</span></p><button style="border:0;background:transparent;font-size:12px;padding:2px 0;color:#172340;text-decoration:underline;text-underline-offset:4px">Remove</button></div><p style="margin:2px 0 0;font-size:12px;color:#4a5670">Covers Multiply matrices, Read matrix rows and columns, Identify compatible matrix dimensions</p></li></ul>
+                <div style="margin:12px 0 0"><button style="border:0;border-radius:10px;color:#173a73;font-weight:600;background:#d6e4f5;padding:1px 6px">Add an exam</button></div>
+              </section>
+              <details><summary style="cursor:pointer;margin:14px 0 6px;padding:8px 0;font-size:13px;list-style:none;display:flex;justify-content:space-between;align-items:center">Week and deferred work<span style="color:#4a5670;font-size:18px;line-height:1">›</span></summary></details>
+            </section>
+          </details>
+        </aside>
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { selected: "s1" };
+  renderVals() {
+    const leafAt = (x, y, angle) => {
+      const t = angle * Math.PI / 180, p = (px, py) => [x + px * Math.cos(t) - py * Math.sin(t), y + px * Math.sin(t) + py * Math.cos(t)];
+      const at = (px, py) => p(px, py).map(v => v.toFixed(1)).join(" "), tip = p(4, -42), mid = p(3, -21);
+      return { path: `M${at(0,0)}C${at(-10,-15)} ${at(-7,-31)} ${at(4,-42)}C${at(15,-27)} ${at(11,-11)} ${at(0,0)}Z`, cx: mid[0], cy: mid[1], lx: tip[0] + (tip[0] < 200 ? -8 : 8), ly: tip[1], anchor: tip[0] < 200 ? "end" : "start" };
+    };
+    const slots = [
+      { path: "M201 106C189 79 193 61 208 45C221 67 216 90 201 106Z", cx: 204, cy: 76, lx: 206, ly: 34, anchor: "middle", above: true },
+      { path: "M139 138C119 133 109 116 111 96C131 105 141 120 139 138Z", cx: 125, cy: 117, lx: 104, ly: 102, anchor: "end" },
+      { path: "M274 166C273 142 285 126 305 122C301 145 288 159 274 166Z", cx: 289, cy: 144, lx: 312, ly: 130, anchor: "start" },
+      { path: "M128 232C107 224 101 203 107 186C126 197 134 214 128 232Z", cx: 117, cy: 209, lx: 98, ly: 196, anchor: "end" },
+      { path: "M291 253C286 230 295 212 314 204C317 228 306 245 291 253Z", cx: 302, cy: 229, lx: 322, ly: 222, anchor: "start" },
+      { path: "M242 96C233 76 239 57 256 44C264 65 255 84 242 96Z", cx: 249, cy: 70, lx: 266, ly: 52, anchor: "start" },
+      leafAt(75, 234, -105), leafAt(339, 250, 100), leafAt(99, 113, -55), leafAt(320, 157, 70), leafAt(276, 77, 35),
+    ];
+    const skills = [
+      { skill: "s1", title: "Multiply matrices", mastery: 72, outcome: "Compute the product of two compatible matrices and explain how each entry is formed.", gate: "Multiply a 2×3 and a 3×2 matrix without help, then explain why reversing the order changes the result." },
+      { skill: "s2", title: "Read matrix rows and columns", mastery: 88, outcome: "Name any entry, row, or column of a matrix by its indices.", gate: "Read five entries by index and write one row and one column correctly." },
+      { skill: "s3", title: "Identify compatible matrix dimensions", mastery: 64, outcome: "Decide whether two matrices can be multiplied and give the product's size.", gate: "Classify six pairs and state each product's dimensions." },
+      { skill: "s4", title: "Check matrix product dimensions", mastery: 41, outcome: "Check a product's size before computing it.", gate: "Predict the size of three products, then verify them." },
+      { skill: "s5", title: "Explain matrix multiplication", mastery: undefined, outcome: "Explain matrix multiplication as composing linear maps.", gate: "Explain, with an example, why AB applies B first." },
+      { skill: "s6", title: "Interpret a matrix product", mastery: 23, outcome: "Read what each entry of a product means in context.", gate: "Interpret two entries of a product from a word problem." },
+    ];
+    const wrap = (title) => { const lines = []; let line = ""; for (const w of title.split(" ")) { if (line.length + w.length > 18 && line) { lines.push(line); line = w; } else line += (line ? " " : "") + w; } if (line) lines.push(line); return lines; };
+    const sel = this.state.selected;
+    const leaves = [], labels = [];
+    skills.forEach((s, i) => {
+      const slot = slots[i], isSel = sel === s.skill;
+      leaves.push({ ...slot, haloFill: isSel ? "#d6e4f5" : "transparent", fill: s.mastery === undefined ? "#d6e4f5" : `rgba(40,84,154,${(0.22 + s.mastery * 0.0078).toFixed(3)})`, stroke: isSel ? "#28549a" : "#172340", strokeW: isSel ? 2 : 1.3, onSelect: () => this.setState({ selected: s.skill }) });
+      const lines = [...wrap(s.title), s.mastery === undefined ? "new" : `${Math.round(s.mastery)}%`];
+      const top = slot.above ? slot.ly - (lines.length - 1) * 18 : slot.ly - ((lines.length - 1) * 18) / 2;
+      lines.forEach((text, j) => { const score = j === lines.length - 1; labels.push({ left: ((slot.lx + 100) / 600 * 100).toFixed(2) + "%", top: ((top + j * 18 + 30) / 482 * 100).toFixed(2) + "%", tf: `translate(${slot.anchor === "start" ? "0" : slot.anchor === "middle" ? "-50%" : "-100%"}, -80%)`, text, weight: score ? 500 : 600, color: score || isSel ? "#28549a" : "#172340" }); });
+    });
+    const cur = skills.find(s => s.skill === sel);
+    return {
+      leaves, labels, empty: slots.slice(skills.length),
+      sel: { ...cur, pct: cur.mastery === undefined ? "—" : Math.round(cur.mastery) + "%", estLabel: cur.mastery === undefined ? "No estimate yet" : "Estimated mastery", dash: `${((cur.mastery || 0) * 1.6965).toFixed(1)} 169.65` },
+    };
+  }
+}
+</script>
+</body>
+</html>

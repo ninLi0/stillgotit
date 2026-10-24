@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import InfoBubble from "./InfoBubble.vue";
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { api, failureText } from "./api.ts";
 import { uploadMaterial } from "./host-api.ts";
@@ -14,8 +15,10 @@ import type { StillGotItHttp } from "../../generated/wire.ts";
  * The graded-work import screen (design/compositions/Importing.md). The course page mounts it once for the screen, and
  * once in each library row, where `material` and `title` are given and it offers "Review graded work" for graded work.
  */
-const props = defineProps<{ course: string; material?: Material; title?: string; aiAvailable?: boolean; aiReason?: string }>();
-const emit = defineEmits<{ changed: [] }>();
+// `external` hides the closed-state intro: the Materials header has its own "Import graded work" button, which calls the
+// exposed startUpload, and gets focus back through `closed`.
+const props = defineProps<{ course: string; material?: Material; title?: string; aiAvailable?: boolean; aiReason?: string; external?: boolean }>();
+const emit = defineEmits<{ changed: []; closed: [] }>();
 const rowMode = props.material !== undefined;
 const graded = computed(() => isGradedTitle(props.title ?? ""));
 function requestReview() { if (props.material) reviewRequest.value = { course: props.course, material: props.material }; }
@@ -359,7 +362,8 @@ async function finish(material: Material, current: KeptReview, done: KeptRow[]) 
 function close() {
   stage.value = "closed"; reviewing.value = null; resetReview(); rememberOpen(null);
   error.value = []; notice.value = ""; nameError.value = ""; filesError.value = [];
-  void nextTick(() => openButton.value?.focus());
+  if (props.external) emit("closed");
+  else void nextTick(() => openButton.value?.focus());
 }
 
 if (!rowMode) {
@@ -379,14 +383,15 @@ if (!rowMode) {
   });
   onBeforeUnmount(() => { importBusy.value = false; });
 }
+defineExpose({ startUpload });
 </script>
 
 <template>
-  <button v-if="rowMode && graded" type="button" class="small-button" :disabled="importBusy" @click="requestReview">Review graded work</button>
-  <section v-else-if="!rowMode" ref="panel" class="graded-panel" :class="{ open: stage !== 'closed' }" :aria-busy="busy" aria-labelledby="graded-title">
+  <button v-if="rowMode && graded" type="button" class="secondary sand" :disabled="importBusy" @click="requestReview">Review graded work</button>
+  <section v-else-if="!rowMode && (stage !== 'closed' || !external)" ref="panel" class="graded-panel" :class="{ open: stage !== 'closed' }" :aria-busy="busy" aria-labelledby="graded-title">
     <div v-if="stage === 'closed'" class="graded-intro">
-      <div><h2 id="graded-title">Graded work</h2><p>Import a returned exam or problem set. Its marked questions become evidence for your skills.</p></div>
-      <button ref="openButton" type="button" class="small-button" @click="startUpload">Import graded work</button>
+      <div class="graded-title-row"><h2 id="graded-title">Graded work</h2><InfoBubble text="Import a returned exam or problem set. Its marked questions become evidence for your skills." /></div>
+      <button ref="openButton" type="button" class="secondary sand" @click="startUpload">Import graded work</button>
     </div>
     <template v-else>
       <header class="graded-heading">
@@ -403,7 +408,7 @@ if (!rowMode) {
       </div>
 
       <form v-if="stage === 'upload'" class="graded-upload" novalidate @submit.prevent="upload">
-        <p class="hint">Upload a returned exam or problem set with its marks. The tutor reads each marked question, and you check every result before anything counts as evidence.</p>
+        <p class="graded-info"><InfoBubble label="How graded import works" text="Upload a returned exam or problem set with its marks. The tutor reads each marked question, and you check every result before anything counts as evidence." /></p>
         <p v-if="uploadReason" id="graded-upload-reason" class="row-warning">{{ uploadReason }}</p>
         <label for="graded-name">Name of the work</label>
         <input id="graded-name" ref="nameInput" v-model="workName" :maxlength="NAME_LIMIT" placeholder="For example, Midterm 1" :disabled="busy" :aria-invalid="!!nameError" :aria-describedby="describedBy('graded-name-hint', !!nameError && 'graded-name-error')" @input="newRequest" />
@@ -416,8 +421,8 @@ if (!rowMode) {
         </ul>
         <p id="graded-files-hint" class="hint">A PDF, with or without a text layer, or photos of the pages (PNG, JPEG, or WebP). Each file can be up to 15 MB, and all files together up to 25 MB.</p>
         <div v-if="filesError.length" id="graded-files-error" ref="filesErrorBox" class="field-error" role="alert" tabindex="-1"><p v-for="line in filesError" :key="line">{{ line }}</p></div>
-        <p class="hint">One import reads at most 50 questions, so upload a longer paper in parts. {{ sentences.separateUploads }}</p>
-        <div class="graded-actions"><div class="action"><button class="primary" :disabled="busy || !!uploadReason" :aria-describedby="uploadReason ? 'graded-upload-reason' : undefined">{{ busy ? 'Uploading…' : 'Upload and read the marks' }}</button></div></div>
+        <p class="graded-info"><InfoBubble label="About long papers" :text="`One import reads at most 50 questions, so upload a longer paper in parts. ${sentences.separateUploads}`" /></p>
+        <div class="graded-actions"><div class="action"><button class="primary sand" :disabled="busy || !!uploadReason" :aria-describedby="uploadReason ? 'graded-upload-reason' : undefined">{{ busy ? 'Uploading…' : 'Upload and read the marks' }}</button></div></div>
       </form>
 
       <template v-if="stage === 'review'">
@@ -481,15 +486,15 @@ if (!rowMode) {
             <p class="hint">{{ summary }}</p>
             <p v-if="confirmError" id="graded-confirm-error" class="field-error" role="alert">{{ confirmError }}</p>
             <div class="graded-actions">
-              <div class="action"><p v-if="readReason" id="graded-read-reason" class="hint reason">{{ readReason }}</p><button type="button" class="small-button" :disabled="busy || !!readReason" :aria-describedby="describedBy('graded-read-hint', !!readReason && 'graded-read-reason')" @click="readAgain">Read the work again</button></div>
-              <div class="action"><p v-if="confirmReason" id="graded-confirm-reason" class="hint reason">{{ confirmReason }}</p><button type="button" class="primary" :disabled="busy || !!confirmReason" :aria-describedby="describedBy(!!confirmError && 'graded-confirm-error', !!confirmReason && 'graded-confirm-reason')" @click="confirmImport">{{ confirming ? 'Importing…' : 'Confirm import' }}</button></div>
+              <div class="action"><p v-if="readReason" id="graded-read-reason" class="hint reason">{{ readReason }}</p><button type="button" class="secondary sand" :disabled="busy || !!readReason" :aria-describedby="describedBy('graded-read-hint', !!readReason && 'graded-read-reason')" @click="readAgain">Read the work again</button></div>
+              <div class="action"><p v-if="confirmReason" id="graded-confirm-reason" class="hint reason">{{ confirmReason }}</p><button type="button" class="primary sand" :disabled="busy || !!confirmReason" :aria-describedby="describedBy(!!confirmError && 'graded-confirm-error', !!confirmReason && 'graded-confirm-reason')" @click="confirmImport">{{ confirming ? 'Importing…' : 'Confirm import' }}</button></div>
             </div>
             <p id="graded-read-hint" class="hint">Reading the work again asks the tutor again and replaces these questions and your changes to them.</p>
           </div>
         </div>
         <div v-else-if="!busy && reviewing" class="graded-actions start">
-          <div v-if="contextLoaded" class="action"><p v-if="readReason" id="graded-read-reason" class="hint reason">{{ readReason }}</p><button type="button" class="primary" :disabled="!!readReason" :aria-describedby="readReason ? 'graded-read-reason' : undefined" @click="readAgain">Read the work again</button></div>
-          <button v-else type="button" class="primary" @click="open(reviewing)">Try again</button>
+          <div v-if="contextLoaded" class="action"><p v-if="readReason" id="graded-read-reason" class="hint reason">{{ readReason }}</p><button type="button" class="primary sand" :disabled="!!readReason" :aria-describedby="readReason ? 'graded-read-reason' : undefined" @click="readAgain">Read the work again</button></div>
+          <button v-else type="button" class="primary sand" @click="open(reviewing)">Try again</button>
         </div>
 
         <section v-if="contextLoaded" class="graded-history" aria-labelledby="graded-history-title">
@@ -509,26 +514,27 @@ if (!rowMode) {
 </template>
 
 <style scoped>
-.graded-panel{margin-top:26px}.graded-intro{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 16px}.graded-intro h2,.graded-heading h2{font:22px Georgia,serif;margin:0 0 4px}.graded-intro p{margin:0;font-size:13px;color:var(--muted)}
-.graded-panel.open{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:0 1px 2px rgba(23,35,64,.05),0 10px 30px rgba(23,35,64,.07)}
+.graded-panel{margin-top:26px}.graded-intro{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;background:#fff;border:1px solid var(--line);border-radius:16px;padding:14px 16px}.graded-intro h2,.graded-heading h2{font:500 22px var(--font-display);margin:0 0 4px}.graded-intro p{margin:0;font-size:13px;color:var(--muted)}
+.graded-panel.open{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:0 1px 2px rgba(23,35,64,.05),0 10px 30px rgba(23,35,64,.07)}
 .graded-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}.graded-subtitle{margin:0;font-size:13px;color:var(--muted);overflow-wrap:anywhere}
 .graded-message{margin:14px 0 0}.working{font-size:13px;color:var(--muted);margin:14px 0 0}.working span{margin-right:6px}
 .graded-upload{max-width:none;margin-top:6px}.graded-upload label{margin:16px 0 7px;font-size:13px}.graded-upload input[type=file]{min-height:0;padding:10px 0;border:0;font-size:13px;background:transparent}
 .graded-files{list-style:none;margin:4px 0 0;padding:0}.graded-files li{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:6px 0;border-top:1px solid var(--line);font-size:13px;overflow-wrap:anywhere}.graded-files small{color:var(--muted)}.graded-files .quiet{font-size:12px;flex:none}
-.field-error{margin:8px 0 0;padding:8px 12px;border-left:3px solid var(--error);background:var(--surface);font-size:13px}.field-error p{margin:0}.field-error p+p{margin-top:4px}
-.graded-actions{display:flex;justify-content:flex-end;align-items:center;flex-wrap:wrap;gap:12px;margin-top:16px}.graded-actions.start{justify-content:flex-start}.action{display:inline-flex;flex-direction:column-reverse;align-items:flex-end}.start .action{align-items:flex-start}.graded-actions:not(.start) .action>.reason{left:auto!important;right:0}.graded-actions .small-button{padding:9px 14px;font-size:13px}
-.graded-file{margin:16px 0 0;font-size:13px}.graded-file summary{color:var(--muted)}.graded-file ul{margin:8px 0;padding-left:18px}.graded-file pre{max-height:200px;overflow:auto;white-space:pre-wrap;font-size:12px;background:var(--wash);padding:12px;border-radius:10px;margin:8px 0 0}
+.field-error{margin:8px 0 0;padding:8px 12px;border-left:3px solid var(--error);background:#fff;font-size:13px}.field-error p{margin:0}.field-error p+p{margin-top:4px}
+.graded-actions{display:flex;justify-content:flex-end;align-items:center;flex-wrap:wrap;gap:12px;margin-top:16px}.graded-actions.start{justify-content:flex-start}.action{display:inline-flex;flex-direction:column-reverse;align-items:flex-end}.start .action{align-items:flex-start}.graded-actions:not(.start) .action>.reason{left:auto!important;right:0}.graded-actions .secondary{font-size:13px}
+.graded-file{margin:16px 0 0;font-size:13px}.graded-file summary{color:var(--muted)}.graded-file ul{margin:8px 0;padding-left:18px}.graded-file pre{max-height:200px;overflow:auto;white-space:pre-wrap;font-size:12px;background:var(--inset);padding:12px;border-radius:10px;margin:8px 0 0}
 .graded-when{border:0;margin:18px 0 0;padding:0;min-width:0}.graded-when label{font-size:13px}.graded-when input[type=date]{max-width:220px}
-.check{display:flex;align-items:flex-start;gap:10px;font-size:13px;font-weight:400;margin:14px 0 0}.check input{width:16px;min-height:16px;height:16px;margin:3px 0 0;padding:0;flex:none;accent-color:var(--primary)}
-.graded-rows{list-style:none;margin:18px 0 0;padding:0;border:1px solid var(--line);border-radius:14px;overflow:hidden}.graded-row{padding:14px 16px}.graded-row+.graded-row{border-top:1px solid var(--line)}.graded-row.done{background:var(--wash)}
+.check{display:flex;align-items:flex-start;gap:10px;font-size:13px;font-weight:400;margin:14px 0 0}.check input{width:16px;min-height:16px;height:16px;margin:3px 0 0;padding:0;flex:none;accent-color:var(--sand-soft-text)}
+.graded-rows{list-style:none;margin:18px 0 0;padding:0;border:1px solid var(--line);border-radius:14px;overflow:hidden}.graded-row{padding:14px 16px}.graded-row+.graded-row{border-top:1px solid var(--line)}.graded-row.done{background:var(--inset)}
 .row-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.row-check{margin:0;flex:1;min-width:0}.row-check strong{font-size:15px;overflow-wrap:anywhere}
-.mark{background:var(--light);color:var(--edge);border-radius:999px;padding:2px 10px;font-size:13px;font-weight:600;white-space:nowrap}.imported-tag{color:var(--success);font-size:13px;font-weight:600}
+.mark{background:var(--sand-soft);color:var(--sand-text);border-radius:999px;padding:2px 10px;font-size:13px;font-weight:600;white-space:nowrap}.imported-tag{color:var(--strong);font-size:13px;font-weight:600}
 .row-facts{margin:10px 0 0;display:grid;gap:6px}.row-facts div{display:grid;grid-template-columns:140px minmax(0,1fr);gap:10px;font-size:13px}.row-facts dt{color:var(--muted)}.row-facts dd{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
 .row-choices{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin-top:10px}.row-choices label{font-size:12px;margin:0 0 5px}
-select{width:100%;font:inherit;font-size:14px;padding:9px 12px;border:1px solid var(--field);border-radius:7px;background:var(--surface);color:var(--ink)}select:disabled{opacity:.7}
-.row-warning{margin:10px 0 0;padding:8px 12px;border-left:3px solid var(--accent);background:var(--wash);font-size:13px}.graded-row.done .row-warning{background:var(--surface)}
+select{width:100%;font:inherit;font-size:14px;padding:9px 12px;border:1px solid var(--faint);border-radius:7px;background:#fff;color:var(--ink)}select:disabled{opacity:.7}
+.row-warning{margin:10px 0 0;padding:8px 12px;border-left:3px solid var(--sand-edge);background:var(--inset);font-size:13px}.graded-row.done .row-warning{background:#fff}
 .graded-confirm{margin-top:14px}.graded-confirm>.hint{margin:0}.graded-confirm>.hint:last-child{margin-top:10px}
-.graded-history{margin-top:22px;padding-top:16px;border-top:1px solid var(--line)}.graded-history h3{font:18px Georgia,serif;margin:0 0 8px}.graded-history ul{list-style:none;margin:0;padding:0}.graded-history li{padding:10px 0}.graded-history li+li{border-top:1px solid var(--line)}.graded-history p{margin:4px 0 0;font-size:13px}
+.graded-history{margin-top:22px;padding-top:16px;border-top:1px solid var(--line)}.graded-history h3{font:500 18px var(--font-display);margin:0 0 8px}.graded-history ul{list-style:none;margin:0;padding:0}.graded-history li{padding:10px 0}.graded-history li+li{border-top:1px solid var(--line)}.graded-history p{margin:4px 0 0;font-size:13px}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
 @media(max-width:650px){.graded-panel.open{padding:14px;border-radius:14px}.graded-row{padding:12px}.row-facts div{grid-template-columns:1fr;gap:2px}.row-choices{grid-template-columns:1fr}.graded-actions .action,.graded-actions .action button{width:100%}.graded-actions .action{align-items:stretch}}
+.graded-title-row{display:flex;align-items:center;gap:6px}.graded-info{margin:0 0 4px}
 </style>
