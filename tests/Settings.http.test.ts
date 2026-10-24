@@ -6,6 +6,7 @@ import { SESSION_COOKIE } from "../src/host/http-policy.ts";
 import { defaultChoice, tutorCatalog } from "../src/computations/tutor.ts";
 import type { CourseTutor } from "../src/host/tutor.ts";
 import type { TutorChoice } from "../src/tutor-types.ts";
+import type { HomeView } from "../src/computations/home-view.ts";
 import type { User } from "../src/concepts/Registering/Registering.ts";
 const ORIGIN = "http://localhost:5173", cleanups: (() => Promise<void>)[] = [];
 afterAll(async () => { for (const cleanup of cleanups.reverse()) await cleanup(); });
@@ -14,6 +15,7 @@ afterAll(async () => { for (const cleanup of cleanups.reverse()) await cleanup()
 const UNKNOWN_MODEL = "That model isn't offered. Choose one of the models in the Tutor panel.";
 const UNSUPPORTED_LEVEL = "That model doesn't offer this thinking level. Choose one of the levels shown for it.";
 const NO_LONGER_OFFERED = "The tutor model or thinking level you chose is no longer offered. Choose another one in the Tutor panel.";
+const VIEW_REFUSED = "Choose the skill tree or the task list.";
 // Sessioning's sentence for NOT_SIGNED_IN, which reaches the browser as the refusal's `detail`.
 const SIGNED_OUT = "Your session has ended. Sign in again.";
 const DEFAULT = defaultChoice({});
@@ -274,4 +276,76 @@ test("choosing does not wait for a running lesson, which keeps the pair it prepa
   expect(await running).toEqual({ status: 200, body: { lesson: expect.any(String), tutor: PRO_LOW } });
   expect(await learner.ok("/learning/lesson", { skill: learner.skill, request: "Again." })).toMatchObject({ tutor: LITE_HIGH });
   expect(app.sent.map(({ choice }) => choice)).toEqual([PRO_LOW, LITE_HIGH]);
+}, 30_000);
+
+test("the home view endpoints read and save the signed-in learner's view, with the skill tree as the default", async () => {
+  const app = await setup(), laptop = await app.browser(), phone = await app.browser(laptop.user), { ViewPreferring } = app.runtime.application.concepts;
+  // Nothing saved: the skill tree.
+  expect(await laptop.ok("/settings/view")).toEqual({ view: "tree" });
+  expect(await ViewPreferring._choice({ user: laptop.user })).toEqual([]);
+
+  // Saving answers the saved view, a second device reads it, and saving the same view again changes nothing.
+  expect(await laptop.ok("/settings/view/set", { view: "tasks" })).toEqual({ view: "tasks" });
+  expect(await phone.ok("/settings/view")).toEqual({ view: "tasks" });
+  expect(await laptop.ok("/settings/view/set", { view: "tasks" })).toEqual({ view: "tasks" });
+  expect(await ViewPreferring._choice({ user: laptop.user })).toEqual([{ option: "tasks" }]);
+
+  // Any other view is refused with the design's sentence, matched exactly including case, and nothing is saved.
+  for (const view of ["forest", "Tree", "TASKS", " tree", "tasks ", "", "x".repeat(100)]) {
+    expect(await laptop.post("/settings/view/set", { view }), JSON.stringify(view)).toEqual({ status: 400, body: { error: "INVALID_REQUEST", detail: VIEW_REFUSED } });
+  }
+  // The boundary refuses other input as invalid before the flow starts, without a refusal sentence.
+  for (const input of [{}, { view: 3 }, { view: null }, { view: true }, { view: ["tree"] }, { view: { view: "tree" } }, { view: "x".repeat(101) }, { view: "tree", user: laptop.user }]) {
+    expect(await laptop.post("/settings/view/set", input), JSON.stringify(input).slice(0, 80)).toEqual({ status: 400, body: { error: "INVALID_REQUEST" } });
+  }
+  expect(await laptop.ok("/settings/view")).toEqual({ view: "tasks" });
+  // The tutor choice is a separate setting, so saving a view leaves it as it was.
+  expect(await laptop.ok("/settings/tutor")).toEqual(settings(DEFAULT, "DEFAULT"));
+
+  // Choosing the skill tree saves it as the learner's own choice.
+  expect(await phone.ok("/settings/view/set", { view: "tree" })).toEqual({ view: "tree" });
+  expect(await laptop.ok("/settings/view")).toEqual({ view: "tree" });
+  expect(await ViewPreferring._choice({ user: laptop.user })).toEqual([{ option: "tree" }]);
+
+  // A saved view that is no longer offered is never answered; the skill tree applies until the learner saves again.
+  await ViewPreferring.set({ user: laptop.user, option: "forest" as HomeView });
+  expect(await laptop.ok("/settings/view")).toEqual({ view: "tree" });
+  expect(await laptop.ok("/settings/view/set", { view: "tasks" })).toEqual({ view: "tasks" });
+
+  // Without a session both endpoints are refused, and the native gateway reports the refusal code with its sentence.
+  for (const [path, input] of [["/settings/view", {}], ["/settings/view/set", { view: "tree" }]] as const) {
+    expect(await laptop.post(path, input, false), path).toEqual({ status: 401, body: { error: "UNAUTHORIZED", detail: SIGNED_OUT } });
+  }
+  expect(await app.runtime.gateway.invoke("/settings/view/set", { session: laptop.session, view: "forest" }))
+    .toEqual({ ok: false, error: { kind: "domain", value: "UNKNOWN_HOME_VIEW", detail: VIEW_REFUSED } });
+  expect(await app.runtime.gateway.invoke("/settings/view/set", { session: laptop.session, view: "tree" })).toEqual({ ok: true, value: { view: "tree" } });
+  expect(await app.runtime.gateway.invoke("/settings/view", { session: laptop.session })).toEqual({ ok: true, value: { view: "tree" } });
+  expect(await app.runtime.gateway.invoke("/settings/view", { session: "ended-session" })).toEqual({ ok: false, error: { kind: "domain", value: "NOT_SIGNED_IN", detail: SIGNED_OUT } });
+}, 30_000);
+
+test("another learner can neither read nor change the learner's home view", async () => {
+  const app = await setup(), maya = await app.browser(), sam = await app.browser(), { ViewPreferring } = app.runtime.application.concepts;
+  await maya.ok("/settings/view/set", { view: "tasks" });
+  expect(await sam.ok("/settings/view")).toEqual({ view: "tree" });
+  // Fields naming Maya are ignored on a read and refused on a save; the session decides whose view it is.
+  expect(await sam.ok("/settings/view", { owner: maya.user, user: maya.user, subject: maya.user })).toEqual({ view: "tree" });
+  expect((await sam.post("/settings/view/set", { view: "tree", user: maya.user })).status).toBe(400);
+  expect((await sam.post("/settings/view/set", { view: "tree", owner: maya.user })).status).toBe(400);
+  expect(await sam.ok("/settings/view/set", { view: "tree" })).toEqual({ view: "tree" });
+  expect(await maya.ok("/settings/view")).toEqual({ view: "tasks" });
+  expect(await ViewPreferring._choice({ user: maya.user })).toEqual([{ option: "tasks" }]);
+  expect(await ViewPreferring._choice({ user: sam.user })).toEqual([{ option: "tree" }]);
+}, 15_000);
+
+test("saving the home view does not wait for a running lesson", async () => {
+  const app = await setup(), learner = await app.learner();
+  const entered = Promise.withResolvers<void>(), release = Promise.withResolvers<void>();
+  app.duringGeneration(async () => { entered.resolve(); await release.promise; });
+  const running = learner.post("/learning/lesson", { skill: learner.skill, request: "Explain products." });
+  await entered.promise;
+  // The learner lock is held by the lesson, but saving and reading the view do not take it.
+  expect(await learner.ok("/settings/view/set", { view: "tasks" })).toEqual({ view: "tasks" });
+  expect(await learner.ok("/settings/view")).toEqual({ view: "tasks" });
+  release.resolve();
+  expect(await running).toEqual({ status: 200, body: { lesson: expect.any(String), tutor: DEFAULT } });
 }, 30_000);

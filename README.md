@@ -4,11 +4,12 @@ Learn course skills, check your understanding, and come back before you forget.
 
 StillGotIt turns your course materials into a tree of skills. For each skill, an AI tutor teaches from your own sources, gives you fresh practice, and assesses your work. The app estimates how well you know each skill and plans short reviews before you are likely to forget it.
 
-The app is built from nine concepts, connected by sync-engine endpoints, views, formers, and reactions. The [implementation guide](design/README.md) links each specification to its source code and to the generated read-back, and [runtime responsibilities](design/runtime.md) explains what the server handles outside the concepts.
+The app is built from ten concepts, connected by sync-engine endpoints, views, formers, and reactions. The [implementation guide](design/README.md) links each specification to its source code and to the generated read-back, and [runtime responsibilities](design/runtime.md) explains what the server handles outside the concepts.
 
 ## P3 beta
 
 - The app: **https://stillgotit.mit-sdg.dev**
+- Narrated journey video: [Your YouTube link]
 - [P3 status](P3.md): the journey, what changed, the validation, and the plan for P4
 - [Visual design study](design/visual-design.md)
 - [Saved test run](tests/output/p3-test-run.txt)
@@ -51,9 +52,10 @@ The class platform sets `HOST`, `PORT`, and `NODE_ENV` itself. [.env.example](.e
 
 ## Run the tests
 
-The tests need the local MongoDB server from `bun run db:up`. Each test file creates its own database, named `stillgotit_test_<id>`, and drops it when it finishes, so the tests never touch the app's data. The tests never call Gemini; they use fake responses instead.
+The tests need Docker for the local MongoDB server, which `bun run db:up` starts. Each test file creates its own database, named `stillgotit_test_<id>`, and drops it when it finishes, so the tests never touch the app's data. The tests never call Gemini; they use fake responses instead, so they need no Gemini key. Start Docker first, then run these commands from a fresh clone:
 
 ```sh
+bun install --frozen-lockfile
 bun run db:up
 bun run check
 bun run test

@@ -1,8 +1,8 @@
 import { endpoint, receive, respond } from "@mit-sdg/sync-engine/boundary";
 import { compute, former, is, no, view, where } from "@mit-sdg/sync-engine/language";
 import { concepts, computations as C } from "../concepts.ts";
-import { structuredOutput, tutorChoiceInput, validators } from "./reusable/inputs.ts";
-const { Sessioning, TutorPreferring: Preferring } = concepts;
+import { homeViewInput, recordOutput, structuredOutput, tutorChoiceInput, validators } from "./reusable/inputs.ts";
+const { Sessioning, TutorPreferring: Preferring, ViewPreferring } = concepts;
 const options = { validators: { ...validators, output: structuredOutput } };
 
 /** The design's sentences for the two ChooseTutor refusals. The HTTP adapter reports only a category, so the host adds them as `detail`. */
@@ -54,4 +54,31 @@ const ClearTutor = endpoint("/settings/tutor/clear", ({ session, owner }) => rec
   .then(Preferring.clear({ user: owner }).responds({}))
   .then(respond({ settings: TutorSettings({ owner }) })), options);
 
-export const composition = { TutorStatus, TutorSettings, TutorReady, SentTutor, ReadTutor, ChooseTutor, ClearTutor };
+/** The design's sentence for the SetHomeView refusal. The HTTP adapter reports only a category, so the host adds it as `detail`. */
+export const homeViewRefusals = {
+  UNKNOWN_HOME_VIEW: "Choose the skill tree or the task list.",
+} as const;
+
+/** Exactly one case holds for each learner: a saved view that is still offered, a saved view that is not, or no saved view. */
+const AppliedHomeView = view("the home view that applies to (owner)", ({ owner }, { view: shown }, { saved, offered }) => [
+  where(ViewPreferring._choice({ user: owner }).is({ option: shown }), compute(C.homeViewOffered, { view: shown }, offered), is.among(offered, [true])),
+  where(ViewPreferring._choice({ user: owner }).is({ option: saved }), compute(C.homeViewOffered, { view: saved }, offered), is.among(offered, [false]),
+    compute(C.defaultHomeView, {}, shown)),
+  where(no(ViewPreferring._choice({ user: owner })), compute(C.defaultHomeView, {}, shown)),
+]).one();
+
+const homeViewOptions = { validators: { ...validators, output: recordOutput(["view"]) } };
+
+const ReadHomeView = endpoint("/settings/view", ({ session, owner, shown }) => receive({ session })
+  .then(Sessioning.use({ session }).responds({ subject: owner }))
+  .then(where(AppliedHomeView({ owner }).is({ view: shown })).then(respond({ view: shown }))), homeViewOptions);
+
+const SetHomeView = endpoint("/settings/view/set", ({ session, view: requested, owner, offered, chosen }) => receive({ session, view: requested })
+  .then(Sessioning.use({ session }).responds({ subject: owner })).then(
+    where(compute(C.homeViewOffered, { view: requested }, offered), is.among(offered, [true]), compute(C.offeredHomeView, { view: requested }, chosen))
+      .then(ViewPreferring.set({ user: owner, option: chosen }).responds({}))
+      .then(respond({ view: chosen })).named("offered"),
+    where(compute(C.homeViewOffered, { view: requested }, offered), is.among(offered, [false])).then(respond({ error: "UNKNOWN_HOME_VIEW" })).named("unknown"),
+  ), { validators: { ...homeViewOptions.validators, input: homeViewInput } });
+
+export const composition = { TutorStatus, TutorSettings, TutorReady, SentTutor, ReadTutor, ChooseTutor, ClearTutor, AppliedHomeView, ReadHomeView, SetHomeView };

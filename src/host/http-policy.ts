@@ -1,5 +1,5 @@
 import { httpPolicy } from "@mit-sdg/sync-engine-http/policy";
-import { tutorRefusals } from "../compositions/settings.ts";
+import { homeViewRefusals, tutorRefusals } from "../compositions/settings.ts";
 import { assessmentReviewing } from "../concepts/AssessmentReviewing/registry.ts";
 import { commonsFederating } from "../concepts/Federating/registry.ts";
 import { generating } from "../concepts/Generating/registry.ts";
@@ -112,6 +112,8 @@ export function stillGotItPolicy(publicOrigin: string, requestBodyBytes = BODY_L
       // ChooseTutor refusals. Nothing is saved; the learner chooses again from the Tutor panel.
       UNKNOWN_TUTOR_MODEL: "INVALID_REQUEST",
       UNSUPPORTED_THINKING_LEVEL: "INVALID_REQUEST",
+      // The SetHomeView refusal. Nothing is saved; the learner chooses the skill tree or the task list.
+      UNKNOWN_HOME_VIEW: "INVALID_REQUEST",
 
       NOT_SIGNED_IN: "UNAUTHORIZED",
       SIGN_IN_EXPIRED: "FORBIDDEN",
@@ -186,8 +188,9 @@ export const refusalDetails: Readonly<Record<string, string>> = {
   // Planning.md.
   EXAM_SKILLS_UNAVAILABLE: "Choose confirmed skills from this course, each once.",
   PROPOSAL_UNAVAILABLE: "Choose one of your proposed plans.",
-  // Settings.md: the two ChooseTutor refusals.
+  // Settings.md: the two ChooseTutor refusals and the SetHomeView refusal.
   ...tutorRefusals,
+  ...homeViewRefusals,
   // Importing.md: Confirm's checks. GRADED_SOURCE_USED is AssessmentReviewing's own refusal, so its sentence comes from the concept.
   GRADED_DATE_INVALID: "Enter the date the work was performed.",
   GRADED_DATE_FUTURE: "The performance date cannot be after today.",

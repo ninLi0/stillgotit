@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import InfoBubble from "./InfoBubble.vue";
 import { computed, nextTick, reactive, ref, watch } from "vue";
 import { api, errorMessage } from "./api.ts";
 import { focusedControl, restoreFocus } from "./focus.ts";
@@ -280,8 +281,7 @@ function setEmphasis(unit: UnitRow, emphasized: boolean) {
 
 <template>
   <section v-if="data.units.length" class="manage-skills" :aria-busy="busy" :aria-labelledby="`${prefix}-title`">
-    <h2 :id="`${prefix}-title`">Manage skills</h2>
-    <p class="hint intro">Keep your confirmed skills accurate, and mark the units your professor emphasized.</p>
+    <div class="manage-head"><h2 :id="`${prefix}-title`">Manage skills</h2><InfoBubble text="Keep your confirmed skills accurate, and mark the units your professor emphasized." /></div>
     <p v-if="!confirmed.length" class="hint">Confirm a skill to rename it, revise it, add sources, or choose its prerequisites here.</p>
 
     <div v-for="group in groups" :key="group.unit.unit" class="unit-block">
@@ -299,18 +299,18 @@ function setEmphasis(unit: UnitRow, emphasized: boolean) {
                 <h4>Name and unit</h4>
                 <label>Skill name<input v-model="item.draft.title" type="text" maxlength="160" :disabled="busy" /></label>
                 <label>Unit<select v-model="item.draft.unit" :disabled="busy"><option v-for="unit in data.units" :key="unit.unit" :value="unit.unit">{{ unit.title }}</option></select></label>
-                <div class="actions"><button class="small-button" :disabled="busy || !!item.reasons.details" :aria-describedby="item.reasons.details ? reasonId(item.keys.details) : undefined">{{ working === item.keys.details ? 'Saving…' : 'Save name and unit' }}</button><p v-if="item.reasons.details" :id="reasonId(item.keys.details)" class="hint reason">{{ item.reasons.details }}</p></div>
+                <div class="actions"><button class="secondary sand" :disabled="busy || !!item.reasons.details" :aria-describedby="item.reasons.details ? reasonId(item.keys.details) : undefined">{{ working === item.keys.details ? 'Saving…' : 'Save name and unit' }}</button><p v-if="item.reasons.details" :id="reasonId(item.keys.details)" class="hint reason">{{ item.reasons.details }}</p></div>
                 <ManageNote :id="noteId(item.keys.details)" :note="notes[item.keys.details]" />
               </form>
 
               <div class="part">
                 <h4>Requirements</h4>
-                <p class="hint">Saving creates a new version. Earlier work keeps the version it used, including a practice session that is still open. The new version needs a new check.</p>
+                <p class="info-line"><InfoBubble label="About versions" text="Saving creates a new version. Earlier work keeps the version it used, including a practice session that is still open. The new version needs a new check." /></p>
                 <form @submit.prevent="revise(item)">
                   <p class="caption">{{ item.editingDefinition ? 'Unsaved changes' : 'Current version' }}</p>
                   <label>What you should be able to do<textarea v-model="item.draft.outcome" rows="2" maxlength="16000" :disabled="busy" /></label>
                   <label>How you will demonstrate it<textarea v-model="item.draft.gate" rows="3" maxlength="16000" :disabled="busy" /></label>
-                  <div class="actions"><button class="small-button" :disabled="busy || !!item.reasons.requirements" :aria-describedby="item.reasons.requirements ? reasonId(item.keys.requirements) : undefined">{{ working === item.keys.requirements ? 'Saving…' : 'Save new version' }}</button><p v-if="item.reasons.requirements" :id="reasonId(item.keys.requirements)" class="hint reason">{{ item.reasons.requirements }}</p></div>
+                  <div class="actions"><button class="secondary sand" :disabled="busy || !!item.reasons.requirements" :aria-describedby="item.reasons.requirements ? reasonId(item.keys.requirements) : undefined">{{ working === item.keys.requirements ? 'Saving…' : 'Save new version' }}</button><p v-if="item.reasons.requirements" :id="reasonId(item.keys.requirements)" class="hint reason">{{ item.reasons.requirements }}</p></div>
                   <ManageNote :id="noteId(item.keys.requirements)" :note="notes[item.keys.requirements]" />
                 </form>
                 <ol v-if="item.previous.length" class="versions">
@@ -323,8 +323,8 @@ function setEmphasis(unit: UnitRow, emphasized: boolean) {
                 <ul v-if="item.sources.length" class="chips"><li v-for="(title, index) in item.sources" :key="index">{{ title }}</li></ul>
                 <form v-if="item.addable.length" @submit.prevent="addSource(item)">
                   <label>Add a source<select v-model="item.draft.source" :disabled="busy"><option value="">Choose a material</option><option v-for="material in item.addable" :key="material.material" :value="material.material">{{ material.title }}</option></select></label>
-                  <p class="hint">A source stays with the skill once it is added.</p>
-                  <div class="actions"><button class="small-button" :disabled="busy || !!item.reasons.sources" :aria-describedby="item.reasons.sources ? reasonId(item.keys.sources) : undefined">{{ working === item.keys.sources ? 'Adding…' : 'Add source' }}</button><p v-if="item.reasons.sources" :id="reasonId(item.keys.sources)" class="hint reason">{{ item.reasons.sources }}</p></div>
+                  <p class="info-line"><InfoBubble label="About sources" text="A source stays with the skill once it is added." /></p>
+                  <div class="actions"><button class="secondary sand" :disabled="busy || !!item.reasons.sources" :aria-describedby="item.reasons.sources ? reasonId(item.keys.sources) : undefined">{{ working === item.keys.sources ? 'Adding…' : 'Add source' }}</button><p v-if="item.reasons.sources" :id="reasonId(item.keys.sources)" class="hint reason">{{ item.reasons.sources }}</p></div>
                 </form>
                 <p v-else class="hint">Every material in this course is already a source for this skill.</p>
                 <ManageNote :id="noteId(item.keys.sources)" :note="notes[item.keys.sources]" />
@@ -335,9 +335,9 @@ function setEmphasis(unit: UnitRow, emphasized: boolean) {
                   <legend><h4>Prerequisites</h4></legend>
                   <p class="hint">{{ item.builtOn.length ? `Builds on ${quoted(item.builtOn)}.` : 'No prerequisites yet.' }}</p>
                   <template v-if="item.candidates.length">
-                    <p class="hint">Choose the skills to learn before this one. Saving replaces the whole list.</p>
+                    <p class="info-line"><InfoBubble label="About prerequisites" text="Choose the skills to learn before this one. Saving replaces the whole list." /></p>
                     <div class="choices"><label v-for="choice in item.candidates" :key="choice.skill" class="check"><input v-model="item.draft.prerequisites" type="checkbox" :value="choice.skill" /><span>{{ choice.title }}<small v-if="choice.detail">{{ choice.detail }}</small></span></label></div>
-                    <div class="actions"><button class="small-button" :disabled="busy || !!item.reasons.prerequisites" :aria-describedby="item.reasons.prerequisites ? reasonId(item.keys.prerequisites) : undefined">{{ working === item.keys.prerequisites ? 'Saving…' : 'Save prerequisites' }}</button><p v-if="item.reasons.prerequisites" :id="reasonId(item.keys.prerequisites)" class="hint reason">{{ item.reasons.prerequisites }}</p></div>
+                    <div class="actions"><button class="secondary sand" :disabled="busy || !!item.reasons.prerequisites" :aria-describedby="item.reasons.prerequisites ? reasonId(item.keys.prerequisites) : undefined">{{ working === item.keys.prerequisites ? 'Saving…' : 'Save prerequisites' }}</button><p v-if="item.reasons.prerequisites" :id="reasonId(item.keys.prerequisites)" class="hint reason">{{ item.reasons.prerequisites }}</p></div>
                   </template>
                   <p v-else class="hint">Confirm another skill in this course to choose prerequisites.</p>
                 </fieldset>
@@ -346,8 +346,8 @@ function setEmphasis(unit: UnitRow, emphasized: boolean) {
 
               <div class="part">
                 <h4>Archive</h4>
-                <p class="hint">An archived skill leaves your tree and plan. It keeps its history, and you can restore it.</p>
-                <div class="actions"><button type="button" class="small-button" :disabled="busy || !!item.reasons.status" :aria-describedby="item.reasons.status ? reasonId(item.keys.status) : undefined" @click="archive(item)">{{ working === item.keys.status ? 'Archiving…' : 'Archive skill' }}</button><p v-if="item.reasons.status" :id="reasonId(item.keys.status)" class="hint reason">{{ item.reasons.status }}</p></div>
+                <p class="info-line"><InfoBubble label="About archiving" text="An archived skill leaves your tree and plan. It keeps its history, and you can restore it." /></p>
+                <div class="actions"><button type="button" class="secondary sand" :disabled="busy || !!item.reasons.status" :aria-describedby="item.reasons.status ? reasonId(item.keys.status) : undefined" @click="archive(item)">{{ working === item.keys.status ? 'Archiving…' : 'Archive skill' }}</button><p v-if="item.reasons.status" :id="reasonId(item.keys.status)" class="hint reason">{{ item.reasons.status }}</p></div>
               </div>
             </div>
           </details>
@@ -359,12 +359,12 @@ function setEmphasis(unit: UnitRow, emphasized: boolean) {
 
     <section v-if="archived.length" class="archived" :aria-labelledby="`${prefix}-archived`">
       <h3 :id="`${prefix}-archived`">Archived</h3>
-      <p class="hint">Archived skills are off your tree and plan. Restoring one brings it back with its history.</p>
+      <p class="info-line"><InfoBubble label="About archived skills" text="Archived skills are off your tree and plan. Restoring one brings it back with its history." /></p>
       <ul class="manage-list">
         <li v-for="item in archived" :key="item.skill.skill">
           <div class="archived-row">
             <span class="skill-text"><strong>{{ item.skill.title }}</strong><small>{{ item.unitTitle }}</small></span>
-            <div class="actions end"><button type="button" class="small-button" :aria-label="`Restore ${item.skill.title}`" :disabled="busy || !!item.reason" :aria-describedby="item.reason ? reasonId(item.key) : undefined" @click="restore(item)">{{ working === item.key ? 'Restoring…' : 'Restore' }}</button><p v-if="item.reason" :id="reasonId(item.key)" class="hint reason">{{ item.reason }}</p></div>
+            <div class="actions end"><button type="button" class="secondary sand" :aria-label="`Restore ${item.skill.title}`" :disabled="busy || !!item.reason" :aria-describedby="item.reason ? reasonId(item.key) : undefined" @click="restore(item)">{{ working === item.key ? 'Restoring…' : 'Restore' }}</button><p v-if="item.reason" :id="reasonId(item.key)" class="hint reason">{{ item.reason }}</p></div>
           </div>
           <div class="item-note"><ManageNote :id="noteId(item.key)" :note="notes[item.key]" /></div>
         </li>
@@ -374,22 +374,23 @@ function setEmphasis(unit: UnitRow, emphasized: boolean) {
 </template>
 
 <style scoped>
-.manage-skills{margin-top:26px}.manage-skills>h2{font:22px Georgia,serif;margin:0 0 6px}.intro{margin:0}
+.manage-skills{margin-top:26px}.manage-skills>h2{font:500 22px var(--font-display);margin:0 0 6px}.intro{margin:0}
 .unit-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px 16px;margin:18px 0 6px}.unit-head h3,.archived h3{display:flex;align-items:center;flex-wrap:wrap;gap:8px;min-width:0;margin:0;font-size:12px;font-weight:600;color:var(--muted);overflow-wrap:anywhere}
-.emphasis-mark{display:inline-flex;align-items:center;gap:4px;border-radius:999px;background:var(--light);color:var(--edge);padding:2px 9px;font-size:11px;font-weight:600}
-.switch{display:inline-flex;align-items:center;gap:8px;border:0;background:none;padding:4px 0;font-size:12px;color:var(--ink);text-align:left}.switch-track{position:relative;flex:none;width:32px;height:18px;border-radius:9px;background:var(--field)}.switch-track::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(23,35,64,.3)}.switch[aria-checked="true"] .switch-track{background:var(--primary)}.switch[aria-checked="true"] .switch-track::after{transform:translateX(14px)}
-.manage-list{list-style:none;margin:0;padding:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}.manage-list>li+li{border-top:1px solid var(--line)}
-summary{display:flex;align-items:center;gap:12px;padding:12px 14px;cursor:pointer;list-style:none}summary::-webkit-details-marker{display:none}summary:hover{background:var(--wash)}summary::after{content:"›";font-size:18px;line-height:1;color:var(--muted)}details[open]>summary::after{transform:rotate(90deg)}
-.skill-text{flex:1;min-width:0}.skill-text strong{display:block;font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.skill-text small{display:block;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.manage-label{font-size:12px;font-weight:600;color:var(--primary)}
+.emphasis-mark{display:inline-flex;align-items:center;gap:4px;border-radius:999px;background:var(--sand-soft);color:var(--sand-text);padding:2px 9px;font-size:11px;font-weight:600}
+.switch{display:inline-flex;align-items:center;gap:8px;border:0;background:none;padding:4px 0;font-size:12px;color:var(--ink);text-align:left}.switch-track{position:relative;flex:none;width:32px;height:18px;border-radius:9px;background:var(--faint)}.switch-track::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(23,35,64,.3)}.switch[aria-checked="true"] .switch-track{background:var(--sand-soft-text)}.switch[aria-checked="true"] .switch-track::after{transform:translateX(14px)}
+.manage-list{list-style:none;margin:0;padding:0;background:#fff;border:1px solid var(--line);border-radius:16px;overflow:hidden}.manage-list>li+li{border-top:1px solid var(--line)}
+summary{display:flex;align-items:center;gap:12px;padding:12px 14px;cursor:pointer;list-style:none}summary::-webkit-details-marker{display:none}summary:hover{background:var(--inset)}summary::after{content:"›";font-size:18px;line-height:1;color:var(--muted)}details[open]>summary::after{transform:rotate(90deg)}
+.skill-text{flex:1;min-width:0}.skill-text strong{display:block;font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.skill-text small{display:block;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.manage-label{font-size:12px;font-weight:600;color:var(--sand-soft-text)}
 .panel{padding:0 14px 4px}.part{max-width:none;padding:14px 0;border-top:1px solid var(--line)}.part form{max-width:none}.part h4,.part legend{margin:0;padding:0;font-size:14px;font-weight:650}fieldset{min-width:0;margin:0;padding:0;border:0}
-label{margin:12px 0 0;font-size:12px}input[type=text]{min-height:40px;margin-top:6px;padding:8px 12px;font-size:14px}select,textarea{display:block;width:100%;margin-top:6px;padding:9px 12px;border:1px solid var(--field);border-radius:8px;background:var(--surface);color:var(--ink);font:inherit;font-size:14px}textarea{resize:vertical;line-height:1.5}
-.actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;margin-top:12px}.actions .reason{flex:1 1 220px;margin:0}.small-button{min-height:34px;padding:6px 12px;font-size:13px}
+label{margin:12px 0 0;font-size:12px}input[type=text]{min-height:40px;margin-top:6px;padding:8px 12px;font-size:14px}select,textarea{display:block;width:100%;margin-top:6px;padding:9px 12px;border:1px solid var(--faint);border-radius:8px;background:#fff;color:var(--ink);font:inherit;font-size:14px}textarea{resize:vertical;line-height:1.5}
+.actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;margin-top:12px}.actions .reason{flex:1 1 220px;margin:0}.secondary{min-height:36px;padding:0 14px;font-size:13px}
 .caption{margin:12px 0 0;font-size:11px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
-.versions{display:grid;gap:8px;list-style:none;margin:14px 0 0;padding:0}.versions li{padding:10px 12px;border-radius:10px;background:var(--wash)}.versions .caption{margin:0 0 4px}.versions p{margin:0;font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}.versions .gate{margin-top:6px;color:var(--muted)}.versions .gate span{font-weight:600;color:var(--ink)}
+.versions{display:grid;gap:8px;list-style:none;margin:14px 0 0;padding:0}.versions li{padding:10px 12px;border-radius:10px;background:var(--inset)}.versions .caption{margin:0 0 4px}.versions p{margin:0;font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}.versions .gate{margin-top:6px;color:var(--muted)}.versions .gate span{font-weight:600;color:var(--ink)}
 .chips{display:flex;flex-wrap:wrap;gap:8px;list-style:none;margin:10px 0 0;padding:0}.chips li{max-width:100%;padding:4px 11px;border:1px solid var(--line);border-radius:999px;font-size:12px;overflow-wrap:anywhere}
-.choices{margin-top:6px}.check{display:flex;align-items:flex-start;gap:10px;margin:8px 0;font-size:13px;font-weight:400}.check input{flex:none;width:16px;height:16px;min-height:16px;margin:3px 0 0;padding:0;accent-color:var(--primary)}.check span{min-width:0;overflow-wrap:anywhere}.check small{display:block;font-size:12px;color:var(--muted)}
+.choices{margin-top:6px}.check{display:flex;align-items:flex-start;gap:10px;margin:8px 0;font-size:13px;font-weight:400}.check input{flex:none;width:16px;height:16px;min-height:16px;margin:3px 0 0;padding:0;accent-color:var(--sand-soft-text)}.check span{min-width:0;overflow-wrap:anywhere}.check small{display:block;font-size:12px;color:var(--muted)}
 .item-note:has(p){padding:0 14px 12px}.empty-unit{margin:4px 0 0}
 .archived{margin-top:22px}.archived h3{margin-bottom:0}.archived>.hint{margin:4px 0 8px}.archived-row{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;padding:12px 14px}.archived-row .skill-text{min-width:140px}.actions.end{flex:0 1 auto;justify-content:flex-end;margin-top:0}.actions.end>.reason{left:auto!important;right:0}
 @media (prefers-reduced-motion:no-preference){.switch-track,.switch-track::after{transition:background-color 150ms,transform 150ms}summary::after{transition:transform 150ms}}
 @media(max-width:650px){summary,.archived-row{padding:12px}.panel{padding:0 12px 4px}.item-note:has(p){padding:0 12px 12px}.manage-label{display:none}}
+.manage-head{display:flex;align-items:center;gap:6px;margin:0 0 6px}.manage-head h2{font:500 22px var(--font-display);margin:0}.info-line{margin:2px 0}
 </style>

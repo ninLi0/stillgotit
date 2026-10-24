@@ -9,6 +9,8 @@ concrete TutorAnswer
   Validated generated text, citations, material identities, optional judgment values, skill suggestions, and extracted graded rows.
 concrete TutorChoice
   One offered tutor model name and one thinking level that model supports, validated on the server against the tutor catalog.
+concrete HomeView
+  The view Home shows: `tree` for the skill tree or `tasks` for the task list, validated on the server.
 ```
 
 ```instances
@@ -57,6 +59,10 @@ instantiate Preferring as TutorPreferring with
   User is Registering.User
   Option is TutorChoice
 
+instantiate Preferring as ViewPreferring with
+  User is Registering.User
+  Option is HomeView
+
 ```
 
 ## Accounts
@@ -96,7 +102,7 @@ The [course composition](../compositions/Courses.md) declares the course endpoin
 
 The API uses the reference HTTP adapter at `/api`. Cookies own `attempt` and `session`. The continuation wrapper also owns `recoveryKey`; the browser client omits that field from the generated input type. Input and result validation, exact request-origin checks, size limits, no-store responses, and no-referrer pages apply to the flow. Callback parameters are removed from the address before posting them. Session creation has no public endpoint accepting a local user ID.
 
-The interface uses black, white, and gray. Avenir Next or the system sans-serif serves controls and conversations; Georgia serves Home headings. Home centers on a line-art skill tree. Selecting a leaf shows its outcome, estimate, and an Open lesson action. Course materials opens a separate setup view for importing sources and reviewing skills. The study plan is expandable on Home.
+The [visual design study](../visual-design.md) describes the interface's colors and typography and where each is used. Home centers on a line-art skill tree, or on a task list when the learner chooses it; the [settings](../compositions/Settings.md) keep that choice on the server as `ViewPreferring`. Selecting a leaf shows its outcome, estimate, and an Open lesson action. Course materials opens a separate setup view for importing sources and reviewing skills. The study plan is expandable on Home.
 
 Learn opens a dedicated chat. A light sidebar holds conversations for the selected skill. The main area shows learner and tutor messages, source references, and assessments. A rounded composer combines text, photo attachments, voice transcription, and Send. Speech remains editable before sending. Learning and independent practice are visibly distinct; assessment still requires explicit review of the complete attempt. Switching Home and Learn preserves the open conversation and unsent work. On narrow screens, conversation history becomes a compact horizontal list. Keyboard focus remains visible.
 
@@ -132,4 +138,4 @@ Uploads accept up to 12 files and 25 MB in total. PDF pages are read as text, an
 
 ## Learning application
 
-[Learning flows](../compositions/Learning.md), [shared reads](../compositions/LearningReads.md), [progress reactions](../compositions/Progress.md), [planning endpoints](../compositions/Planning.md), and [tutor settings](../compositions/Settings.md) define the rest of this stage. The host forwards JSON requests to these declared endpoints. It does not sequence tutoring, assessment, mastery, or planning actions. [Importing graded work](../compositions/Importing.md) turns returned, graded coursework into imported assessment evidence.
+[Learning flows](../compositions/Learning.md), [shared reads](../compositions/LearningReads.md), [progress reactions](../compositions/Progress.md), [planning endpoints](../compositions/Planning.md), and [settings](../compositions/Settings.md) for the tutor choice and the home view define the rest of this stage. The host forwards JSON requests to these declared endpoints. It does not sequence tutoring, assessment, mastery, or planning actions. [Importing graded work](../compositions/Importing.md) turns returned, graded coursework into imported assessment evidence.

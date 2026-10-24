@@ -137,10 +137,10 @@ function openCase(item: Case) { if (item.task) emit("openSession", item.task); }
   <section class="estimate-panel" aria-labelledby="estimate-heading">
     <div class="estimate-top">
       <div class="estimate-figure">
-        <h2 id="estimate-heading">{{ data.estimate ? `${percent(data.estimate.value)} estimated mastery` : 'No estimate yet' }}</h2>
+        <h2 id="estimate-heading" class="eyebrow rail-title">Evidence<span class="sr-only"> · {{ data.estimate ? `${percent(data.estimate.value)} estimated mastery` : 'No estimate yet' }}</span></h2>
         <p v-if="data.estimate" class="readiness">{{ data.estimate.basis }}</p>
       </div>
-      <button v-if="data.track" type="button" class="small-button adjust-toggle" :aria-expanded="adjustOpen" aria-controls="adjust-form" :disabled="sending" @click="toggleAdjust">Adjust estimate</button>
+      <button v-if="data.track" type="button" class="adjust-toggle" :aria-expanded="adjustOpen" aria-controls="adjust-form" :disabled="sending" @click="toggleAdjust">Adjust estimate</button>
     </div>
 
     <form v-if="data.track" v-show="adjustOpen" id="adjust-form" class="adjust-form" novalidate @submit.prevent="sendAdjustment">
@@ -157,7 +157,7 @@ function openCase(item: Case) { if (item.task) emit("openSession", item.task); }
         </div>
       </div>
       <p class="hint">An adjustment never marks a skill as ready by itself.</p>
-      <button class="primary" :disabled="sending || busy">{{ retrying ? 'Send adjustment again' : 'Save adjustment' }}</button>
+      <button class="primary dawn" :disabled="sending || busy">{{ retrying ? 'Send adjustment again' : 'Save adjustment' }}</button>
       <div role="alert"><p v-if="problem" id="adjust-problem" ref="problemBox" class="error" tabindex="-1">{{ problem }}</p></div>
     </form>
     <div role="status"><p v-if="sending" class="working-note">Saving your adjustment…</p><p v-else-if="saved" ref="savedBox" class="notice" tabindex="-1">{{ saved }}</p></div>
@@ -207,60 +207,52 @@ function openCase(item: Case) { if (item.task) emit("openSession", item.task); }
 </template>
 
 <style scoped>
-.estimate-panel{padding:18px max(24px,calc((100% - 750px)/2)) 22px;background:var(--wash);border-bottom:1px solid var(--line);max-height:min(50%,540px);flex:none;overflow-y:auto;font-size:13px}
-.estimate-top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+/* The Evidence card of the Learn rail (design/revamp/README.md): a lavender rail with square nodes. */
+.estimate-panel{font-size:13px;overflow-wrap:anywhere}
+.estimate-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .estimate-figure{min-width:0}
-.estimate-top h2{font:22px/1.3 Georgia,serif;letter-spacing:-.3px;margin:0}
-.readiness{margin:4px 0 0;color:var(--muted)}
-.adjust-toggle{padding:9px 13px;font-size:12px;white-space:nowrap;flex:none}
-.adjust-form{max-width:none;margin:14px 0 6px;padding:16px;background:var(--surface);border:1px solid var(--line);border-radius:12px}
-.adjust-fields{display:grid;grid-template-columns:150px minmax(0,1fr);gap:14px}
-.adjust-form label{font-size:12px;margin:0 0 6px}
-.value-input{display:flex;align-items:center;gap:8px}
-.value-input input{min-height:42px;padding:8px 10px;font-variant-numeric:tabular-nums}
+.rail-title{color:#7A7397}
+.readiness{margin:8px 0 0;color:var(--soft);font-size:12px;line-height:1.5}
+.adjust-toggle{flex:none;border:0;border-radius:999px;background:var(--dawn-soft);color:var(--dawn-soft-text);padding:4px 10px;font-size:12px;font-weight:700;white-space:nowrap}
+.adjust-toggle:hover:not(:disabled){background:#DEDAFF}
+.adjust-form{max-width:none;margin:12px 0 6px;padding:12px;background:#FAF9FE;border:1px solid #ECE9F5;border-radius:14px}
+.adjust-fields{display:grid;grid-template-columns:1fr;gap:10px}
+.adjust-form label{font-size:12px;font-weight:600;margin:0 0 6px}
+.value-input{display:flex;align-items:center;gap:8px;max-width:140px}
+.value-input input{min-height:38px;padding:6px 10px;font-variant-numeric:tabular-nums;border-radius:10px}
 .adjust-form .hint{font-size:12px;margin:6px 0 0}
-.adjust-form textarea{display:block;width:100%;min-height:42px;padding:10px;border:1px solid var(--field);border-radius:8px;font:inherit;background:var(--surface);color:var(--ink);resize:vertical}
-.adjust-form [aria-invalid="true"]{border-color:var(--error);border-width:2px}
-.adjust-form .primary{min-height:42px;margin-top:14px;padding:8px 18px}
-.adjust-form .error{margin:14px 0 0}
-.waiting-note{margin:0 0 12px;padding:10px 12px;border-left:3px solid var(--accent);background:var(--wash);border-radius:4px}
+.adjust-form textarea{display:block;width:100%;min-height:42px;padding:8px 10px;border:1px solid var(--ring);border-radius:10px;font:inherit;font-size:13px;background:#FFFFFF;color:var(--ink);resize:vertical}
+.adjust-form [aria-invalid="true"]{border-color:var(--coral);border-width:2px}
+.adjust-form .primary{min-height:38px;margin-top:12px;padding:0 14px;font-size:13px}
+.adjust-form .error{margin:12px 0 0}
+.waiting-note{margin:0 0 10px;padding:8px 10px;border-left:3px solid var(--dawn-edge);background:#FFFFFF;border-radius:4px;font-size:12px}
 .working-note{margin:10px 0 0;color:var(--muted)}
-.notice{margin:12px 0 0}
-h3{font-size:14px;margin:22px 0 8px}
-.basis{margin:0 0 6px;color:var(--ink);line-height:1.6}
-.provisional{display:inline-block;margin-right:8px;padding:1px 8px;border:1px solid var(--accent);border-radius:999px;font-size:11px;font-weight:600;color:var(--edge);background:var(--surface)}
-.timeline{list-style:none;margin:12px 0 0 5px;padding:0;border-left:2px solid var(--light)}
-.row{position:relative;display:grid;grid-template-columns:96px minmax(0,1fr) auto;gap:2px 14px;padding:9px 0 9px 18px}
-.row::before{content:"";position:absolute;left:-7px;top:14px;width:12px;height:12px;border-radius:50%;background:var(--surface);border:2px solid var(--accent)}
-.kind-start::before{border-color:var(--field)}
-.kind-attempt::before{background:var(--primary);border-color:var(--primary)}
-.kind-time::before{border-color:var(--line)}
-.row-date{color:var(--muted);white-space:nowrap}
-.row-body{min-width:0}
-.row-body strong{font-weight:600}
-.row-body p{margin:2px 0 0;color:var(--muted);overflow-wrap:anywhere}
+.notice{margin:10px 0 0}
+h3{font-family:var(--font-display);font-weight:500;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#7A7397;margin:16px 0 6px}
+.basis{margin:0 0 6px;color:var(--soft);line-height:1.5;font-size:12px}
+.provisional{display:inline-block;margin-right:6px;padding:0 7px;border-radius:999px;font-size:11px;font-weight:700;color:var(--dawn-soft-text);background:var(--dawn-soft)}
+.timeline{list-style:none;margin:10px 0 0 4px;padding:0;border-left:2px solid #E3DEF7}
+.row{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"body date" "body value";gap:0 8px;padding:0 0 12px 14px;line-height:1.35}
+.row::before{content:"";position:absolute;left:-6px;top:5px;width:10px;height:10px;background:#A79CEE}
+.kind-start::before{background:#D6D1F2}
+.kind-time::before{background:#E3DEF7}
+.row-date{grid-area:date;color:#8A8A86;font-size:12px;white-space:nowrap;text-align:right}
+.row-body{grid-area:body;min-width:0}
+.row-body strong{font-weight:700}
+.row-body p{margin:2px 0 0;color:var(--faint);font-size:12px;line-height:1.4}
 .row-body .row-reason{color:var(--ink);font-style:italic}
-.row-value{font-weight:600;white-space:nowrap;font-variant-numeric:tabular-nums}
-.ignored{margin:0;padding-left:18px}
+.row-value{grid-area:value;font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums;text-align:right;font-size:12px}
+.ignored{margin:0;padding-left:16px;font-size:12px}
 .ignored li{margin:0 0 6px}
 .ignored strong{margin-right:6px}
 .case-history{list-style:none;margin:0;padding:0}
-.case-history li{padding:10px 0;border-top:1px solid var(--line)}
+.case-history li{padding:8px 0;border-top:1px solid #EEEBF5}
 .case-history li:first-child{border-top:0}
-.case-line{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:baseline}
-.case-note{margin:4px 0 0;color:var(--muted);overflow-wrap:anywhere}
-.case-note span{display:block;font-size:11px;font-weight:600;color:var(--ink);margin-top:6px}
-.imported{padding-left:12px!important;border-left:3px solid var(--accent)}
-.case-open{border:0;background:transparent;padding:0 0 0 10px;font-size:12px;color:var(--primary);text-decoration:underline;text-underline-offset:3px}
+.case-line{display:flex;flex-wrap:wrap;gap:2px 10px;align-items:baseline}
+.case-line .row-date{text-align:left}
+.case-note{margin:4px 0 0;color:var(--muted);font-size:12px}
+.case-note span{display:block;font-size:11px;font-weight:700;color:var(--ink);margin-top:6px}
+.imported{padding-left:10px!important;border-left:3px solid #A79CEE}
+.case-open{border:0;background:transparent;padding:0 0 0 8px;font-size:12px;font-weight:600;color:var(--dawn-soft-text);text-decoration:underline;text-underline-offset:3px}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
-@media(max-width:900px){.estimate-panel{padding-left:20px;padding-right:20px}}
-@media(max-width:650px){
-  .estimate-panel{padding:14px 8px 18px}
-  .estimate-top{flex-wrap:wrap}
-  .estimate-top h2{font-size:19px}
-  .adjust-fields{grid-template-columns:1fr}
-  .value-input{max-width:150px}
-  .row{grid-template-columns:minmax(0,1fr) auto}
-  .row-date{grid-column:1/-1;font-size:12px}
-}
 </style>

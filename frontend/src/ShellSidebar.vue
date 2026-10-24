@@ -1,0 +1,101 @@
+<script setup lang="ts">
+import { computed } from "vue";
+import PixelIcon from "./PixelIcon.vue";
+import type { IconName } from "./pixel-art.ts";
+
+// The app's sidebar (design/revamp/README.md): brand, course switcher (the slot, owned by App.vue), the nav rows with
+// their biome capsules and badges, and at the bottom the Today card, the tutor model row and Settings. Under 760px it
+// becomes a top bar with the nav rows as a horizontal strip.
+export type ShellView = "home" | "plan" | "setup" | "chat";
+const props = defineProps<{ view: ShellView; forestOpen: boolean; lessonTitle?: string; materialsBadge: number; homeBadge?: number;
+  today: { spent: number; total: number } | null; tutorLabel: string; username: string }>();
+const emit = defineEmits<{ navigate: [view: ShellView]; forest: []; lesson: []; tutor: []; settings: [] }>();
+
+type Row = { view: ShellView | "forest"; label: string; icon: IconName; biome: string; badge?: number };
+const rows = computed<Row[]>(() => [
+  { view: "home", label: "Home", icon: "home", biome: "meadow", badge: props.homeBadge },
+  { view: "plan", label: "Plan", icon: "calendar", biome: "ocean" },
+  { view: "setup", label: "Materials", icon: "school", biome: "sand", badge: props.materialsBadge },
+  { view: "forest", label: "Forest view", icon: "tree", biome: "meadow" },
+]);
+function isCurrent(row: Row) {
+  if (row.view === "forest") return props.forestOpen;
+  if (props.forestOpen) return false;
+  return row.view === "home" ? props.view === "home" || props.view === "chat" : props.view === row.view;
+}
+function go(row: Row) { if (row.view === "forest") emit("forest"); else emit("navigate", row.view); }
+const cells = computed(() => {
+  const t = props.today; const on = t && t.total > 0 ? Math.round(Math.min(1, t.spent / t.total) * 15) : 0;
+  return Array.from({ length: 15 }, (_, i) => i < on);
+});
+</script>
+
+<template>
+  <aside class="shell-sidebar">
+    <div class="brand"><PixelIcon name="leaf" :size="24" /><span class="brand-name">StillGotIt</span></div>
+    <slot name="switcher" />
+    <nav class="nav" aria-label="Study views">
+      <template v-for="row in rows" :key="row.view">
+        <button type="button" class="nav-row" :class="[row.biome, { current: isCurrent(row) }]" :aria-current="isCurrent(row) ? 'page' : undefined" @click="go(row)">
+          <PixelIcon :name="row.icon" :size="24" /><span class="nav-label">{{ row.label }}</span>
+          <span v-if="row.badge" class="badge" :aria-label="`${row.badge} waiting`">{{ row.badge }}</span>
+        </button>
+        <button v-if="row.view === 'home' && lessonTitle" type="button" class="sub-row" :class="{ current: view === 'chat' && !forestOpen }" :aria-current="view === 'chat' && !forestOpen ? 'page' : undefined" @click="emit('lesson')">
+          <span class="sub-square" aria-hidden="true" /><span class="sub-label">{{ lessonTitle }}</span>
+        </button>
+      </template>
+    </nav>
+    <div class="bottom">
+      <div class="today card">
+        <div class="today-top"><PixelIcon name="sun" :size="20" /><span class="eyebrow">Today</span><span class="today-min">{{ today ? `${today.spent} of ${today.total} min` : 'No study time set' }}</span></div>
+        <span class="today-cells" role="img" :aria-label="today ? `${today.spent} of ${today.total} minutes studied today` : 'No daily study time set'">
+          <span v-for="(on, i) in cells" :key="i" class="today-cell" :class="{ on }" />
+        </span>
+      </div>
+      <button type="button" class="foot-row" aria-haspopup="dialog" @click="emit('tutor')"><PixelIcon name="leaf" :size="20" /><span class="foot-label">{{ tutorLabel || 'Tutor' }}</span></button>
+      <button type="button" class="foot-row" aria-haspopup="dialog" @click="emit('settings')"><PixelIcon name="settings" :size="20" /><span class="foot-label">{{ username }}</span><span class="sr-only"> · Settings</span></button>
+    </div>
+  </aside>
+</template>
+
+<style scoped>
+.shell-sidebar { display: flex; flex-direction: column; gap: 14px; padding: 20px 12px 14px 14px; min-width: 0; position: sticky; top: 0; height: 100dvh; overflow-y: auto; }
+.brand { display: flex; align-items: center; gap: 8px; padding: 0 6px; }
+.brand-name { font: 500 20px var(--font-display); color: var(--ink); }
+.nav { display: flex; flex-direction: column; gap: 4px; }
+.nav-row { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 42px; padding: 0 12px 0 10px; border: 0; border-radius: 999px; background: transparent; color: var(--soft); font-size: 15px; font-weight: 600; text-align: left; }
+.nav-row:hover { background: var(--inset-2); color: var(--ink); }
+.nav-row.current { color: var(--ink); font-weight: 700; }
+.nav-row.current.meadow { background: var(--meadow-nav); }
+.nav-row.current.ocean { background: var(--ocean-nav); }
+.nav-row.current.sand { background: var(--sand-nav); }
+.nav-label { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.badge { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--coral); color: #fff; font-size: 12px; font-weight: 700; }
+.nav-row.current .badge { background: #fff; color: var(--coral); }
+.sub-row { display: flex; align-items: center; gap: 8px; margin: 0 4px 2px 34px; padding: 6px 10px; border: 0; border-radius: 10px; background: #F1EEFF; color: var(--dawn-text); font-size: 13px; font-weight: 600; text-align: left; min-width: 0; }
+.sub-row.current { box-shadow: 0 0 0 1px var(--dawn-edge); }
+.sub-square { width: 8px; height: 8px; flex: none; background: #8B7FE0; }
+.sub-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bottom { margin-top: auto; display: flex; flex-direction: column; gap: 6px; }
+.today { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.today-top { display: flex; align-items: center; gap: 6px; }
+.today-min { margin-left: auto; font-size: 13px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+.today-cells { display: flex; gap: 2px; }
+.today-cell { flex: 1 1 0; height: 6px; border-radius: 1px; background: #F1EBDA; }
+.today-cell.on { background: #E3A233; }
+.foot-row { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 38px; padding: 0 10px; border: 0; border-radius: 12px; background: transparent; color: var(--soft); font-size: 13px; font-weight: 600; text-align: left; }
+.foot-row:hover { background: var(--inset-2); color: var(--ink); }
+.foot-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+@media (max-width: 760px) {
+  .shell-sidebar { position: static; height: auto; padding: 12px 14px 4px; gap: 10px; overflow: visible; }
+  .brand { padding: 0; }
+  .nav { flex-direction: row; overflow-x: auto; gap: 4px; padding-bottom: 4px; scrollbar-width: none; }
+  .nav-row { width: auto; flex: none; min-height: 38px; font-size: 14px; }
+  .nav-label { overflow: visible; }
+  .sub-row { flex: none; margin: 0; max-width: 180px; }
+  .bottom { flex-direction: row; flex-wrap: wrap; margin-top: 0; }
+  .today { flex: 1 1 100%; padding: 8px 10px; }
+  .foot-row { width: auto; flex: 1 1 0; min-width: 0; }
+}
+</style>

@@ -1,6 +1,6 @@
 # Implementation specifications
 
-[P1 concepts](p1-concepts.md) preserves the original design. Current concept specifications use sync-engine 1.1.0 format.
+[P1 concepts](p1-concepts.md) preserves the original design. Current concept specifications use sync-engine 1.2.0 format.
 
 ## Registered concepts
 
@@ -15,22 +15,22 @@
 | [Sessioning](concepts/Sessioning.md) | Local sessions and expiry. |
 | [Federating](concepts/Federating.md) | Verified Commons identities and local account links. |
 | [Generating](concepts/Generating.md) | A stateless external-provider action used as TutorGenerating. |
-| [Preferring](concepts/Preferring.md) | A user's remembered choice among offered options, used as TutorPreferring for the tutor model and thinking level. |
+| [Preferring](concepts/Preferring.md) | A user's remembered choice among offered options, used as TutorPreferring for the tutor model and thinking level and as ViewPreferring for the home view. |
 
-The eight domain concepts and TutorPreferring own their MongoDB collections. Generating has no durable state. None calls another concept. [Source attribution](../THIRD_PARTY_NOTICES.md) identifies the reused account code and license.
+The eight domain concepts, TutorPreferring, and ViewPreferring own their MongoDB collections. Generating has no durable state. None calls another concept. [Source attribution](../THIRD_PARTY_NOTICES.md) identifies the reused account code and license.
 
 ## Application boundary
 
-[The P2 stage](stages/materials.md) is selected by `generated.config.ts`. It binds ten instances. The selected [course flows](compositions/Courses.md), learning, progress, planning, read, admission, computation, and [tutor settings](compositions/Settings.md) documents describe the current engine flows. [Generated read-back](../generated/stillgotit.md) shows the resulting `when / where / then` rules.
+[The application stage](stages/materials.md) is selected by `generated.config.ts`. It binds eleven instances. The selected [course flows](compositions/Courses.md), learning, progress, planning, read, admission, computation, and [settings](compositions/Settings.md) documents describe the current engine flows. [Generated read-back](../generated/stillgotit.md) shows the resulting `when / where / then` rules.
 
-The selected composition documents match the current implementation. Unselected access and identity sketches describe broader P3 work. The selected P2 stage and its linked flow documents identify the implemented paths. [The onboarding stage](stages/onboarding.md) preserves an earlier increment.
+The selected composition documents match the current implementation. Unselected access and identity sketches describe broader work that the selected stage does not bind. The selected stage and its linked flow documents identify the implemented paths. [The onboarding stage](stages/onboarding.md) preserves an earlier increment.
 
 - [Runtime contract](runtime.md): host boundaries, provider access, and recovery.
 - [Material data](material-data.md): retained originals and readable renditions.
 - [Import store](material-import-store.md): one key and frozen preparation per import.
 - [Shared identities](types.md): bindings across concepts.
-- [P2 progress](../P2.md): current checks and work still requiring live validation.
-- [Diagnostic review](advisory-review.md): all 40 advisories, tested fixes, and P2 decisions.
+- [P3 status](../P3.md): the beta's journey, checks, known limits, and plan. [P2](../P2.md) records the earlier alpha.
+- [Diagnostic review](advisory-review.md): the P2 review of the checker's advisories, with its tested fixes and decisions.
 
 ## Checks
 

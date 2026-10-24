@@ -1,10 +1,15 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onDeactivated, ref, shallowRef, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onDeactivated, onMounted, ref, shallowRef, watch } from "vue";
 import { uploadMaterial } from "./host-api.ts";
 import SpeechInput from "./SpeechInput.vue";
 import ListenButton from "./ListenButton.vue";
 import SourcesUsed from "./SourcesUsed.vue";
 import EstimatePanel from "./EstimatePanel.vue";
+import PixelIcon from "./PixelIcon.vue";
+import MasteryCells from "./MasteryCells.vue";
+import InfoBubble from "./InfoBubble.vue";
+import { stageOf } from "./pixel-art.ts";
+import type { OpenSource } from "./revamp-types.ts";
 import { api, unwrap } from "./api.ts";
 import { resultLabels, sessionLabels } from "./labels.ts";
 import { focusedControl, restoreFocus } from "./focus.ts";
@@ -17,8 +22,10 @@ type StudySession = SkillData["sessions"][number];
 /** A photo uploaded for the answer being written. `preview` is a local picture of it, so learners can tell photos apart. */
 type Attachment = { material: string; name: string; preview: string };
 // aiReason explains why AI features are off when aiAvailable is false. materials gives titles for cited sources.
-const props = defineProps<{ skill: string; course: string; materials: { material: string; title: string }[]; aiAvailable: boolean; aiReason: string; active?: boolean }>();
-const emit = defineEmits<{ changed: [] }>();
+// initialDraft prefills the message box of a new conversation (for example "Ask about this page" in Materials); it is never sent by itself.
+const props = defineProps<{ skill: string; course: string; materials: { material: string; title: string }[]; aiAvailable: boolean; aiReason: string; active?: boolean; initialDraft?: string }>();
+// `back` returns to the skill tree. `open-source` asks the shell to show a cited source in Materials.
+const emit = defineEmits<{ changed: []; back: []; "open-source": [source: OpenSource] }>();
 const data = shallowRef<SkillData | null>(null), selected = ref<StudySession["session"] | "">(""), busy = ref(false), error = ref(""), notice = ref("");
 const noticeBox = ref<HTMLElement | null>(null), errorBox = ref<HTMLElement | null>(null), composerInput = ref<HTMLTextAreaElement | null>(null), heading = ref<HTMLElement | null>(null);
 const confidence = ref(50), freshLesson = ref(false), recording = ref(false), reviewOpen = ref(false), thread = ref<HTMLElement | null>(null), evidenceOpen = ref(false);
@@ -138,12 +145,84 @@ async function requestRegrade(assessment: string, basedOn: string) {
 async function saveCorrection(assessment: string, basedOn: string) {
   await act(async () => { unwrap(await api.learning.correct({ case: assessment, basedOn, result: correction.value, gateMet: fullGate.value, reason: reason.value })); reason.value = ""; }, "Correction saved. The assessment above shows your correction.");
 }
+// ---- Presentation for the Pixel Nature layout (design/revamp/README.md) ----
+const pct = computed(() => data.value?.estimate ? data.value.estimate.value : null);
+const pctText = computed(() => pct.value === null ? "–" : `${Math.round(pct.value)}%`);
+const stage = computed(() => stageOf(pct.value));
+const masteryNote = computed(() => [data.value?.estimate?.basis ?? "No estimate yet. Set your starting confidence, then practice.",
+  data.value?.explanation?.provisional ? "Provisional: no assessed attempt has counted toward this estimate yet." : "",
+  "The mastery estimate is a study aid, not a course grade."].filter(Boolean).join(" "));
+const composerNote = computed(() => current.value?.task ? "Review your complete answer before requesting assessment." : "Grounded in your course materials. Check important details.");
+/** Session identities are time-ordered UUIDs (version 7), whose first 48 bits are the start time. Older ones have no date. */
+const tabDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "America/New_York" });
+function sessionDate(id: string) {
+  if (id[14] !== "7") return "";
+  const time = parseInt(id.replace(/-/g, "").slice(0, 12), 16);
+  return Number.isFinite(time) ? tabDate.format(new Date(time)) : "";
+}
+function assessed(id: string) { return data.value?.cases.some((item) => item.task === id && !!item.judgment) ?? false; }
+// Every source this skill's conversations were taught from, once each, for the rail's Taught from card.
+const railCitations = computed(() => {
+  const seen = new Set<string>(), out: StudySession["citations"][number][] = [];
+  for (const session of data.value?.sessions ?? []) for (const citation of session.citations) {
+    const key = `${citation.material}\n${citation.location}`;
+    if (!seen.has(key)) { seen.add(key); out.push(citation); }
+  }
+  return out;
+});
+/** Splits a tutor answer into prose and fenced code or $$ maths blocks, so blocks render in the mono font. */
+function blocks(text: string): { code: boolean; text: string }[] {
+  const out: { code: boolean; text: string }[] = [], pattern = /```[^\n]*\n?([\s\S]*?)```|\$\$([\s\S]*?)\$\$/g;
+  let last = 0, match: RegExpExecArray | null;
+  while ((match = pattern.exec(text))) {
+    if (match.index > last) out.push({ code: false, text: text.slice(last, match.index).replace(/^\n+|\n+$/g, "") });
+    out.push({ code: true, text: (match[1] ?? match[2] ?? "").replace(/\n+$/, "") });
+    last = pattern.lastIndex;
+  }
+  if (last < text.length) out.push({ code: false, text: text.slice(last).replace(/^\n+/, "") });
+  return out.filter((part) => part.code || part.text.trim());
+}
+const SUCCESS = new Set(["INDEPENDENT", "SUPPORTED"]);
+/** The estimate after an assessed attempt and its change, from the explanation's timeline. */
+function attemptChange(assessment: string) {
+  const change = data.value?.explanation?.changes.find((row) => row.kind === "ATTEMPT" && row.source === assessment);
+  if (!change) return null;
+  const delta = Math.round(change.after - change.before);
+  return { after: `${Math.round(change.after)}%`, delta: delta === 0 ? "No change" : `${delta > 0 ? "+" : "−"}${Math.abs(delta)} ${Math.abs(delta) === 1 ? "point" : "points"}` };
+}
+// Under 1240px the rail slides over the lesson; the mastery chip opens it. evidenceOpen keeps its old meaning: the evidence is in view.
+const narrow = ref(false), railChip = ref<HTMLElement | null>(null), railClose = ref<HTMLButtonElement | null>(null);
+let narrowQuery: MediaQueryList | null = null;
+const onNarrow = () => { narrow.value = !!narrowQuery?.matches; };
+onMounted(() => { narrowQuery = window.matchMedia("(max-width: 1239px)"); onNarrow(); narrowQuery.addEventListener("change", onNarrow); });
+onBeforeUnmount(() => narrowQuery?.removeEventListener("change", onNarrow));
+async function toggleRail() { evidenceOpen.value = !evidenceOpen.value; await nextTick(); if (evidenceOpen.value) railClose.value?.focus(); }
+async function closeRail() { evidenceOpen.value = false; await nextTick(); railChip.value?.focus(); }
+function openSource(source: OpenSource) { emit("open-source", source); }
+/** A draft from elsewhere starts a new conversation with the message box filled in and focused. It is not sent. */
+async function applyDraft(draft: string | undefined) {
+  if (!draft) return;
+  if (!freshLesson.value || selected.value !== "") { freshLesson.value = true; reviewOpen.value = false; selected.value = ""; await nextTick(); }
+  response.value = draft; channel.value = "TEXT";
+  await nextTick();
+  if (!busy.value && composerInput.value && !composerInput.value.disabled) { composerInput.value.focus(); return; }
+  const stop = watch(busy, async (now) => { if (!now) { stop(); await nextTick(); composerInput.value?.focus(); } });
+}
 watch(() => props.skill, (skill) => {
   selected.value = ""; data.value = null; response.value = ""; attachments.value = []; reviewed.value = false;
   // An unanswered adjustment from before a reload is shown at once, so the learner can see it and send it again.
   evidenceOpen.value = !!new PendingAdjustment(sessionStore(), skill).read();
   act(load);
 }, { immediate: true });
+watch(() => props.initialDraft, (draft) => { void applyDraft(draft); }, { immediate: true });
+/** The shell's "Check my understanding": the same admission as the header button. A refusal shows its sentence in the alert area. */
+async function startPractice() {
+  if (busy.value || !data.value) return;
+  const refusal = practiceReason.value || (!props.aiAvailable ? aiOff.value : "");
+  if (refusal) { notice.value = ""; error.value = refusal; await nextTick(); errorBox.value?.focus(); return; }
+  await startTask();
+}
+defineExpose({ startPractice });
 watch(selected, (next, previous) => {
   unsent.set(previous, { text: response.value, channel: channel.value, attachments: attachments.value });
   const saved = unsent.get(next); response.value = saved?.text ?? ""; channel.value = saved?.channel ?? "TEXT"; attachments.value = saved?.attachments ?? []; reviewed.value = false;
@@ -162,89 +241,278 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
 </script>
 
 <template>
-  <section class="study-chat" :aria-busy="busy">
-    <aside class="chat-history">
-      <button class="new-lesson" :disabled="busy || recording" @click="newLesson"><span aria-hidden="true">＋</span> New conversation</button>
-      <p class="history-caption">This skill</p>
-      <button v-for="session in data?.sessions" :key="session.session" class="history-item" :class="{ chosen: !freshLesson && selected === session.session }" :disabled="busy || recording" @click="selectSession(session.session)">
-        <span>{{ labels[session.session] }}</span><small>{{ session.lesson?.request || (session.status === 'CLOSED' ? 'Submitted work' : 'Independent check') }}</small>
-      </button>
-      <p v-if="!data?.sessions.length" class="hint">Your conversations will appear here.</p>
-      <details v-if="data" class="skill-detail"><summary>About this skill</summary><p>{{ data.skill.outcome }}</p><strong>How to demonstrate it</strong><p>{{ data.skill.gate }}</p><p v-if="data.estimate">{{ data.estimate.basis }}</p><p class="hint">The mastery estimate is a study aid, not a course grade.</p></details>
-    </aside>
-    <div class="chat-main">
-      <header class="chat-heading">
-        <div><h1 id="page-title" ref="heading" tabindex="-1">{{ data?.skill.title || 'Opening your lesson…' }}</h1><p>{{ current?.task ? 'Independent practice' : 'Lesson' }}<template v-if="hasEvidence"> · <button type="button" class="estimate-toggle" :aria-expanded="evidenceOpen" aria-controls="estimate-panel" @click="evidenceOpen = !evidenceOpen">{{ estimateText ? `${estimateText} · Evidence` : 'Assessment history' }}<span aria-hidden="true">{{ evidenceOpen ? '▴' : '▾' }}</span></button></template><span v-else-if="estimateText"> · {{ estimateText }}</span></p></div>
-        <div class="heading-action"><button class="practice-button" :disabled="busy || recording || !aiAvailable || !data?.track" :aria-describedby="describedBy(!!practiceReason && 'practice-reason', !aiAvailable && 'ai-reason-chat')" @click="startTask">Check my understanding</button><p v-if="practiceReason" id="practice-reason" class="hint reason">{{ practiceReason }}</p></div>
-      </header>
-      <EstimatePanel v-if="data && hasEvidence" v-show="evidenceOpen" id="estimate-panel" :skill="skill" :data="data" :session-labels="labels" :busy="busy" :reload="load" @changed="emit('changed')" @open-session="openCaseSession" />
-      <div ref="thread" class="chat-thread">
-        <div v-if="data && !data.track" class="confidence-note">
-          <form @submit.prevent="saveConfidence"><label for="confidence">How confident do you feel?</label><div class="confidence"><input id="confidence" v-model.number="confidence" type="range" min="0" max="100" :disabled="busy" /><output>{{ confidence }}%</output><button :disabled="busy" class="small-button">Set starting point</button></div><p class="hint">A rough estimate is fine. Your practice will refine it.</p></form>
-        </div>
-        <div v-if="!current && data" class="chat-welcome">
-          <span class="tutor-mark" aria-hidden="true">✳</span><h2>Let's work through it.</h2><p>{{ data.skill.outcome }}</p>
-          <div class="prompt-choices"><button :disabled="busy" @click="choosePrompt('Explain this skill with a worked example.')">Show me an example</button><button :disabled="busy" @click="choosePrompt('Explain why this method works, using a concrete example.')">Help me understand why</button><button :disabled="busy" @click="choosePrompt('Walk me through guided practice. Ask one question at a time.')">Guide me through practice</button></div>
-        </div>
-        <template v-if="current">
-          <div v-if="current.lesson" class="message from-you"><span class="speaker">You</span><p class="prose">{{ current.lesson.request }}</p></div>
-          <article class="message from-tutor"><div class="speaker-row"><span class="speaker"><span aria-hidden="true">✳</span> StillGotIt</span><ListenButton :message-key="`${current.session}:opening`" :text="current.lesson?.explanation || current.task?.question || ''" :what="current.lesson ? 'lesson' : 'practice question'" describedby="listen-reason" /></div><div class="prose">{{ current.lesson?.explanation || current.task?.question }}</div>
-            <p v-if="answerLabel('session', current.session)" class="tutor-label">{{ answerLabel('session', current.session) }}</p>
-            <SourcesUsed v-if="current.citations.length" :key="current.session" :citations="current.citations" :titles="materialTitles" :id-prefix="`passage-${current.session}`" />
-          </article>
-          <article v-for="item in current.dialogue" :key="item.turnIndex" class="message" :class="item.turn.speaker === 'LEARNER' ? 'from-you' : 'from-tutor'">
-            <div v-if="item.turn.speaker === 'TUTOR'" class="speaker-row"><span class="speaker">StillGotIt{{ purposeNote(item.turn.purpose) }}</span><ListenButton :message-key="`${current.session}:${item.turnIndex}`" :text="item.turn.text" :what="item.turn.purpose === 'HINT' ? 'hint' : 'tutor reply'" describedby="listen-reason" /></div>
-            <span v-else class="speaker">You{{ purposeNote(item.turn.purpose) }}</span>
-            <p class="prose">{{ item.turn.text }}</p><p v-for="(file, fileIndex) in item.turn.media" :key="file.file" class="attachment-label">{{ item.turn.media.length > 1 ? `Attachment ${fileIndex + 1} of ${item.turn.media.length}` : 'Attachment' }} · {{ file.name }}</p><p v-if="answerLabel('turn', current.session, item.turnIndex)" class="tutor-label">{{ answerLabel('turn', current.session, item.turnIndex) }}</p></article>
-          <button v-if="current.lesson && current.dialogue.at(-1)?.turn.speaker === 'LEARNER'" class="message-action" :disabled="busy || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="retryReply">Retry tutor reply</button>
-          <div v-if="current.task && current.status === 'OPEN' && current.dialogue.some(item => item.turn.speaker === 'LEARNER' && item.turn.purpose === 'RESPONSE')" class="review-step">
-            <button class="practice-button" :disabled="busy || recording" @click="reviewOpen = !reviewOpen">{{ reviewOpen ? 'Close review' : 'Review and assess my work' }}</button>
-            <div v-if="reviewOpen" class="attempt-review">
-              <h3>Ready to check your understanding?</h3><p class="hint">Review your complete answer before assessment.</p>
-              <div v-for="voice in current.voice" :key="voice.turnIndex" class="transcript"><label :for="`voice-${voice.turnIndex}`">Speech transcript {{ voice.turnIndex + 1 }}</label><textarea :id="`voice-${voice.turnIndex}`" v-model="speechEdits[voice.turnIndex]" rows="3" /><button class="message-action" :disabled="busy" @click="correctTranscript(voice.turnIndex)">Save transcript correction</button></div>
-              <label class="check"><input v-model="unseen" type="checkbox" /> These exact problems are new to me.</label><label class="check"><input v-model="outsideHelp" type="checkbox" /> I used help outside this conversation.</label><label class="check"><input v-model="reviewed" type="checkbox" /> I reviewed my answer and all speech transcripts.</label>
-              <button class="primary" :disabled="busy || !!assessReason" :aria-describedby="assessReason ? 'assess-reason' : undefined" @click="assess">Assess my work</button><p v-if="assessReason" id="assess-reason" class="hint reason">{{ assessReason }}</p>
+  <section class="learn" :class="{ narrow, 'rail-open': evidenceOpen }" :aria-busy="busy">
+    <div class="learn-main">
+      <header class="learn-head">
+        <div class="head-row">
+          <div class="head-title">
+            <span class="sprite-tile"><PixelIcon :sprite="stage" :size="36" /></span>
+            <div class="title-block">
+              <button type="button" class="back-link" @click="emit('back')">← Your skill tree</button>
+              <h1 id="page-title" ref="heading" tabindex="-1">{{ data?.skill.title || 'Opening your lesson…' }}</h1>
+              <p class="sr-only">{{ current?.task ? 'Independent practice' : 'Lesson' }}<template v-if="estimateText"> · {{ estimateText }}</template></p>
             </div>
           </div>
-          <button v-if="current.status === 'CLOSED' && !currentCases.some(item => item.judgment)" class="practice-button" :disabled="busy || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="assess">Retry saved assessment</button>
-          <article v-for="item in currentCases" :key="item.case" class="assessment">
-            <template v-if="item.judgment"><span class="speaker">Your assessment</span><h3>{{ resultLabels[item.judgment.result] }}</h3><p class="prose">{{ item.judgment.rationale }}</p>
-              <p v-if="answerLabel('judgment', item.judgment.judgment)" class="tutor-label">{{ answerLabel('judgment', item.judgment.judgment) }}</p>
-              <details><summary>Review or correct this assessment</summary><label>Reason<textarea v-model="reason" rows="3" /></label><p v-if="!reason.trim()" :id="`reason-needed-${item.case}`" class="hint reason">Write a reason to request a regrade or save a correction.</p><button class="message-action" :disabled="busy || !aiAvailable || !reason.trim()" :aria-describedby="describedBy(!reason.trim() && `reason-needed-${item.case}`, !aiAvailable && 'ai-reason-chat')" @click="requestRegrade(item.case, item.judgment.judgment)">Request regrade</button>
-              <label>Manual correction<select v-model="correction"><option v-for="(label,value) in resultLabels" :key="value" :value="value">{{ label }}</option></select></label><label class="check"><input v-model="fullGate" type="checkbox" /> All requirements were met in fresh independent work.</label><button class="message-action" :disabled="busy || !reason.trim()" :aria-describedby="reason.trim() ? undefined : `reason-needed-${item.case}`" @click="saveCorrection(item.case, item.judgment.judgment)">Save correction</button><ol><li v-for="judgment in item.history" :key="judgment.judgment">{{ resultLabels[judgment.result] }} · {{ judgment.origin === 'AI' ? 'Tutor' : 'Your correction' }}<p>{{ judgment.rationale }}</p></li></ol></details>
-            </template><p v-else>Your answer is saved. Assessment is pending.</p>
-          </article>
-        </template>
-        <p v-if="busy" class="working" role="status"><span aria-hidden="true">✳</span> Working on it…</p>
-        <div role="status"><p v-if="notice && !busy" ref="noticeBox" class="notice" tabindex="-1">{{ notice }}</p></div>
-        <div role="alert"><p v-if="error" ref="errorBox" class="error" tabindex="-1">{{ error }}</p></div>
+          <div class="head-actions">
+            <button v-if="narrow" ref="railChip" type="button" class="mastery-chip" :aria-expanded="evidenceOpen" aria-controls="learn-rail" :aria-label="`${estimateText || 'No estimate yet'}. ${evidenceOpen ? 'Hide' : 'Show'} mastery and evidence`" @click="toggleRail">
+              <span class="chip-top"><strong>{{ pctText }}</strong><span>mastery</span></span><MasteryCells :value="pct" :cells="7" :height="4" label="" aria-hidden="true" />
+            </button>
+            <div v-else class="mastery-chip static" role="img" :aria-label="estimateText || 'No estimate yet'"><span class="chip-top"><strong>{{ pctText }}</strong><span>mastery</span></span><MasteryCells :value="pct" :cells="7" :height="4" label="" aria-hidden="true" /></div>
+            <div class="heading-action"><button class="primary dawn practice-button" :disabled="busy || recording || !aiAvailable || !data?.track" :aria-describedby="describedBy(!!practiceReason && 'practice-reason', !aiAvailable && 'ai-reason-chat')" @click="startTask">Check my understanding</button><p v-if="practiceReason" id="practice-reason" class="hint reason">{{ practiceReason }}</p></div>
+          </div>
+        </div>
+        <nav class="tabs" aria-label="Conversations for this skill">
+          <button v-for="session in data?.sessions" :key="session.session" type="button" class="tab" :class="{ chosen: !freshLesson && selected === session.session }" :aria-current="!freshLesson && selected === session.session ? 'true' : undefined" :title="session.lesson?.request || (session.status === 'CLOSED' ? 'Submitted work' : 'Independent check')" :disabled="busy || recording" @click="selectSession(session.session)">
+            <span class="tab-square" :class="session.lesson ? 'lesson' : 'practice'" aria-hidden="true" />{{ labels[session.session] }}<span v-if="sessionDate(session.session)" class="tab-date">{{ sessionDate(session.session) }}</span><span v-if="assessed(session.session)" class="tab-done"><span aria-hidden="true">✓</span><span class="sr-only">, assessed</span></span>
+          </button>
+          <button type="button" class="new-lesson" :class="{ chosen: freshLesson || !data?.sessions.length }" :disabled="busy || recording" @click="newLesson">+ New conversation</button>
+        </nav>
+      </header>
+      <div ref="thread" class="chat-thread">
+        <div class="thread-inner">
+          <div v-if="data && !data.track" class="confidence-note">
+            <form @submit.prevent="saveConfidence"><label for="confidence">How confident do you feel?</label><div class="confidence"><input id="confidence" v-model.number="confidence" type="range" min="0" max="100" :disabled="busy" /><output>{{ confidence }}%</output><button :disabled="busy" class="secondary dawn small-button">Set starting point</button></div><p class="hint">A rough estimate is fine. Your practice will refine it.</p></form>
+          </div>
+          <div v-if="!current && data" class="chat-welcome">
+            <PixelIcon name="leaf" :size="48" /><h2>Let's work through it.</h2><p>{{ data.skill.outcome }}</p>
+            <div class="prompt-choices"><button :disabled="busy" @click="choosePrompt('Explain this skill with a worked example.')">Show me an example</button><button :disabled="busy" @click="choosePrompt('Explain why this method works, using a concrete example.')">Help me understand why</button><button :disabled="busy" @click="choosePrompt('Walk me through guided practice. Ask one question at a time.')">Guide me through practice</button></div>
+          </div>
+          <template v-if="current">
+            <div v-if="current.lesson" class="message from-you"><span class="sr-only">You</span><p class="prose">{{ current.lesson.request }}</p></div>
+            <article class="message from-tutor"><div class="speaker-row"><span class="speaker"><PixelIcon name="leaf" :size="18" /> StillGotIt<span v-if="current.task" class="tag task">Practice task</span></span><ListenButton :message-key="`${current.session}:opening`" :text="current.lesson?.explanation || current.task?.question || ''" :what="current.lesson ? 'lesson' : 'practice question'" describedby="listen-reason" /></div>
+              <div class="prose-blocks"><template v-for="(part, partIndex) in blocks(current.lesson?.explanation || current.task?.question || '')" :key="partIndex"><pre v-if="part.code" class="code-block">{{ part.text }}</pre><p v-else class="prose">{{ part.text }}</p></template></div>
+              <p v-if="answerLabel('session', current.session)" class="tutor-label">{{ answerLabel('session', current.session) }}</p>
+              <SourcesUsed v-if="current.citations.length" :key="current.session" :citations="current.citations" :titles="materialTitles" :id-prefix="`passage-${current.session}`" @open="openSource" />
+            </article>
+            <article v-for="item in current.dialogue" :key="item.turnIndex" class="message" :class="item.turn.speaker === 'LEARNER' ? 'from-you' : 'from-tutor'">
+              <div v-if="item.turn.speaker === 'TUTOR'" class="speaker-row"><span class="speaker"><PixelIcon name="leaf" :size="18" /> StillGotIt<span v-if="item.turn.purpose === 'HINT'" class="tag hint-tag">Hint</span><span v-else-if="item.turn.purpose === 'CORRECTION'" class="tag">Transcript correction</span></span><ListenButton :message-key="`${current.session}:${item.turnIndex}`" :text="item.turn.text" :what="item.turn.purpose === 'HINT' ? 'hint' : 'tutor reply'" describedby="listen-reason" /></div>
+              <template v-else><span class="sr-only">You{{ purposeNote(item.turn.purpose) }}</span><span v-if="purposeNote(item.turn.purpose)" class="tag you-tag" aria-hidden="true">{{ purposeNote(item.turn.purpose).replace(' · ', '') }}</span></template>
+              <div v-if="item.turn.speaker === 'TUTOR'" class="prose-blocks"><template v-for="(part, partIndex) in blocks(item.turn.text)" :key="partIndex"><pre v-if="part.code" class="code-block">{{ part.text }}</pre><p v-else class="prose">{{ part.text }}</p></template></div>
+              <p v-else class="prose">{{ item.turn.text }}</p>
+              <p v-for="(file, fileIndex) in item.turn.media" :key="file.file" class="attachment-label"><span class="attach-thumb" aria-hidden="true" />{{ item.turn.media.length > 1 ? `Attachment ${fileIndex + 1} of ${item.turn.media.length}` : 'Attachment' }} · {{ file.name }}</p><p v-if="answerLabel('turn', current.session, item.turnIndex)" class="tutor-label">{{ answerLabel('turn', current.session, item.turnIndex) }}</p></article>
+            <button v-if="current.lesson && current.dialogue.at(-1)?.turn.speaker === 'LEARNER'" class="message-action" :disabled="busy || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="retryReply">Retry tutor reply</button>
+            <div v-if="current.task && current.status === 'OPEN' && current.dialogue.some(item => item.turn.speaker === 'LEARNER' && item.turn.purpose === 'RESPONSE')" class="review-step">
+              <button class="secondary dawn" :disabled="busy || recording" :aria-expanded="reviewOpen" @click="reviewOpen = !reviewOpen">{{ reviewOpen ? 'Close review' : 'Review and assess my work' }}</button>
+              <div v-if="reviewOpen" class="attempt-review">
+                <div class="review-title"><h3>Ready for assessment?</h3><InfoBubble text="Review your complete answer before assessment. Your answers to these three questions go with your work, and Assess stays off until you confirm the review." /></div>
+                <div v-for="voice in current.voice" :key="voice.turnIndex" class="transcript"><label :for="`voice-${voice.turnIndex}`">Speech transcript {{ voice.turnIndex + 1 }}</label><textarea :id="`voice-${voice.turnIndex}`" v-model="speechEdits[voice.turnIndex]" rows="3" /><button class="message-action" :disabled="busy" @click="correctTranscript(voice.turnIndex)">Save transcript correction</button></div>
+                <label class="check"><input v-model="unseen" type="checkbox" /><span class="box" aria-hidden="true" />These exact problems are new to me.</label><label class="check"><input v-model="outsideHelp" type="checkbox" /><span class="box" aria-hidden="true" />I used help outside this conversation.</label><label class="check"><input v-model="reviewed" type="checkbox" /><span class="box" aria-hidden="true" />I reviewed my answer and all speech transcripts.</label>
+                <div class="assess-row"><button class="primary dawn" :disabled="busy || !!assessReason" :aria-describedby="assessReason ? 'assess-reason' : undefined" @click="assess">Assess my work</button><p v-if="assessReason" id="assess-reason" class="hint reason">{{ assessReason }}</p></div>
+              </div>
+            </div>
+            <button v-if="current.status === 'CLOSED' && !currentCases.some(item => item.judgment)" class="secondary dawn" :disabled="busy || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="assess">Retry saved assessment</button>
+            <article v-for="item in currentCases" :key="item.case" class="assessment">
+              <template v-if="item.judgment">
+                <div class="result-top"><div><p class="eyebrow">Assessment</p><h3 :class="{ success: SUCCESS.has(item.judgment.result) }">{{ resultLabels[item.judgment.result] }}</h3></div><div v-if="attemptChange(item.case)" class="result-figure"><p class="result-pct">{{ attemptChange(item.case)!.after }}</p><p class="result-delta">{{ attemptChange(item.case)!.delta }}</p></div></div>
+                <p class="prose rationale">{{ item.judgment.rationale }}</p>
+                <p v-if="answerLabel('judgment', item.judgment.judgment)" class="tutor-label">{{ answerLabel('judgment', item.judgment.judgment) }}</p>
+                <div class="result-actions"><button v-if="current.status === 'CLOSED'" class="secondary dawn" :disabled="busy || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="startTask">Try a fresh check</button></div>
+                <details class="regrade"><summary>This seems wrong? Review or correct this assessment</summary><label>Reason<textarea v-model="reason" rows="3" /></label><p v-if="!reason.trim()" :id="`reason-needed-${item.case}`" class="hint reason">Write a reason to request a regrade or save a correction.</p><button class="message-action" :disabled="busy || !aiAvailable || !reason.trim()" :aria-describedby="describedBy(!reason.trim() && `reason-needed-${item.case}`, !aiAvailable && 'ai-reason-chat')" @click="requestRegrade(item.case, item.judgment.judgment)">Request regrade</button>
+                  <label>Manual correction<select v-model="correction"><option v-for="(label,value) in resultLabels" :key="value" :value="value">{{ label }}</option></select></label><label class="check"><input v-model="fullGate" type="checkbox" /><span class="box" aria-hidden="true" />All requirements were met in fresh independent work.</label><button class="message-action" :disabled="busy || !reason.trim()" :aria-describedby="reason.trim() ? undefined : `reason-needed-${item.case}`" @click="saveCorrection(item.case, item.judgment.judgment)">Save correction</button><ol><li v-for="judgment in item.history" :key="judgment.judgment">{{ resultLabels[judgment.result] }} · {{ judgment.origin === 'AI' ? 'Tutor' : 'Your correction' }}<p>{{ judgment.rationale }}</p></li></ol></details>
+              </template><p v-else>Your answer is saved. Assessment is pending.</p>
+            </article>
+          </template>
+          <p v-if="busy" class="working" role="status"><PixelIcon name="leaf" :size="18" /> Working on it…</p>
+          <div role="status"><p v-if="notice && !busy" ref="noticeBox" class="notice" tabindex="-1">{{ notice }}</p></div>
+          <div role="alert"><p v-if="error" ref="errorBox" class="error" tabindex="-1">{{ error }}</p></div>
+        </div>
       </div>
       <div class="composer-area">
-        <template v-if="!current || current.status === 'OPEN'">
-          <div class="composer" :class="{ 'is-recording': recording }">
-            <ul v-if="attachments.length" ref="attachmentList" class="attachment-list" aria-label="Photos attached to this answer">
-              <li v-for="(item, index) in attachments" :key="item.material" class="attachment-chip"><img v-if="item.preview" :src="item.preview" alt="" class="attachment-thumb" /><span>{{ attachments.length > 1 ? `${index + 1}. ` : '' }}{{ item.name }}</span><button type="button" :aria-label="`Remove photo ${index + 1}, ${item.name}`" :disabled="busy" @click="removeAttachment(index)">×</button></li>
-            </ul>
-            <label class="sr-only" for="chat-message">{{ current?.task ? 'Your answer and reasoning' : 'Message your tutor' }}</label>
-            <textarea id="chat-message" ref="composerInput" v-model="response" rows="2" :disabled="busy" :placeholder="current?.task ? 'Explain your reasoning. You can type, speak, or attach your work.' : 'Ask a question or tell me what you want to learn…'" @keydown="enterToSend" />
-            <div class="composer-tools"><div class="input-tools"><label class="attach-button" :class="{ unavailable: !current || busy || recording }" :title="current ? 'Attach photos of your work' : 'Start a lesson before attaching work'"><span aria-hidden="true">＋</span><span class="sr-only">{{ attachments.length ? 'Add another photo of your work' : 'Add photos of your work' }}</span><input type="file" accept="image/*" capture="environment" multiple :disabled="busy || recording || !current" @change="uploadWork" /></label>
-              <button v-if="current?.task" class="hint-button" :disabled="busy || recording || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="requestHint">Hint</button>
-            </div><div class="composer-right"><SpeechInput :disabled="busy || !aiAvailable" :active="active !== false" :describedby="aiAvailable ? undefined : 'ai-reason-chat'" compact @recording="recording = $event" @transcript="response = response ? response + '\n' + $event : $event; channel = 'VOICE'" @error="error = $event" /><button class="send-button" :disabled="!canSend" :aria-label="current?.task ? 'Save answer' : 'Send message'" :aria-describedby="aiAvailable || current?.task ? undefined : 'ai-reason-chat'" @click="submitMessage"><span aria-hidden="true">↑</span></button></div></div>
-          </div>
-          <p class="composer-note">{{ recording ? 'Recording. Stop to review your words before sending.' : current?.task ? 'Review your complete answer before requesting assessment.' : 'Grounded in your course materials. Check important details.' }}</p>
-        </template>
-        <div v-else class="finished-message"><p>This attempt is saved.</p><button class="practice-button" :disabled="busy || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="startTask">Try a fresh check</button><button class="message-action" :disabled="busy" @click="newLesson">Keep learning</button></div>
-        <p v-if="aiOff" id="ai-reason-chat" class="hint">{{ aiOff }}</p>
-        <p v-if="current && listenUnavailable" id="listen-reason" class="hint">{{ listenUnavailable }}</p>
+        <div class="composer-inner">
+          <template v-if="!current || current.status === 'OPEN'">
+            <div class="composer" :class="{ 'is-recording': recording }">
+              <ul v-if="attachments.length" ref="attachmentList" class="attachment-list" aria-label="Photos attached to this answer">
+                <li v-for="(item, index) in attachments" :key="item.material" class="attachment-chip"><img v-if="item.preview" :src="item.preview" alt="" class="attachment-thumb" /><span>{{ attachments.length > 1 ? `${index + 1}. ` : '' }}{{ item.name }}</span><button type="button" :aria-label="`Remove photo ${index + 1}, ${item.name}`" :disabled="busy" @click="removeAttachment(index)">×</button></li>
+              </ul>
+              <label class="sr-only" for="chat-message">{{ current?.task ? 'Your answer and reasoning' : 'Message your tutor' }}</label>
+              <textarea id="chat-message" ref="composerInput" v-model="response" rows="2" :disabled="busy" :placeholder="current?.task ? 'Explain your reasoning. You can type, speak, or attach your work.' : 'Ask a question or tell me what you want to learn…'" @keydown="enterToSend" />
+              <div class="composer-tools"><div class="input-tools"><label class="attach-button tool-pill" :class="{ unavailable: !current || busy || recording }" :title="current ? 'Attach photos of your work' : 'Start a lesson before attaching work'"><span aria-hidden="true">＋ Photo of work</span><span class="sr-only">{{ attachments.length ? 'Add another photo of your work' : 'Add photos of your work' }}</span><input type="file" accept="image/*" capture="environment" multiple :disabled="busy || recording || !current" @change="uploadWork" /></label>
+                <SpeechInput :disabled="busy || !aiAvailable" :active="active !== false" :describedby="aiAvailable ? undefined : 'ai-reason-chat'" compact @recording="recording = $event" @transcript="response = response ? response + '\n' + $event : $event; channel = 'VOICE'" @error="error = $event" />
+                <button v-if="current?.task" class="hint-button tool-pill" :disabled="busy || recording || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="requestHint">Ask for a hint</button>
+              </div><div class="composer-right"><span class="note-info"><InfoBubble :text="composerNote" label="About this message box" /></span><button class="send-button" :disabled="!canSend" :aria-label="current?.task ? 'Save answer' : 'Send message'" :aria-describedby="aiAvailable || current?.task ? undefined : 'ai-reason-chat'" @click="submitMessage"><span aria-hidden="true">↑</span></button></div></div>
+            </div>
+            <p v-if="recording" class="composer-note" role="status">Recording. Stop to review your words before sending.</p>
+          </template>
+          <div v-else class="finished-message"><p>This attempt is saved.</p><button v-if="!currentCases.some(item => item.judgment)" class="secondary dawn" :disabled="busy || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="startTask">Try a fresh check</button><button class="message-action" :disabled="busy" @click="newLesson">Keep learning</button></div>
+          <p v-if="aiOff" id="ai-reason-chat" class="hint">{{ aiOff }}</p>
+          <p v-if="current && listenUnavailable" id="listen-reason" class="hint">{{ listenUnavailable }}</p>
+        </div>
       </div>
     </div>
+    <aside id="learn-rail" class="rail" aria-label="Mastery, goal, evidence and sources" :hidden="narrow && !evidenceOpen ? true : undefined">
+      <div v-if="narrow" class="rail-close"><button ref="railClose" type="button" class="quiet" @click="closeRail">Close</button></div>
+      <section class="rail-card">
+        <div class="rail-head"><p class="eyebrow rail-eyebrow">Your mastery</p><InfoBubble :text="masteryNote" label="About your mastery estimate" /></div>
+        <div class="mastery-row"><span class="sprite-tile green"><PixelIcon :sprite="stage" :size="35" /></span><div class="mastery-figure"><strong>{{ pctText }}</strong><MasteryCells :value="pct" :cells="10" /></div></div>
+      </section>
+      <section v-if="data" class="rail-card goal">
+        <p class="eyebrow rail-eyebrow">Goal</p><p class="goal-text">{{ data.skill.outcome }}</p>
+        <div class="divider" />
+        <p class="eyebrow rail-eyebrow">To master it</p><p class="gate-text">{{ data.skill.gate }}</p>
+      </section>
+      <section class="rail-card">
+        <EstimatePanel v-if="data && hasEvidence" id="estimate-panel" :skill="skill" :data="data" :session-labels="labels" :busy="busy" :reload="load" @changed="emit('changed')" @open-session="openCaseSession" />
+        <template v-else><p class="eyebrow rail-eyebrow">Evidence</p><p class="hint rail-empty">Assessed practice will appear here.</p></template>
+      </section>
+      <section v-if="railCitations.length" class="rail-card">
+        <p class="eyebrow rail-eyebrow">Taught from</p>
+        <SourcesUsed :citations="railCitations" :titles="materialTitles" id-prefix="rail-source" variant="rail" @open="openSource" />
+      </section>
+    </aside>
   </section>
 </template>
 
 <style scoped>
-.study-chat{display:grid;grid-template-columns:215px minmax(0,1fr);height:calc(100dvh - 166px);min-height:560px;border-top:1px solid var(--line)}.chat-history{padding:18px 12px 20px;background:var(--wash);border-right:1px solid var(--line);overflow:auto}.chat-history>p:not(.history-caption){margin:0 8px;font-size:13px;color:var(--muted)}.new-lesson{display:flex;align-items:center;gap:8px;padding:8px;width:100%;border:0;border-radius:10px;background:transparent;text-align:left;font-size:13px;white-space:nowrap;font-weight:500;color:var(--ink)}.new-lesson:hover:not(:disabled){background:var(--light)}.new-lesson span{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--light);color:var(--primary);font-size:14px}.from-you .speaker{font-size:11px;color:var(--muted);margin-bottom:4px}.skill-detail>summary{padding:8px;border-radius:10px;list-style:none;font-size:13px;color:var(--ink)}.skill-detail>summary::-webkit-details-marker{display:none}.skill-detail>summary:hover{background:var(--light)}.confidence-note{background:var(--surface)!important}.history-caption{font-size:12px;font-weight:600;color:var(--muted);margin:22px 8px 6px}.history-item{display:block;width:100%;text-align:left;border:0;border-radius:10px;background:transparent;padding:8px;margin:2px 0}.history-item:hover{background:var(--light)}.history-item.chosen{background:var(--light);color:var(--ink)}.history-item span{display:block;font-size:13px;font-weight:600}.history-item small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);margin-top:4px;font-size:11px}.skill-detail{margin:18px 0 0;padding-top:10px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}.skill-detail>p,.skill-detail>strong{display:block;padding:0 8px}.skill-detail strong{font-size:12px;color:var(--ink)}.chat-main{display:flex;flex-direction:column;min-width:0;min-height:0}.chat-heading{padding:23px 28px 18px;display:flex;align-items:center;justify-content:space-between;gap:18px;border-bottom:1px solid var(--light)}.chat-heading h1{font:23px/1.3 Georgia,serif;letter-spacing:-.4px;margin:0}.chat-heading p{font-size:12px;color:var(--muted);margin:5px 0 0}.practice-button,.small-button{background:var(--surface);border:1px solid var(--line);border-radius:7px;padding:9px 13px;font-size:12px;white-space:nowrap}.practice-button:hover:not(:disabled){background:var(--light)}.heading-action{text-align:right;max-width:240px}.heading-action .hint{font-size:11px;margin-top:6px}.chat-thread{flex:1;overflow-y:auto;padding:30px max(24px,calc((100% - 750px)/2));scroll-behavior:auto}.confidence-note{border:1px solid var(--line);padding:16px 20px;border-radius:10px;margin-bottom:24px;background:var(--wash)}.confidence-note form{max-width:none}.confidence-note label{font-size:13px;margin:0 0 9px}.confidence{display:flex;gap:14px;align-items:center}.confidence input{min-height:20px;padding:0;accent-color:var(--primary);flex:1;min-width:60px}.confidence output{font-size:13px}.chat-welcome{text-align:center;max-width:560px;margin:35px auto 50px}.tutor-mark{font-size:40px}.chat-welcome h2{font:36px/1.2 Georgia,serif;letter-spacing:-1px;margin:18px 0}.chat-welcome p{font-size:14px;color:var(--muted);line-height:1.7}.prompt-choices{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:26px}.prompt-choices button{border:1px solid var(--line);border-radius:24px;background:var(--surface);padding:10px 15px;font-size:12px}.message{margin:0 0 28px;max-width:100%;font-size:15px}.from-you{margin-left:auto;max-width:85%;padding:16px 20px;background:var(--light);border-radius:18px 18px 4px 18px;white-space:normal}.from-tutor{padding:5px 0}.speaker{display:block;font-size:12px;font-weight:650;color:var(--muted);margin-bottom:10px}.speaker-row{display:flex;justify-content:space-between;align-items:baseline}.speaker span{font-size:21px;vertical-align:middle;margin-right:7px;color:var(--ink)}.prose{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.85;font-size:15px;margin:0}.from-you .prose{line-height:1.65}.message-action{border:0;background:transparent;color:var(--muted);padding:5px 0;font-size:12px;text-decoration:underline;text-underline-offset:4px}.sources{margin-top:18px;color:var(--muted);font-size:12px}.sources ul{padding-left:18px}summary{cursor:pointer}.composer-area{padding:12px max(24px,calc((100% - 750px)/2)) 14px;background:linear-gradient(to bottom,transparent,var(--paper) 30%)}.composer{border:1px solid var(--line);border-radius:26px;padding:12px 17px 10px;background:var(--surface);box-shadow:0 1px 2px rgba(23,35,64,.05),0 10px 30px rgba(23,35,64,.08)}.composer:focus-within{border-color:var(--accent)}.composer textarea{border:0;outline:none;width:100%;resize:vertical;min-height:55px;max-height:180px;padding:6px 5px;font-family:inherit;font-size:14px;line-height:1.65;background:transparent;color:var(--ink);box-shadow:none}.composer-right{display:flex;align-items:center;gap:10px}.composer-tools,.input-tools{display:flex;align-items:center;gap:9px}.composer-tools{justify-content:space-between}.attach-button{margin:0;width:34px;height:34px;display:grid;place-items:center;border-radius:50%;font-size:25px;font-weight:400;cursor:pointer}.attach-button:hover{background:var(--light)}.attach-button input{position:absolute;width:1px;height:1px;min-height:0;opacity:0;padding:0;border:0}.unavailable{opacity:.35;cursor:default}.attach-button:focus-within{outline:2px solid var(--ink)}.send-button{border:0;border-radius:50%;background:var(--primary);color:var(--surface);font-size:24px;width:36px;height:36px;display:grid;place-items:center;padding:0}.send-button:disabled{background:var(--line);color:var(--muted);opacity:1;cursor:default}.hint-button{border:0;background:transparent;color:var(--muted);font-size:12px;padding:8px}.composer-note{margin:9px 0 0;text-align:center;font-size:11px;color:var(--muted)}.attachment-chip{display:inline-flex;align-items:center;gap:12px;padding:5px 10px;border:1px solid var(--line);border-radius:6px;font-size:12px;margin:2px 4px 8px}.attachment-chip button{border:0;background:none;font-size:19px}.is-recording{border-color:var(--primary)}.working{font-size:13px;color:var(--muted)}.working span{font-size:20px;margin-right:8px}.review-step{margin:20px 0}.attempt-review,.assessment{margin:20px 0;padding:22px;background:var(--wash);border-radius:12px}.attempt-review h3,.assessment h3{font-size:19px;margin:8px 0 15px}.check{display:flex;align-items:flex-start;gap:10px;font-size:12px;font-weight:400;margin:14px 0}.check input{width:16px;min-height:16px;margin-top:3px;accent-color:var(--primary)}.transcript textarea,.assessment textarea,.assessment select{width:100%;padding:10px;border:1px solid var(--field);border-radius:6px;font:inherit;background:var(--surface)}.transcript{margin:20px 0}.assessment details{margin-top:20px;font-size:12px}.assessment label{margin-top:15px}.finished-message{display:flex;align-items:center;justify-content:center;gap:15px;font-size:13px;color:var(--muted)}.attachment-label{font-size:12px;color:var(--muted)}.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
-.estimate-toggle{display:inline-flex;align-items:center;gap:5px;border:0;border-radius:999px;background:var(--light);color:var(--edge);font-size:inherit;font-weight:600;padding:3px 10px;margin:2px 0}.estimate-toggle:hover{background:#c4d7f0}.estimate-toggle span{font-size:10px}
-.attachment-list{display:flex;flex-wrap:wrap;gap:6px;list-style:none;margin:2px 0 8px;padding:0}.attachment-list .attachment-chip{margin:0;gap:8px;padding:4px 4px 4px 6px;max-width:100%}.attachment-chip span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.attachment-thumb{width:28px;height:28px;flex:none;object-fit:cover;border-radius:4px;background:var(--wash)}.attachment-chip button{min-width:28px;min-height:28px;padding:0;line-height:1;color:var(--muted)}.attachment-chip button:hover:not(:disabled){color:var(--ink)}
-@media(max-width:900px){.study-chat{grid-template-columns:165px minmax(0,1fr)}.chat-heading{padding:18px;align-items:flex-start}.chat-heading h1{font-size:16px}.chat-heading .practice-button{font-size:11px;padding:8px}.chat-thread,.composer-area{padding-left:20px;padding-right:20px}.chat-history{padding-right:12px}}
-@media(max-width:650px){.study-chat{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr);height:calc(100dvh - 149px);min-height:520px}.chat-history{display:flex;gap:6px;border-right:0;background:transparent;border-bottom:1px solid var(--light);padding:9px 0;overflow-x:auto;align-items:center}.new-lesson{width:auto;white-space:nowrap;padding:8px}.history-caption,.history-item small,.skill-detail{display:none}.history-item{width:auto;white-space:nowrap;margin:0;padding:8px}.history-item span{font-size:12px}.chat-main{min-height:0}.chat-heading{padding:14px 0}.chat-heading p{font-size:11px}.chat-thread{padding:18px 8px}.composer-area{padding:10px 0}.confidence{flex-wrap:wrap}.chat-welcome h2{font-size:29px}.chat-heading .practice-button{white-space:normal;max-width:115px}.heading-action{max-width:130px}.prose{font-size:14px}.from-you{max-width:94%}.finished-message{flex-wrap:wrap}}
+.learn{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 312px;height:calc(100dvh - 28px);min-height:560px;background:#FFFFFF}
+.learn.narrow{grid-template-columns:minmax(0,1fr)}
+.learn-main{display:flex;flex-direction:column;min-width:0;min-height:0}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+/* Header */
+.learn-head{padding:18px 28px 0;background:#FFFFFF;border-bottom:1px solid #ECEAF3}
+.head-row{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.head-title{display:flex;align-items:center;gap:14px;min-width:240px;flex:1}
+.sprite-tile{flex:none;width:52px;height:52px;border-radius:14px;background:var(--dawn-soft);display:grid;place-items:center;box-shadow:inset 0 -3px 0 #E2DEF6}
+.sprite-tile.green{background:#EAF7EE;box-shadow:none}
+.title-block{min-width:0}
+.back-link{white-space:nowrap;border:0;background:none;padding:0;font-size:12px;font-weight:600;color:#6B6490;margin-bottom:2px}
+.back-link:hover{color:var(--ink)}
+.learn-head h1{margin:0;font-family:var(--font-display);font-weight:400;font-size:26px;line-height:1.3;text-wrap:balance;overflow-wrap:anywhere}
+.head-actions{display:flex;align-items:center;gap:10px;flex:none}
+.mastery-chip{display:flex;flex-direction:column;align-items:flex-start;gap:5px;border:1px solid #E6E3F2;border-radius:12px;background:#FFFFFF;padding:7px 12px;min-width:76px;color:var(--ink)}
+button.mastery-chip:hover{border-color:#C9C1F0}
+.mastery-chip :deep(.mastery-cells){width:63px}
+.chip-top{display:flex;align-items:baseline;gap:6px}
+.chip-top strong{font-size:16px;font-variant-numeric:tabular-nums}
+.chip-top span{font-size:11px;font-weight:600;color:var(--faint)}
+.heading-action .primary{min-height:46px;padding:0 18px;font-size:14px;white-space:nowrap}
+/* Tabs */
+.tabs{display:flex;align-items:flex-end;gap:22px;margin-top:14px;overflow-x:auto}
+.tab,.new-lesson{display:flex;align-items:center;gap:8px;border:0;background:none;padding:0 2px 12px;font-size:14px;font-weight:500;color:var(--muted);white-space:nowrap;border-radius:0}
+.tab:hover:not(:disabled){color:var(--ink)}
+.tab.chosen{font-weight:700;color:var(--ink);box-shadow:inset 0 -3px 0 #8A7EE0}
+.tab-square{width:8px;height:8px;flex:none}
+.tab-square.lesson{background:#2F7D9B}
+.tab-square.practice{background:#E3A233}
+.tab-date{font-size:12px;font-weight:500;color:var(--faint)}
+.tab-done{font-size:11px;font-weight:800;color:var(--strong)}
+.new-lesson{font-weight:700;color:#4B3FA8}
+.new-lesson:hover:not(:disabled){color:var(--dawn-text)}
+.new-lesson.chosen{box-shadow:inset 0 -3px 0 #8A7EE0}
+/* Thread */
+.chat-thread{flex:1;overflow-y:auto;background:#FFFFFF}
+.thread-inner{max-width:760px;margin:0 auto;padding:30px 32px 24px}
+.confidence-note{border:1px solid var(--line);padding:16px 20px;border-radius:16px;margin-bottom:24px;background:var(--inset)}
+.confidence-note form{max-width:none}
+.confidence-note label{font-size:14px;font-weight:700;margin:0 0 9px}
+.confidence{display:flex;gap:14px;align-items:center}
+.confidence input{min-height:20px;padding:0;accent-color:var(--dawn-edge);flex:1;min-width:60px}
+.confidence output{font-size:14px;font-weight:700;font-variant-numeric:tabular-nums}
+.small-button{min-height:36px;padding:0 14px;font-size:13px;white-space:nowrap}
+.chat-welcome{text-align:center;max-width:540px;margin:40px auto 30px}
+.chat-welcome h2{margin:12px 0 10px;font-family:var(--font-display);font-weight:400;font-size:34px;line-height:1.2;letter-spacing:0}
+.chat-welcome p{margin:0;font-size:15px;color:var(--muted);line-height:1.7}
+.prompt-choices{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:24px}
+.prompt-choices button{border:1px solid var(--line);border-radius:999px;background:#FFFFFF;padding:10px 16px;font-size:13px;color:var(--ink)}
+.prompt-choices button:hover:not(:disabled){border-color:rgba(20,20,20,.35)}
+.message{margin:0 0 26px;max-width:100%;font-size:15px;animation:sgRise 240ms ease-out both}
+.from-you{margin-left:auto;margin-bottom:22px;width:fit-content;max-width:82%;padding:14px 18px;background:var(--dawn-soft);border-radius:18px 18px 4px 18px}
+.from-tutor{padding:0}
+.speaker-row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
+.speaker{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:var(--muted)}
+.tag{padding:1px 8px;border-radius:999px;background:var(--inset-2);color:var(--soft);font-size:11px;font-weight:700}
+.tag.hint-tag{background:var(--dawn-soft);color:var(--dawn-soft-text)}
+.tag.task{background:#4A775A;color:#FFFFFF}
+.you-tag{display:inline-block;margin-bottom:6px;background:#FFFFFF;color:var(--dawn-soft-text)}
+.prose-blocks{display:flex;flex-direction:column;gap:14px}
+.prose{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.8;font-size:15px;margin:0}
+.from-you .prose{line-height:1.65}
+.code-block{margin:0;padding:14px 16px;border-radius:12px;background:var(--inset);border:1px solid var(--line);font:13px/1.7 var(--font-mono);white-space:pre-wrap;overflow-wrap:anywhere;color:var(--ink)}
+.tutor-label{margin:8px 0 0;font-size:11px;color:var(--faint)}
+.attachment-label{display:inline-flex;align-items:center;gap:8px;margin:10px 0 0;padding:4px 10px 4px 4px;border-radius:8px;background:#FFFFFF;font-size:12px;color:var(--soft)}
+.attach-thumb{width:26px;height:26px;border-radius:5px;background:var(--inset);flex:none}
+.message-action{border:0;background:transparent;color:var(--muted);padding:5px 0;font-size:12px;text-decoration:underline;text-underline-offset:4px}
+.review-step{margin:6px 0 20px}
+.attempt-review,.assessment{margin:14px 0 20px;padding:20px 22px;border-radius:16px;border:1px solid var(--line);animation:sgRise 240ms ease-out both}
+.attempt-review{background:var(--inset)}
+.assessment{background:#FFFFFF;box-shadow:0 8px 24px rgba(20,20,20,.07)}
+.review-title{display:flex;align-items:center;gap:6px;margin:0 0 8px}
+.review-title h3{margin:0;font-family:var(--font-display);font-weight:400;font-size:21px}
+.check{position:relative;display:flex;align-items:center;gap:10px;padding:8px 0;margin:0;font-size:14px;font-weight:400;cursor:pointer}
+.check input{position:absolute;opacity:0;width:18px;height:18px;min-height:0;margin:0;left:0}
+.check .box{width:18px;height:18px;flex:none;border-radius:5px;border:1.5px solid #BDBDB8;background:#FFFFFF;display:grid;place-items:center}
+.check input:checked+.box{background:var(--dawn-edge);border-color:var(--dawn-edge)}
+.check input:checked+.box::after{content:"✓";color:#FFFFFF;font-size:12px;font-weight:800;line-height:1}
+.check input:focus-visible+.box{outline:2px solid var(--ink);outline-offset:2px}
+.assess-row{display:flex;align-items:center;gap:14px;margin-top:12px}
+.assess-row .primary{min-height:44px;padding:0 20px;font-size:14px}
+.transcript{margin:14px 0}
+.transcript label{font-size:13px;font-weight:700}
+.transcript textarea,.assessment textarea,.assessment select{width:100%;padding:10px;border:1px solid var(--ring);border-radius:10px;font:inherit;background:#FFFFFF}
+.result-top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+.result-top .eyebrow{margin:0 0 4px;font-size:12px}
+.result-top h3{margin:0;font-family:var(--font-display);font-weight:400;font-size:24px;color:var(--ink)}
+.result-top h3.success{color:var(--strong)}
+.result-figure{text-align:right;flex:none}
+.result-pct{margin:0;font-family:var(--font-display);font-size:26px}
+.result-delta{margin:0;font-size:12px;color:var(--muted)}
+.rationale{margin:12px 0 0;font-size:14px;line-height:1.7}
+.result-actions{display:flex;gap:16px;margin-top:14px}
+.result-actions .secondary{min-height:36px;font-size:13px}
+.regrade{margin-top:12px;font-size:13px}
+.regrade summary{cursor:pointer;color:var(--muted);text-decoration:underline;text-underline-offset:4px;list-style:none}
+.regrade summary::-webkit-details-marker{display:none}
+.regrade label{margin-top:14px}
+.working{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+/* Composer */
+.composer-area{padding:12px 32px 16px;background:#FFFFFF}
+.composer-inner{max-width:760px;margin:0 auto}
+.composer{border:1px solid var(--line);border-radius:22px;padding:10px 14px 10px 18px;background:#FFFFFF;box-shadow:0 1px 2px rgba(20,20,20,.05),0 10px 30px rgba(20,20,20,.08)}
+.composer:focus-within{border-color:var(--dawn-edge)}
+.composer textarea{border:0;outline:none;width:100%;resize:vertical;min-height:52px;max-height:180px;padding:4px 0;font-family:inherit;font-size:15px;line-height:1.6;background:transparent;color:var(--ink);box-shadow:none}
+.composer-tools{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.input-tools{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+.composer-right{display:flex;align-items:center;gap:6px}
+.note-info :deep(.info-bubble){left:auto;right:0;top:auto;bottom:calc(100% + 6px)}
+.tool-pill{display:flex;align-items:center;gap:6px;margin:0;border:1px solid var(--line);border-radius:999px;background:#FFFFFF;padding:5px 12px;min-height:30px;font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap;cursor:pointer}
+.tool-pill:hover:not(:disabled){border-color:rgba(20,20,20,.35);color:var(--ink)}
+.attach-button{position:relative}
+.attach-button input{position:absolute;width:1px;height:1px;min-height:0;opacity:0;padding:0;border:0}
+.attach-button:focus-within{outline:2px solid var(--ink);outline-offset:2px}
+.unavailable{opacity:.45;cursor:default}
+.send-button{border:0;border-radius:12px;background:var(--dawn);color:var(--dawn-text);box-shadow:0 3px 0 var(--dawn-edge);font-size:20px;font-weight:700;width:38px;height:38px;display:grid;place-items:center;padding:0;margin-bottom:3px}
+.send-button:hover:not(:disabled){background:var(--dawn-hover)}
+.send-button:disabled{background:var(--inset-2);color:var(--faint);box-shadow:0 3px 0 var(--ring);opacity:1;cursor:default}
+.composer-note{margin:8px 0 0;text-align:center;font-size:12px;color:var(--coral-text)}
+.is-recording{border-color:var(--coral)}
+.attachment-list{display:flex;flex-wrap:wrap;gap:6px;list-style:none;margin:2px 0 8px;padding:0}
+.attachment-chip{display:inline-flex;align-items:center;gap:8px;padding:4px 4px 4px 6px;border:1px solid var(--line);border-radius:10px;font-size:12px;max-width:100%}
+.attachment-chip span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.attachment-thumb{width:28px;height:28px;flex:none;object-fit:cover;border-radius:5px;background:var(--inset)}
+.attachment-chip button{border:0;background:none;font-size:19px;min-width:28px;min-height:28px;padding:0;line-height:1;color:var(--muted)}
+.attachment-chip button:hover:not(:disabled){color:var(--ink)}
+.finished-message{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:15px;font-size:13px;color:var(--muted)}
+.finished-message .secondary{min-height:38px;font-size:13px}
+/* Rail */
+.rail{border-left:1px solid #EEEAF7;background:#FAF9FE;overflow-y:auto;overflow-x:hidden;padding:16px 14px;display:flex;flex-direction:column;gap:10px;min-height:0}
+.narrow .rail{position:absolute;top:0;right:0;bottom:0;width:312px;max-width:100%;z-index:20;box-shadow:-12px 0 32px rgba(20,20,20,.12);animation:railIn 200ms ease-out}
+.rail[hidden]{display:none}
+.rail-close{display:flex;justify-content:flex-end}
+.rail-close .quiet{font-size:13px;color:var(--muted)}
+.rail-card{background:#FFFFFF;border-radius:18px;padding:16px;box-shadow:0 0 0 1px #ECE9F5;flex:none}
+.rail-card.goal{display:flex;flex-direction:column;gap:6px}
+.rail-eyebrow{color:#7A7397;white-space:nowrap}
+.rail-head{display:flex;align-items:center;justify-content:space-between}
+.rail-head :deep(.info-bubble){left:auto;right:0}
+.mastery-row{display:flex;align-items:center;gap:12px;margin-top:10px}
+.mastery-figure{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+.mastery-figure strong{font-size:30px;line-height:1;font-weight:700;letter-spacing:-1px;font-variant-numeric:tabular-nums}
+.mastery-figure :deep(.mastery-cells){max-width:none}
+.goal-text{margin:0;font-size:14px;line-height:1.55}
+.gate-text{margin:0;font-size:13px;line-height:1.55;color:var(--soft)}
+.divider{height:1px;background:#EEEBF5;margin:8px 0}
+.rail-empty{margin:8px 0 0;font-size:12px}
+@keyframes sgRise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes railIn{from{transform:translateX(24px);opacity:0}to{transform:none;opacity:1}}
+@media(max-width:900px){.learn-head{padding:14px 18px 0}.thread-inner{padding:22px 18px 18px}.composer-area{padding:10px 18px 14px}}
+@media(max-width:650px){.learn{height:calc(100dvh - 20px);min-height:520px}.head-title{min-width:0}.learn-head h1{font-size:22px}.sprite-tile{width:44px;height:44px}.heading-action .primary{min-height:42px;padding:0 12px;font-size:13px;white-space:normal}.from-you{max-width:94%}.prose{font-size:14px}.confidence{flex-wrap:wrap}.chat-welcome h2{font-size:29px}}
 </style>
