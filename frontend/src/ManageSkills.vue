@@ -297,13 +297,16 @@ function setEmphasis(unit: UnitRow, emphasized: boolean) {
             <div v-if="open[item.skill.skill]" class="panel">
               <form class="part" @submit.prevent="saveDetails(item)">
                 <h4>Name and unit</h4>
-                <label>Skill name<input v-model="item.draft.title" type="text" maxlength="160" :disabled="busy" /></label>
-                <label>Unit<select v-model="item.draft.unit" :disabled="busy"><option v-for="unit in data.units" :key="unit.unit" :value="unit.unit">{{ unit.title }}</option></select></label>
+                <div class="name-row">
+                  <label>Skill name<input v-model="item.draft.title" type="text" maxlength="160" :disabled="busy" /></label>
+                  <label>Unit<select v-model="item.draft.unit" :disabled="busy"><option v-for="unit in data.units" :key="unit.unit" :value="unit.unit">{{ unit.title }}</option></select></label>
+                </div>
                 <div class="actions"><button class="secondary sand" :disabled="busy || !!item.reasons.details" :aria-describedby="item.reasons.details ? reasonId(item.keys.details) : undefined">{{ working === item.keys.details ? 'Saving…' : 'Save name and unit' }}</button><p v-if="item.reasons.details" :id="reasonId(item.keys.details)" class="hint reason">{{ item.reasons.details }}</p></div>
                 <ManageNote :id="noteId(item.keys.details)" :note="notes[item.keys.details]" />
               </form>
 
-              <div class="part">
+              <div class="panel-grid">
+              <div class="part part-main">
                 <h4>Requirements</h4>
                 <p class="info-line"><InfoBubble label="About versions" text="Saving creates a new version. Earlier work keeps the version it used, including a practice session that is still open. The new version needs a new check." /></p>
                 <form @submit.prevent="revise(item)">
@@ -318,6 +321,7 @@ function setEmphasis(unit: UnitRow, emphasized: boolean) {
                 </ol>
               </div>
 
+              <div class="part-side">
               <div class="part">
                 <h4>Sources</h4>
                 <ul v-if="item.sources.length" class="chips"><li v-for="(title, index) in item.sources" :key="index">{{ title }}</li></ul>
@@ -344,7 +348,9 @@ function setEmphasis(unit: UnitRow, emphasized: boolean) {
                 <ManageNote :id="noteId(item.keys.prerequisites)" :note="notes[item.keys.prerequisites]" />
               </form>
 
-              <div class="part">
+              </div>
+              </div>
+              <div class="part foot">
                 <h4>Archive</h4>
                 <p class="info-line"><InfoBubble label="About archiving" text="An archived skill leaves your tree and plan. It keeps its history, and you can restore it." /></p>
                 <div class="actions"><button type="button" class="secondary sand" :disabled="busy || !!item.reasons.status" :aria-describedby="item.reasons.status ? reasonId(item.keys.status) : undefined" @click="archive(item)">{{ working === item.keys.status ? 'Archiving…' : 'Archive skill' }}</button><p v-if="item.reasons.status" :id="reasonId(item.keys.status)" class="hint reason">{{ item.reasons.status }}</p></div>
@@ -381,12 +387,17 @@ function setEmphasis(unit: UnitRow, emphasized: boolean) {
 .manage-list{list-style:none;margin:0;padding:0;background:#fff;border:1px solid var(--line);border-radius:16px;overflow:hidden}.manage-list>li+li{border-top:1px solid var(--line)}
 summary{display:flex;align-items:center;gap:12px;padding:12px 14px;cursor:pointer;list-style:none}summary::-webkit-details-marker{display:none}summary:hover{background:var(--inset)}summary::after{content:"›";font-size:18px;line-height:1;color:var(--muted)}details[open]>summary::after{transform:rotate(90deg)}
 .skill-text{flex:1;min-width:0}.skill-text strong{display:block;font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.skill-text small{display:block;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.manage-label{font-size:12px;font-weight:600;color:var(--sand-soft-text)}
-.panel{padding:0 14px 4px}.part{max-width:none;padding:14px 0;border-top:1px solid var(--line)}.part form{max-width:none}.part h4,.part legend{margin:0;padding:0;font-size:14px;font-weight:650}fieldset{min-width:0;margin:0;padding:0;border:0}
+.panel{padding:0 14px 6px;background:var(--inset);border-top:1px solid var(--line)}.part{max-width:none;padding:14px 0;border-top:1px solid var(--line)}.part:first-child{border-top:0}.part form{max-width:none}.part h4,.part legend{margin:0;padding:0;font:400 12px var(--font-display);letter-spacing:1px;text-transform:uppercase;color:var(--muted)}fieldset{min-width:0;margin:0;padding:0;border:0}
+.part>h4{display:inline-flex;align-items:center;vertical-align:middle}.part>h4+.info-line{display:inline-flex;vertical-align:middle;margin:0 0 0 2px}
+.name-row{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(150px,1fr);gap:0 12px}
+.panel-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:0 28px}.part-main{border-top:1px solid var(--line)}.part-side>.part:first-child{border-top:1px solid var(--line)}
+.part.foot{display:flex;align-items:center;flex-wrap:wrap;gap:8px 14px}.part.foot h4{flex:none}.part.foot .info-line{flex:1 1 auto;margin:0}.part.foot .actions{margin-top:0}
+@media(max-width:900px){.panel-grid{grid-template-columns:1fr}.part-side>.part:first-child{border-top:1px solid var(--line)}.name-row{grid-template-columns:1fr}}
 label{margin:12px 0 0;font-size:12px}input[type=text]{min-height:40px;margin-top:6px;padding:8px 12px;font-size:14px}select,textarea{display:block;width:100%;margin-top:6px;padding:9px 12px;border:1px solid var(--faint);border-radius:8px;background:#fff;color:var(--ink);font:inherit;font-size:14px}textarea{resize:vertical;line-height:1.5}
-.actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;margin-top:12px}.actions .reason{flex:1 1 220px;margin:0}.secondary{min-height:36px;padding:0 14px;font-size:13px}
-.caption{margin:12px 0 0;font-size:11px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
-.versions{display:grid;gap:8px;list-style:none;margin:14px 0 0;padding:0}.versions li{padding:10px 12px;border-radius:10px;background:var(--inset)}.versions .caption{margin:0 0 4px}.versions p{margin:0;font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}.versions .gate{margin-top:6px;color:var(--muted)}.versions .gate span{font-weight:600;color:var(--ink)}
-.chips{display:flex;flex-wrap:wrap;gap:8px;list-style:none;margin:10px 0 0;padding:0}.chips li{max-width:100%;padding:4px 11px;border:1px solid var(--line);border-radius:999px;font-size:12px;overflow-wrap:anywhere}
+.actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;margin-top:12px}.actions .reason{flex:1 1 220px;margin:0}.secondary{min-height:34px;padding:0 13px;font-size:13px;background:#FFFFFF}
+.caption{margin:12px 0 0;font-size:11px;font-weight:600;color:var(--faint)}
+.versions{display:grid;gap:8px;list-style:none;margin:14px 0 0;padding:0}.versions li{padding:10px 12px;border-radius:10px;background:#FFFFFF;border:1px solid var(--line)}.versions .caption{margin:0 0 4px}.versions p{margin:0;font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}.versions .gate{margin-top:6px;color:var(--muted)}.versions .gate span{font-weight:600;color:var(--ink)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;list-style:none;margin:10px 0 0;padding:0}.chips li{max-width:100%;padding:4px 11px;border:1px solid var(--line);border-radius:999px;background:#FFFFFF;font-size:12px;overflow-wrap:anywhere}
 .choices{margin-top:6px}.check{display:flex;align-items:flex-start;gap:10px;margin:8px 0;font-size:13px;font-weight:400}.check input{flex:none;width:16px;height:16px;min-height:16px;margin:3px 0 0;padding:0;accent-color:var(--sand-soft-text)}.check span{min-width:0;overflow-wrap:anywhere}.check small{display:block;font-size:12px;color:var(--muted)}
 .item-note:has(p){padding:0 14px 12px}.empty-unit{margin:4px 0 0}
 .archived{margin-top:22px}.archived h3{margin-bottom:0}.archived>.hint{margin:4px 0 8px}.archived-row{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;padding:12px 14px}.archived-row .skill-text{min-width:140px}.actions.end{flex:0 1 auto;justify-content:flex-end;margin-top:0}.actions.end>.reason{left:auto!important;right:0}

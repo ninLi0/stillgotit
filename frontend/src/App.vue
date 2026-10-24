@@ -4,6 +4,7 @@ import { api, failureText, type Course } from "./api.ts";
 import PixelIcon from "./PixelIcon.vue";
 import CourseWorkspace from "./CourseWorkspace.vue";
 import TutorPanel from "./TutorPanel.vue";
+import WelcomeScene from "./WelcomeScene.vue";
 import { levelName, modelName, tutorSettings } from "./tutor-choice.ts";
 import { HOME_VIEW_KEY, type HomeView } from "./revamp-types.ts";
 
@@ -219,15 +220,15 @@ onMounted(async () => {
         <div v-if="error" class="error" role="alert"><p>{{ error }}</p><button v-if="username" class="quiet" :disabled="busy" @click="reload">Reload saved work</button></div>
         <p v-if="notice" class="notice" role="status">{{ notice }}</p>
       </section>
-      <figure class="sky-card">
-        <PixelIcon name="tree" :size="160" />
-        <figcaption class="eyebrow">Understanding takes root</figcaption>
-      </figure>
+      <WelcomeScene />
     </main>
   </div>
 
   <dialog v-if="username" ref="settingsDialog" class="app-settings" aria-labelledby="app-settings-title">
-    <h2 id="app-settings-title" class="display">Settings</h2>
+    <header class="settings-head">
+      <h2 id="app-settings-title" class="display">Settings</h2>
+      <button type="button" class="settings-close" aria-label="Close settings" @click="settingsDialog?.close()"><span aria-hidden="true">✕</span></button>
+    </header>
     <section class="settings-section">
       <h3 class="eyebrow">Home view</h3>
       <div class="view-tiles" role="radiogroup" aria-label="Home view">
@@ -246,7 +247,6 @@ onMounted(async () => {
       <p class="account-line">Signed in as <strong>{{ username }}</strong> with your 6.1040 Commons account.</p>
       <button class="secondary meadow" :disabled="busy" @click="settingsDialog?.close(); signOut()">Sign out</button>
     </section>
-    <div class="settings-actions"><button class="primary meadow" @click="settingsDialog?.close()">Close</button></div>
   </dialog>
 </template>
 
@@ -281,16 +281,18 @@ onMounted(async () => {
 .steps { list-style: none; margin: 24px 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; width: 100%; }
 .steps li { display: flex; flex-direction: column; gap: 6px; padding: 12px; border-radius: 14px; background: var(--inset); font-size: 13px; color: var(--muted); }
 .steps strong { display: block; color: var(--ink); font-size: 14px; }
-.sky-card { margin: 0; align-self: stretch; min-height: 420px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; border-radius: 24px; background: #D7E8F1; }
-.sky-card figcaption { color: var(--soft); font-size: 12px; }
-@media (max-width: 900px) { .welcome-main { grid-template-columns: minmax(0, 1fr); padding: 28px 22px; } .sky-card { min-height: 260px; } .hero-title { font-size: 48px; } }
+@media (max-width: 900px) { .welcome-main { grid-template-columns: minmax(0, 1fr); padding: 28px 22px; } .hero-title { font-size: 48px; } }
 @media (max-width: 520px) { .welcome { padding: 8px; } .hero-title { font-size: 40px; } .steps { grid-template-columns: minmax(0, 1fr); } }
 
 /* Settings modal */
 .app-settings { border: 0; border-radius: 22px; padding: 24px; width: min(660px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow-y: auto; box-shadow: 0 20px 50px rgba(0, 0, 0, .18); color: var(--ink); background: #fff; }
 .app-settings::backdrop { background: rgba(21, 21, 21, .35); }
-.app-settings > h2 { margin: 0 0 6px; font-size: 26px; }
+.settings-head { position: sticky; top: -24px; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: -24px -24px 6px; padding: 24px 24px 8px; background: #fff; }
+.settings-head h2 { margin: 0; font-size: 26px; }
+.settings-close { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 10px; background: var(--inset); color: var(--ink); font-size: 16px; line-height: 1; }
+.settings-close:hover { background: var(--inset-2); }
 .settings-section { padding: 16px 0; border-bottom: 1px solid var(--line); }
+.settings-section:last-of-type { border-bottom: 0; padding-bottom: 4px; }
 .settings-section h3 { margin: 0 0 10px; }
 .view-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .view-tile { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 0; border-radius: 16px; background: #fff; box-shadow: 0 0 0 1px var(--ring); text-align: left; }
@@ -302,5 +304,4 @@ onMounted(async () => {
 .tile-name { font-size: 14px; font-weight: 700; }
 .view-note { margin: 10px 0 0; font-size: 13px; color: var(--muted); }
 .account-line { margin: 0 0 10px; font-size: 14px; color: var(--soft); }
-.settings-actions { display: flex; justify-content: flex-end; margin-top: 16px; }
 </style>

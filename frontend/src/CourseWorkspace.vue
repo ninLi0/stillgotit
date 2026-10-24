@@ -589,7 +589,7 @@ watch(view, (now) => { if (now === "setup" && material.value && !preview.value) 
             <div class="mat-tabs" role="tablist" aria-label="Material views">
               <button id="mat-tab-preview" type="button" role="tab" :aria-selected="matTab === 'preview'" aria-controls="mat-panel" @click="matTab = 'preview'">Preview</button>
               <button id="mat-tab-skills" type="button" role="tab" :aria-selected="matTab === 'skills'" aria-controls="mat-panel" @click="matTab = 'skills'">Skills ({{ materialSkills.length }})</button>
-              <button id="mat-tab-text" type="button" role="tab" :aria-selected="matTab === 'text'" aria-controls="mat-panel" @click="matTab = 'text'">Text your tutor reads</button>
+              <button id="mat-tab-text" type="button" role="tab" :aria-selected="matTab === 'text'" aria-controls="mat-panel" @click="matTab = 'text'">Readable text</button>
             </div>
             <div id="mat-panel" role="tabpanel" :aria-labelledby="`mat-tab-${matTab}`" class="mat-panel">
               <MaterialViewer v-if="matTab === 'preview'" :material="selectedMaterial.material" :title="selectedMaterial.title" :skills="viewerSkills" :initial-location="jumpLocation" @ask="ask" @open-skill="openSkill" @review-draft="reviewDraft" />

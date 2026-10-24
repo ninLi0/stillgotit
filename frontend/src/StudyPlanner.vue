@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, shallowRef, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
 import { api } from "./api.ts";
 import { planDay, planDayLabel } from "./labels.ts";
 import { focusedControl, restoreFocus } from "./focus.ts";
@@ -130,7 +130,7 @@ function addDays(day: string, count: number) {
 }
 type PlanItem = NonNullable<NonNullable<typeof data.value>["plan"]>["items"][number];
 type Kind = "lesson" | "review" | "practice" | "prep";
-function kindOf(item: PlanItem): Kind {
+function kindOf(item: { candidate: { activity: string; examRefs: string[] } }): Kind {
   const activity = item.candidate.activity;
   return item.candidate.examRefs.length ? "prep" : /^lesson/i.test(activity) ? "lesson" : /^review/i.test(activity) ? "review" : "practice";
 }
@@ -173,6 +173,22 @@ const outside = computed(() => {
   const days = new Set(week.value.map((day) => day.day));
   return (data.value?.plan?.items ?? []).filter((item) => !days.has(item.day));
 });
+// The week is drawn on the sea: the columns are measured so the boat, buoys and lighthouse sit at each day's horizon.
+const weekList = ref<HTMLElement | null>(null), seaGeo = ref<{ width: number; height: number; horizon: number; centers: number[] }>({ width: 0, height: 0, horizon: 0, centers: [] });
+let weekObserver: ResizeObserver | undefined;
+function measureWeek() {
+  const list = weekList.value; if (!list) { seaGeo.value = { width: 0, height: 0, horizon: 0, centers: [] }; return; }
+  const base = list.getBoundingClientRect().left;
+  const centers = Array.from(list.querySelectorAll<HTMLElement>(":scope > .day")).map((el) => { const box = el.getBoundingClientRect(); return box.left - base + box.width / 2; });
+  const width = Math.max(list.clientWidth, list.scrollWidth), height = list.offsetHeight;
+  const line = list.querySelector<HTMLElement>(":scope > .day > .horizon"), top = list.getBoundingClientRect().top;
+  const horizon = line ? Math.round(line.getBoundingClientRect().top - top + line.offsetHeight * 0.55) : 0;
+  const same = width === seaGeo.value.width && height === seaGeo.value.height && horizon === seaGeo.value.horizon && centers.length === seaGeo.value.centers.length && centers.every((c, i) => Math.abs(c - seaGeo.value.centers[i]!) <= 0.5);
+  if (!same) seaGeo.value = { width, height, horizon, centers };
+}
+watch(weekList, (list) => { weekObserver?.disconnect(); weekObserver = undefined; if (list) { weekObserver = new ResizeObserver(measureWeek); weekObserver.observe(list); measureWeek(); } }, { flush: "post" });
+watch(week, () => { void nextTick(measureWeek); }, { flush: "post" });
+onBeforeUnmount(() => weekObserver?.disconnect());
 function loadPct(total: number) { return budgetMinutes.value > 0 ? Math.min(100, total / budgetMinutes.value * 100) : 0; }
 function dayName(day: string) { const away = data.value ? daysUntil(day, data.value.today) : null; return away === 0 ? "Today" : planDay(day); }
 /** The shell's way in to the daily budget: the study-time dialog, the same one the "Other" segment opens. */
@@ -197,7 +213,6 @@ watch(() => props.revision, () => Promise.all([read(), readCourse()]).catch((pro
     <p v-if="!data && !error" class="hint loading">Loading your plan…</p><button v-if="!data && error && !busy" type="button" class="secondary ocean retry-load" @click="load('Your plan is loaded.')">Try again</button>
     <p v-if="data && !data.preferences" class="budget-row">Set a daily study time for this course to get a plan. <button type="button" class="link-button" @click="settings?.showModal()">Set study time</button></p>
     <Teleport to="body"><dialog ref="settings" class="settings-dialog" aria-labelledby="settings-title"><form class="settings-form" @submit.prevent="saveSettings"><h3 id="settings-title">Study time</h3><p class="hint">For this course only. Each course has its own plan.</p><label>Minutes a day<input v-model.number="minutes" type="number" min="0" max="1440" step="1" required :disabled="busy" /></label><label>Focus note<input v-model="note" maxlength="300" :disabled="busy" placeholder="Optional, for example: matrix products" /></label><div class="dialog-actions"><button type="button" class="quiet" @click="settings?.close()">Cancel</button><button class="primary ocean" :disabled="busy">Save</button></div></form></dialog></Teleport>
-    <PlanSea v-if="data" class="sea" :exam-day="examIndex" :exam-title="seaExam ? 'Exam' : undefined" :exam-date="seaExam?.label" />
     <TradeoffPanel v-if="data && proposal" :proposal="proposal" :items="current!.proposalItems" :cuts="cutRows" :today="data.today" :has-active-plan="!!data.plan" :busy="busy" @confirm="decide(true)" @decline="decide(false)" />
     <div v-if="data?.next" class="next">
       <div class="next-body"><p class="eyebrow next-eyebrow">Next up · {{ planDayLabel(data.next.day, data.today) }} · {{ data.next.candidate.minutes }} min</p><h3>{{ data.next.candidate.activity }}</h3><p class="next-reason">{{ data.next.candidate.reason }}</p><p class="sr-only">About {{ data.next.candidate.minutes }} minutes</p></div>
@@ -207,16 +222,20 @@ watch(() => props.revision, () => Promise.all([read(), readCourse()]).catch((pro
         <div role="alert"><p v-if="error && shownAt === 'activity'" ref="activityErrorBox" class="error activity-error" tabindex="-1">{{ error }}</p></div>
       </div>
     </div><p v-else-if="data?.preferences" class="hint no-next">No review is scheduled. Update the plan after adding skills or completing practice.</p>
-    <div v-if="data?.preferences" class="week-bar">
+    <section v-if="data?.preferences" class="week-card" aria-label="This week">
+    <div class="week-bar">
       <p v-if="data.budget" class="budget">{{ Math.round(data.budget.remainingMinutes) }} min left today <span>· {{ Math.round(data.budget.spentMinutes) }} min recorded</span></p><span v-else />
       <div class="update-wrap"><button class="secondary ocean update-plan" :disabled="busy || !!updateReason" :aria-describedby="updateReason ? 'update-reason' : undefined" @click="propose">Update plan</button><p v-if="updateReason" id="update-reason" class="hint reason">{{ updateReason }}</p></div>
     </div>
-    <div v-if="data?.preferences" class="week-scroll">
-      <ol class="week" aria-label="This week's plan">
+    <div class="week-scroll">
+      <div class="voyage">
+      <PlanSea class="sea" :exam-day="examIndex" :exam-title="seaExam ? 'Exam' : undefined" :exam-date="seaExam?.label" :width="seaGeo.width || undefined" :height="seaGeo.height || undefined" :centers="seaGeo.centers" :horizon="seaGeo.horizon" />
+      <ol ref="weekList" class="week" aria-label="This week's plan">
         <li v-for="day in week" :key="day.day" class="day" :class="{ today: day.index === 0, exam: !!day.exam }" :aria-label="day.index === 0 ? `Today, ${day.label}` : day.label">
           <div class="day-top"><span class="dow" aria-hidden="true">{{ day.dow }}</span><span class="date" aria-hidden="true">{{ day.date }}</span></div>
-          <div v-if="!day.exam" class="load"><MasteryCells :value="loadPct(day.total)" :cells="6" on="#3FA7D1" off="#DCEEF6" :height="5" :label="`${day.total} of ${budgetMinutes} minutes planned`" /><span class="load-text">{{ day.total }} of {{ budgetMinutes }} min</span></div>
-          <div v-else class="exam-mark"><PixelIcon name="lighthouse" :size="48" /><span class="exam-title">Exam</span><span class="exam-covers">Covers {{ day.exam.covered.length }} {{ day.exam.covered.length === 1 ? 'skill' : 'skills' }}</span></div>
+          <div class="horizon" aria-hidden="true" />
+          <div v-if="!day.exam" class="load"><MasteryCells :value="loadPct(day.total)" :cells="6" on="#1E6F96" off="#CFE7F2" :height="5" :label="`${day.total} of ${budgetMinutes} minutes planned`" /><span class="load-text">{{ day.total }} of {{ budgetMinutes }} min</span></div>
+          <div v-else class="exam-mark"><span class="exam-title"><PixelIcon name="lighthouse" :size="22" /> Exam</span><span class="exam-covers">Covers {{ day.exam.covered.length }} {{ day.exam.covered.length === 1 ? 'skill' : 'skills' }}</span></div>
           <ul v-if="day.items.length" class="items">
             <li v-for="item in day.items" :key="item.item" class="item" :class="[kindOf(item), { next: data.next?.item === item.item, done: item.status === 'DONE', missed: item.status === 'MISSED' || item.status === 'REPLACED', deferring: deferring.has(item.item) }]">
               <span class="item-title"><span class="type-square" aria-hidden="true" />{{ item.candidate.activity }}</span>
@@ -225,7 +244,9 @@ watch(() => props.revision, () => Promise.all([read(), readCourse()]).catch((pro
           </ul>
         </li>
       </ol>
+      </div>
     </div>
+    </section>
     <div v-if="data" class="below">
       <PlannerExams ref="examsPanel" :exams="current!.exams" :skills="skills" :units="units" :today="data.today" :busy="busy" :add-reason="addExamReason" :error="error && shownAt === 'exams' ? error : ''" @save="saveExam" @remove="removeExam" />
       <section v-if="data.plan" class="deferred" aria-labelledby="deferred-title">
@@ -257,7 +278,7 @@ watch(() => props.revision, () => Promise.all([read(), readCourse()]).catch((pro
 .link-button{border:0;background:none;padding:0;font:inherit;font-weight:700;color:var(--ocean-soft-text);text-decoration:underline;text-underline-offset:3px}
 .loading{margin:4px 0 0}.retry-load{margin:10px 0;min-height:36px;font-size:13px}
 .error,.notice{margin:0 0 12px}
-.sea{margin-top:4px}
+.no-next{margin:14px 0 0}
 /* Next activity, with its actions */
 .next{margin-top:14px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:16px;align-items:center;padding:16px 20px;border-radius:18px;background:#FFFFFF;border:2px solid #E3A233}
 .next-eyebrow{color:#8A5A12}
@@ -270,33 +291,37 @@ watch(() => props.revision, () => Promise.all([read(), readCourse()]).catch((pro
 .spent{display:flex;align-items:center;gap:8px;margin:0;font-size:13px}
 .spent input{width:80px;min-height:34px;padding:4px 8px;border-radius:10px}
 .activity-error{margin:8px 0 0!important}
-.no-next{margin:14px 0 0}
-/* Week grid */
-.week-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:16px}
+/* The week at sea: one picture where each day is a column of the water. */
+.week-card{margin-top:16px}
+.week-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 4px}
 .budget{margin:0;font-size:13px;font-weight:700}
 .budget span{font-weight:500;color:var(--muted)}
 .update-plan{min-height:34px;padding:0 14px;font-size:13px}
 .week-scroll{overflow-x:auto;margin-top:10px;padding-bottom:4px}
-.week{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(7,minmax(112px,1fr));gap:8px}
-.day{display:flex;flex-direction:column;gap:8px;min-height:260px;padding:10px;border-radius:16px;background:#FFFFFF;border:1px solid #E6EEF2;color:var(--ink);min-width:0}
-.day.today{background:#F0F9FD;border:2px solid #62BCE0}
-.day.exam{background:#1E6F96;border:0;color:#FFFFFF}
-.day-top{display:flex;align-items:baseline;justify-content:space-between;gap:6px}
-.dow{font-family:var(--font-display);font-size:11px;letter-spacing:1px;text-transform:uppercase;opacity:.8}
-.date{font-family:var(--font-display);font-size:22px;line-height:1}
-.load{display:flex;flex-direction:column;gap:5px}
+.voyage{position:relative;border-radius:22px;overflow:hidden;border:1px solid #CFE7F2;background:#9BD7EC}
+.sea{position:absolute;left:0;top:0;height:100%;border:0;border-radius:0}
+.week{position:relative;z-index:1;list-style:none;margin:0;padding:26px 12px 16px;display:grid;grid-template-columns:repeat(7,minmax(128px,1fr));gap:10px}
+.day{display:flex;flex-direction:column;align-items:stretch;gap:8px;min-height:300px;min-width:0;padding:6px;border-radius:14px;color:var(--ink)}
+.day.today{background:rgba(255,255,255,.26);box-shadow:inset 0 0 0 2px rgba(255,255,255,.85)}
+.day-top{align-self:flex-start;display:flex;align-items:baseline;gap:8px;padding:3px 10px 4px;background:#E9D6A8;box-shadow:inset 0 -2px 0 #CDB884,0 0 0 2px #C08324}
+.day.today .day-top{background:#FFF1C9;box-shadow:inset 0 -2px 0 #E7C676,0 0 0 2px #C08324}
+.day.exam .day-top{background:#1E6F96;color:#FFFFFF;box-shadow:inset 0 -2px 0 #15516E,0 0 0 2px #0D3F58}
+.dow{font-family:var(--font-display);font-size:11px;letter-spacing:1px;text-transform:uppercase}
+.date{font-family:var(--font-display);font-size:20px;line-height:1}
+.horizon{height:58px;flex:none}
+.load{display:flex;flex-direction:column;gap:4px;padding:6px 8px;border-radius:8px;background:rgba(255,255,255,.88)}
 .load :deep(.mastery-cells){max-width:none}
-.load-text{font-size:11px;font-weight:600;color:#3A5F72}
-.exam-mark{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;gap:6px}
-.exam-title{font-family:var(--font-display);font-size:22px}
-.exam-covers{font-size:12px;font-weight:600;opacity:.85}
+.load-text{font-size:11px;font-weight:600;color:#1E5B78}
+.exam-mark{display:flex;flex-direction:column;gap:2px;padding:6px 8px;border-radius:8px;background:#1E6F96;color:#FFFFFF}
+.exam-title{display:flex;align-items:center;gap:6px;font-family:var(--font-display);font-size:18px}
+.exam-covers{font-size:11px;font-weight:600;opacity:.9}
 .items{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
-.item{display:flex;flex-direction:column;gap:6px;padding:8px 9px;border-radius:10px;border:1px solid transparent;color:var(--ink);animation:sgRise 240ms ease-out both}
+.item{display:flex;flex-direction:column;gap:6px;padding:8px 9px;border-radius:8px;border:1px solid rgba(13,63,88,.14);box-shadow:0 2px 0 rgba(13,63,88,.22);color:var(--ink);animation:sgRise 240ms ease-out both}
 .item-title{font-size:12px;font-weight:650;line-height:1.35;text-wrap:pretty;overflow-wrap:anywhere}
 .type-square{display:inline-block;width:7px;height:7px;margin:0 6px 1px 0;vertical-align:middle}
 .item-meta{font-size:11px;font-weight:600;line-height:1.35;color:var(--muted);overflow-wrap:anywhere}
 .item.lesson{background:#E3EEF3}.item.lesson .type-square{background:#2F7D9B}
-.item.review{background:#F1F1EE}.item.review .type-square{background:#2F8A5F}
+.item.review{background:#F4F4F1}.item.review .type-square{background:#2F8A5F}
 .item.practice{background:#FBF0D6}.item.practice .type-square{background:#E3A233}
 .item.prep{background:#FBE6DC}.item.prep .type-square{background:#D9663A}
 .item.next{border:2px solid #E3A233}.item.next .item-meta{color:var(--ink)}
