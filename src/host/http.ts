@@ -37,11 +37,19 @@ export function createApplicationHttp({ application, recovery, publicOrigin, clo
 
   /** Evaluates the path's admission formers in order and returns the first that declines, or null when all admit. */
   async function admission(path: string, body: Record<string, unknown>, owner: string) {
-    const entries: readonly { check: (input: Record<string, unknown>) => Parameters<Application["form"]>[0]; fields: readonly string[]; detail: string }[] =
+    const entries: readonly { check: (input: Record<string, unknown>) => Parameters<Application["form"]>[0]; fields: readonly string[]; detail: string;
+      prerequisite?: { check: (input: Record<string, unknown>) => Parameters<Application["form"]>[0]; detail: (input: { title: string }) => string } }[] =
       admissions[path as keyof typeof admissions] ?? [];
     for (const entry of entries) {
       const values = Object.fromEntries(entry.fields.map((field) => [field, field === "assessment" ? body.case : body[field]]));
-      if (Object.values(values).some((value) => value === undefined) || !await application.form(entry.check({ ...values, owner }))) return entry;
+      const missing = Object.values(values).some((value) => value === undefined);
+      if (!missing && await application.form(entry.check({ ...values, owner }))) continue;
+      // A declined practice start names the prerequisite to work on first, when one is not ready.
+      if (!missing && entry.prerequisite) {
+        const found = await application.form(entry.prerequisite.check({ ...values, owner })) as { title?: unknown } | null;
+        if (found && typeof found.title === "string") return { entry, detail: entry.prerequisite.detail({ title: found.title }) };
+      }
+      return { entry, detail: entry.detail };
     }
     return null;
   }

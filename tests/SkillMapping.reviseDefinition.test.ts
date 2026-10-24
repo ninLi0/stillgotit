@@ -64,6 +64,12 @@ async function savedState(instanceName = "SkillMapping") {
   ));
 }
 
+async function savedVersion(version: string) {
+  return connection!.db
+    .collection<{ _id: string; skill: string; outcome: string; gate: string; previous?: string }>("SkillMapping.versions")
+    .findOne({ _id: version });
+}
+
 async function versionCount(skill: string, instanceName = "SkillMapping") {
   return connection!.db.collection(`${instanceName}.versions`).countDocuments({ skill });
 }
@@ -97,6 +103,120 @@ describe("SkillMapping requirements revision", () => {
     ));
     expect(after[3]!.filter((row) => String(row._id) !== result.version)).toEqual(before[3]);
     expect(after[3]!.length).toBe(before[3]!.length + 1);
+    // The new version carries the version it replaced.
+    expect(await savedVersion(result.version)).toEqual({
+      _id: result.version, skill, outcome, gate, previous: current,
+    });
+    expect(await mapping._versions({ skill })).toEqual([
+      { version: result.version, outcome, gate },
+      { version: current, outcome: content.outcome, gate: content.gate },
+    ]);
+  });
+
+  test("saves the replaced version in the one write that saves the new version", async () => {
+    const { owner, skill, current } = await makeConfirmed();
+    const gate = "Explain incompatible dimensions.";
+    const writes: string[] = [];
+    const spies = (["insertOne", "insertMany", "updateOne", "updateMany", "replaceOne", "deleteOne", "deleteMany"] as const)
+      .map((method) => {
+        const original = Collection.prototype[method] as (...args: unknown[]) => unknown;
+        return spyOn(Collection.prototype, method).mockImplementation(function (this: Collection, ...args: unknown[]) {
+          writes.push(`${method} ${this.collectionName}`);
+          return original.apply(this, args);
+        } as never);
+      });
+    let result: { previous: string; version: string };
+    try {
+      result = await mapping.reviseDefinition({ owner, skill, outcome: content.outcome, gate });
+    } finally {
+      for (const spy of spies) spy.mockRestore();
+    }
+    // One write saves the new version with its link; one write makes it current.
+    expect(writes).toEqual(["insertOne SkillMapping.versions", "updateOne SkillMapping.skills"]);
+    expect(await savedVersion(result!.version)).toEqual({
+      _id: result!.version, skill, outcome: content.outcome, gate, previous: current,
+    });
+  });
+
+  test("lists a skill's versions newest first through each replaced version", async () => {
+    const { owner, unit, skill, current } = await makeConfirmed();
+    const gates = ["Explain incompatible dimensions.", "Explain why order matters.", "Explain each entry's sum."];
+    const revisions = [];
+    for (const gate of gates) {
+      revisions.push(await mapping.reviseDefinition({ owner, skill, outcome: content.outcome, gate }));
+    }
+    expect(revisions.map((revision) => revision.previous))
+      .toEqual([current, revisions[0]!.version, revisions[1]!.version]);
+    const history = [
+      { version: revisions[2]!.version, outcome: content.outcome, gate: gates[2] },
+      { version: revisions[1]!.version, outcome: content.outcome, gate: gates[1] },
+      { version: revisions[0]!.version, outcome: content.outcome, gate: gates[0] },
+      { version: current, outcome: content.outcome, gate: content.gate },
+    ];
+    expect(await mapping._versions({ skill })).toEqual(history);
+
+    // Renaming, moving, adding a source, and archiving keep the history.
+    const { course } = (await mapping._unit({ unit }))[0]!;
+    const target = await mapping.addUnit({ owner, course, title: "Products" });
+    await mapping.editDetails({ owner, skill, unit: target.unit, title: "Matrix products" });
+    await mapping.attachMaterial({ owner, skill, material: "source-c" });
+    await mapping.archive({ owner, skill });
+    expect(await mapping._versions({ skill })).toEqual(history);
+
+    // Another skill's history is separate.
+    const other = await makeConfirmed();
+    expect(await mapping._versions({ skill: other.skill })).toEqual([
+      { version: other.current, outcome: content.outcome, gate: content.gate },
+    ]);
+  });
+
+  test("lists only the current version of a draft, and no rows for unknown or discarded skills", async () => {
+    const { owner, unit, skill, current } = await makeDraft();
+    expect(await mapping._versions({ skill })).toEqual([
+      { version: current, outcome: content.outcome, gate: content.gate },
+    ]);
+
+    // A draft revision replaces the version without recording it as previous.
+    const gate = "Explain incompatible dimensions.";
+    await mapping.reviseDraft({ ...content, owner, unit, skill, gate });
+    const [draft] = await mapping._skill({ skill });
+    expect(draft!.current).not.toBe(current);
+    expect(await mapping._versions({ skill })).toEqual([
+      { version: draft!.current, outcome: content.outcome, gate },
+    ]);
+    // So the confirmed skill's history starts from the version it was confirmed with.
+    await mapping.confirm({ owner, skill });
+    const revision = await mapping.reviseDefinition({ owner, skill, outcome: content.outcome, gate: content.gate });
+    expect(await mapping._versions({ skill })).toEqual([
+      { version: revision.version, outcome: content.outcome, gate: content.gate },
+      { version: draft!.current, outcome: content.outcome, gate },
+    ]);
+    expect(await mapping._version({ version: current })).toEqual([
+      { skill, outcome: content.outcome, gate: content.gate },
+    ]);
+
+    expect(await mapping._versions({ skill: randomUUID() })).toEqual([]);
+    const discarded = await makeDraft();
+    await mapping.discardDraft({ owner: discarded.owner, skill: discarded.skill });
+    expect(await mapping._versions({ skill: discarded.skill })).toEqual([]);
+  });
+
+  test("lists no rows, rather than failing, when a draft is discarded between the history's reads", async () => {
+    const { owner, skill } = await makeDraft();
+    const originalFindOne = Collection.prototype.findOne as (...args: unknown[]) => Promise<unknown>;
+    // The history reads the skill, then the draft is discarded before its versions are read.
+    const read = spyOn(Collection.prototype, "findOne")
+      .mockImplementationOnce(async function (this: Collection, ...args: unknown[]) {
+        const record = await originalFindOne.apply(this, args);
+        await mapping.discardDraft({ owner, skill });
+        return record;
+      } as never);
+    try {
+      expect(await mapping._versions({ skill })).toEqual([]);
+    } finally {
+      read.mockRestore();
+    }
+    expect(await mapping._skill({ skill })).toEqual([]);
   });
 
   test("keeps draft history and creates a fresh version when returning to earlier text", async () => {
@@ -120,6 +240,13 @@ describe("SkillMapping requirements revision", () => {
     }
     expect((await mapping._skill({ skill }))[0]?.current).toBe(secondRevision.version);
     expect(await versionCount(skill)).toBe(4);
+    // Returning to earlier text is still a new entry in the history. The draft's
+    // first version was replaced by reviseDraft, so the history ends before it.
+    expect(await mapping._versions({ skill })).toEqual([
+      { version: secondRevision.version, outcome: content.outcome, gate: content.gate },
+      { version: firstRevision.version, outcome: content.outcome, gate: revisedGate },
+      { version: secondVersion, outcome: content.outcome, gate: draftGate },
+    ]);
   });
 
   test("refuses foreign, missing, draft, and archived skills before checking text", async () => {
@@ -204,6 +331,10 @@ describe("SkillMapping requirements revision", () => {
     expect(result.previous).toBe(current);
     expect((await concept._skill({ skill }))[0]?.current).toBe(result.version);
     expect(await versionCount(skill, instanceName)).toBe(2);
+    expect(await concept._versions({ skill })).toEqual([
+      { version: result.version, outcome: content.outcome, gate: revision.gate },
+      { version: current, outcome: content.outcome, gate: content.gate },
+    ]);
   });
 
   test("a request that stops before switching versions leaves the old version current", async () => {
@@ -232,6 +363,44 @@ describe("SkillMapping requirements revision", () => {
     // The stopped attempt left one unused version. No action returned its
     // identity and the skill never used it, so no query reaches it.
     expect(await versionCount(skill)).toBe(3);
+    expect(await mapping._versions({ skill })).toEqual([
+      { version: result.version, outcome: content.outcome, gate: revision.gate },
+      { version: current, outcome: content.outcome, gate: content.gate },
+    ]);
+  });
+
+  test("a lost reply followed by another revision keeps the replaced version in the history", async () => {
+    const { owner, skill, current } = await makeConfirmed();
+    const first = { owner, skill, outcome: content.outcome, gate: "Explain incompatible dimensions." };
+    const second = { owner, skill, outcome: content.outcome, gate: "Explain why order matters." };
+    const originalUpdate = Collection.prototype.updateOne as (...args: unknown[]) => Promise<unknown>;
+    let later: { previous: string; version: string } | undefined;
+    // The first switch applies, but its reply is lost. Before the first
+    // request checks whether its new version is in use, another revision
+    // replaces that version.
+    const update = spyOn(Collection.prototype, "updateOne")
+      .mockImplementationOnce(async function (this: Collection, ...args: unknown[]) {
+        await originalUpdate.apply(this, args);
+        later = await mapping.reviseDefinition(second);
+        throw new Error("Lost reply.");
+      } as never);
+    try {
+      await expect(mapping.reviseDefinition(first)).rejects.toThrow("Lost reply.");
+    } finally {
+      update.mockRestore();
+    }
+
+    const replaced = later!.previous;
+    expect(replaced).not.toBe(current);
+    expect(await mapping._version({ version: replaced })).toEqual([
+      { skill, outcome: content.outcome, gate: first.gate },
+    ]);
+    expect(await mapping._versions({ skill })).toEqual([
+      { version: later!.version, outcome: content.outcome, gate: second.gate },
+      { version: replaced, outcome: content.outcome, gate: first.gate },
+      { version: current, outcome: content.outcome, gate: content.gate },
+    ]);
+    expect(await versionCount(skill)).toBe(3);
   });
 
   test("concurrent identical revisions create one version and one unchanged refusal", async () => {
@@ -250,6 +419,10 @@ describe("SkillMapping requirements revision", () => {
       expect(rejected[0]!.reason).toBeInstanceOf(SkillDefinitionUnchangedError);
       expect(accepted[0]!.value.previous).toBe(current);
       expect((await mapping._skill({ skill }))[0]?.current).toBe(accepted[0]!.value.version);
+      expect(await mapping._versions({ skill })).toEqual([
+        { version: accepted[0]!.value.version, outcome: content.outcome, gate: revision.gate },
+        { version: current, outcome: content.outcome, gate: content.gate },
+      ]);
     } finally {
       await secondConnection.client.close();
     }
@@ -279,6 +452,19 @@ describe("SkillMapping requirements revision", () => {
           skill, outcome: revisions[index]!.outcome, gate: revisions[index]!.gate,
         }]);
       }
+      // The revision that lost the first race read again, so its saved link
+      // names the version that actually preceded it. Both clients read the same history.
+      const contentOf = (version: string) => {
+        const index = results.findIndex((result) => result.version === version);
+        return { outcome: revisions[index]!.outcome, gate: revisions[index]!.gate };
+      };
+      const history = [
+        { version: second!.version, ...contentOf(second!.version) },
+        { version: first!.version, ...contentOf(first!.version) },
+        { version: current, outcome: content.outcome, gate: content.gate },
+      ];
+      expect(await mapping._versions({ skill })).toEqual(history);
+      expect(await secondMapping._versions({ skill })).toEqual(history);
     } finally {
       await secondConnection.client.close();
     }

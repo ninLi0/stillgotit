@@ -7,6 +7,7 @@ import { focusedControl, restoreFocus } from "./focus.ts";
 import SkillTree from "./SkillTree.vue";
 import SkillStudy from "./SkillStudy.vue";
 import StudyPlanner from "./StudyPlanner.vue";
+import ManageSkills from "./ManageSkills.vue";
 import type { StillGotItHttp } from "../../generated/wire.ts";
 import { takeTutor, tutorLabel, type TutorUsed } from "./tutor-choice.ts";
 
@@ -19,7 +20,7 @@ const pendingDraftCount = ref(0);
 type CourseData = StillGotItHttp["/courses/read"]["output"];
 type MaterialId = CourseData["materials"][number]["material"];
 type Suggestion = { title: string; outcome: string; gate: string };
-const data = ref<CourseData>({ materials: [], units: [], skills: [] });
+const data = ref<CourseData>({ materials: [], units: [], skills: [], prerequisites: [], skillSources: [], versions: [] });
 const busy = ref(false), message = ref(""), error = ref(""), justConfirmed = ref<string | null>(null);
 const notice = ref<HTMLElement | null>(null), setupError = ref<HTMLElement | null>(null);
 // Start empty: typing into a prefilled name merges the two names.
@@ -270,6 +271,7 @@ onMounted(() => task(async () => {
             </ul>
           </div>
         </section>
+        <ManageSkills :course="course.course" :data="data" @changed="task(refresh)" />
       </div>
     </section>
     <div v-show="view === 'chat'" class="lesson-view">

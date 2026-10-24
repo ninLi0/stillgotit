@@ -268,6 +268,8 @@ Defined in [SkillMapping](../design/concepts/SkillMapping.md), line 1.
 - `addUnit(owner: User, course: Course, title: String) : returns (unit: Unit)`
   - Refuses `UNIT_COURSE_UNAVAILABLE`: Choose one of your courses.
   - Refuses `INVALID_UNIT_TITLE`: Enter a unit title.
+- `setEmphasis(owner: User, unit: Unit, emphasized: Flag) : returns ()`
+  - Refuses `UNIT_EMPHASIS_UNAVAILABLE`: Choose a unit in one of your courses.
 - `propose(owner: User, unit: Unit, proposalKey: String, title: String, outcome: String, gate: String, materials: MaterialSet) : returns (skill: Skill)`
   - Refuses `PROPOSAL_UNIT_UNAVAILABLE`: Choose a unit in one of your courses.
   - Refuses `INVALID_SKILL_PROPOSAL`: Enter a skill title, outcome, and demonstration requirements.
@@ -307,12 +309,13 @@ Defined in [SkillMapping](../design/concepts/SkillMapping.md), line 1.
 
 - `_courses(owner: User) : many (course: Course, title: String)`
 - `_course(course: Course) : optional (owner: User, title: String)`
-- `_units(course: Course) : many (unit: Unit, title: String)`
+- `_units(course: Course) : many (unit: Unit, title: String, emphasized: Flag)`
 - `_unit(unit: Unit) : optional (course: Course, title: String)`
 - `_skills(unit: Unit) : many (skill: Skill, title: String, current: Version, status: SkillStatus)`
 - `_skill(skill: Skill) : optional (unit: Unit, title: String, current: Version, status: SkillStatus)`
 - `_materials(skill: Skill) : many (material: Material)`
 - `_prerequisites(skill: Skill) : many (prerequisite: Skill)`
+- `_versions(skill: Skill) : many (version: Version, outcome: String, gate: String)`
 - `_version(version: Version) : optional (skill: Skill, outcome: String, gate: String)`
 - `_map(course: Course) : one (skills: SkillMapRows)`
 
@@ -401,6 +404,7 @@ Concrete types:
 
 - `attemptIsReady(data: GroundedTutoring.StudyRecord, dialogueLength: Number, reviewed: Flag, unseen: Flag, outsideHelp: Flag) : Flag` — [Learning computations](../design/compositions/LearningComputations.md), line 105.
 - `beginAllowed(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows, skill: SkillMapping.Skill, urgent: Flag) : Flag` — [Daily planning flows](../design/compositions/Planning.md), line 106.
+- `carriedEstimate(tracks: MasteryEstimating.ProgressRows, skill: SkillMapping.Skill, current: SkillMapping.Version) : CarriedEstimate` — [Courses, materials, and skills](../design/compositions/Courses.md), line 46.
 - `choiceOffered(choice: TutorChoice) : Flag` — [Tutor settings](../design/compositions/Settings.md), line 41.
 - `correctionNote(reason: String) : AttemptClarification` — [Learning computations](../design/compositions/LearningComputations.md), line 21.
 - `coveredSkillsConfirmed(covered: StudyPlanning.SubjectSet, skills: SkillMapping.SkillMapRows) : Flag` — [Daily planning flows](../design/compositions/Planning.md), line 100.
@@ -422,6 +426,8 @@ Concrete types:
 - `offeredChoice(model: String, level: String) : TutorChoice` — [Tutor settings](../design/compositions/Settings.md), line 38.
 - `planDetail(schedule: StudyPlanning.ScheduleValue) : PlanDetail` — [Learning computations](../design/compositions/LearningComputations.md), line 48.
 - `planRequest(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows, schedule: StudyPlanning.ScheduleValue) : ReviewProposal` — [Learning computations](../design/compositions/LearningComputations.md), line 51.
+- `prerequisiteSet(prerequisites: SkillList) : SkillMapping.SkillSet` — [Courses, materials, and skills](../design/compositions/Courses.md), line 55.
+- `prerequisiteToPractice(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows, skill: SkillMapping.Skill) : PrerequisiteChoice` — [Request admission](../design/compositions/LearningAccess.md), line 32.
 - `prerequisitesReady(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows, skill: SkillMapping.Skill) : Flag` — [Learning computations](../design/compositions/LearningComputations.md), line 56.
 - `progressRows(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows) : SkillProgress` — [Learning computations](../design/compositions/LearningComputations.md), line 59.
 - `requestChoice(request: TutorRequest) : TutorChoice` — [Tutor settings](../design/compositions/Settings.md), line 84.
@@ -450,7 +456,7 @@ _Views name reusable conditions. Multiple `where` blocks are alternatives._
 ### (owner) owns (course) with (title)
 
 Authored path: `Courses.OwnedCourse`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 7.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 7.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 3.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 87.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 107.
@@ -559,7 +565,8 @@ Authored path: `Planning.StartAllowed`.
 ### (owner) owns (unit) in (course)
 
 Authored path: `Courses.OwnedUnit`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 7.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 7.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 29.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 107.
 
 ```view
@@ -572,7 +579,8 @@ Authored path: `Courses.OwnedUnit`.
 ### (owner) owns (skill) in (course)
 
 Authored path: `Courses.OwnedSkill`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 7.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 7.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 29.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 107.
 
 ```view
@@ -597,7 +605,7 @@ Authored path: `Reads.OwnedCase`.
 ### (skill) has a source outside (owner)'s (course)
 
 Authored path: `Courses.UnavailableSkillMaterial`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 25.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 25.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 113.
 
 ```view
@@ -805,6 +813,7 @@ Former "admit learner work in (studySession)" — inputs (owner, studySession, t
 
 Authored path: `Access.TaskReady`.
 - Covered by [Request admission](../design/compositions/LearningAccess.md), line 12.
+- Covered by [Request admission](../design/compositions/LearningAccess.md), line 29.
 
 ```former
 Former "admit practice for (owner) and (skill)" — inputs (owner, skill); bindings (definition, skills, tracks, context, sources, materials); promises at most one record — forms:
@@ -1013,7 +1022,7 @@ Former "the activities of the proposal awaiting confirmation for (owner) in (cou
 ### the courses belonging to (owner)
 
 Authored path: `Courses.CourseList`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 7.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 7.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 87.
 
 ```former
@@ -1039,6 +1048,37 @@ Former "the cuts of the proposal awaiting confirmation for (owner) in (course)" 
     arranged by order
     form a record of
       cut
+```
+
+### the prerequisite links in (course)
+
+Authored path: `Courses.Prerequisites`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 9.
+- Covered by [P2 learning journey](../design/stages/materials.md), line 107.
+
+```former
+Former "the prerequisite links in (course)" — inputs (course); bindings (unit, skill, prerequisite); promises exactly one record — forms:
+  each SkillMapping._units (course) has (unit)
+    where SkillMapping._skills (unit) has (skill)
+    where SkillMapping._prerequisites (skill) has (prerequisite)
+    arranged by skill
+    form a record of
+      prerequisite
+      skill
+```
+
+### the prerequisite to work on before practicing (skill) for (owner)
+
+Authored path: `Access.PracticePrerequisite`.
+- Covered by [Request admission](../design/compositions/LearningAccess.md), line 29.
+
+```former
+Former "the prerequisite to work on before practicing (skill) for (owner)" — inputs (owner, skill); bindings (skills, tracks, title); promises at most one record — forms:
+  a record of
+    where view "(owner) can study confirmed (skill)" with (owner, skill)
+    where view "the current context of (skill) for (owner)" with (owner, skill) has (skills, tracks)
+    where (found: true, title) is prerequisiteToPractice (skill, skills, tracks)
+    title
 ```
 
 ### the proposal awaiting confirmation for (owner) in (course)
@@ -1067,10 +1107,29 @@ Former "the proposal awaiting confirmation for (owner) in (course)" — inputs (
       sessionInProgress
 ```
 
+### the requirements versions in (course)
+
+Authored path: `Courses.Versions`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 9.
+- Covered by [P2 learning journey](../design/stages/materials.md), line 107.
+
+```former
+Former "the requirements versions in (course)" — inputs (course); bindings (unit, skill, version, outcome, gate); promises exactly one record — forms:
+  each SkillMapping._units (course) has (unit)
+    where SkillMapping._skills (unit) has (skill)
+    where SkillMapping._versions (skill) has (gate, outcome, version)
+    arranged by skill
+    form a record of
+      gate
+      outcome
+      skill
+      version
+```
+
 ### the skill definitions in (course)
 
 Authored path: `Courses.Skills`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 9.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 9.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 107.
 
 ```former
@@ -1089,10 +1148,27 @@ Former "the skill definitions in (course)" — inputs (course); bindings (unit, 
       unit
 ```
 
+### the skill sources in (course)
+
+Authored path: `Courses.SkillSources`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 9.
+- Covered by [P2 learning journey](../design/stages/materials.md), line 107.
+
+```former
+Former "the skill sources in (course)" — inputs (course); bindings (unit, skill, material); promises exactly one record — forms:
+  each SkillMapping._units (course) has (unit)
+    where SkillMapping._skills (unit) has (skill)
+    where SkillMapping._materials (skill) has (material)
+    arranged by skill
+    form a record of
+      material
+      skill
+```
+
 ### the source summaries for (owner) in (course)
 
 Authored path: `Courses.Materials`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 9.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 9.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 107.
 
 ```former
@@ -1139,14 +1215,15 @@ Former "the tutor settings for (owner)" — inputs (owner); bindings (models, ch
 ### the units in (course)
 
 Authored path: `Courses.Units`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 9.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 9.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 107.
 
 ```former
-Former "the units in (course)" — inputs (course); bindings (unit, title); promises exactly one record — forms:
-  each SkillMapping._units (course) has (title, unit)
+Former "the units in (course)" — inputs (course); bindings (unit, title, emphasized); promises exactly one record — forms:
+  each SkillMapping._units (course) has (emphasized, title, unit)
     arranged by unit
     form a record of
+      emphasized
       title
       unit
 ```
@@ -1156,8 +1233,8 @@ Former "the units in (course)" — inputs (course); bindings (unit, title); prom
 ### Courses.AddMaterial
 
 Authored path: `Courses.AddMaterial`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 15.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 39.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 15.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 75.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 111.
 
 ```reaction
@@ -1169,8 +1246,8 @@ then
 ### Courses.AddMaterial:missing#2
 
 Authored path: `Courses.AddMaterial`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 15.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 39.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 15.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 75.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 111.
 
 ```reaction
@@ -1185,8 +1262,8 @@ then
 ### Courses.AddMaterial:owned#2
 
 Authored path: `Courses.AddMaterial`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 15.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 39.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 15.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 75.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 111.
 
 ```reaction
@@ -1201,8 +1278,8 @@ then
 ### Courses.AddMaterial:owned#3
 
 Authored path: `Courses.AddMaterial`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 15.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 39.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 15.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 75.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 111.
 
 ```reaction
@@ -1213,11 +1290,84 @@ then
   RequestBoundary.respond (material, requestId)
 ```
 
+### Courses.AddSkillSource
+
+Authored path: `Courses.AddSkillSource`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 50.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 81.
+
+```reaction
+when RequestBoundary.request (material, path: "/courses/skills/sources/add", requestId, session, skill)
+then
+  Sessioning.use (session)
+```
+
+### Courses.AddSkillSource:missing#2
+
+Authored path: `Courses.AddSkillSource`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 50.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 81.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Courses.AddSkillSource
+where
+  earlier, RequestBoundary.request (material, path: "/courses/skills/sources/add", requestId, session, skill)
+  no view "(owner) owns (skill) in (course)" with (owner, skill)
+then
+  RequestBoundary.respond (error: "COURSE_UNAVAILABLE", requestId)
+```
+
+### Courses.AddSkillSource:owned#2
+
+Authored path: `Courses.AddSkillSource`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 50.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 81.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Courses.AddSkillSource
+where
+  earlier, RequestBoundary.request (material, path: "/courses/skills/sources/add", requestId, session, skill)
+  view "(owner) owns (skill) in (course)" with (owner, skill) has (course)
+  GroundedTutoring._material (material) has (owner, scope: course)
+then
+  SkillMapping.attachMaterial (material, owner, skill)
+```
+
+### Courses.AddSkillSource:owned#3
+
+Authored path: `Courses.AddSkillSource`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 50.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 81.
+
+```reaction
+when SkillMapping.attachMaterial (material, owner, skill), asked by Courses.AddSkillSource:owned#2
+where
+  earlier, RequestBoundary.request (material, path: "/courses/skills/sources/add", requestId, session, skill)
+then
+  RequestBoundary.respond (requestId)
+```
+
+### Courses.AddSkillSource:source#2
+
+Authored path: `Courses.AddSkillSource`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 50.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 81.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Courses.AddSkillSource
+where
+  earlier, RequestBoundary.request (material, path: "/courses/skills/sources/add", requestId, session, skill)
+  view "(owner) owns (skill) in (course)" with (owner, skill) has (course)
+  no GroundedTutoring._material (material) has (owner, scope: course)
+then
+  RequestBoundary.respond (error: "MATERIAL_UNAVAILABLE", requestId)
+```
+
 ### Courses.AddUnit
 
 Authored path: `Courses.AddUnit`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 13.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 38.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 13.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 74.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 111.
 
 ```reaction
@@ -1229,8 +1379,8 @@ then
 ### Courses.AddUnit#2
 
 Authored path: `Courses.AddUnit`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 13.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 38.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 13.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 74.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 111.
 
 ```reaction
@@ -1244,8 +1394,8 @@ then
 ### Courses.AddUnit#3
 
 Authored path: `Courses.AddUnit`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 13.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 38.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 13.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 74.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 111.
 
 ```reaction
@@ -1256,11 +1406,67 @@ then
   RequestBoundary.respond (requestId, unit)
 ```
 
+### Courses.ArchiveSkill
+
+Authored path: `Courses.ArchiveSkill`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 59.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 83.
+
+```reaction
+when RequestBoundary.request (path: "/courses/skills/archive", requestId, session, skill)
+then
+  Sessioning.use (session)
+```
+
+### Courses.ArchiveSkill:missing#2
+
+Authored path: `Courses.ArchiveSkill`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 59.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 83.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Courses.ArchiveSkill
+where
+  earlier, RequestBoundary.request (path: "/courses/skills/archive", requestId, session, skill)
+  no view "(owner) owns (skill) in (course)" with (owner, skill)
+then
+  RequestBoundary.respond (error: "COURSE_UNAVAILABLE", requestId)
+```
+
+### Courses.ArchiveSkill:owned#2
+
+Authored path: `Courses.ArchiveSkill`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 59.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 83.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Courses.ArchiveSkill
+where
+  earlier, RequestBoundary.request (path: "/courses/skills/archive", requestId, session, skill)
+  view "(owner) owns (skill) in (course)" with (owner, skill)
+then
+  SkillMapping.archive (owner, skill)
+```
+
+### Courses.ArchiveSkill:owned#3
+
+Authored path: `Courses.ArchiveSkill`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 59.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 83.
+
+```reaction
+when SkillMapping.archive (owner, skill), asked by Courses.ArchiveSkill:owned#2
+where
+  earlier, RequestBoundary.request (path: "/courses/skills/archive", requestId, session, skill)
+then
+  RequestBoundary.respond (requestId)
+```
+
 ### Courses.ConfirmSkill
 
 Authored path: `Courses.ConfirmSkill`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 25.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 42.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 25.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 78.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 113.
 
 ```reaction
@@ -1272,8 +1478,8 @@ then
 ### Courses.ConfirmSkill:missing#2
 
 Authored path: `Courses.ConfirmSkill`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 25.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 42.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 25.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 78.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 113.
 
 ```reaction
@@ -1288,8 +1494,8 @@ then
 ### Courses.ConfirmSkill:owned#2
 
 Authored path: `Courses.ConfirmSkill`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 25.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 42.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 25.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 78.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 113.
 
 ```reaction
@@ -1305,8 +1511,8 @@ then
 ### Courses.ConfirmSkill:owned#3
 
 Authored path: `Courses.ConfirmSkill`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 25.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 42.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 25.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 78.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 113.
 
 ```reaction
@@ -1320,8 +1526,8 @@ then
 ### Courses.ConfirmSkill:source#2
 
 Authored path: `Courses.ConfirmSkill`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 25.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 42.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 25.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 78.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 113.
 
 ```reaction
@@ -1337,8 +1543,8 @@ then
 ### Courses.CreateCourse
 
 Authored path: `Courses.CreateCourse`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 13.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 35.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 13.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 71.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 89.
 
 ```reaction
@@ -1350,8 +1556,8 @@ then
 ### Courses.CreateCourse#2
 
 Authored path: `Courses.CreateCourse`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 13.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 35.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 13.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 71.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 89.
 
 ```reaction
@@ -1365,8 +1571,8 @@ then
 ### Courses.CreateCourse#3
 
 Authored path: `Courses.CreateCourse`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 13.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 35.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 13.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 71.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 89.
 
 ```reaction
@@ -1380,8 +1586,8 @@ then
 ### Courses.EditDraft
 
 Authored path: `Courses.EditDraft`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 25.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 41.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 25.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 77.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 113.
 
 ```reaction
@@ -1393,8 +1599,8 @@ then
 ### Courses.EditDraft:missing#2
 
 Authored path: `Courses.EditDraft`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 25.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 41.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 25.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 77.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 113.
 
 ```reaction
@@ -1409,8 +1615,8 @@ then
 ### Courses.EditDraft:owned#2
 
 Authored path: `Courses.EditDraft`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 25.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 41.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 25.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 77.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 113.
 
 ```reaction
@@ -1427,8 +1633,8 @@ then
 ### Courses.EditDraft:owned#3
 
 Authored path: `Courses.EditDraft`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 25.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 41.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 25.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 77.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 113.
 
 ```reaction
@@ -1442,8 +1648,8 @@ then
 ### Courses.EditDraft:source#2
 
 Authored path: `Courses.EditDraft`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 25.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 41.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 25.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 77.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 113.
 
 ```reaction
@@ -1456,11 +1662,67 @@ then
   RequestBoundary.respond (error: "MATERIAL_UNAVAILABLE", requestId)
 ```
 
+### Courses.EditSkillDetails
+
+Authored path: `Courses.EditSkillDetails`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 33.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 79.
+
+```reaction
+when RequestBoundary.request (path: "/courses/skills/details", requestId, session, skill, title, unit)
+then
+  Sessioning.use (session)
+```
+
+### Courses.EditSkillDetails:missing#2
+
+Authored path: `Courses.EditSkillDetails`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 33.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 79.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Courses.EditSkillDetails
+where
+  earlier, RequestBoundary.request (path: "/courses/skills/details", requestId, session, skill, title, unit)
+  no view "(owner) owns (skill) in (course)" with (owner, skill)
+then
+  RequestBoundary.respond (error: "COURSE_UNAVAILABLE", requestId)
+```
+
+### Courses.EditSkillDetails:owned#2
+
+Authored path: `Courses.EditSkillDetails`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 33.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 79.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Courses.EditSkillDetails
+where
+  earlier, RequestBoundary.request (path: "/courses/skills/details", requestId, session, skill, title, unit)
+  view "(owner) owns (skill) in (course)" with (owner, skill)
+then
+  SkillMapping.editDetails (owner, skill, title, unit)
+```
+
+### Courses.EditSkillDetails:owned#3
+
+Authored path: `Courses.EditSkillDetails`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 33.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 79.
+
+```reaction
+when SkillMapping.editDetails (owner, skill, title, unit), asked by Courses.EditSkillDetails:owned#2
+where
+  earlier, RequestBoundary.request (path: "/courses/skills/details", requestId, session, skill, title, unit)
+then
+  RequestBoundary.respond (requestId)
+```
+
 ### Courses.ListCourses
 
 Authored path: `Courses.ListCourses`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 7.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 34.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 7.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 70.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 87.
 
 ```reaction
@@ -1472,8 +1734,8 @@ then
 ### Courses.ListCourses#2
 
 Authored path: `Courses.ListCourses`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 7.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 34.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 7.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 70.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 87.
 
 ```reaction
@@ -1487,8 +1749,8 @@ then
 ### Courses.ProposeSkill
 
 Authored path: `Courses.ProposeSkill`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 19.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 40.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 19.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 76.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 113.
 
 ```reaction
@@ -1500,8 +1762,8 @@ then
 ### Courses.ProposeSkill:missing#2
 
 Authored path: `Courses.ProposeSkill`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 19.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 40.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 19.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 76.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 113.
 
 ```reaction
@@ -1516,8 +1778,8 @@ then
 ### Courses.ProposeSkill:owned#2
 
 Authored path: `Courses.ProposeSkill`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 19.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 40.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 19.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 76.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 113.
 
 ```reaction
@@ -1534,8 +1796,8 @@ then
 ### Courses.ProposeSkill:owned#3
 
 Authored path: `Courses.ProposeSkill`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 19.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 40.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 19.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 76.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 113.
 
 ```reaction
@@ -1549,8 +1811,8 @@ then
 ### Courses.ProposeSkill:source#2
 
 Authored path: `Courses.ProposeSkill`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 19.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 40.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 19.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 76.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 113.
 
 ```reaction
@@ -1566,8 +1828,8 @@ then
 ### Courses.ReadCourse
 
 Authored path: `Courses.ReadCourse`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 9.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 36.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 9.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 72.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 107.
 
 ```reaction
@@ -1579,12 +1841,13 @@ then
 ### Courses.ReadCourse:missing#2
 
 Authored path: `Courses.ReadCourse`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 9.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 36.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 9.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 72.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 107.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Courses.ReadCourse
+at the flow's settlement frontier
 where
   earlier, RequestBoundary.request (course, path: "/courses/read", requestId, session)
   no view "(owner) owns (course) with (title)" with (course, owner)
@@ -1595,24 +1858,25 @@ then
 ### Courses.ReadCourse:owned#2
 
 Authored path: `Courses.ReadCourse`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 9.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 36.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 9.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 72.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 107.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Courses.ReadCourse
+at the flow's settlement frontier
 where
   earlier, RequestBoundary.request (course, path: "/courses/read", requestId, session)
   view "(owner) owns (course) with (title)" with (course, owner)
 then
-  RequestBoundary.respond (materials: former "the source summaries for (owner) in (course)" with (course, owner), requestId, skills: former "the skill definitions in (course)" with (course), units: former "the units in (course)" with (course))
+  RequestBoundary.respond (materials: former "the source summaries for (owner) in (course)" with (course, owner), prerequisites: former "the prerequisite links in (course)" with (course), requestId, skillSources: former "the skill sources in (course)" with (course), skills: former "the skill definitions in (course)" with (course), units: former "the units in (course)" with (course), versions: former "the requirements versions in (course)" with (course))
 ```
 
 ### Courses.ReadMaterial
 
 Authored path: `Courses.ReadMaterial`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 9.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 37.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 9.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 73.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 111.
 
 ```reaction
@@ -1624,8 +1888,8 @@ then
 ### Courses.ReadMaterial:course#2
 
 Authored path: `Courses.ReadMaterial`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 9.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 37.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 9.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 73.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 111.
 
 ```reaction
@@ -1641,8 +1905,8 @@ then
 ### Courses.ReadMaterial:missing#2
 
 Authored path: `Courses.ReadMaterial`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 9.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 37.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 9.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 73.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 111.
 
 ```reaction
@@ -1657,8 +1921,8 @@ then
 ### Courses.ReadMaterial:owned#2
 
 Authored path: `Courses.ReadMaterial`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 9.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 37.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 9.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 73.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 111.
 
 ```reaction
@@ -1669,6 +1933,268 @@ where
   view "(owner) owns (course) with (title)" with (course, owner)
 then
   RequestBoundary.respond (content, locator, origin, originals, requestId, title)
+```
+
+### Courses.RepairRevisedTrack
+
+Authored path: `Courses.RepairRevisedTrack`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 9.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 39.
+
+```reaction
+when any action is returned (action: "use", concept: "Sessioning", result: identity)
+where
+  (owner) is sessionSubject (identity)
+  SkillMapping._courses (owner) has (course)
+  SkillMapping._units (course) has (unit)
+  SkillMapping._skills (unit) has (current, skill, status: "CONFIRMED")
+  no MasteryEstimating._track (definition: current, learner: owner, subject: skill)
+  MasteryEstimating._progress (learner: owner) has (tracks)
+  (confidence, found: true) is carriedEstimate (current, skill, tracks)
+then
+  MasteryEstimating.initialize (basis: "PREVIOUS_DEFINITION", confidence, definition: current, learner: owner, subject: skill)
+```
+
+### Courses.RestoreSkill
+
+Authored path: `Courses.RestoreSkill`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 61.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 84.
+
+```reaction
+when RequestBoundary.request (path: "/courses/skills/restore", requestId, session, skill)
+then
+  Sessioning.use (session)
+```
+
+### Courses.RestoreSkill:missing#2
+
+Authored path: `Courses.RestoreSkill`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 61.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 84.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Courses.RestoreSkill
+where
+  earlier, RequestBoundary.request (path: "/courses/skills/restore", requestId, session, skill)
+  no view "(owner) owns (skill) in (course)" with (owner, skill)
+then
+  RequestBoundary.respond (error: "COURSE_UNAVAILABLE", requestId)
+```
+
+### Courses.RestoreSkill:owned#2
+
+Authored path: `Courses.RestoreSkill`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 61.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 84.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Courses.RestoreSkill
+where
+  earlier, RequestBoundary.request (path: "/courses/skills/restore", requestId, session, skill)
+  view "(owner) owns (skill) in (course)" with (owner, skill)
+then
+  SkillMapping.restore (owner, skill)
+```
+
+### Courses.RestoreSkill:owned#3
+
+Authored path: `Courses.RestoreSkill`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 61.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 84.
+
+```reaction
+when SkillMapping.restore (owner, skill), asked by Courses.RestoreSkill:owned#2
+where
+  earlier, RequestBoundary.request (path: "/courses/skills/restore", requestId, session, skill)
+then
+  RequestBoundary.respond (requestId)
+```
+
+### Courses.ReviseSkill
+
+Authored path: `Courses.ReviseSkill`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 35.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 80.
+
+```reaction
+when RequestBoundary.request (gate, outcome, path: "/courses/skills/revise", requestId, session, skill)
+then
+  Sessioning.use (session)
+```
+
+### Courses.ReviseSkill:missing#2
+
+Authored path: `Courses.ReviseSkill`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 35.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 80.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Courses.ReviseSkill
+where
+  earlier, RequestBoundary.request (gate, outcome, path: "/courses/skills/revise", requestId, session, skill)
+  no view "(owner) owns (skill) in (course)" with (owner, skill)
+then
+  RequestBoundary.respond (error: "COURSE_UNAVAILABLE", requestId)
+```
+
+### Courses.ReviseSkill:owned#2
+
+Authored path: `Courses.ReviseSkill`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 35.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 80.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Courses.ReviseSkill
+where
+  earlier, RequestBoundary.request (gate, outcome, path: "/courses/skills/revise", requestId, session, skill)
+  view "(owner) owns (skill) in (course)" with (owner, skill)
+then
+  SkillMapping.reviseDefinition (gate, outcome, owner, skill)
+```
+
+### Courses.ReviseSkill:owned#3
+
+Authored path: `Courses.ReviseSkill`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 35.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 80.
+
+```reaction
+when SkillMapping.reviseDefinition (gate, outcome, owner, skill, previous, version), asked by Courses.ReviseSkill:owned#2
+where
+  earlier, RequestBoundary.request (gate, outcome, path: "/courses/skills/revise", requestId, session, skill)
+then
+  RequestBoundary.respond (previous, requestId, version)
+```
+
+### Courses.RevisedTrack
+
+Authored path: `Courses.RevisedTrack`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 35.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 37.
+
+```reaction
+when SkillMapping.reviseDefinition (owner, skill, previous, version)
+where
+  MasteryEstimating._track (definition: previous, learner: owner, subject: skill)
+  no MasteryEstimating._track (definition: version, learner: owner, subject: skill)
+  at is the current flow's instant
+  MasteryEstimating._estimate (at, definition: previous, learner: owner, subject: skill) has (value: confidence)
+then
+  MasteryEstimating.initialize (basis: "PREVIOUS_DEFINITION", confidence, definition: version, learner: owner, subject: skill)
+```
+
+### Courses.SetSkillPrerequisites
+
+Authored path: `Courses.SetSkillPrerequisites`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 52.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 82.
+
+```reaction
+when RequestBoundary.request (path: "/courses/skills/prerequisites", prerequisites, requestId, session, skill)
+then
+  Sessioning.use (session)
+```
+
+### Courses.SetSkillPrerequisites:missing#2
+
+Authored path: `Courses.SetSkillPrerequisites`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 52.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 82.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Courses.SetSkillPrerequisites
+where
+  earlier, RequestBoundary.request (path: "/courses/skills/prerequisites", prerequisites, requestId, session, skill)
+  no view "(owner) owns (skill) in (course)" with (owner, skill)
+then
+  RequestBoundary.respond (error: "COURSE_UNAVAILABLE", requestId)
+```
+
+### Courses.SetSkillPrerequisites:owned#2
+
+Authored path: `Courses.SetSkillPrerequisites`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 52.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 82.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Courses.SetSkillPrerequisites
+where
+  earlier, RequestBoundary.request (path: "/courses/skills/prerequisites", prerequisites, requestId, session, skill)
+  view "(owner) owns (skill) in (course)" with (owner, skill)
+  required is prerequisiteSet (prerequisites)
+then
+  SkillMapping.setPrerequisites (owner, prerequisites: required, skill)
+```
+
+### Courses.SetSkillPrerequisites:owned#3
+
+Authored path: `Courses.SetSkillPrerequisites`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 52.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 82.
+
+```reaction
+when SkillMapping.setPrerequisites (owner, prerequisites: required, skill), asked by Courses.SetSkillPrerequisites:owned#2
+where
+  earlier, RequestBoundary.request (path: "/courses/skills/prerequisites", prerequisites, requestId, session, skill)
+then
+  RequestBoundary.respond (requestId)
+```
+
+### Courses.SetUnitEmphasis
+
+Authored path: `Courses.SetUnitEmphasis`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 63.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 85.
+
+```reaction
+when RequestBoundary.request (emphasized, path: "/courses/units/emphasis", requestId, session, unit)
+then
+  Sessioning.use (session)
+```
+
+### Courses.SetUnitEmphasis:missing#2
+
+Authored path: `Courses.SetUnitEmphasis`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 63.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 85.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Courses.SetUnitEmphasis
+where
+  earlier, RequestBoundary.request (emphasized, path: "/courses/units/emphasis", requestId, session, unit)
+  no view "(owner) owns (unit) in (course)" with (owner, unit)
+then
+  RequestBoundary.respond (error: "COURSE_UNAVAILABLE", requestId)
+```
+
+### Courses.SetUnitEmphasis:owned#2
+
+Authored path: `Courses.SetUnitEmphasis`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 63.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 85.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Courses.SetUnitEmphasis
+where
+  earlier, RequestBoundary.request (emphasized, path: "/courses/units/emphasis", requestId, session, unit)
+  view "(owner) owns (unit) in (course)" with (owner, unit)
+then
+  SkillMapping.setEmphasis (emphasized, owner, unit)
+```
+
+### Courses.SetUnitEmphasis:owned#3
+
+Authored path: `Courses.SetUnitEmphasis`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 63.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 85.
+
+```reaction
+when SkillMapping.setEmphasis (emphasized, owner, unit), asked by Courses.SetUnitEmphasis:owned#2
+where
+  earlier, RequestBoundary.request (emphasized, path: "/courses/units/emphasis", requestId, session, unit)
+then
+  RequestBoundary.respond (requestId)
 ```
 
 ### DeliverFaultToAsker
@@ -2796,7 +3322,7 @@ then
 ### Learning.Suggest
 
 Authored path: `Learning.Suggest`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 19.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 19.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 82.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 104.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 113.
@@ -2810,7 +3336,7 @@ then
 ### Learning.Suggest#2
 
 Authored path: `Learning.Suggest`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 19.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 19.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 82.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 104.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 113.
@@ -2835,7 +3361,7 @@ then
 ### Learning.Suggest#3
 
 Authored path: `Learning.Suggest`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 19.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 19.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 82.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 104.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 113.
@@ -2851,7 +3377,7 @@ then
 ### Learning.Suggest#4
 
 Authored path: `Learning.Suggest`.
-- Covered by [Courses, materials, and skill drafts](../design/compositions/Courses.md), line 19.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 19.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 82.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 104.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 113.
@@ -4038,7 +4564,7 @@ then
 
 Authored path: `Progress.ActivateRoutine`.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 35.
-- Covered by [Progress reactions](../design/compositions/Progress.md), line 13.
+- Covered by [Progress reactions](../design/compositions/Progress.md), line 15.
 
 ```reaction
 when StudyPlanning.replan (learner: owner, scope: course, workloadComplete: false, plan)
@@ -4109,7 +4635,7 @@ then
 ### Progress.RepairReadClosure
 
 Authored path: `Progress.RepairReadClosure`.
-- Covered by [Progress reactions](../design/compositions/Progress.md), line 17.
+- Covered by [Progress reactions](../design/compositions/Progress.md), line 19.
 
 ```reaction
 when any action is returned (action: "use", concept: "Sessioning", result: identity)
@@ -4128,7 +4654,7 @@ then
 ### Progress.RepairReadEvidence
 
 Authored path: `Progress.RepairReadEvidence`.
-- Covered by [Progress reactions](../design/compositions/Progress.md), line 17.
+- Covered by [Progress reactions](../design/compositions/Progress.md), line 19.
 
 ```reaction
 when any action is returned (action: "use", concept: "Sessioning", result: identity)
@@ -4147,7 +4673,7 @@ then
 ### Progress.ReplanAfterBudget
 
 Authored path: `Progress.ReplanAfterBudget`.
-- Covered by [Progress reactions](../design/compositions/Progress.md), line 11.
+- Covered by [Progress reactions](../design/compositions/Progress.md), line 13.
 
 ```reaction
 when StudyPlanning.configure (learner: owner, scope: course)
@@ -4161,7 +4687,7 @@ then
 ### Progress.ReplanAfterConfidence
 
 Authored path: `Progress.ReplanAfterConfidence`.
-- Covered by [Progress reactions](../design/compositions/Progress.md), line 11.
+- Covered by [Progress reactions](../design/compositions/Progress.md), line 13.
 
 ```reaction
 when MasteryEstimating.initialize (learner: owner, subject: skill)
@@ -4177,7 +4703,7 @@ then
 ### Progress.ReplanAfterEvidence
 
 Authored path: `Progress.ReplanAfterEvidence`.
-- Covered by [Progress reactions](../design/compositions/Progress.md), line 11.
+- Covered by [Progress reactions](../design/compositions/Progress.md), line 13.
 
 ```reaction
 when MasteryEstimating.acceptEvidence (learner: owner, subject: skill)
@@ -4194,7 +4720,7 @@ then
 
 Authored path: `Progress.ReplanAfterFinish`.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 37.
-- Covered by [Progress reactions](../design/compositions/Progress.md), line 15.
+- Covered by [Progress reactions](../design/compositions/Progress.md), line 17.
 
 ```reaction
 when StudyPlanning.finish (learner: owner)
@@ -4209,7 +4735,7 @@ then
 ### Progress.ReplanAfterMiss
 
 Authored path: `Progress.ReplanAfterMiss`.
-- Covered by [Progress reactions](../design/compositions/Progress.md), line 15.
+- Covered by [Progress reactions](../design/compositions/Progress.md), line 17.
 
 ```reaction
 when StudyPlanning.miss (item, learner: owner)
@@ -4225,7 +4751,7 @@ then
 
 Authored path: `Progress.ReplanAfterStop`.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 37.
-- Covered by [Progress reactions](../design/compositions/Progress.md), line 15.
+- Covered by [Progress reactions](../design/compositions/Progress.md), line 17.
 
 ```reaction
 when StudyPlanning.stop (learner: owner)
@@ -4831,11 +5357,18 @@ not listed here have no explicit input contract.
 - `/courses/create` — requires `session`, `title`
 - `/courses/materials/read` — requires `material`, `session`
 - `/courses/read` — requires `course`, `session`
+- `/courses/skills/archive` — requires `session`, `skill`
 - `/courses/skills/confirm` — requires `session`, `skill`
+- `/courses/skills/details` — requires `session`, `skill`, `title`, `unit`
 - `/courses/skills/edit` — requires `gate`, `material`, `outcome`, `session`, `skill`, `title`, `unit`
+- `/courses/skills/prerequisites` — requires `prerequisites`, `session`, `skill`
 - `/courses/skills/propose` — requires `gate`, `material`, `outcome`, `proposalKey`, `session`, `title`, `unit`
+- `/courses/skills/restore` — requires `session`, `skill`
+- `/courses/skills/revise` — requires `gate`, `outcome`, `session`, `skill`
+- `/courses/skills/sources/add` — requires `material`, `session`, `skill`
 - `/courses/skills/suggest` — requires `material`, `session`
 - `/courses/units/add` — requires `course`, `session`, `title`
+- `/courses/units/emphasis` — requires `emphasized`, `session`, `unit`
 - `/internal/materials/add` — requires `content`, `course`, `importKey`, `locator`, `origin`, `originals`, `session`, `title`
 - `/learning/adjust` — requires `adjustmentKey`, `reason`, `session`, `skill`, `value`
 - `/learning/assess` — requires `dialogueLength`, `outsideHelp`, `reviewed`, `session`, `studySession`, `unseen`

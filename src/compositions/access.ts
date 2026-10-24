@@ -57,14 +57,23 @@ const ItemReady = former("admit progress on (item) in (course)", ({ owner, cours
 const BeginReady = former("admit starting (item) in (course)", ({ owner, course, item }) => where(
   Courses.OwnedCourse({ owner, course }), PlanningFlows.StartAllowed({ owner, course, item }),
 ).form({ allowed: true })).optional();
-export const composition = { LessonReady, TaskReady, ResponseReady, QuestionReady, ReplyReady, HintReady, TranscriptReady, AssessmentReady, RetryReady, RegradeReady, AdjustReady, SuggestionReady, CourseReady, PlanReady, ItemReady, BeginReady };
+// When TaskReady declines, this names a prerequisite that is not ready, by the rule TaskReady uses.
+// No row means every prerequisite is ready, so the general practice explanation stays.
+const PracticePrerequisite = former("the prerequisite to work on before practicing (skill) for (owner)", ({ owner, skill }, { skills, tracks, title }) => where(
+  R.ActiveSkill({ owner, skill }), R.SkillContext({ owner, skill }).is({ skills, tracks }),
+  compute(C.prerequisiteToPractice, { skills, tracks, skill }, { found: true, title }),
+).form({ title })).optional();
+/** The practice explanation that names the prerequisite PracticePrerequisite found. */
+export const prerequisiteDetail = ({ title }: { title: string }) => `Work on “${title}” first. This skill builds on it.`;
+export const composition = { LessonReady, TaskReady, PracticePrerequisite, ResponseReady, QuestionReady, ReplyReady, HintReady, TranscriptReady, AssessmentReady, RetryReady, RegradeReady, AdjustReady, SuggestionReady, CourseReady, PlanReady, ItemReady, BeginReady };
 
 // Transport admission uses these same declared reads before starting a causal flow. Each path lists its formers in the
 // order they run; a command that asks the tutor passes TutorReady first, so a retired choice is refused before any write.
 const tutorReady = { check: Settings.TutorReady, fields: [], detail: "The tutor model or thinking level you chose is no longer offered. Choose another one in the Tutor panel." } as const;
 export const admissions = {
   "/learning/lesson": [tutorReady, { check: LessonReady, fields: ["skill"], detail: "Confirm the skill and attach sources from this course before requesting a lesson." }],
-  "/learning/task": [tutorReady, { check: TaskReady, fields: ["skill"], detail: "Set starting confidence and check the prerequisites before starting fresh practice." }],
+  "/learning/task": [tutorReady, { check: TaskReady, fields: ["skill"], detail: "Set starting confidence and check the prerequisites before starting fresh practice.",
+    prerequisite: { check: PracticePrerequisite, detail: prerequisiteDetail } }],
   "/learning/respond": [{ check: ResponseReady, fields: ["studySession", "text", "channel", "attachments", "dialogueLength"], detail: "Choose an open session, check the latest dialogue, and attach only your own work from this course, each file once." }],
   "/learning/question": [tutorReady, { check: QuestionReady, fields: ["studySession", "text", "channel", "attachments", "dialogueLength"], detail: "Choose an open lesson, check the latest dialogue, and attach only your own work from this course, each file once." }],
   "/learning/reply": [tutorReady, { check: ReplyReady, fields: ["studySession"], detail: "Send a question in an open lesson before asking for a reply." }],

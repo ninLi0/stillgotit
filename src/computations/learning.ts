@@ -67,18 +67,58 @@ export function estimateTimeline({ explanation, tracks }: { explanation?: Estima
 export function progressRows({ skills, tracks }: { skills: SkillRows; tracks: Tracks }) {
   return skills.map((skill) => ({ skill: skill.skill, estimate: tracks.find((track) => track.subject === skill.skill && track.definition === skill.current)?.estimate ?? null }));
 }
-export function prerequisitesReady({ skills, tracks, skill }: { skills: SkillRows; tracks: Tracks; skill: string }): boolean {
-  const visited = new Set<string>();
-  function ready(id: string): boolean {
-    if (visited.has(id)) return true;
-    visited.add(id);
+// The readiness rule shared by practice admission and its explanation. A prerequisite is ready when it is a
+// confirmed skill whose current version has a ready estimate and whose own prerequisites are ready. A skill
+// reached again while its own check is still running counts as ready, so a cycle cannot recurse forever.
+function readinessRule(skills: SkillRows, tracks: Tracks) {
+  const settled = new Map<string, boolean>();
+  function prerequisitesReady(id: string): boolean {
+    const saved = settled.get(id);
+    if (saved !== undefined) return saved;
+    settled.set(id, true);
     const current = skills.find((row) => row.skill === id);
-    return Boolean(current && current.prerequisites.every((id) => {
-      const prerequisite = skills.find((row) => row.skill === id);
-      return prerequisite?.status === "CONFIRMED" && tracks.some((track) => track.subject === id && track.definition === prerequisite.current && track.estimate?.ready) && ready(id);
-    }));
+    const result = Boolean(current && current.prerequisites.every(prerequisiteReady));
+    settled.set(id, result);
+    return result;
   }
-  return ready(skill);
+  function prerequisiteReady(id: string): boolean {
+    const prerequisite = skills.find((row) => row.skill === id);
+    return prerequisite?.status === "CONFIRMED" &&
+      tracks.some((track) => track.subject === id && track.definition === prerequisite.current && track.estimate?.ready) && prerequisitesReady(id);
+  }
+  return { prerequisitesReady, prerequisiteReady };
+}
+export function prerequisitesReady({ skills, tracks, skill }: { skills: SkillRows; tracks: Tracks; skill: string }): boolean {
+  return readinessRule(skills, tracks).prerequisitesReady(skill);
+}
+/** Names the prerequisite to work on first, following not-ready prerequisites by lowest skill identity. */
+export function prerequisiteToPractice({ skills, tracks, skill }: { skills: SkillRows; tracks: Tracks; skill: string }): { found: boolean; title?: string } {
+  const rule = readinessRule(skills, tracks);
+  // Only a prerequisite with a skill row can be named. The concept keeps every prerequisite a skill of the same course.
+  const blocking = (id: string) => (skills.find((row) => row.skill === id)?.prerequisites ?? [])
+    .filter((prerequisite) => skills.some((row) => row.skill === prerequisite) && !rule.prerequisiteReady(prerequisite)).sort();
+  let next = blocking(skill)[0];
+  if (next === undefined) return { found: false };
+  const followed = new Set([skill]);
+  for (;;) {
+    followed.add(next);
+    const deeper = blocking(next).find((id) => !followed.has(id));
+    if (deeper === undefined) return { found: true, title: skills.find((row) => row.skill === next)!.title };
+    next = deeper;
+  }
+}
+/** The request's prerequisite list as a set: distinct identities, in a fixed order that carries no meaning. */
+export function prerequisiteSet({ prerequisites }: { prerequisites: readonly string[] }): readonly string[] {
+  return [...new Set(prerequisites)].sort();
+}
+/** The current estimate of the most recently started track for an earlier version of the skill. */
+export function carriedEstimate({ tracks, skill, current }: { tracks: Tracks; skill: string; current: string }): { found: boolean; confidence?: number } {
+  const earlier = tracks.filter((track) => track.subject === skill && track.definition !== current)
+    .sort((a, b) => a.initializedAt.getTime() - b.initializedAt.getTime() || (a.track < b.track ? -1 : a.track > b.track ? 1 : 0));
+  // _progress estimates at the live clock, which is never before a saved track starts. Without an estimate
+  // there is no value to carry, so no track is started.
+  const estimate = earlier.at(-1)?.estimate;
+  return estimate ? { found: true, confidence: estimate.value } : { found: false };
 }
 export function lessonRequest({ selected, context, request }: { selected: SourceContext[]; context: SkillInfo; request: string }): TutorRequest {
   return { kind: "LESSON", definition: context.current, sources: selected, context: { title: context.title, outcome: context.outcome, request }, work: [] };

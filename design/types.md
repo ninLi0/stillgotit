@@ -47,3 +47,14 @@ The practice-task binding requires membership in `GroundedTutoring.PracticeSessi
 An assessment case identifies one attempt against one skill version. All its judgment revisions use that same case as mastery evidence. A changed skill version gets a new mastery track and does not inherit the previous version's evidence.
 
 `AssessmentReviewing.Result` and `MasteryEstimating.Signal` have the same five labels. The application maps each label explicitly and rejects an unknown label. It does not convert a model-provided percentage into mastery directly.
+
+The course composition and request admission use three application-owned values. [prerequisiteSet](compositions/Courses.md) reads a SkillList, [carriedEstimate](compositions/Courses.md) returns a CarriedEstimate, and [prerequisiteToPractice](compositions/LearningAccess.md) returns a PrerequisiteChoice.
+
+```types
+concrete SkillList
+  The skill identities one request lists, in the order sent. An identity may repeat, and the list may be empty.
+concrete CarriedEstimate
+  Two fields. found is a Flag that says whether the skill has a track for an earlier version. When found is true, confidence is that track's current estimate, a Number from 0 through 100; otherwise confidence is absent.
+concrete PrerequisiteChoice
+  Two fields. found is a Flag that says whether a prerequisite that is not ready blocks practice. When found is true, title is the String title of the prerequisite to work on first; otherwise title is absent.
+```

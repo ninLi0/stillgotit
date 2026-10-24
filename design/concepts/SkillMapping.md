@@ -34,6 +34,7 @@ a set of Courses with
 a set of Units with
   a course Course
   a title String
+  an emphasized Flag
 a set of Skills with
   a unit Unit
   a title String
@@ -45,6 +46,8 @@ a set of Versions with
   a skill Skill
   an outcome String
   a gate String
+a set of Revised Versions with
+  a previous Version
 a set of ProposalReceipts with
   an owner User
   a proposalKey String
@@ -58,7 +61,9 @@ a set of ProposalReceipts with
   a saved Flag
 Rule: each unit belongs to an existing course. Each skill belongs to an existing unit.
 Rule: a unit or skill belongs to the owner of its course. An unknown record belongs to no owner.
+Rule: emphasized records that the learner marked a unit as one the professor stressed, so the course shows which units matter most; a new unit is not emphasized.
 Rule: a skill's current version belongs to that skill. Existing versions never change. Discarding a draft removes its versions; other actions preserve them.
+Rule: a revised version's previous version is the version of the same skill that was current when reviseDefinition replaced it, so a skill's requirement history runs from its current version back through previous versions.
 Rule: an outcome describes the ability. A gate describes the complete demonstration required for that ability.
 Rule: a confirmed skill's prerequisites are confirmed skills in the same course. A skill cannot require itself, and prerequisite links cannot form a cycle. Archived skills may retain links to archived prerequisites.
 Rule: blank text is empty or contains only whitespace. Titles, outcomes, and gates are not blank.
@@ -90,6 +95,15 @@ addUnit(owner: User, course: Course, title: String) : returns (unit: Unit)
   then
     create unit with course and title
     returns unit
+
+setEmphasis(owner: User, unit: Unit, emphasized: Flag) : returns ()
+  where unit does not belong to owner
+  then
+    refuses UNIT_EMPHASIS_UNAVAILABLE "Choose a unit in one of your courses."
+  where unit belongs to owner
+  then
+    set the unit's emphasized flag to emphasized; setting its current value again changes nothing
+    returns
 
 propose(owner: User, unit: Unit, proposalKey: String, title: String, outcome: String, gate: String, materials: MaterialSet) : returns (skill: Skill)
   where unit does not belong to owner
@@ -192,7 +206,7 @@ reviseDefinition(owner: User, skill: Skill, outcome: String, gate: String) : ret
   where skill is owner's confirmed skill, outcome and gate are not blank, and at least one differs from its current version
   then
     save the skill's current version as previous
-    create version with skill, outcome, and gate, then make it current
+    create version as a revised version with skill, outcome, gate, and previous, then make it current
     returns previous, version
 
 attachMaterial(owner: User, skill: Skill, material: Material) : returns ()
@@ -250,8 +264,8 @@ _courses(owner: User) : many (course: Course, title: String)
 _course(course: Course) : optional (owner: User, title: String)
   Returns the course's owner and title. Returns no row for an unknown course.
 
-_units(course: Course) : many (unit: Unit, title: String)
-  Returns the course's units, ordered by unit identity. Returns no rows for an unknown course or one with no units.
+_units(course: Course) : many (unit: Unit, title: String, emphasized: Flag)
+  Returns the course's units and whether each is emphasized, ordered by unit identity. Returns no rows for an unknown course or one with no units.
 
 _unit(unit: Unit) : optional (course: Course, title: String)
   Returns the unit's course and title. Returns no row for an unknown unit.
@@ -267,6 +281,9 @@ _materials(skill: Skill) : many (material: Material)
 
 _prerequisites(skill: Skill) : many (prerequisite: Skill)
   Returns direct prerequisites only, ordered by skill identity. Returns no rows for an unknown skill or one with no prerequisites.
+
+_versions(skill: Skill) : many (version: Version, outcome: String, gate: String)
+  Returns the skill's current version, then each earlier version reached through previous versions, newest first. Returns no rows for an unknown or discarded skill.
 
 _version(version: Version) : optional (skill: Skill, outcome: String, gate: String)
   Returns the version's skill, outcome, and gate, including earlier versions of an existing skill. Returns no row for an unknown or discarded version.

@@ -64,6 +64,9 @@ describe("SkillMapping framework registration", () => {
     expect(await skills._course({ course })).toEqual([{ owner, title: "Linear Algebra" }]);
     expect(await skills._unit({ unit })).toEqual([{ course, title: "Matrices" }]);
     expect(await skills._units({ course })).toHaveLength(2);
+    expect(await skills.setEmphasis({ owner, unit, emphasized: true })).toEqual({});
+    expect(Object.fromEntries((await skills._units({ course })).map((row) => [row.unit, row.emphasized])))
+      .toEqual({ [unit]: true, [otherUnit.unit]: false });
 
     const draft = {
       owner, unit, title: "Multiply matrices", outcome: "Compute a product.",
@@ -88,6 +91,10 @@ describe("SkillMapping framework registration", () => {
     expect(await skills._version({ version: definition.previous })).toEqual([{
       skill, outcome: draft.outcome, gate: "Explain two fresh products.",
     }]);
+    expect(await skills._versions({ skill })).toEqual([
+      { version: definition.version, outcome: "Compute and explain a product.", gate: "Explain three fresh products." },
+      { version: definition.previous, outcome: draft.outcome, gate: "Explain two fresh products." },
+    ]);
     expect(await skills.attachMaterial({ owner, skill, material: "extra-source" })).toEqual({});
     expect(await skills._materials({ skill })).toEqual([
       { material: "extra-source" }, { material: "test-source" },
@@ -132,6 +139,10 @@ describe("SkillMapping framework registration", () => {
         .toEqual(await skills._skill({ skill }));
       expect(await second.concepts.SkillMapping._version({ version: definition.version }))
         .toEqual([{ skill, outcome: "Compute and explain a product.", gate: "Explain three fresh products." }]);
+      expect(await second.concepts.SkillMapping._versions({ skill }))
+        .toEqual(await skills._versions({ skill }));
+      expect(await second.concepts.SkillMapping._units({ course }))
+        .toEqual(await skills._units({ course }));
       expect(Object.keys(second.publicInterface.routes)).toContain("/courses");
     } finally {
       if (second) await second.beginDrain();
@@ -152,6 +163,10 @@ describe("SkillMapping framework registration", () => {
     });
     expect(await skills._units({ course })).toEqual([]);
     const { unit } = success(await skills.addUnit({ owner, course, title: "Motion" }));
+    expect(await skills.setEmphasis({ owner: randomUUID(), unit, emphasized: true })).toEqual({
+      error: "UNIT_EMPHASIS_UNAVAILABLE", detail: "Choose a unit in one of your courses.",
+    });
+    expect(await skills._units({ course })).toEqual([{ unit, title: "Motion", emphasized: false }]);
     const { skill } = success(await skills.propose({ proposalKey: crypto.randomUUID(),
       owner, unit, title: "Explain motion", outcome: "Describe motion.",
       gate: "Explain two examples.", materials: [],

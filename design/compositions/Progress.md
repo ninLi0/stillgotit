@@ -8,6 +8,8 @@
 
 [InitializedEvidence](reaction:Progress.InitializedEvidence): when a track is initialized, apply existing judgments for that same definition. Evidence for an earlier definition does not silently certify a newer one.
 
+After a skill definition is revised, the new version's mastery track starts from the previous estimate, and is repaired on the next course read, by two reactions declared in [Courses](Courses.md): RevisedTrack and RepairRevisedTrack. They live there because the course-editing flow owns the learner's lock and the course read.
+
 [ReplanAfterEvidence](reaction:Progress.ReplanAfterEvidence) and [ReplanAfterConfidence](reaction:Progress.ReplanAfterConfidence) wait for ordinary work in their causal flow to settle, then propose reviews from the current requirements and evidence. [ReplanAfterBudget](reaction:Progress.ReplanAfterBudget) does the same after changed preferences. No proposal is made while an activity is in progress.
 
 [ActivateRoutine](reaction:Progress.ActivateRoutine) checks both the planning concept's state and the current application fingerprint before activating a routine proposal. A proposal needing tradeoff approval cannot use this path.

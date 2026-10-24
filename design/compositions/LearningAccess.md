@@ -26,4 +26,11 @@ A command that asks the tutor first passes [TutorReady](former:Settings.TutorRea
 
 [QuestionReady](former:Access.QuestionReady) requires an open lesson, current dialogue length, and valid learner content, with the same attachment rule as ResponseReady.
 
+When [TaskReady](former:Access.TaskReady) declines, [PracticePrerequisite](former:Access.PracticePrerequisite) reads the same skill context and uses [prerequisiteToPractice](computation:prerequisiteToPractice) to look for a prerequisite that is not ready. If it finds one, the explanation names it: Work on “<title>” first. This skill builds on it. Otherwise the practice explanation stays: Set starting confidence and check the prerequisites before starting fresh practice.
+
+```computations
+prerequisiteToPractice(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows, skill: SkillMapping.Skill) : PrerequisiteChoice
+  Finds the prerequisite to work on first. It starts from the skill's direct prerequisites that are not ready by the rule prerequisitesReady uses. It follows prerequisites that are also not ready until it reaches one whose own prerequisites are all ready, taking the lowest skill identity at each step, and gives that skill's title. Answers found false when every direct prerequisite is ready.
+```
+
 Exam and tradeoff commands are admitted on course ownership alone, with the detail "Choose one of your own courses.", the same answer the planning endpoints give for a course that is not the learner's. The planning concept's own refusals then reach the learner with its messages. Begin admission uses the planning composition's StartAllowed view, so admission and the endpoint apply the same urgent-mode rule.

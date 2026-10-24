@@ -175,6 +175,7 @@ describe("SkillMapping draft discard", () => {
     for (const version of [first, latest]) {
       expect(await concept._version({ version })).toEqual([]);
     }
+    expect(await concept._versions({ skill })).toEqual([]);
     // The draft is already gone, so a retry is refused, and the kept receipt
     // still stops a replay of the original save from recreating it.
     await expect(concept.discardDraft({ owner, skill })).rejects.toBeInstanceOf(DraftDiscardUnavailableError);
