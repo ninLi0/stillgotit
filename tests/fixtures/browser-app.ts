@@ -50,7 +50,13 @@ const tutor: Pick<CourseTutor, "suggest" | "generate"> = live ? new CourseTutor(
     console.log(`Live provider request completed in ${Math.round(performance.now() - started)} ms.`); return result; }
   catch (error) { console.log(`Live provider request failed after ${Math.round(performance.now() - started)} ms (${error instanceof Error ? error.message : "unknown error"}).`); throw error; }
 } }, new MaterialFiles()) : fixtureTutor;
-const runtime = await createRuntime({ database: db, provider, providerOrigin: origin, publicOrigin: origin, tutor, gemini });
+// STILLGOTIT_TEST_FAIL_REPLIES=1 fails every lesson reply after the question is saved, to check how the browser recovers.
+const failReplies = process.env.STILLGOTIT_TEST_FAIL_REPLIES === "1";
+const testTutor: Pick<CourseTutor, "suggest" | "generate"> = failReplies ? { suggest: (...args) => tutor.suggest(...args), generate: async (...args: Parameters<CourseTutor["generate"]>) => {
+  if (args[2].startsWith("Answer the latest learner question")) throw new Error("Test interruption: the tutor's reply was lost.");
+  return tutor.generate(...args);
+} } : tutor;
+const runtime = await createRuntime({ database: db, provider, providerOrigin: origin, publicOrigin: origin, tutor: testTutor, gemini });
 const site = serveSite({ api: runtime.handle, directory: `${import.meta.dir}/../../frontend/dist` });
 let dropDraftReply = process.env.STILLGOTIT_TEST_DROP_DRAFT_REPLY === "1";
 const server = Bun.serve({ hostname: "127.0.0.1", port: 5174, maxRequestBodySize: 26 * 1024 * 1024, async fetch(request) {

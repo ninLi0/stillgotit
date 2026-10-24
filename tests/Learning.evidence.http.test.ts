@@ -18,6 +18,9 @@ const QUESTION_DECLINED = "Choose an open lesson, check the latest dialogue, and
 const message = (Refusal: new () => Error) => new Refusal().message;
 const decay = (value: number, days: number) => value * 2 ** (-days / 60);
 const studyDate = (at: Date) => at.toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+// Calendar days, as the planner counts them (src/computations/learning.ts). Adding 24-hour spans to a clock instead lands two
+// different spans on the same New York date when the span crosses the end of daylight saving time.
+const addDays = (day: string, days: number) => new Date(Date.parse(day) + days * DAY).toISOString().slice(0, 10);
 
 // The harness of Learning.http.test.ts, with a clock the test can move forward.
 async function setup() {
@@ -207,7 +210,7 @@ test("an exam beyond the seven-day horizon extends the replan after an adjustmen
   const before = await learner.ok("/planning/read", { course });
   // Before exams were planned for, an exam beyond the seven-day horizon made every replan refuse INVALID_PLAN_INPUT.
   // The plan now runs up to the day before the exam, and preparation for the exam stands for the skill's review.
-  const date = studyDate(new Date(app.now().getTime() + 9 * DAY));
+  const date = addDays(studyDate(app.now()), 9);
   expect(await app.concepts.StudyPlanning.setExam({ learner: user, scope: course, date, covered: [skill] } as never)).not.toHaveProperty("error");
 
   const input = { skill, adjustmentKey: crypto.randomUUID(), value: 40, reason: "I could not redo the second product today." };
@@ -216,7 +219,7 @@ test("an exam beyond the seven-day horizon extends the replan after an adjustmen
   expect((await learner.ok("/learning/read", { skill })).estimate.value).toBeCloseTo(40, 3);
   const after = await learner.ok("/planning/read", { course });
   expect(after.plan.plan).not.toBe(before.plan.plan);
-  expect(after.plan.horizonEnd).toBe(studyDate(new Date(app.now().getTime() + 8 * DAY)));
+  expect(after.plan.horizonEnd).toBe(addDays(studyDate(app.now()), 8));
   const candidates = after.plan.items.map((item: { candidate: { subject: string; examRefs: string[]; key: string } }) => item.candidate);
   const preparation = candidates.find((candidate: { subject: string }) => candidate.subject === skill);
   // The exam candidate was proposed when the exam was set and is carried unchanged, so its key predates the adjustment.

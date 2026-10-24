@@ -47,6 +47,8 @@ export function speak(id: string, text: string) {
   synth.cancel();
   const parts = speechParts(text);
   speakingId.value = parts.length ? id : null;
+  // Chrome stops speaking a page that has been read aloud for a while unless speech is resumed; resuming is harmless.
+  if (synth.paused) synth.resume();
   parts.forEach((part, index) => {
     const utterance = new SpeechSynthesisUtterance(part);
     utterance.onerror = () => { if (mine === reading) stopSpeaking(); };
@@ -55,9 +57,16 @@ export function speak(id: string, text: string) {
   });
 }
 
-/** Stop reading aloud. */
+/** True while the browser is reading or has parts queued, whichever message started it. */
+export function isSpeaking() { return !!synth && (synth.speaking || synth.pending); }
+
+/** Stop reading aloud. Some browsers ignore a bare cancel while a part is mid-sentence, so it is paused first and cancelled twice. */
 export function stopSpeaking() {
   reading++;
-  synth?.cancel();
+  if (synth) {
+    try { synth.pause(); } catch { /* Not every browser can pause. */ }
+    synth.cancel();
+    setTimeout(() => { if (synth.speaking || synth.pending) synth.cancel(); }, 50);
+  }
   speakingId.value = null;
 }

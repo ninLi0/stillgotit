@@ -1,4 +1,4 @@
-import { CourseTutor, objectSchema, OriginalTooLarge } from "./tutor.ts";
+import { CourseTutor, objectSchema, OriginalTooLarge, SUBMITTED_WORK } from "./tutor.ts";
 import { GeminiError } from "./gemini.ts";
 import type { TutorRequest, TutorAnswer } from "../learning-data.ts";
 import type { PassageSet } from "../concepts/GroundedTutoring/dialogue.ts";
@@ -30,6 +30,10 @@ const prompts = {
 const extractSchema = objectSchema({ rows: { type: "array", maxItems: EXTRACT_ROW_LIMIT, items: objectSchema({
   label: text, mark: text, feedback: text, excerpt: text, skill: text, result: { type: "string", enum: [...results] }, rationale: text,
 }) } });
+/** The tutor answered without citing any course material. The message is a complete sentence for the learner. */
+export class AnswerNotGrounded extends Error {
+  constructor() { super("The tutor's answer did not cite your course materials. Try again."); this.name = "AnswerNotGrounded"; }
+}
 /**
  * The Generating concept reports every provider failure as GENERATION_FAILED. This keeps the learner-facing
  * reason for the host, which reads it under the same learner lock as the request.
@@ -37,7 +41,7 @@ const extractSchema = objectSchema({ rows: { type: "array", maxItems: EXTRACT_RO
 export class TutorFailures {
   private readonly reasons = new Map<string, string>();
   record(owner: string, error: unknown) {
-    const reason = error instanceof GeminiError || error instanceof OriginalTooLarge ? error.message : "The tutor could not produce a usable answer. Try again.";
+    const reason = error instanceof GeminiError || error instanceof OriginalTooLarge || error instanceof AnswerNotGrounded ? error.message : "The tutor could not produce a usable answer. Try again.";
     this.reasons.set(owner, `${reason} Your saved work is still available.`);
   }
   take(owner: string): string | undefined { const reason = this.reasons.get(owner); this.reasons.delete(owner); return reason; }
@@ -81,8 +85,11 @@ function validated(tutor: Pick<CourseTutor, "generate" | "suggest">) {
     answer.text = result[field] as string;
     if (request.kind === "TASK" && (request.context as { previousQuestions: string[] }).previousQuestions.includes(answer.text)) throw new Error("Repeated task");
     if (request.kind !== "HINT") {
-      if (!Array.isArray(result.citations) || !result.citations.length) throw new Error("Missing citations");
-      answer.citations = result.citations.map((part: PassageSet[number]) => {
+      if (!Array.isArray(result.citations)) throw new Error("Missing citations");
+      // The learner's attached work is sent to read, not as a course material, so a citation of it is dropped rather than failing the answer.
+      const cited = result.citations.filter((part: PassageSet[number]) => !(part && part.material === SUBMITTED_WORK));
+      if (!cited.length) throw new AnswerNotGrounded();
+      answer.citations = cited.map((part: PassageSet[number]) => {
         const source = request.sources.find((source) => source.material === part.material);
         if (!source || typeof part.location !== "string" || !(part.location === "content" && source.data.content.trim()) &&
           !source.data.originals.some((file) => file.renditions.some((rendition) => rendition.location === part.location))) throw new Error("Invalid citation");
