@@ -18,6 +18,7 @@ import type { GroundedTutoring } from "./concepts/GroundedTutoring/GroundedTutor
 import { composition as accounts } from "./compositions/reusable/accounts.ts";
 import { composition as commons } from "./compositions/reusable/commons.ts";
 import { composition as Courses } from "./compositions/courses.ts";
+import { composition as Importing } from "./compositions/importing.ts";
 import { TutorGenerating } from "./concepts/Generating/registry.ts";
 
 // Apply the same deadline to the interpreter and its HTTP gateway.
@@ -44,7 +45,7 @@ export function assembleApplication(instances: {
     conceptSet: applicationConceptSet,
     instances: { ...instances, TutorGenerating: instances.TutorGenerating ?? new TutorGenerating(),
       TutorPreferring: instances.TutorPreferring ?? new TutorPreferring(unconfiguredDatabase, "TutorPreferring") },
-    composition: { reusable: { accounts, commons }, Courses, Learning, Reads, Progress, Planning, Access, Settings },
+    composition: { reusable: { accounts, commons }, Courses, Learning, Importing, Reads, Progress, Planning, Access, Settings },
     queryCache: "none",
     executionLimits,
     clock,

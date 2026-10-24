@@ -8,6 +8,7 @@ import SkillTree from "./SkillTree.vue";
 import SkillStudy from "./SkillStudy.vue";
 import StudyPlanner from "./StudyPlanner.vue";
 import ManageSkills from "./ManageSkills.vue";
+import GradedImport from "./GradedImport.vue";
 import type { StillGotItHttp } from "../../generated/wire.ts";
 import { takeTutor, tutorLabel, type TutorUsed } from "./tutor-choice.ts";
 
@@ -225,13 +226,15 @@ onMounted(() => task(async () => {
             <div class="import-actions"><p v-if="!chosenFiles.length" id="import-reason" class="hint reason">Choose at least one file to import.</p><button class="primary" :disabled="busy || !chosenFiles.length" :aria-describedby="chosenFiles.length ? undefined : 'import-reason'">{{ busy ? 'Working…' : 'Import material' }}</button></div>
           </form>
         </section>
+        <GradedImport :course="course.course" :ai-available="ai.available" :ai-reason="ai.reason" @changed="task(refresh)" />
         <section v-if="data.materials.length" class="library">
           <h2>Files <span class="count">{{ data.materials.length }}</span></h2>
           <ul class="material-list">
             <li v-for="source in data.materials" :key="source.material" class="material-row">
               <div class="material-main"><span class="doc-icon" aria-hidden="true"><svg width="16" height="18" viewBox="0 0 16 18" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 1.8h7.5L14 6.3v9.9H2z"/><path d="M9.5 1.8v4.5H14M5 10h6M5 13h4"/></svg></span>
                 <div class="material-text"><strong>{{ source.title }}</strong><small>{{ material === source.material && showPreview && preview ? `${preview.originals.length} ${preview.originals.length === 1 ? 'file' : 'files'}` : 'Course material' }}</small></div>
-                <div class="row-actions"><button class="quiet" :disabled="busy" :aria-expanded="material === source.material && showPreview" @click="openMaterial(source.material)">{{ material === source.material && showPreview ? 'Hide' : 'View' }}</button><button class="small-button" :disabled="busy || !!suggestReason" :aria-describedby="suggestReason ? 'suggest-reason' : undefined" @click="suggestFrom(source.material)">Find skills</button></div></div>
+                <GradedImport :course="course.course" :material="source.material" :title="source.title" />
+                <div class="row-actions"><button class="quiet" :disabled="busy" :aria-expanded="material === source.material && showPreview" @click="openMaterial(source.material)">{{ material === source.material && showPreview ? 'Hide' : 'View' }}</button><button v-if="!source.title.startsWith('Graded work: ')" class="small-button" :disabled="busy || !!suggestReason" :aria-describedby="suggestReason ? 'suggest-reason' : undefined" @click="suggestFrom(source.material)">Find skills</button></div></div>
               <div v-if="material === source.material && showPreview && preview" class="material-preview">
                 <div class="file-chips"><button v-for="file in preview.originals" :key="file.file" class="file-chip" :disabled="busy" @click="download(file.file, file.name)">↓ {{ file.name }}</button></div>
                 <p v-for="limit in preview.originals.flatMap((file) => file.limitations)" :key="limit" class="hint">{{ limit }}</p>

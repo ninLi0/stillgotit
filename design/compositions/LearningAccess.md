@@ -16,9 +16,10 @@ A command that asks the tutor first passes [TutorReady](former:Settings.TutorRea
 [TranscriptReady](former:Access.TranscriptReady) checks the corresponding command against current owned state.
 [AssessmentReady](former:Access.AssessmentReady) checks the corresponding command against current owned state.
 [RetryReady](former:Access.RetryReady) checks the corresponding command against current owned state.
-[RegradeReady](former:Access.RegradeReady) checks the corresponding command against current owned state.
+[RegradeReady](former:Access.RegradeReady) admits Correct and Regrade for the learner's own practice or imported case ([OwnedAnyCase](view:Reads.OwnedAnyCase)) whose effective judgment is the one the learner saw. Regrade then refuses an imported case itself.
 [AdjustReady](former:Access.AdjustReady) requires a confirmed skill that the learner owns. It declines an unknown skill, another learner's skill, and a draft skill with the same detail as the endpoint's `SKILL_UNAVAILABLE`, "Choose one of your confirmed skills before adjusting its estimate." It does not check the key, value, or reason, so the concept's message explains those refusals.
 [SuggestionReady](former:Access.SuggestionReady) checks the corresponding command against current owned state.
+[GradedReady](former:Access.GradedReady) admits Extract and Confirm only when [GradedMaterial](view:Importing.GradedMaterial) holds. Otherwise it declines, with the admission layer's usual code, and the sentence "Choose graded work that you imported into one of your courses." The answer is the same for an unknown material, another learner's material, a material outside the learner's courses, and the learner's own ungraded material.
 [CourseReady](former:Access.CourseReady) checks the corresponding command against current owned state.
 [PlanReady](former:Access.PlanReady) checks the corresponding command against current owned state.
 [ItemReady](former:Access.ItemReady) checks the corresponding command against current owned state.

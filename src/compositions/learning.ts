@@ -154,14 +154,30 @@ const RetryAssessment = endpoint("/learning/retry", ({ session, studySession, ow
     .then(Assessment.assess({ case: assessment, result, gateMet, rationale }).responds({})))
   .afterFlowSettles().then(respond({ tutor: Settings.SentTutor({ request: prepared }) })), options);
 
+// An imported case keeps gateMet false: imported coursework cannot show the complete demonstration gate.
+// Every other correction goes to revise, which still refuses another learner's case or an outdated judgment.
+// A continuation follows every branch, so the settled answer reads the effective judgment again, and each branch excludes the others.
 const Correct = endpoint("/learning/correct", ({ session, case: assessment, basedOn, result, gateMet, reason, owner, judgment }) => receive({ session, case: assessment, basedOn, result, gateMet, reason })
-  .then(Sessioning.use({ session }).responds({ subject: owner }))
-  .then(Assessment.revise({ author: owner, case: assessment, basedOn, result, gateMet, rationale: reason, origin: "MANUAL" }).responds({ judgment }))
-  .afterFlowSettles().then(respond({ judgment })), options);
+  .then(Sessioning.use({ session }).responds({ subject: owner })).then(
+    where(R.OwnedAnyCase({ owner, assessment }).is({ imported: true }), is.among(gateMet, [true]))
+      .then(respond({ error: "IMPORTED_GATE_UNAVAILABLE" })).named("importedGate"),
+    where(R.OwnedAnyCase({ owner, assessment }).is({ imported: true }), is.among(gateMet, [false]))
+      .then(Assessment.revise({ author: owner, case: assessment, basedOn, result, gateMet, rationale: reason, origin: "MANUAL" }).responds({ judgment })).named("imported"),
+    where(no(R.OwnedAnyCase({ owner, assessment }).is({ imported: true })))
+      .then(Assessment.revise({ author: owner, case: assessment, basedOn, result, gateMet, rationale: reason, origin: "MANUAL" }).responds({ judgment })).named("practice"),
+  ).afterFlowSettles().then(
+    where(Assessment._effectiveJudgment({ case: assessment }).is({ judgment }), R.OwnedAnyCase({ owner, assessment }).is({ imported: true }), is.among(gateMet, [false]))
+      .then(respond({ judgment })).named("importedRevised"),
+    where(Assessment._effectiveJudgment({ case: assessment }).is({ judgment }), no(R.OwnedAnyCase({ owner, assessment }).is({ imported: true })))
+      .then(respond({ judgment })).named("practiceRevised"),
+  ), options);
+// Imported coursework has no practice task to regrade, so it is refused before any clarification or tutor request.
 const Regrade = endpoint("/learning/regrade", ({ session, case: assessment, basedOn, reason, owner, course, task, clarification, data, sessionData, sources, materials, selected, draft, choice, status, prepared, answer, result, gateMet, rationale, judgment }) => receive({ session, case: assessment, basedOn, reason })
-  .then(Sessioning.use({ session }).responds({ subject: owner }))
-  .then(where(R.OwnedCase({ owner, assessment }), Assessment._effectiveJudgment({ case: assessment }).is({ judgment: basedOn }),
-    compute(C.correctionNote, { reason }, clarification)).then(Assessment.clarify({ author: owner, case: assessment, clarification }).responds({})))
+  .then(Sessioning.use({ session }).responds({ subject: owner })).then(
+    where(R.OwnedAnyCase({ owner, assessment }).is({ imported: true })).then(respond({ error: "REGRADE_IMPORTED_UNAVAILABLE" })).named("imported"),
+    where(R.OwnedCase({ owner, assessment }), Assessment._effectiveJudgment({ case: assessment }).is({ judgment: basedOn }),
+      compute(C.correctionNote, { reason }, clarification)).then(Assessment.clarify({ author: owner, case: assessment, clarification }).responds({})).named("practice"),
+  )
   .then(where(R.OwnedCase({ owner, assessment }).is({ course, task }), Assessment._caseData({ case: assessment }).is({ data }), Tutoring._sessionData({ session: task }).is({ data: sessionData }),
     Tutoring._sourceSet({ owner, scope: course }).is({ sources }), compute(C.sessionMaterials, { data: sessionData }, materials),
     compute(C.selectSources, { sources, materials }, { selected, valid: true }), compute(C.gradeRequest, { selected, data }, draft),
@@ -192,9 +208,17 @@ const Adjust = endpoint("/learning/adjust", ({ session, skill, adjustmentKey, va
 const ReplanAfterAdjustment = reaction(({ owner, skill, course, candidates, horizonEnd, basis, explanation }) => when(Mastery.adjust({ learner: owner, subject: skill }).responds({}))
   .afterFlowSettles().where(R.OwnedSkill({ owner, skill }).is({ course }), R.CanReplan({ owner, course }), R.PlanContext({ owner, course }).is({ candidates, horizonEnd, basis, explanation }))
   .then(Planning.replan({ learner: owner, scope: course, candidates, horizonEnd, basis, explanation, workloadComplete: false })));
-const Suggest = endpoint("/courses/skills/suggest", ({ session, material, owner, course, sources, selected, materials, draft, choice, status, prepared, answer, suggestions }) => receive({ session, material })
-  .then(Sessioning.use({ session }).responds({ subject: owner }))
-  .then(where(Tutoring._material({ material }).is({ owner, scope: course }), Courses.OwnedCourse({ owner, course }),
+// Graded work is evidence, not a teaching source. The check applies only to the learner's own material in a course they own;
+// any other material keeps the admission refusal. Every branch shares the stages that follow, so the tutor request lives there
+// and repeats the source condition: the graded branch has already answered, and the source branch only rechecks the session.
+const Suggest = endpoint("/courses/skills/suggest", ({ session, material, owner, course, sources, selected, materials, draft, choice, status, prepared, answer, suggestions, title, graded }) => receive({ session, material })
+  .then(Sessioning.use({ session }).responds({ subject: owner })).then(
+    where(Tutoring._material({ material }).is({ owner, scope: course, title }), Courses.OwnedCourse({ owner, course }), compute(C.gradedTitle, { title }, graded), is.among(graded, [true]))
+      .then(respond({ error: "GRADED_MATERIAL_NOT_SOURCE" })).named("graded"),
+    where(Tutoring._material({ material }).is({ owner, scope: course, title }), Courses.OwnedCourse({ owner, course }), compute(C.gradedTitle, { title }, graded), is.among(graded, [false]))
+      .then(Sessioning.use({ session }).responds({ subject: owner })).named("source"),
+  )
+  .then(where(Tutoring._material({ material }).is({ owner, scope: course, title }), Courses.OwnedCourse({ owner, course }), compute(C.gradedTitle, { title }, graded), is.among(graded, [false]),
     Tutoring._sourceSet({ owner, scope: course }).is({ sources }), compute(C.singleMaterial, { material }, materials),
     compute(C.selectSources, { sources, materials }, { selected, valid: true }), compute(C.suggestRequest, { selected }, draft),
     ...usingTutorChoice(owner, draft, choice, status, prepared))

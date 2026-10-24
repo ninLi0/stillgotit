@@ -1,9 +1,9 @@
 import { admissions, composition as Access } from "../compositions/access.ts";
 import { tutorRefusals } from "../compositions/settings.ts";
-import { learningInput, structuredInput, tutorChoiceInput } from "../compositions/reusable/inputs.ts";
+import { gradedConfirmInput, gradedExtractInput, learningInput, structuredInput, tutorChoiceInput } from "../compositions/reusable/inputs.ts";
 import { levelSupported, modelOffered } from "../computations/tutor.ts";
 import { createHttpHandler } from "@mit-sdg/sync-engine-http/handler";
-import { createGateway, type Invoker, type InvocationResult } from "@mit-sdg/sync-engine/boundary";
+import { createGateway, type EndpointValidator, type Invoker, type InvocationResult } from "@mit-sdg/sync-engine/boundary";
 import { executionLimits, type assembleApplication } from "../assembly.ts";
 import type { Attempt } from "../concepts/Federating/Federating.ts";
 import type { Session } from "../concepts/Sessioning/Sessioning.ts";
@@ -17,6 +17,12 @@ import type { MaterialImportStore } from "../storage/MaterialImportStore.ts";
 import type { Material } from "../concepts/GroundedTutoring/GroundedTutoring.ts";
 
 type Application = ReturnType<typeof assembleApplication>;
+
+// Graded commands run like learning commands, with their own input check. Reading earlier imports is not a command.
+const gradedCommands: Record<string, EndpointValidator> = { "/courses/graded/extract": gradedExtractInput, "/courses/graded/confirm": gradedConfirmInput };
+/** Commands that run under the learner's lock after admission, with the tutor's failure reason added over HTTP. Paths exclude `/api`. */
+const learnerCommand = (path: string) => path.startsWith("/learning/") || path.startsWith("/planning/") || path === "/courses/skills/suggest" || Object.hasOwn(gradedCommands, path);
+const commandInput = (path: string, value: unknown) => (gradedCommands[path] ?? learningInput)(value);
 
 export function createApplicationHttp({ application, recovery, publicOrigin, clock = () => new Date(), gemini, failures, files, imports }: {
   application: Application;
@@ -58,7 +64,7 @@ export function createApplicationHttp({ application, recovery, publicOrigin, clo
   // The raw invoker remains internal; it assumes these application preconditions.
   const admittedInvoker: Invoker<Record<string, { input: unknown; output: unknown }>> = {
     async invoke(path, input, options = {}) {
-      const learning = path.startsWith("/learning/") || path.startsWith("/planning/") || path === "/courses/skills/suggest";
+      const learning = learnerCommand(path);
       const courseMutation = ["/courses/create", "/courses/units/add", "/courses/skills/propose", "/courses/skills/edit", "/courses/skills/confirm"].includes(path);
       if (!learning && !courseMutation) {
         return rawGateway.invoke(path, input, options);
@@ -66,7 +72,8 @@ export function createApplicationHttp({ application, recovery, publicOrigin, clo
       const refuse = (value: string): InvocationResult => ({ ok: false, error: { kind: "domain", value } });
       const invalid = (detail: string): InvocationResult => ({ ok: false, error: { kind: "framework", code: "INVALID_INPUT", detail } });
       if (options.signal?.aborted) return { ok: false, error: { kind: "framework", code: "ABORTED" } };
-      if (!(learning ? learningInput(input) : structuredInput(input)).ok) return invalid("Check the supplied text, numbers, and review choices.");
+      const checked = learning ? commandInput(path, input) : structuredInput(input);
+      if (!checked.ok) return invalid(checked.detail ?? "Check the supplied text, numbers, and review choices.");
       const body = input as Record<string, unknown>;
       if (typeof body.session !== "string") return refuse("NOT_SIGNED_IN");
       try {
@@ -240,13 +247,13 @@ export function createApplicationHttp({ application, recovery, publicOrigin, clo
         const transcript = await gemini.transcribe(recording);
         return await learner(request) === owner ? Response.json(transcript) : failure("UNAUTHORIZED", 401);
       }
-      if (path.startsWith("/api/learning/") || path.startsWith("/api/planning/") || path === "/api/courses/skills/suggest") {
+      if (path.startsWith("/api/") && learnerCommand(path.slice(4))) {
         const owner = await learner(request);
         if (!owner) return failure("UNAUTHORIZED", 401);
         return locks.run(`user:${owner}`, async () => {
           if (path.slice(4) in admissions) {
             const body = await readBody(request.clone());
-            if (!body || !learningInput(body).ok) return failure("INVALID_REQUEST", 400);
+            if (!body || !commandInput(path.slice(4), body).ok) return failure("INVALID_REQUEST", 400);
             const declined = await admission(path.slice(4), body, owner);
             if (declined) {
               return Response.json({ error: "INVALID_REQUEST", detail: declined.detail }, { status: 400, headers: { "Cache-Control": "no-store" } });
@@ -300,7 +307,7 @@ export function createApplicationHttp({ application, recovery, publicOrigin, clo
       }
       return await inner(request);
     } catch (error) {
-      if (multipart || path.startsWith("/api/ai/") || path.startsWith("/api/learning/") || path.startsWith("/api/planning/") || path === "/api/courses/skills/suggest") {
+      if (multipart || path.startsWith("/api/ai/") || (path.startsWith("/api/") && learnerCommand(path.slice(4)))) {
         const detail = error instanceof Error && error.name !== "MongoServerError" ? error.message : "This operation could not finish. Your saved work is available to retry.";
         return Response.json({ error: "OPERATION_FAILED", detail }, { status: 400, headers: { "Cache-Control": "no-store" } });
       }

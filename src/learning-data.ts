@@ -5,7 +5,7 @@ import type { MasteryEstimating } from "./concepts/MasteryEstimating/MasteryEsti
 import type { StudyPlanning } from "./concepts/StudyPlanning/StudyPlanning.ts";
 import type { PassageSet, MaterialSet } from "./concepts/GroundedTutoring/dialogue.ts";
 import type { MediaList } from "./concepts/GroundedTutoring/media.ts";
-import type { SourceContext, Suggestions } from "./tutor-types.ts";
+import type { ExtractedRow, SourceContext, Suggestions } from "./tutor-types.ts";
 export type SkillRows = Awaited<ReturnType<SkillMapping["_map"]>>["skills"];
 export type SkillInfo = SkillRows[number];
 export type Sessions = Awaited<ReturnType<GroundedTutoring["_study"]>>["sessions"];
@@ -15,10 +15,12 @@ export type CaseInfo = Cases[number];
 export type Tracks = Awaited<ReturnType<MasteryEstimating["_progress"]>>["tracks"];
 export type Schedule = Awaited<ReturnType<StudyPlanning["_schedule"]>>["schedule"];
 export interface TutorRequest {
-  kind: "SUGGEST" | "LESSON" | "TASK" | "REPLY" | "HINT" | "GRADE";
+  kind: "SUGGEST" | "LESSON" | "TASK" | "REPLY" | "HINT" | "GRADE" | "EXTRACT";
   sources: SourceContext[]; context: unknown; work: MediaList; definition?: string; criteria?: string;
 }
 export interface TutorAnswer {
   text: string; citations: PassageSet; materials: MaterialSet;
   result: Result; gateMet: boolean; rationale: string; suggestions: Suggestions;
+  /** Validated EXTRACT rows in the tutor's order; empty for every other kind. */
+  rows: ExtractedRow[];
 }

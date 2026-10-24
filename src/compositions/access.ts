@@ -4,7 +4,8 @@ import { composition as Courses } from "./courses.ts";
 import { composition as Settings } from "./settings.ts";
 import * as R from "./learning-reads.ts";
 import { composition as PlanningFlows } from "./planning.ts";
-const { GroundedTutoring: Tutoring, AssessmentReviewing: Assessment, MasteryEstimating: Mastery, StudyPlanning: Planning } = concepts;
+import { composition as Importing } from "./importing.ts";
+const { SkillMapping: Mapping, GroundedTutoring: Tutoring, AssessmentReviewing: Assessment, MasteryEstimating: Mastery, StudyPlanning: Planning } = concepts;
 
 const LessonReady = former("admit a lesson for (owner) and (skill)", ({ owner, skill }, { context, sources, materials }) => where(
   R.ActiveSkill({ owner, skill }), R.SkillContext({ owner, skill }).is({ context, sources }), compute(C.selectSkillMaterials, { context }, materials),
@@ -40,14 +41,17 @@ const AssessmentReady = former("admit review of (studySession)", ({ owner, study
 const RetryReady = former("admit retry of (studySession)", ({ owner, studySession }, { assessment }) => where(
   R.OwnedSession({ owner, studySession }), Assessment._byTask({ author: owner, task: studySession }).is({ case: assessment }), no(Assessment._effectiveJudgment({ case: assessment })),
 ).form({ allowed: true })).optional();
+// Admits Correct and Regrade for a practice or imported case. Regrade refuses an imported case itself.
 const RegradeReady = former("admit revision of (assessment)", ({ owner, assessment, basedOn }) => where(
-  R.OwnedCase({ owner, assessment }), Assessment._effectiveJudgment({ case: assessment }).is({ judgment: basedOn }),
+  R.OwnedAnyCase({ owner, assessment }), Assessment._effectiveJudgment({ case: assessment }).is({ judgment: basedOn }),
 ).form({ allowed: true })).optional();
 // Only the skill is checked; the concept explains a bad key, value, or reason.
 const AdjustReady = former("admit an estimate adjustment for (owner) and (skill)", ({ owner, skill }) => where(R.ActiveSkill({ owner, skill })).form({ allowed: true })).optional();
 const SuggestionReady = former("admit suggestions from (material)", ({ owner, material }, { course }) => where(
   Tutoring._material({ material }).is({ owner, scope: course }), Courses.OwnedCourse({ owner, course }),
 ).form({ allowed: true })).optional();
+// The same answer for an unknown material, another learner's material, one outside the learner's courses, and an ungraded material.
+const GradedReady = former("admit graded work (material) for (owner)", ({ owner, material }) => where(Importing.GradedMaterial({ owner, material })).form({ allowed: true })).optional();
 const CourseReady = former("admit access to (course) for (owner)", ({ owner, course }) => where(Courses.OwnedCourse({ owner, course })).form({ allowed: true })).optional();
 const PlanReady = former("admit a routine plan in (course)", ({ owner, course }) => where(R.CanReplan({ owner, course })).form({ allowed: true })).optional();
 const ItemReady = former("admit progress on (item) in (course)", ({ owner, course, item }) => where(
@@ -65,7 +69,7 @@ const PracticePrerequisite = former("the prerequisite to work on before practici
 ).form({ title })).optional();
 /** The practice explanation that names the prerequisite PracticePrerequisite found. */
 export const prerequisiteDetail = ({ title }: { title: string }) => `Work on “${title}” first. This skill builds on it.`;
-export const composition = { LessonReady, TaskReady, PracticePrerequisite, ResponseReady, QuestionReady, ReplyReady, HintReady, TranscriptReady, AssessmentReady, RetryReady, RegradeReady, AdjustReady, SuggestionReady, CourseReady, PlanReady, ItemReady, BeginReady };
+export const composition = { LessonReady, TaskReady, PracticePrerequisite, ResponseReady, QuestionReady, ReplyReady, HintReady, TranscriptReady, AssessmentReady, RetryReady, RegradeReady, AdjustReady, SuggestionReady, GradedReady, CourseReady, PlanReady, ItemReady, BeginReady };
 
 // Transport admission uses these same declared reads before starting a causal flow. Each path lists its formers in the
 // order they run; a command that asks the tutor passes TutorReady first, so a retired choice is refused before any write.
@@ -97,4 +101,6 @@ export const admissions = {
   "/planning/exams/remove": [{ check: CourseReady, fields: ["course"], detail: "Choose one of your own courses." }],
   "/planning/tradeoffs/confirm": [{ check: CourseReady, fields: ["course"], detail: "Choose one of your own courses." }],
   "/planning/tradeoffs/decline": [{ check: CourseReady, fields: ["course"], detail: "Choose one of your own courses." }],
+  "/courses/graded/extract": [tutorReady, { check: GradedReady, fields: ["material"], detail: "Choose graded work that you imported into one of your courses." }],
+  "/courses/graded/confirm": [{ check: GradedReady, fields: ["material"], detail: "Choose graded work that you imported into one of your courses." }],
 } as const;

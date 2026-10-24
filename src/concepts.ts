@@ -19,6 +19,7 @@ import { choiceOffered, defaultChoice, levelSupported, modelOffered, offeredChoi
 /** Preferring bound as the stage's TutorPreferring instance: User is Registering.User, Option is TutorChoice. */
 export class TutorPreferring extends Preferring<User, TutorChoice> {}
 const tutorPreferring = registerConcept({ class: TutorPreferring, spec: preferringSpec, refusals: {} });
+import { extractRequest, gradedImport, gradedKey, gradedReview, gradedSource, gradedTitle, gradedToday, hasConfirmedSkill, hasGradedRows } from "./computations/importing.ts";
 
 export const applicationConceptSet = conceptSet({
   Registering: registering,
@@ -32,5 +33,6 @@ export const applicationConceptSet = conceptSet({
   TutorGenerating: generating,
   TutorPreferring: tutorPreferring,
 }, { singleMaterial, evidenceAttribution, carriedEstimate, prerequisiteSet, prerequisiteToPractice, sessionSubject, attemptIsReady, beginAllowed, correctionNote, coveredSkillsConfirmed, cutKey, dialogueIsCurrent, evidenceUpdate, generationDefinition, generationFields, gradeRequest, hasLessonQuestion, itemOrder, itemSubject, lessonRequest, planDetail, planRequest, prerequisitesReady, progressRows, responseInput, reviewApproved, selectSkill, selectSkillMaterials, selectSources, sessionMaterials, sessionRequest, studyDetail, submissionInput, suggestRequest, taskRequest, urgentExamItem, estimateTimeline,
-  tutorCatalog, defaultChoice, modelOffered, levelSupported, offeredChoice, choiceOffered, withChoice, requestChoice, tutorStatus });
+  tutorCatalog, defaultChoice, modelOffered, levelSupported, offeredChoice, choiceOffered, withChoice, requestChoice, tutorStatus,
+  gradedTitle, hasConfirmedSkill, extractRequest, hasGradedRows, gradedToday, gradedReview, gradedKey, gradedImport, gradedSource });
 export const { concepts, computations } = applicationConceptSet;

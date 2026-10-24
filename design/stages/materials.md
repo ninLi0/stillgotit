@@ -6,7 +6,7 @@ This stage connects course materials, skill review, tutoring, assessment, master
 concrete TutorRequest
   A server-prepared generation request containing its purpose, owned sources, saved context, and optional learner work. Once withChoice has added it, the request also carries the validated tutor model and thinking level; the Gemini transport refuses a tutor request without that pair.
 concrete TutorAnswer
-  Validated generated text, citations, material identities, optional judgment values, and skill suggestions.
+  Validated generated text, citations, material identities, optional judgment values, skill suggestions, and extracted graded rows.
 concrete TutorChoice
   One offered tutor model name and one thinking level that model supports, validated on the server against the tutor catalog.
 ```
@@ -132,4 +132,4 @@ Uploads accept up to 12 files and 25 MB in total. PDF pages are read as text, an
 
 ## Learning application
 
-[Learning flows](../compositions/Learning.md), [shared reads](../compositions/LearningReads.md), [progress reactions](../compositions/Progress.md), [planning endpoints](../compositions/Planning.md), and [tutor settings](../compositions/Settings.md) define the rest of this stage. The host forwards JSON requests to these declared endpoints. It does not sequence tutoring, assessment, mastery, or planning actions.
+[Learning flows](../compositions/Learning.md), [shared reads](../compositions/LearningReads.md), [progress reactions](../compositions/Progress.md), [planning endpoints](../compositions/Planning.md), and [tutor settings](../compositions/Settings.md) define the rest of this stage. The host forwards JSON requests to these declared endpoints. It does not sequence tutoring, assessment, mastery, or planning actions. [Importing graded work](../compositions/Importing.md) turns returned, graded coursework into imported assessment evidence.

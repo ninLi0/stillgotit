@@ -414,9 +414,18 @@ Concrete types:
 - `estimateTimeline(explanation?: MasteryEstimating.EstimateExplanation, tracks: MasteryEstimating.ProgressRows) : EstimateTimeline` — [Learning computations](../design/compositions/LearningComputations.md), line 86.
 - `evidenceAttribution(origin: AssessmentReviewing.Origin, rationale: String) : String` — [P2 learning journey](../design/stages/materials.md), line 119.
 - `evidenceUpdate(data: AssessmentReviewing.CaseRecord, tracks: MasteryEstimating.ProgressRows) : EvidenceUpdate` — [Learning computations](../design/compositions/LearningComputations.md), line 27.
+- `extractRequest(selected: GroundedTutoring.SourceRecords, skills: SkillMapping.SkillMapRows) : TutorRequest` — [Importing graded work](../design/compositions/Importing.md), line 112.
 - `generationDefinition(request: TutorRequest) : GenerationDefinition` — [Learning computations](../design/compositions/LearningComputations.md), line 30.
 - `generationFields(answer: TutorAnswer) : TutorAnswer` — [Learning computations](../design/compositions/LearningComputations.md), line 33.
 - `gradeRequest(selected: GroundedTutoring.SourceRecords, data: AssessmentReviewing.CaseRecord) : TutorRequest` — [Learning computations](../design/compositions/LearningComputations.md), line 36.
+- `gradedImport(material: GroundedTutoring.Material, originals: GroundedTutoring.MediaList, row: GradedRow, outsideHelp: Flag, performedAt: DateTime, skills: SkillMapping.SkillMapRows) : GradedImport` — [Importing graded work](../design/compositions/Importing.md), line 127.
+- `gradedKey(material: GroundedTutoring.Material, row: GradedRow) : GradedKey` — [Importing graded work](../design/compositions/Importing.md), line 124.
+- `gradedReview(row: GradedRow, outsideHelp: Flag, performedOn: String, at: DateTime, skills: SkillMapping.SkillMapRows) : GradedReview` — [Importing graded work](../design/compositions/Importing.md), line 121.
+- `gradedSource(sourceKey: String, material: GroundedTutoring.Material) : Flag` — [Importing graded work](../design/compositions/Importing.md), line 130.
+- `gradedTitle(title: String) : Flag` — [Importing graded work](../design/compositions/Importing.md), line 106.
+- `gradedToday(at: DateTime) : String` — [Importing graded work](../design/compositions/Importing.md), line 118.
+- `hasConfirmedSkill(skills: SkillMapping.SkillMapRows) : Flag` — [Importing graded work](../design/compositions/Importing.md), line 109.
+- `hasGradedRows(answer: TutorAnswer) : Flag` — [Importing graded work](../design/compositions/Importing.md), line 115.
 - `hasLessonQuestion(data: GroundedTutoring.StudyRecord) : Flag` — [Learning computations](../design/compositions/LearningComputations.md), line 39.
 - `itemOrder(day: Date, candidate: StudyPlanning.Candidate) : String` — [Daily planning flows](../design/compositions/Planning.md), line 109.
 - `itemSubject(candidate: StudyPlanning.Candidate) : ItemSubject` — [Learning computations](../design/compositions/LearningComputations.md), line 42.
@@ -427,7 +436,7 @@ Concrete types:
 - `planDetail(schedule: StudyPlanning.ScheduleValue) : PlanDetail` — [Learning computations](../design/compositions/LearningComputations.md), line 48.
 - `planRequest(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows, schedule: StudyPlanning.ScheduleValue) : ReviewProposal` — [Learning computations](../design/compositions/LearningComputations.md), line 51.
 - `prerequisiteSet(prerequisites: SkillList) : SkillMapping.SkillSet` — [Courses, materials, and skills](../design/compositions/Courses.md), line 55.
-- `prerequisiteToPractice(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows, skill: SkillMapping.Skill) : PrerequisiteChoice` — [Request admission](../design/compositions/LearningAccess.md), line 32.
+- `prerequisiteToPractice(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows, skill: SkillMapping.Skill) : PrerequisiteChoice` — [Request admission](../design/compositions/LearningAccess.md), line 33.
 - `prerequisitesReady(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows, skill: SkillMapping.Skill) : Flag` — [Learning computations](../design/compositions/LearningComputations.md), line 56.
 - `progressRows(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows) : SkillProgress` — [Learning computations](../design/compositions/LearningComputations.md), line 59.
 - `requestChoice(request: TutorRequest) : TutorChoice` — [Tutor settings](../design/compositions/Settings.md), line 84.
@@ -453,10 +462,23 @@ Concrete types:
 
 _Views name reusable conditions. Multiple `where` blocks are alternatives._
 
+### (owner) already imported (sourceKey) for (skill)
+
+Authored path: `Importing.AlreadyImported`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 54.
+
+```view
+(owner) already imported (sourceKey) for (skill) — inputs (owner, skill, sourceKey); outputs (); bindings (assessment)
+  where
+    AssessmentReviewing._cases (author: owner, subject: skill) has (case: assessment)
+    AssessmentReviewing._case (case: assessment) has (sourceKey)
+```
+
 ### (owner) owns (course) with (title)
 
 Authored path: `Courses.OwnedCourse`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 7.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 19.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 3.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 87.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 107.
@@ -544,6 +566,21 @@ Authored path: `Planning.ActivityInProgress`.
     StudyPlanning._next (learner: owner, scope: course) has (status: "IN_PROGRESS")
 ```
 
+### (owner) imported graded work (material)
+
+Authored path: `Importing.GradedMaterial`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 19.
+- Covered by [Request admission](../design/compositions/LearningAccess.md), line 22.
+
+```view
+(owner) imported graded work (material) — inputs (owner, material); outputs (course, originals); bindings (title, graded) — answers at most one (course, originals)
+  where
+    GroundedTutoring._material (material) has (originals, owner, scope: course, title)
+    view "(owner) owns (course) with (title)" with (course, owner)
+    graded is gradedTitle (title)
+    graded is among [true]
+```
+
 ### (owner) may start (item) in (course)
 
 Authored path: `Planning.StartAllowed`.
@@ -593,12 +630,26 @@ Authored path: `Courses.OwnedSkill`.
 ### (owner) owns assessment (assessment)
 
 Authored path: `Reads.OwnedCase`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 84.
 - Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 3.
 
 ```view
 (owner) owns assessment (assessment) — inputs (owner, assessment); outputs (skill, course, definition, task); bindings () — answers at most one (skill, course, definition, task)
   where
     AssessmentReviewing._case (case: assessment) has (author: owner, definition, subject: skill, task)
+    view "(owner) owns study skill (skill)" with (owner, skill) has (course)
+```
+
+### (owner) owns practice or imported assessment (assessment)
+
+Authored path: `Reads.OwnedAnyCase`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 27.
+- Covered by [Request admission](../design/compositions/LearningAccess.md), line 19.
+
+```view
+(owner) owns practice or imported assessment (assessment) — inputs (owner, assessment); outputs (skill, course, definition, imported); bindings () — answers at most one (skill, course, definition, imported)
+  where
+    AssessmentReviewing._case (case: assessment) has (author: owner, definition, imported, subject: skill)
     view "(owner) owns study skill (skill)" with (owner, skill) has (course)
 ```
 
@@ -664,7 +715,7 @@ the current context of (skill) for (owner) — inputs (owner, skill); outputs (c
 ### the tutor choice that applies to (owner)
 
 Authored path: `Settings.TutorStatus`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 84.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 88.
 - Covered by [Tutor settings](../design/compositions/Settings.md), line 52.
 
 ```view
@@ -702,7 +753,7 @@ Former "admit a lesson for (owner) and (skill)" — inputs (owner, skill); bindi
 ### admit a question in (studySession)
 
 Authored path: `Access.QuestionReady`.
-- Covered by [Request admission](../design/compositions/LearningAccess.md), line 27.
+- Covered by [Request admission](../design/compositions/LearningAccess.md), line 28.
 
 ```former
 Former "admit a question in (studySession)" — inputs (owner, studySession, text, channel, attachments, dialogueLength); bindings (course, data, sources); promises at most one record — forms:
@@ -719,7 +770,7 @@ Former "admit a question in (studySession)" — inputs (owner, studySession, tex
 ### admit a routine plan in (course)
 
 Authored path: `Access.PlanReady`.
-- Covered by [Request admission](../design/compositions/LearningAccess.md), line 23.
+- Covered by [Request admission](../design/compositions/LearningAccess.md), line 24.
 
 ```former
 Former "admit a routine plan in (course)" — inputs (owner, course); bindings (); promises at most one record — forms:
@@ -757,7 +808,7 @@ Former "admit a tutor reply in (studySession)" — inputs (owner, studySession);
 ### admit a tutor request for (owner)
 
 Authored path: `Settings.TutorReady`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 84.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 88.
 - Covered by [Request admission](../design/compositions/LearningAccess.md), line 7.
 - Covered by [Tutor settings](../design/compositions/Settings.md), line 88.
 
@@ -772,7 +823,7 @@ Former "admit a tutor request for (owner)" — inputs (owner); bindings (status)
 ### admit access to (course) for (owner)
 
 Authored path: `Access.CourseReady`.
-- Covered by [Request admission](../design/compositions/LearningAccess.md), line 22.
+- Covered by [Request admission](../design/compositions/LearningAccess.md), line 23.
 
 ```former
 Former "admit access to (course) for (owner)" — inputs (owner, course); bindings (); promises at most one record — forms:
@@ -790,6 +841,19 @@ Authored path: `Access.AdjustReady`.
 Former "admit an estimate adjustment for (owner) and (skill)" — inputs (owner, skill); bindings (); promises at most one record — forms:
   a record of
     where view "(owner) can study confirmed (skill)" with (owner, skill)
+    allowed: true
+```
+
+### admit graded work (material) for (owner)
+
+Authored path: `Access.GradedReady`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 7.
+- Covered by [Request admission](../design/compositions/LearningAccess.md), line 22.
+
+```former
+Former "admit graded work (material) for (owner)" — inputs (owner, material); bindings (); promises at most one record — forms:
+  a record of
+    where view "(owner) imported graded work (material)" with (material, owner)
     allowed: true
 ```
 
@@ -813,7 +877,7 @@ Former "admit learner work in (studySession)" — inputs (owner, studySession, t
 
 Authored path: `Access.TaskReady`.
 - Covered by [Request admission](../design/compositions/LearningAccess.md), line 12.
-- Covered by [Request admission](../design/compositions/LearningAccess.md), line 29.
+- Covered by [Request admission](../design/compositions/LearningAccess.md), line 30.
 
 ```former
 Former "admit practice for (owner) and (skill)" — inputs (owner, skill); bindings (definition, skills, tracks, context, sources, materials); promises at most one record — forms:
@@ -830,7 +894,7 @@ Former "admit practice for (owner) and (skill)" — inputs (owner, skill); bindi
 ### admit progress on (item) in (course)
 
 Authored path: `Access.ItemReady`.
-- Covered by [Request admission](../design/compositions/LearningAccess.md), line 24.
+- Covered by [Request admission](../design/compositions/LearningAccess.md), line 25.
 
 ```former
 Former "admit progress on (item) in (course)" — inputs (owner, course, item); bindings (); promises at most one record — forms:
@@ -890,7 +954,7 @@ Authored path: `Access.RegradeReady`.
 ```former
 Former "admit revision of (assessment)" — inputs (owner, assessment, basedOn); bindings (); promises at most one record — forms:
   a record of
-    where view "(owner) owns assessment (assessment)" with (assessment, owner)
+    where view "(owner) owns practice or imported assessment (assessment)" with (assessment, owner)
     where AssessmentReviewing._effectiveJudgment (case: assessment) has (judgment: basedOn)
     allowed: true
 ```
@@ -898,7 +962,7 @@ Former "admit revision of (assessment)" — inputs (owner, assessment, basedOn);
 ### admit starting (item) in (course)
 
 Authored path: `Access.BeginReady`.
-- Covered by [Request admission](../design/compositions/LearningAccess.md), line 25.
+- Covered by [Request admission](../design/compositions/LearningAccess.md), line 26.
 
 ```former
 Former "admit starting (item) in (course)" — inputs (owner, course, item); bindings (); promises at most one record — forms:
@@ -950,6 +1014,7 @@ Former "skill estimates for (owner) in (course)" — inputs (owner, course); bin
 ### study data for (owner) and (skill) at (at)
 
 Authored path: `Reads.SkillData`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 46.
 - Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 7.
 
 ```former
@@ -1050,6 +1115,32 @@ Former "the cuts of the proposal awaiting confirmation for (owner) in (course)" 
       cut
 ```
 
+### the imports from (material) for (owner) in (course)
+
+Authored path: `Importing.ImportedRows`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 82.
+
+```former
+Former "the imports from (material) for (owner) in (course)" — inputs (owner, material, course); bindings (unit, skill, assessment, performedAt, sourceKey, fromMaterial, label, mark, feedback, result); promises exactly one record — forms:
+  each SkillMapping._units (course) has (unit)
+    where SkillMapping._skills (unit) has (skill)
+    where AssessmentReviewing._cases (author: owner, subject: skill) has (case: assessment, imported: true, performedAt)
+    where AssessmentReviewing._case (case: assessment) has (sourceKey)
+    where fromMaterial is gradedSource (material, sourceKey)
+    where fromMaterial is among [true]
+    where AssessmentReviewing._work (case: assessment) has (originalFeedback: feedback, originalMark: mark, question: label)
+    where AssessmentReviewing._effectiveJudgment (case: assessment) has (result)
+    arranged by assessment
+    form a record of
+      case: assessment
+      feedback
+      label
+      mark
+      performedAt
+      result
+      skill
+```
+
 ### the prerequisite links in (course)
 
 Authored path: `Courses.Prerequisites`.
@@ -1070,7 +1161,7 @@ Former "the prerequisite links in (course)" — inputs (course); bindings (unit,
 ### the prerequisite to work on before practicing (skill) for (owner)
 
 Authored path: `Access.PracticePrerequisite`.
-- Covered by [Request admission](../design/compositions/LearningAccess.md), line 29.
+- Covered by [Request admission](../design/compositions/LearningAccess.md), line 30.
 
 ```former
 Former "the prerequisite to work on before practicing (skill) for (owner)" — inputs (owner, skill); bindings (skills, tracks, title); promises at most one record — forms:
@@ -1235,6 +1326,7 @@ Former "the units in (course)" — inputs (course); bindings (unit, title, empha
 Authored path: `Courses.AddMaterial`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 15.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 75.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 11.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 111.
 
 ```reaction
@@ -1248,6 +1340,7 @@ then
 Authored path: `Courses.AddMaterial`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 15.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 75.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 11.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 111.
 
 ```reaction
@@ -1264,6 +1357,7 @@ then
 Authored path: `Courses.AddMaterial`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 15.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 75.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 11.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 111.
 
 ```reaction
@@ -1280,6 +1374,7 @@ then
 Authored path: `Courses.AddMaterial`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 15.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 75.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 11.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 111.
 
 ```reaction
@@ -1588,6 +1683,7 @@ then
 Authored path: `Courses.EditDraft`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 25.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 77.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 113.
 
 ```reaction
@@ -1596,11 +1692,32 @@ then
   Sessioning.use (session)
 ```
 
+### Courses.EditDraft:graded#2
+
+Authored path: `Courses.EditDraft`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 25.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 77.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
+- Covered by [P2 learning journey](../design/stages/materials.md), line 113.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Courses.EditDraft
+where
+  earlier, RequestBoundary.request (gate, material, outcome, path: "/courses/skills/edit", requestId, session, skill, title, unit)
+  view "(owner) owns (unit) in (course)" with (owner, unit) has (course)
+  GroundedTutoring._material (material) has (owner, scope: course, title: materialTitle)
+  graded is gradedTitle (title: materialTitle)
+  graded is among [true]
+then
+  RequestBoundary.respond (error: "GRADED_MATERIAL_NOT_SOURCE", requestId)
+```
+
 ### Courses.EditDraft:missing#2
 
 Authored path: `Courses.EditDraft`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 25.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 77.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 113.
 
 ```reaction
@@ -1617,6 +1734,7 @@ then
 Authored path: `Courses.EditDraft`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 25.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 77.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 113.
 
 ```reaction
@@ -1624,7 +1742,9 @@ when Sessioning.use (session, subject: owner), asked by Courses.EditDraft
 where
   earlier, RequestBoundary.request (gate, material, outcome, path: "/courses/skills/edit", requestId, session, skill, title, unit)
   view "(owner) owns (unit) in (course)" with (owner, unit) has (course)
-  GroundedTutoring._material (material) has (owner, scope: course)
+  GroundedTutoring._material (material) has (owner, scope: course, title: materialTitle)
+  graded is gradedTitle (title: materialTitle)
+  graded is among [false]
   materials is singleMaterial (material)
 then
   SkillMapping.reviseDraft (gate, materials, outcome, owner, skill, title, unit)
@@ -1635,6 +1755,7 @@ then
 Authored path: `Courses.EditDraft`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 25.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 77.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 113.
 
 ```reaction
@@ -1650,6 +1771,7 @@ then
 Authored path: `Courses.EditDraft`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 25.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 77.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 113.
 
 ```reaction
@@ -1751,6 +1873,7 @@ then
 Authored path: `Courses.ProposeSkill`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 19.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 76.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 113.
 
 ```reaction
@@ -1759,11 +1882,32 @@ then
   Sessioning.use (session)
 ```
 
+### Courses.ProposeSkill:graded#2
+
+Authored path: `Courses.ProposeSkill`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 19.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 76.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
+- Covered by [P2 learning journey](../design/stages/materials.md), line 113.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Courses.ProposeSkill
+where
+  earlier, RequestBoundary.request (gate, material, outcome, path: "/courses/skills/propose", proposalKey, requestId, session, title, unit)
+  view "(owner) owns (unit) in (course)" with (owner, unit) has (course)
+  GroundedTutoring._material (material) has (owner, scope: course, title: materialTitle)
+  graded is gradedTitle (title: materialTitle)
+  graded is among [true]
+then
+  RequestBoundary.respond (error: "GRADED_MATERIAL_NOT_SOURCE", requestId)
+```
+
 ### Courses.ProposeSkill:missing#2
 
 Authored path: `Courses.ProposeSkill`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 19.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 76.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 113.
 
 ```reaction
@@ -1780,6 +1924,7 @@ then
 Authored path: `Courses.ProposeSkill`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 19.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 76.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 113.
 
 ```reaction
@@ -1787,7 +1932,9 @@ when Sessioning.use (session, subject: owner), asked by Courses.ProposeSkill
 where
   earlier, RequestBoundary.request (gate, material, outcome, path: "/courses/skills/propose", proposalKey, requestId, session, title, unit)
   view "(owner) owns (unit) in (course)" with (owner, unit) has (course)
-  GroundedTutoring._material (material) has (owner, scope: course)
+  GroundedTutoring._material (material) has (owner, scope: course, title: materialTitle)
+  graded is gradedTitle (title: materialTitle)
+  graded is among [false]
   materials is singleMaterial (material)
 then
   SkillMapping.propose (gate, materials, outcome, owner, proposalKey, title, unit)
@@ -1798,6 +1945,7 @@ then
 Authored path: `Courses.ProposeSkill`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 19.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 76.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 113.
 
 ```reaction
@@ -1813,6 +1961,7 @@ then
 Authored path: `Courses.ProposeSkill`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 19.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 76.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 113.
 
 ```reaction
@@ -1830,6 +1979,7 @@ then
 Authored path: `Courses.ReadCourse`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 9.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 72.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 37.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 107.
 
 ```reaction
@@ -1843,6 +1993,7 @@ then
 Authored path: `Courses.ReadCourse`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 9.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 72.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 37.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 107.
 
 ```reaction
@@ -1860,6 +2011,7 @@ then
 Authored path: `Courses.ReadCourse`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 9.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 72.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 37.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 107.
 
 ```reaction
@@ -1877,6 +2029,7 @@ then
 Authored path: `Courses.ReadMaterial`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 9.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 73.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 11.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 111.
 
 ```reaction
@@ -1890,6 +2043,7 @@ then
 Authored path: `Courses.ReadMaterial`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 9.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 73.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 11.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 111.
 
 ```reaction
@@ -1907,6 +2061,7 @@ then
 Authored path: `Courses.ReadMaterial`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 9.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 73.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 11.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 111.
 
 ```reaction
@@ -1923,6 +2078,7 @@ then
 Authored path: `Courses.ReadMaterial`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 9.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 73.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 11.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 111.
 
 ```reaction
@@ -2217,11 +2373,843 @@ then
   RequestBoundary.respond (error: message, requestId)
 ```
 
+### Importing.Confirm
+
+Authored path: `Importing.Confirm`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+
+```reaction
+when RequestBoundary.request (material, outsideHelp, path: "/courses/graded/confirm", performedOn, requestId, row, session)
+then
+  Sessioning.use (session)
+```
+
+### Importing.Confirm:dateFuture#2
+
+Authored path: `Importing.Confirm`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Importing.Confirm
+where
+  at is the current flow's instant
+  earlier, RequestBoundary.request (material, outsideHelp, path: "/courses/graded/confirm", performedOn, requestId, row, session)
+  view "(owner) imported graded work (material)" with (material, owner) has (course)
+  SkillMapping._map (course) has (skills)
+  (status: "DATE_FUTURE") is gradedReview (at, outsideHelp, performedOn, row, skills)
+then
+  RequestBoundary.respond (error: "GRADED_DATE_FUTURE", requestId)
+```
+
+### Importing.Confirm:dateFuture#3
+
+Authored path: `Importing.Confirm`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+
+```reaction
+when RequestBoundary.respond (error: "GRADED_DATE_FUTURE", requestId), asked by Importing.Confirm:dateFuture#2
+where
+  at is the current flow's instant
+  earlier, Sessioning.use (session, subject: owner), asked by Importing.Confirm
+  earlier, RequestBoundary.request (material, outsideHelp, path: "/courses/graded/confirm", performedOn, requestId, row, session)
+  view "(owner) imported graded work (material)" with (material, owner) has (course, originals)
+  SkillMapping._map (course) has (skills)
+  (performedAt, status: "READY") is gradedReview (at, outsideHelp, performedOn, row, skills)
+  (skill, sourceKey) is gradedKey (material, row)
+  (criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject) is gradedImport (material, originals, outsideHelp, performedAt, row, skills)
+then
+  AssessmentReviewing.importGraded (author: owner, criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject)
+```
+
+### Importing.Confirm:dateFuture#4
+
+Authored path: `Importing.Confirm`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+
+```reaction
+when AssessmentReviewing.importGraded (author: owner, criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject, case: assessment), asked by Importing.Confirm:dateFuture#3
+at the flow's settlement frontier
+where
+  earlier, RequestBoundary.respond (error: "GRADED_DATE_FUTURE", requestId), asked by Importing.Confirm:dateFuture#2
+then
+  RequestBoundary.respond (case: assessment, requestId)
+```
+
+### Importing.Confirm:dateInvalid#2
+
+Authored path: `Importing.Confirm`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Importing.Confirm
+where
+  at is the current flow's instant
+  earlier, RequestBoundary.request (material, outsideHelp, path: "/courses/graded/confirm", performedOn, requestId, row, session)
+  view "(owner) imported graded work (material)" with (material, owner) has (course)
+  SkillMapping._map (course) has (skills)
+  (status: "DATE_INVALID") is gradedReview (at, outsideHelp, performedOn, row, skills)
+then
+  RequestBoundary.respond (error: "GRADED_DATE_INVALID", requestId)
+```
+
+### Importing.Confirm:dateInvalid#3
+
+Authored path: `Importing.Confirm`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+
+```reaction
+when RequestBoundary.respond (error: "GRADED_DATE_INVALID", requestId), asked by Importing.Confirm:dateInvalid#2
+where
+  at is the current flow's instant
+  earlier, Sessioning.use (session, subject: owner), asked by Importing.Confirm
+  earlier, RequestBoundary.request (material, outsideHelp, path: "/courses/graded/confirm", performedOn, requestId, row, session)
+  view "(owner) imported graded work (material)" with (material, owner) has (course, originals)
+  SkillMapping._map (course) has (skills)
+  (performedAt, status: "READY") is gradedReview (at, outsideHelp, performedOn, row, skills)
+  (skill, sourceKey) is gradedKey (material, row)
+  (criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject) is gradedImport (material, originals, outsideHelp, performedAt, row, skills)
+then
+  AssessmentReviewing.importGraded (author: owner, criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject)
+```
+
+### Importing.Confirm:dateInvalid#4
+
+Authored path: `Importing.Confirm`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+
+```reaction
+when AssessmentReviewing.importGraded (author: owner, criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject, case: assessment), asked by Importing.Confirm:dateInvalid#3
+at the flow's settlement frontier
+where
+  earlier, RequestBoundary.respond (error: "GRADED_DATE_INVALID", requestId), asked by Importing.Confirm:dateInvalid#2
+then
+  RequestBoundary.respond (case: assessment, requestId)
+```
+
+### Importing.Confirm:helpConflict#2
+
+Authored path: `Importing.Confirm`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Importing.Confirm
+where
+  at is the current flow's instant
+  earlier, RequestBoundary.request (material, outsideHelp, path: "/courses/graded/confirm", performedOn, requestId, row, session)
+  view "(owner) imported graded work (material)" with (material, owner) has (course)
+  SkillMapping._map (course) has (skills)
+  (status: "HELP_CONFLICT") is gradedReview (at, outsideHelp, performedOn, row, skills)
+then
+  RequestBoundary.respond (error: "GRADED_HELP_CONFLICT", requestId)
+```
+
+### Importing.Confirm:helpConflict#3
+
+Authored path: `Importing.Confirm`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+
+```reaction
+when RequestBoundary.respond (error: "GRADED_HELP_CONFLICT", requestId), asked by Importing.Confirm:helpConflict#2
+where
+  at is the current flow's instant
+  earlier, Sessioning.use (session, subject: owner), asked by Importing.Confirm
+  earlier, RequestBoundary.request (material, outsideHelp, path: "/courses/graded/confirm", performedOn, requestId, row, session)
+  view "(owner) imported graded work (material)" with (material, owner) has (course, originals)
+  SkillMapping._map (course) has (skills)
+  (performedAt, status: "READY") is gradedReview (at, outsideHelp, performedOn, row, skills)
+  (skill, sourceKey) is gradedKey (material, row)
+  (criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject) is gradedImport (material, originals, outsideHelp, performedAt, row, skills)
+then
+  AssessmentReviewing.importGraded (author: owner, criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject)
+```
+
+### Importing.Confirm:helpConflict#4
+
+Authored path: `Importing.Confirm`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+
+```reaction
+when AssessmentReviewing.importGraded (author: owner, criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject, case: assessment), asked by Importing.Confirm:helpConflict#3
+at the flow's settlement frontier
+where
+  earlier, RequestBoundary.respond (error: "GRADED_HELP_CONFLICT", requestId), asked by Importing.Confirm:helpConflict#2
+then
+  RequestBoundary.respond (case: assessment, requestId)
+```
+
+### Importing.Confirm:missing#2
+
+Authored path: `Importing.Confirm`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Importing.Confirm
+where
+  earlier, RequestBoundary.request (material, outsideHelp, path: "/courses/graded/confirm", performedOn, requestId, row, session)
+  no view "(owner) imported graded work (material)" with (material, owner)
+then
+  RequestBoundary.respond (error: "GRADED_MATERIAL_UNAVAILABLE", requestId)
+```
+
+### Importing.Confirm:missing#3
+
+Authored path: `Importing.Confirm`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+
+```reaction
+when RequestBoundary.respond (error: "GRADED_MATERIAL_UNAVAILABLE", requestId), asked by Importing.Confirm:missing#2
+where
+  at is the current flow's instant
+  earlier, Sessioning.use (session, subject: owner), asked by Importing.Confirm
+  earlier, RequestBoundary.request (material, outsideHelp, path: "/courses/graded/confirm", performedOn, requestId, row, session)
+  view "(owner) imported graded work (material)" with (material, owner) has (course, originals)
+  SkillMapping._map (course) has (skills)
+  (performedAt, status: "READY") is gradedReview (at, outsideHelp, performedOn, row, skills)
+  (skill, sourceKey) is gradedKey (material, row)
+  (criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject) is gradedImport (material, originals, outsideHelp, performedAt, row, skills)
+then
+  AssessmentReviewing.importGraded (author: owner, criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject)
+```
+
+### Importing.Confirm:missing#4
+
+Authored path: `Importing.Confirm`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+
+```reaction
+when AssessmentReviewing.importGraded (author: owner, criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject, case: assessment), asked by Importing.Confirm:missing#3
+at the flow's settlement frontier
+where
+  earlier, RequestBoundary.respond (error: "GRADED_MATERIAL_UNAVAILABLE", requestId), asked by Importing.Confirm:missing#2
+then
+  RequestBoundary.respond (case: assessment, requestId)
+```
+
+### Importing.Confirm:ready#2
+
+Authored path: `Importing.Confirm`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Importing.Confirm
+where
+  at is the current flow's instant
+  earlier, RequestBoundary.request (material, outsideHelp, path: "/courses/graded/confirm", performedOn, requestId, row, session)
+  view "(owner) imported graded work (material)" with (material, owner) has (course, originals)
+  SkillMapping._map (course) has (skills)
+  (performedAt, status: "READY") is gradedReview (at, outsideHelp, performedOn, row, skills)
+  (skill, sourceKey) is gradedKey (material, row)
+  no view "(owner) already imported (sourceKey) for (skill)" with (owner, skill, sourceKey)
+then
+  Sessioning.use (session)
+```
+
+### Importing.Confirm:ready#3
+
+Authored path: `Importing.Confirm`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Importing.Confirm:ready#2
+where
+  at is the current flow's instant
+  earlier, RequestBoundary.request (material, outsideHelp, path: "/courses/graded/confirm", performedOn, requestId, row, session)
+  view "(owner) imported graded work (material)" with (material, owner) has (course, originals)
+  SkillMapping._map (course) has (skills)
+  (performedAt, status: "READY") is gradedReview (at, outsideHelp, performedOn, row, skills)
+  (skill, sourceKey) is gradedKey (material, row)
+  (criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject) is gradedImport (material, originals, outsideHelp, performedAt, row, skills)
+then
+  AssessmentReviewing.importGraded (author: owner, criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject)
+```
+
+### Importing.Confirm:ready#4
+
+Authored path: `Importing.Confirm`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+
+```reaction
+when AssessmentReviewing.importGraded (author: owner, criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject, case: assessment), asked by Importing.Confirm:ready#3
+at the flow's settlement frontier
+where
+  earlier, RequestBoundary.request (material, outsideHelp, path: "/courses/graded/confirm", performedOn, requestId, row, session)
+then
+  RequestBoundary.respond (case: assessment, requestId)
+```
+
+### Importing.Confirm:rowInvalid#2
+
+Authored path: `Importing.Confirm`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Importing.Confirm
+where
+  at is the current flow's instant
+  earlier, RequestBoundary.request (material, outsideHelp, path: "/courses/graded/confirm", performedOn, requestId, row, session)
+  view "(owner) imported graded work (material)" with (material, owner) has (course)
+  SkillMapping._map (course) has (skills)
+  (status: "ROW_INVALID") is gradedReview (at, outsideHelp, performedOn, row, skills)
+then
+  RequestBoundary.respond (error: "GRADED_ROW_INVALID", requestId)
+```
+
+### Importing.Confirm:rowInvalid#3
+
+Authored path: `Importing.Confirm`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+
+```reaction
+when RequestBoundary.respond (error: "GRADED_ROW_INVALID", requestId), asked by Importing.Confirm:rowInvalid#2
+where
+  at is the current flow's instant
+  earlier, Sessioning.use (session, subject: owner), asked by Importing.Confirm
+  earlier, RequestBoundary.request (material, outsideHelp, path: "/courses/graded/confirm", performedOn, requestId, row, session)
+  view "(owner) imported graded work (material)" with (material, owner) has (course, originals)
+  SkillMapping._map (course) has (skills)
+  (performedAt, status: "READY") is gradedReview (at, outsideHelp, performedOn, row, skills)
+  (skill, sourceKey) is gradedKey (material, row)
+  (criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject) is gradedImport (material, originals, outsideHelp, performedAt, row, skills)
+then
+  AssessmentReviewing.importGraded (author: owner, criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject)
+```
+
+### Importing.Confirm:rowInvalid#4
+
+Authored path: `Importing.Confirm`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+
+```reaction
+when AssessmentReviewing.importGraded (author: owner, criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject, case: assessment), asked by Importing.Confirm:rowInvalid#3
+at the flow's settlement frontier
+where
+  earlier, RequestBoundary.respond (error: "GRADED_ROW_INVALID", requestId), asked by Importing.Confirm:rowInvalid#2
+then
+  RequestBoundary.respond (case: assessment, requestId)
+```
+
+### Importing.Confirm:skillUnavailable#2
+
+Authored path: `Importing.Confirm`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Importing.Confirm
+where
+  at is the current flow's instant
+  earlier, RequestBoundary.request (material, outsideHelp, path: "/courses/graded/confirm", performedOn, requestId, row, session)
+  view "(owner) imported graded work (material)" with (material, owner) has (course)
+  SkillMapping._map (course) has (skills)
+  (status: "SKILL_UNAVAILABLE") is gradedReview (at, outsideHelp, performedOn, row, skills)
+then
+  RequestBoundary.respond (error: "GRADED_SKILL_UNAVAILABLE", requestId)
+```
+
+### Importing.Confirm:skillUnavailable#3
+
+Authored path: `Importing.Confirm`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+
+```reaction
+when RequestBoundary.respond (error: "GRADED_SKILL_UNAVAILABLE", requestId), asked by Importing.Confirm:skillUnavailable#2
+where
+  at is the current flow's instant
+  earlier, Sessioning.use (session, subject: owner), asked by Importing.Confirm
+  earlier, RequestBoundary.request (material, outsideHelp, path: "/courses/graded/confirm", performedOn, requestId, row, session)
+  view "(owner) imported graded work (material)" with (material, owner) has (course, originals)
+  SkillMapping._map (course) has (skills)
+  (performedAt, status: "READY") is gradedReview (at, outsideHelp, performedOn, row, skills)
+  (skill, sourceKey) is gradedKey (material, row)
+  (criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject) is gradedImport (material, originals, outsideHelp, performedAt, row, skills)
+then
+  AssessmentReviewing.importGraded (author: owner, criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject)
+```
+
+### Importing.Confirm:skillUnavailable#4
+
+Authored path: `Importing.Confirm`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+
+```reaction
+when AssessmentReviewing.importGraded (author: owner, criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject, case: assessment), asked by Importing.Confirm:skillUnavailable#3
+at the flow's settlement frontier
+where
+  earlier, RequestBoundary.respond (error: "GRADED_SKILL_UNAVAILABLE", requestId), asked by Importing.Confirm:skillUnavailable#2
+then
+  RequestBoundary.respond (case: assessment, requestId)
+```
+
+### Importing.Confirm:unmapped#2
+
+Authored path: `Importing.Confirm`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Importing.Confirm
+where
+  at is the current flow's instant
+  earlier, RequestBoundary.request (material, outsideHelp, path: "/courses/graded/confirm", performedOn, requestId, row, session)
+  view "(owner) imported graded work (material)" with (material, owner) has (course)
+  SkillMapping._map (course) has (skills)
+  (status: "UNMAPPED") is gradedReview (at, outsideHelp, performedOn, row, skills)
+then
+  RequestBoundary.respond (error: "GRADED_ROW_UNMAPPED", requestId)
+```
+
+### Importing.Confirm:unmapped#3
+
+Authored path: `Importing.Confirm`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+
+```reaction
+when RequestBoundary.respond (error: "GRADED_ROW_UNMAPPED", requestId), asked by Importing.Confirm:unmapped#2
+where
+  at is the current flow's instant
+  earlier, Sessioning.use (session, subject: owner), asked by Importing.Confirm
+  earlier, RequestBoundary.request (material, outsideHelp, path: "/courses/graded/confirm", performedOn, requestId, row, session)
+  view "(owner) imported graded work (material)" with (material, owner) has (course, originals)
+  SkillMapping._map (course) has (skills)
+  (performedAt, status: "READY") is gradedReview (at, outsideHelp, performedOn, row, skills)
+  (skill, sourceKey) is gradedKey (material, row)
+  (criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject) is gradedImport (material, originals, outsideHelp, performedAt, row, skills)
+then
+  AssessmentReviewing.importGraded (author: owner, criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject)
+```
+
+### Importing.Confirm:unmapped#4
+
+Authored path: `Importing.Confirm`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+
+```reaction
+when AssessmentReviewing.importGraded (author: owner, criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject, case: assessment), asked by Importing.Confirm:unmapped#3
+at the flow's settlement frontier
+where
+  earlier, RequestBoundary.respond (error: "GRADED_ROW_UNMAPPED", requestId), asked by Importing.Confirm:unmapped#2
+then
+  RequestBoundary.respond (case: assessment, requestId)
+```
+
+### Importing.Confirm:used#2
+
+Authored path: `Importing.Confirm`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Importing.Confirm
+where
+  at is the current flow's instant
+  earlier, RequestBoundary.request (material, outsideHelp, path: "/courses/graded/confirm", performedOn, requestId, row, session)
+  view "(owner) imported graded work (material)" with (material, owner) has (course, originals)
+  SkillMapping._map (course) has (skills)
+  (performedAt, status: "READY") is gradedReview (at, outsideHelp, performedOn, row, skills)
+  (skill, sourceKey) is gradedKey (material, row)
+  view "(owner) already imported (sourceKey) for (skill)" with (owner, skill, sourceKey)
+then
+  RequestBoundary.respond (error: "GRADED_SOURCE_USED", requestId)
+```
+
+### Importing.Confirm:used#3
+
+Authored path: `Importing.Confirm`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+
+```reaction
+when RequestBoundary.respond (error: "GRADED_SOURCE_USED", requestId), asked by Importing.Confirm:used#2
+where
+  at is the current flow's instant
+  earlier, Sessioning.use (session, subject: owner), asked by Importing.Confirm
+  earlier, RequestBoundary.request (material, outsideHelp, path: "/courses/graded/confirm", performedOn, requestId, row, session)
+  view "(owner) imported graded work (material)" with (material, owner) has (course, originals)
+  SkillMapping._map (course) has (skills)
+  (performedAt, status: "READY") is gradedReview (at, outsideHelp, performedOn, row, skills)
+  (skill, sourceKey) is gradedKey (material, row)
+  (criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject) is gradedImport (material, originals, outsideHelp, performedAt, row, skills)
+then
+  AssessmentReviewing.importGraded (author: owner, criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject)
+```
+
+### Importing.Confirm:used#4
+
+Authored path: `Importing.Confirm`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+
+```reaction
+when AssessmentReviewing.importGraded (author: owner, criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject, case: assessment), asked by Importing.Confirm:used#3
+at the flow's settlement frontier
+where
+  earlier, RequestBoundary.respond (error: "GRADED_SOURCE_USED", requestId), asked by Importing.Confirm:used#2
+then
+  RequestBoundary.respond (case: assessment, requestId)
+```
+
+### Importing.Extract
+
+Authored path: `Importing.Extract`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 25.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 91.
+
+```reaction
+when RequestBoundary.request (material, path: "/courses/graded/extract", requestId, session)
+then
+  Sessioning.use (session)
+```
+
+### Importing.Extract:missing#2
+
+Authored path: `Importing.Extract`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 25.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 91.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Importing.Extract
+where
+  earlier, RequestBoundary.request (material, path: "/courses/graded/extract", requestId, session)
+  no view "(owner) imported graded work (material)" with (material, owner)
+then
+  RequestBoundary.respond (error: "GRADED_MATERIAL_UNAVAILABLE", requestId)
+```
+
+### Importing.Extract:missing#3
+
+Authored path: `Importing.Extract`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 25.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 91.
+
+```reaction
+when RequestBoundary.respond (error: "GRADED_MATERIAL_UNAVAILABLE", requestId), asked by Importing.Extract:missing#2
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Importing.Extract
+  view "the tutor choice that applies to (owner)" with (owner) has (choice, status)
+  status is among ["SAVED", "DEFAULT"]
+  earlier, RequestBoundary.request (material, path: "/courses/graded/extract", requestId, session)
+  view "(owner) imported graded work (material)" with (material, owner) has (course)
+  SkillMapping._map (course) has (skills)
+  confirmed is hasConfirmedSkill (skills)
+  confirmed is among [true]
+  GroundedTutoring._sourceSet (owner, scope: course) has (sources)
+  materials is singleMaterial (material)
+  (selected, valid: true) is selectSources (materials, sources)
+  draft is extractRequest (selected, skills)
+  prepared is withChoice (choice, request: draft)
+then
+  TutorGenerating.generate (owner, request: prepared)
+```
+
+### Importing.Extract:missing#4
+
+Authored path: `Importing.Extract`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 25.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 91.
+
+```reaction
+when TutorGenerating.generate (owner, request: prepared, answer), asked by Importing.Extract:missing#3
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Importing.Extract
+then
+  Sessioning.use (session)
+```
+
+### Importing.Extract:missing:rows#5
+
+Authored path: `Importing.Extract`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 25.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 91.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Importing.Extract:missing#4
+where
+  earlier, RequestBoundary.respond (error: "GRADED_MATERIAL_UNAVAILABLE", requestId), asked by Importing.Extract:missing#2
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Importing.Extract:missing#3
+  found is hasGradedRows (answer)
+  found is among [true]
+  (rows) is generationFields (answer)
+then
+  RequestBoundary.respond (requestId, rows)
+```
+
+### Importing.Extract:missing:total#5
+
+Authored path: `Importing.Extract`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 25.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 91.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Importing.Extract:missing#4
+where
+  earlier, RequestBoundary.respond (error: "GRADED_MATERIAL_UNAVAILABLE", requestId), asked by Importing.Extract:missing#2
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Importing.Extract:missing#3
+  found is hasGradedRows (answer)
+  found is among [false]
+then
+  RequestBoundary.respond (error: "GRADED_MARKS_MISSING", requestId)
+```
+
+### Importing.Extract:ready#2
+
+Authored path: `Importing.Extract`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 25.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 91.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Importing.Extract
+where
+  earlier, RequestBoundary.request (material, path: "/courses/graded/extract", requestId, session)
+  view "(owner) imported graded work (material)" with (material, owner) has (course)
+  SkillMapping._map (course) has (skills)
+  confirmed is hasConfirmedSkill (skills)
+  confirmed is among [true]
+then
+  Sessioning.use (session)
+```
+
+### Importing.Extract:ready#3
+
+Authored path: `Importing.Extract`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 25.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 91.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Importing.Extract:ready#2
+where
+  view "the tutor choice that applies to (owner)" with (owner) has (choice, status)
+  status is among ["SAVED", "DEFAULT"]
+  earlier, RequestBoundary.request (material, path: "/courses/graded/extract", requestId, session)
+  view "(owner) imported graded work (material)" with (material, owner) has (course)
+  SkillMapping._map (course) has (skills)
+  confirmed is hasConfirmedSkill (skills)
+  confirmed is among [true]
+  GroundedTutoring._sourceSet (owner, scope: course) has (sources)
+  materials is singleMaterial (material)
+  (selected, valid: true) is selectSources (materials, sources)
+  draft is extractRequest (selected, skills)
+  prepared is withChoice (choice, request: draft)
+then
+  TutorGenerating.generate (owner, request: prepared)
+```
+
+### Importing.Extract:ready#4
+
+Authored path: `Importing.Extract`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 25.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 91.
+
+```reaction
+when TutorGenerating.generate (owner, request: prepared, answer), asked by Importing.Extract:ready#3
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Importing.Extract
+then
+  Sessioning.use (session)
+```
+
+### Importing.Extract:ready:rows#5
+
+Authored path: `Importing.Extract`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 25.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 91.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Importing.Extract:ready#4
+where
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Importing.Extract:ready#3
+  found is hasGradedRows (answer)
+  found is among [true]
+  (rows) is generationFields (answer)
+  earlier, RequestBoundary.request (material, path: "/courses/graded/extract", requestId, session)
+then
+  RequestBoundary.respond (requestId, rows)
+```
+
+### Importing.Extract:ready:total#5
+
+Authored path: `Importing.Extract`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 25.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 91.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Importing.Extract:ready#4
+where
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Importing.Extract:ready#3
+  found is hasGradedRows (answer)
+  found is among [false]
+  earlier, RequestBoundary.request (material, path: "/courses/graded/extract", requestId, session)
+then
+  RequestBoundary.respond (error: "GRADED_MARKS_MISSING", requestId)
+```
+
+### Importing.Extract:unmapped#2
+
+Authored path: `Importing.Extract`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 25.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 91.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Importing.Extract
+where
+  earlier, RequestBoundary.request (material, path: "/courses/graded/extract", requestId, session)
+  view "(owner) imported graded work (material)" with (material, owner) has (course)
+  SkillMapping._map (course) has (skills)
+  confirmed is hasConfirmedSkill (skills)
+  confirmed is among [false]
+then
+  RequestBoundary.respond (error: "GRADED_SKILLS_UNAVAILABLE", requestId)
+```
+
+### Importing.Extract:unmapped#3
+
+Authored path: `Importing.Extract`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 25.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 91.
+
+```reaction
+when RequestBoundary.respond (error: "GRADED_SKILLS_UNAVAILABLE", requestId), asked by Importing.Extract:unmapped#2
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Importing.Extract
+  view "the tutor choice that applies to (owner)" with (owner) has (choice, status)
+  status is among ["SAVED", "DEFAULT"]
+  earlier, RequestBoundary.request (material, path: "/courses/graded/extract", requestId, session)
+  view "(owner) imported graded work (material)" with (material, owner) has (course)
+  SkillMapping._map (course) has (skills)
+  confirmed is hasConfirmedSkill (skills)
+  confirmed is among [true]
+  GroundedTutoring._sourceSet (owner, scope: course) has (sources)
+  materials is singleMaterial (material)
+  (selected, valid: true) is selectSources (materials, sources)
+  draft is extractRequest (selected, skills)
+  prepared is withChoice (choice, request: draft)
+then
+  TutorGenerating.generate (owner, request: prepared)
+```
+
+### Importing.Extract:unmapped#4
+
+Authored path: `Importing.Extract`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 25.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 91.
+
+```reaction
+when TutorGenerating.generate (owner, request: prepared, answer), asked by Importing.Extract:unmapped#3
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Importing.Extract
+then
+  Sessioning.use (session)
+```
+
+### Importing.Extract:unmapped:rows#5
+
+Authored path: `Importing.Extract`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 25.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 91.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Importing.Extract:unmapped#4
+where
+  earlier, RequestBoundary.respond (error: "GRADED_SKILLS_UNAVAILABLE", requestId), asked by Importing.Extract:unmapped#2
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Importing.Extract:unmapped#3
+  found is hasGradedRows (answer)
+  found is among [true]
+  (rows) is generationFields (answer)
+then
+  RequestBoundary.respond (requestId, rows)
+```
+
+### Importing.Extract:unmapped:total#5
+
+Authored path: `Importing.Extract`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 25.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 91.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Importing.Extract:unmapped#4
+where
+  earlier, RequestBoundary.respond (error: "GRADED_SKILLS_UNAVAILABLE", requestId), asked by Importing.Extract:unmapped#2
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Importing.Extract:unmapped#3
+  found is hasGradedRows (answer)
+  found is among [false]
+then
+  RequestBoundary.respond (error: "GRADED_MARKS_MISSING", requestId)
+```
+
+### Importing.ReadImports
+
+Authored path: `Importing.ReadImports`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 37.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 82.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 93.
+
+```reaction
+when RequestBoundary.request (material, path: "/courses/graded/read", requestId, session)
+then
+  Sessioning.use (session)
+```
+
+### Importing.ReadImports:graded#2
+
+Authored path: `Importing.ReadImports`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 37.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 82.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 93.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Importing.ReadImports
+where
+  at is the current flow's instant
+  today is gradedToday (at)
+  earlier, RequestBoundary.request (material, path: "/courses/graded/read", requestId, session)
+  view "(owner) imported graded work (material)" with (material, owner) has (course)
+then
+  RequestBoundary.respond (imported: former "the imports from (material) for (owner) in (course)" with (course, material, owner), requestId, today)
+```
+
+### Importing.ReadImports:missing#2
+
+Authored path: `Importing.ReadImports`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 37.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 82.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 93.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Importing.ReadImports
+where
+  earlier, RequestBoundary.request (material, path: "/courses/graded/read", requestId, session)
+  no view "(owner) imported graded work (material)" with (material, owner)
+then
+  RequestBoundary.respond (error: "GRADED_MATERIAL_UNAVAILABLE", requestId)
+```
+
 ### Learning.Adjust
 
 Authored path: `Learning.Adjust`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 31.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 103.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 107.
 
 ```reaction
 when RequestBoundary.request (adjustmentKey, path: "/learning/adjust", reason, requestId, session, skill, value)
@@ -2233,7 +3221,7 @@ then
 
 Authored path: `Learning.Adjust`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 31.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 103.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 107.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Adjust
@@ -2248,7 +3236,7 @@ then
 
 Authored path: `Learning.Adjust`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 31.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 103.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 107.
 
 ```reaction
 when MasteryEstimating.adjust (adjustmentKey, definition, learner: owner, reason, subject: skill, value, adjustment), asked by Learning.Adjust:active#2
@@ -2271,7 +3259,7 @@ then
 
 Authored path: `Learning.Adjust`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 31.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 103.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 107.
 
 ```reaction
 when MasteryEstimating.adjust (adjustmentKey, definition, learner: owner, reason, subject: skill, value, adjustment), asked by Learning.Adjust:active#2
@@ -2290,7 +3278,7 @@ then
 
 Authored path: `Learning.Adjust`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 31.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 103.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 107.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Adjust
@@ -2305,7 +3293,7 @@ then
 
 Authored path: `Learning.Adjust`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 31.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 103.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 107.
 
 ```reaction
 when RequestBoundary.respond (detail: "Choose one of your confirmed skills before adjusting its estimate.", error: "SKILL_UNAVAILABLE", requestId), asked by Learning.Adjust:missing#2
@@ -2329,7 +3317,7 @@ then
 
 Authored path: `Learning.Adjust`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 31.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 103.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 107.
 
 ```reaction
 when RequestBoundary.respond (detail: "Choose one of your confirmed skills before adjusting its estimate.", error: "SKILL_UNAVAILABLE", requestId), asked by Learning.Adjust:missing#2
@@ -2349,7 +3337,7 @@ then
 
 Authored path: `Learning.Assess`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 25.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 99.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 103.
 
 ```reaction
 when RequestBoundary.request (dialogueLength, outsideHelp, path: "/learning/assess", requestId, reviewed, session, studySession, unseen)
@@ -2361,7 +3349,7 @@ then
 
 Authored path: `Learning.Assess`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 25.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 99.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 103.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Assess
@@ -2379,7 +3367,7 @@ then
 
 Authored path: `Learning.Assess`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 25.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 99.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 103.
 
 ```reaction
 when GroundedTutoring.confirmAttempt (dialogueLength, outsideHelp, owner, task: studySession, unseen), asked by Learning.Assess#2
@@ -2405,7 +3393,7 @@ then
 
 Authored path: `Learning.Assess`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 25.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 99.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 103.
 
 ```reaction
 when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Assess#3
@@ -2419,7 +3407,7 @@ then
 
 Authored path: `Learning.Assess`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 25.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 99.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 103.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Assess#4
@@ -2436,7 +3424,7 @@ then
 
 Authored path: `Learning.Assess`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 25.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 99.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 103.
 
 ```reaction
 when AssessmentReviewing.assess (case: assessment, gateMet, rationale, result), asked by Learning.Assess#5
@@ -2453,7 +3441,7 @@ then
 
 Authored path: `Learning.Confidence`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 5.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 91.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 95.
 
 ```reaction
 when RequestBoundary.request (confidence, path: "/learning/confidence", requestId, session, skill)
@@ -2465,7 +3453,7 @@ then
 
 Authored path: `Learning.Confidence`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 5.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 91.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 95.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Confidence
@@ -2481,7 +3469,7 @@ then
 
 Authored path: `Learning.Confidence`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 5.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 91.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 95.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Confidence
@@ -2496,7 +3484,7 @@ then
 
 Authored path: `Learning.Confidence`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 5.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 91.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 95.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Confidence
@@ -2512,7 +3500,7 @@ then
 
 Authored path: `Learning.Confidence`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 5.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 91.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 95.
 
 ```reaction
 when MasteryEstimating.initialize (basis: "SELF_REPORTED", confidence, definition, learner: owner, subject: skill, track), asked by Learning.Confidence:new#2
@@ -2525,8 +3513,9 @@ then
 ### Learning.Correct
 
 Authored path: `Learning.Correct`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 27.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 101.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 105.
 
 ```reaction
 when RequestBoundary.request (basedOn, case, gateMet, path: "/learning/correct", reason, requestId, result, session)
@@ -2534,30 +3523,164 @@ then
   Sessioning.use (session)
 ```
 
-### Learning.Correct#2
+### Learning.Correct:imported#2
 
 Authored path: `Learning.Correct`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 27.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 101.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 105.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Correct
 where
   earlier, RequestBoundary.request (basedOn, case, gateMet, path: "/learning/correct", reason, requestId, result, session)
+  view "(owner) owns practice or imported assessment (assessment)" with (assessment: case, owner) has (imported: true)
+  gateMet is among [false]
 then
   AssessmentReviewing.revise (author: owner, basedOn, case, gateMet, origin: "MANUAL", rationale: reason, result)
 ```
 
-### Learning.Correct#3
+### Learning.Correct:imported:importedRevised#3
 
 Authored path: `Learning.Correct`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 27.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 101.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 105.
 
 ```reaction
-when AssessmentReviewing.revise (author: owner, basedOn, case, gateMet, origin: "MANUAL", rationale: reason, result, judgment), asked by Learning.Correct#2
+when AssessmentReviewing.revise (author: owner, basedOn, case, gateMet, origin: "MANUAL", rationale: reason, result, judgment), asked by Learning.Correct:imported#2
 at the flow's settlement frontier
 where
+  AssessmentReviewing._effectiveJudgment (case) has (judgment)
+  view "(owner) owns practice or imported assessment (assessment)" with (assessment: case, owner) has (imported: true)
+  gateMet is among [false]
+  earlier, RequestBoundary.request (basedOn, case, gateMet, path: "/learning/correct", reason, requestId, result, session)
+then
+  RequestBoundary.respond (judgment, requestId)
+```
+
+### Learning.Correct:imported:practiceRevised#3
+
+Authored path: `Learning.Correct`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 27.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 105.
+
+```reaction
+when AssessmentReviewing.revise (author: owner, basedOn, case, gateMet, origin: "MANUAL", rationale: reason, result, judgment), asked by Learning.Correct:imported#2
+at the flow's settlement frontier
+where
+  AssessmentReviewing._effectiveJudgment (case) has (judgment)
+  no view "(owner) owns practice or imported assessment (assessment)" with (assessment: case, owner) has (imported: true)
+  earlier, RequestBoundary.request (basedOn, case, gateMet, path: "/learning/correct", reason, requestId, result, session)
+then
+  RequestBoundary.respond (judgment, requestId)
+```
+
+### Learning.Correct:importedGate#2
+
+Authored path: `Learning.Correct`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 27.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 105.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Correct
+where
+  earlier, RequestBoundary.request (basedOn, case, gateMet, path: "/learning/correct", reason, requestId, result, session)
+  view "(owner) owns practice or imported assessment (assessment)" with (assessment: case, owner) has (imported: true)
+  gateMet is among [true]
+then
+  RequestBoundary.respond (error: "IMPORTED_GATE_UNAVAILABLE", requestId)
+```
+
+### Learning.Correct:importedGate:importedRevised#3
+
+Authored path: `Learning.Correct`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 27.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 105.
+
+```reaction
+when RequestBoundary.respond (error: "IMPORTED_GATE_UNAVAILABLE", requestId), asked by Learning.Correct:importedGate#2
+at the flow's settlement frontier
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Learning.Correct
+  earlier, RequestBoundary.request (basedOn, case, gateMet, path: "/learning/correct", reason, requestId, result, session)
+  AssessmentReviewing._effectiveJudgment (case) has (judgment)
+  view "(owner) owns practice or imported assessment (assessment)" with (assessment: case, owner) has (imported: true)
+  gateMet is among [false]
+then
+  RequestBoundary.respond (judgment, requestId)
+```
+
+### Learning.Correct:importedGate:practiceRevised#3
+
+Authored path: `Learning.Correct`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 27.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 105.
+
+```reaction
+when RequestBoundary.respond (error: "IMPORTED_GATE_UNAVAILABLE", requestId), asked by Learning.Correct:importedGate#2
+at the flow's settlement frontier
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Learning.Correct
+  earlier, RequestBoundary.request (basedOn, case, gateMet, path: "/learning/correct", reason, requestId, result, session)
+  AssessmentReviewing._effectiveJudgment (case) has (judgment)
+  no view "(owner) owns practice or imported assessment (assessment)" with (assessment: case, owner) has (imported: true)
+then
+  RequestBoundary.respond (judgment, requestId)
+```
+
+### Learning.Correct:practice#2
+
+Authored path: `Learning.Correct`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 27.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 105.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Correct
+where
+  earlier, RequestBoundary.request (basedOn, case, gateMet, path: "/learning/correct", reason, requestId, result, session)
+  no view "(owner) owns practice or imported assessment (assessment)" with (assessment: case, owner) has (imported: true)
+then
+  AssessmentReviewing.revise (author: owner, basedOn, case, gateMet, origin: "MANUAL", rationale: reason, result)
+```
+
+### Learning.Correct:practice:importedRevised#3
+
+Authored path: `Learning.Correct`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 27.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 105.
+
+```reaction
+when AssessmentReviewing.revise (author: owner, basedOn, case, gateMet, origin: "MANUAL", rationale: reason, result, judgment), asked by Learning.Correct:practice#2
+at the flow's settlement frontier
+where
+  AssessmentReviewing._effectiveJudgment (case) has (judgment)
+  view "(owner) owns practice or imported assessment (assessment)" with (assessment: case, owner) has (imported: true)
+  gateMet is among [false]
+  earlier, RequestBoundary.request (basedOn, case, gateMet, path: "/learning/correct", reason, requestId, result, session)
+then
+  RequestBoundary.respond (judgment, requestId)
+```
+
+### Learning.Correct:practice:practiceRevised#3
+
+Authored path: `Learning.Correct`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 27.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 105.
+
+```reaction
+when AssessmentReviewing.revise (author: owner, basedOn, case, gateMet, origin: "MANUAL", rationale: reason, result, judgment), asked by Learning.Correct:practice#2
+at the flow's settlement frontier
+where
+  AssessmentReviewing._effectiveJudgment (case) has (judgment)
+  no view "(owner) owns practice or imported assessment (assessment)" with (assessment: case, owner) has (imported: true)
   earlier, RequestBoundary.request (basedOn, case, gateMet, path: "/learning/correct", reason, requestId, result, session)
 then
   RequestBoundary.respond (judgment, requestId)
@@ -2567,7 +3690,7 @@ then
 
 Authored path: `Learning.Hint`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 9.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 97.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 101.
 
 ```reaction
 when RequestBoundary.request (path: "/learning/hint", requestId, session, studySession)
@@ -2579,7 +3702,7 @@ then
 
 Authored path: `Learning.Hint`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 9.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 97.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 101.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Hint
@@ -2594,7 +3717,7 @@ then
 
 Authored path: `Learning.Hint`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 9.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 97.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 101.
 
 ```reaction
 when GroundedTutoring.requestHint (owner, task: studySession), asked by Learning.Hint#2
@@ -2616,7 +3739,7 @@ then
 
 Authored path: `Learning.Hint`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 9.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 97.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 101.
 
 ```reaction
 when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Hint#3
@@ -2630,7 +3753,7 @@ then
 
 Authored path: `Learning.Hint`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 9.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 97.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 101.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Hint#4
@@ -2646,7 +3769,7 @@ then
 
 Authored path: `Learning.Hint`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 9.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 97.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 101.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Hint#4
@@ -2663,7 +3786,7 @@ then
 
 Authored path: `Learning.Hint`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 9.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 97.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 101.
 
 ```reaction
 when GroundedTutoring.giveHint (channel: "TEXT", owner, task: studySession, text), asked by Learning.Hint:open#5
@@ -2678,7 +3801,7 @@ then
 
 Authored path: `Learning.Lesson`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 7.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 92.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 96.
 
 ```reaction
 when RequestBoundary.request (path: "/learning/lesson", request, requestId, session, skill)
@@ -2690,7 +3813,7 @@ then
 
 Authored path: `Learning.Lesson`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 7.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 92.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 96.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Lesson
@@ -2712,7 +3835,7 @@ then
 
 Authored path: `Learning.Lesson`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 7.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 92.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 96.
 
 ```reaction
 when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Lesson#2
@@ -2726,7 +3849,7 @@ then
 
 Authored path: `Learning.Lesson`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 7.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 92.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 96.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Lesson#3
@@ -2743,7 +3866,7 @@ then
 
 Authored path: `Learning.Lesson`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 7.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 92.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 96.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Lesson#3
@@ -2761,7 +3884,7 @@ then
 
 Authored path: `Learning.Lesson`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 7.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 92.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 96.
 
 ```reaction
 when GroundedTutoring.explain (citations, definition, explanation, materials, owner, request, topic: skill, lesson), asked by Learning.Lesson:current#4
@@ -2776,7 +3899,7 @@ then
 
 Authored path: `Learning.Progress`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 5.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 90.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 94.
 
 ```reaction
 when RequestBoundary.request (course, path: "/learning/progress", requestId, session)
@@ -2788,7 +3911,7 @@ then
 
 Authored path: `Learning.Progress`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 5.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 90.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 94.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Progress
@@ -2803,7 +3926,7 @@ then
 
 Authored path: `Learning.Progress`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 5.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 90.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 94.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Progress
@@ -2818,7 +3941,7 @@ then
 
 Authored path: `Learning.Question`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 9.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 95.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 99.
 
 ```reaction
 when RequestBoundary.request (attachments, channel, dialogueLength, path: "/learning/question", requestId, session, studySession, text)
@@ -2830,7 +3953,7 @@ then
 
 Authored path: `Learning.Question`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 9.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 95.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 99.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Question
@@ -2851,7 +3974,7 @@ then
 
 Authored path: `Learning.Question`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 9.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 95.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 99.
 
 ```reaction
 when GroundedTutoring.respond (channel, media, owner, session: studySession, text), asked by Learning.Question#2
@@ -2873,7 +3996,7 @@ then
 
 Authored path: `Learning.Question`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 9.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 95.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 99.
 
 ```reaction
 when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Question#3
@@ -2887,7 +4010,7 @@ then
 
 Authored path: `Learning.Question`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 9.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 95.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 99.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Question#4
@@ -2903,7 +4026,7 @@ then
 
 Authored path: `Learning.Question`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 9.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 95.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 99.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Question#4
@@ -2920,7 +4043,7 @@ then
 
 Authored path: `Learning.Question`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 9.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 95.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 99.
 
 ```reaction
 when GroundedTutoring.answerLesson (channel: "TEXT", citations, lesson: studySession, owner, text: reply), asked by Learning.Question:open#5
@@ -2934,8 +4057,9 @@ then
 ### Learning.Read
 
 Authored path: `Learning.Read`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 46.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 5.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 89.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 93.
 
 ```reaction
 when RequestBoundary.request (path: "/learning/read", requestId, session, skill)
@@ -2946,8 +4070,9 @@ then
 ### Learning.Read:missing#2
 
 Authored path: `Learning.Read`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 46.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 5.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 89.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 93.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Read
@@ -2962,8 +4087,9 @@ then
 ### Learning.Read:owned#2
 
 Authored path: `Learning.Read`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 46.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 5.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 89.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 93.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Read
@@ -2979,8 +4105,9 @@ then
 ### Learning.Regrade
 
 Authored path: `Learning.Regrade`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 27.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 102.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 82.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 106.
 
 ```reaction
 when RequestBoundary.request (basedOn, case, path: "/learning/regrade", reason, requestId, session)
@@ -2988,11 +4115,103 @@ then
   Sessioning.use (session)
 ```
 
-### Learning.Regrade#2
+### Learning.Regrade:imported#2
 
 Authored path: `Learning.Regrade`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 27.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 102.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 82.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 106.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Regrade
+where
+  earlier, RequestBoundary.request (basedOn, case, path: "/learning/regrade", reason, requestId, session)
+  view "(owner) owns practice or imported assessment (assessment)" with (assessment: case, owner) has (imported: true)
+then
+  RequestBoundary.respond (error: "REGRADE_IMPORTED_UNAVAILABLE", requestId)
+```
+
+### Learning.Regrade:imported#3
+
+Authored path: `Learning.Regrade`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 82.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 106.
+
+```reaction
+when RequestBoundary.respond (error: "REGRADE_IMPORTED_UNAVAILABLE", requestId), asked by Learning.Regrade:imported#2
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Learning.Regrade
+  view "the tutor choice that applies to (owner)" with (owner) has (choice, status)
+  status is among ["SAVED", "DEFAULT"]
+  earlier, RequestBoundary.request (basedOn, case, path: "/learning/regrade", reason, requestId, session)
+  view "(owner) owns assessment (assessment)" with (assessment: case, owner) has (course, task)
+  AssessmentReviewing._caseData (case) has (data)
+  GroundedTutoring._sessionData (session: task) has (data: sessionData)
+  GroundedTutoring._sourceSet (owner, scope: course) has (sources)
+  materials is sessionMaterials (data: sessionData)
+  (selected, valid: true) is selectSources (materials, sources)
+  draft is gradeRequest (data, selected)
+  prepared is withChoice (choice, request: draft)
+then
+  TutorGenerating.generate (owner, request: prepared)
+```
+
+### Learning.Regrade:imported#4
+
+Authored path: `Learning.Regrade`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 82.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 106.
+
+```reaction
+when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Regrade:imported#3
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Learning.Regrade
+then
+  Sessioning.use (session)
+```
+
+### Learning.Regrade:imported#5
+
+Authored path: `Learning.Regrade`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 82.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 106.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Regrade:imported#4
+where
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Regrade:imported#3
+  (gateMet, rationale, result) is generationFields (answer)
+  earlier, RequestBoundary.request (basedOn, case, path: "/learning/regrade", reason, requestId, session)
+then
+  AssessmentReviewing.revise (author: owner, basedOn, case, gateMet, origin: "AI", rationale, result)
+```
+
+### Learning.Regrade:imported#6
+
+Authored path: `Learning.Regrade`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 82.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 106.
+
+```reaction
+when AssessmentReviewing.revise (author: owner, basedOn, case, gateMet, origin: "AI", rationale, result, judgment), asked by Learning.Regrade:imported#5
+at the flow's settlement frontier
+where
+  earlier, RequestBoundary.respond (error: "REGRADE_IMPORTED_UNAVAILABLE", requestId), asked by Learning.Regrade:imported#2
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Regrade:imported#3
+then
+  RequestBoundary.respond (judgment, requestId, tutor: former "the tutor choice that (request) carried" with (request: prepared))
+```
+
+### Learning.Regrade:practice#2
+
+Authored path: `Learning.Regrade`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 82.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 106.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Regrade
@@ -3005,14 +4224,15 @@ then
   AssessmentReviewing.clarify (author: owner, case, clarification)
 ```
 
-### Learning.Regrade#3
+### Learning.Regrade:practice#3
 
 Authored path: `Learning.Regrade`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 27.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 102.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 82.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 106.
 
 ```reaction
-when AssessmentReviewing.clarify (author: owner, case, clarification), asked by Learning.Regrade#2
+when AssessmentReviewing.clarify (author: owner, case, clarification), asked by Learning.Regrade:practice#2
 where
   view "(owner) owns assessment (assessment)" with (assessment: case, owner) has (course, task)
   AssessmentReviewing._caseData (case) has (data)
@@ -3028,48 +4248,51 @@ then
   TutorGenerating.generate (owner, request: prepared)
 ```
 
-### Learning.Regrade#4
+### Learning.Regrade:practice#4
 
 Authored path: `Learning.Regrade`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 27.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 102.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 82.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 106.
 
 ```reaction
-when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Regrade#3
+when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Regrade:practice#3
 where
   earlier, Sessioning.use (session, subject: owner), asked by Learning.Regrade
 then
   Sessioning.use (session)
 ```
 
-### Learning.Regrade#5
+### Learning.Regrade:practice#5
 
 Authored path: `Learning.Regrade`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 27.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 102.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 82.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 106.
 
 ```reaction
-when Sessioning.use (session, subject: owner), asked by Learning.Regrade#4
+when Sessioning.use (session, subject: owner), asked by Learning.Regrade:practice#4
 where
-  earlier, AssessmentReviewing.clarify (author: owner, case, clarification), asked by Learning.Regrade#2
-  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Regrade#3
+  earlier, AssessmentReviewing.clarify (author: owner, case, clarification), asked by Learning.Regrade:practice#2
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Regrade:practice#3
   (gateMet, rationale, result) is generationFields (answer)
   earlier, RequestBoundary.request (basedOn, case, path: "/learning/regrade", reason, requestId, session)
 then
   AssessmentReviewing.revise (author: owner, basedOn, case, gateMet, origin: "AI", rationale, result)
 ```
 
-### Learning.Regrade#6
+### Learning.Regrade:practice#6
 
 Authored path: `Learning.Regrade`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 27.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 102.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 82.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 106.
 
 ```reaction
-when AssessmentReviewing.revise (author: owner, basedOn, case, gateMet, origin: "AI", rationale, result, judgment), asked by Learning.Regrade#5
+when AssessmentReviewing.revise (author: owner, basedOn, case, gateMet, origin: "AI", rationale, result, judgment), asked by Learning.Regrade:practice#5
 at the flow's settlement frontier
 where
-  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Regrade#3
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Regrade:practice#3
   earlier, RequestBoundary.request (basedOn, case, path: "/learning/regrade", reason, requestId, session)
 then
   RequestBoundary.respond (judgment, requestId, tutor: former "the tutor choice that (request) carried" with (request: prepared))
@@ -3095,7 +4318,7 @@ then
 
 Authored path: `Learning.Reply`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 9.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 96.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 100.
 
 ```reaction
 when RequestBoundary.request (path: "/learning/reply", requestId, session, studySession)
@@ -3107,7 +4330,7 @@ then
 
 Authored path: `Learning.Reply`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 9.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 96.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 100.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Reply
@@ -3131,7 +4354,7 @@ then
 
 Authored path: `Learning.Reply`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 9.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 96.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 100.
 
 ```reaction
 when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Reply#2
@@ -3145,7 +4368,7 @@ then
 
 Authored path: `Learning.Reply`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 9.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 96.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 100.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Reply#3
@@ -3160,7 +4383,7 @@ then
 
 Authored path: `Learning.Reply`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 9.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 96.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 100.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Reply#3
@@ -3177,7 +4400,7 @@ then
 
 Authored path: `Learning.Reply`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 9.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 96.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 100.
 
 ```reaction
 when GroundedTutoring.answerLesson (channel: "TEXT", citations, lesson: studySession, owner, text), asked by Learning.Reply:open#4
@@ -3192,7 +4415,7 @@ then
 
 Authored path: `Learning.Respond`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 9.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 94.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 98.
 
 ```reaction
 when RequestBoundary.request (attachments, channel, dialogueLength, path: "/learning/respond", requestId, session, studySession, text)
@@ -3204,7 +4427,7 @@ then
 
 Authored path: `Learning.Respond`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 9.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 94.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 98.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Respond
@@ -3224,7 +4447,7 @@ then
 
 Authored path: `Learning.Respond`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 9.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 94.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 98.
 
 ```reaction
 when GroundedTutoring.respond (channel, media, owner, session: studySession, text), asked by Learning.Respond#2
@@ -3238,7 +4461,7 @@ then
 
 Authored path: `Learning.RetryAssessment`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 25.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 100.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 104.
 
 ```reaction
 when RequestBoundary.request (path: "/learning/retry", requestId, session, studySession)
@@ -3250,7 +4473,7 @@ then
 
 Authored path: `Learning.RetryAssessment`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 25.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 100.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 104.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.RetryAssessment
@@ -3276,7 +4499,7 @@ then
 
 Authored path: `Learning.RetryAssessment`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 25.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 100.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 104.
 
 ```reaction
 when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.RetryAssessment#2
@@ -3290,7 +4513,7 @@ then
 
 Authored path: `Learning.RetryAssessment`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 25.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 100.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 104.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.RetryAssessment#3
@@ -3307,7 +4530,7 @@ then
 
 Authored path: `Learning.RetryAssessment`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 25.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 100.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 104.
 
 ```reaction
 when AssessmentReviewing.assess (case: assessment, gateMet, rationale, result), asked by Learning.RetryAssessment#4
@@ -3323,8 +4546,9 @@ then
 
 Authored path: `Learning.Suggest`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 19.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 82.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 104.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 86.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 108.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 113.
 
 ```reaction
@@ -3333,22 +4557,47 @@ then
   Sessioning.use (session)
 ```
 
-### Learning.Suggest#2
+### Learning.Suggest:graded#2
 
 Authored path: `Learning.Suggest`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 19.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 82.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 104.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 86.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 108.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 113.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Suggest
 where
+  earlier, RequestBoundary.request (material, path: "/courses/skills/suggest", requestId, session)
+  GroundedTutoring._material (material) has (owner, scope: course, title)
+  view "(owner) owns (course) with (title)" with (course, owner)
+  graded is gradedTitle (title)
+  graded is among [true]
+then
+  RequestBoundary.respond (error: "GRADED_MATERIAL_NOT_SOURCE", requestId)
+```
+
+### Learning.Suggest:graded#3
+
+Authored path: `Learning.Suggest`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 19.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 86.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 108.
+- Covered by [P2 learning journey](../design/stages/materials.md), line 113.
+
+```reaction
+when RequestBoundary.respond (error: "GRADED_MATERIAL_NOT_SOURCE", requestId), asked by Learning.Suggest:graded#2
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Learning.Suggest
   view "the tutor choice that applies to (owner)" with (owner) has (choice, status)
   status is among ["SAVED", "DEFAULT"]
   earlier, RequestBoundary.request (material, path: "/courses/skills/suggest", requestId, session)
-  GroundedTutoring._material (material) has (owner, scope: course)
+  GroundedTutoring._material (material) has (owner, scope: course, title)
   view "(owner) owns (course) with (title)" with (course, owner)
+  graded is gradedTitle (title)
+  graded is among [false]
   GroundedTutoring._sourceSet (owner, scope: course) has (sources)
   materials is singleMaterial (material)
   (selected, valid: true) is selectSources (materials, sources)
@@ -3358,34 +4607,121 @@ then
   TutorGenerating.generate (owner, request: prepared)
 ```
 
-### Learning.Suggest#3
+### Learning.Suggest:graded#4
 
 Authored path: `Learning.Suggest`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 19.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 82.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 104.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 86.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 108.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 113.
 
 ```reaction
-when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Suggest#2
+when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Suggest:graded#3
 where
   earlier, Sessioning.use (session, subject: owner), asked by Learning.Suggest
 then
   Sessioning.use (session)
 ```
 
-### Learning.Suggest#4
+### Learning.Suggest:graded#5
 
 Authored path: `Learning.Suggest`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 19.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 82.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 104.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 86.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 108.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 113.
 
 ```reaction
-when Sessioning.use (session, subject: owner), asked by Learning.Suggest#3
+when Sessioning.use (session, subject: owner), asked by Learning.Suggest:graded#4
 where
-  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Suggest#2
+  earlier, RequestBoundary.respond (error: "GRADED_MATERIAL_NOT_SOURCE", requestId), asked by Learning.Suggest:graded#2
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Suggest:graded#3
+  (suggestions) is generationFields (answer)
+then
+  RequestBoundary.respond (requestId, suggestions, tutor: former "the tutor choice that (request) carried" with (request: prepared))
+```
+
+### Learning.Suggest:source#2
+
+Authored path: `Learning.Suggest`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 19.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 86.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 108.
+- Covered by [P2 learning journey](../design/stages/materials.md), line 113.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Suggest
+where
+  earlier, RequestBoundary.request (material, path: "/courses/skills/suggest", requestId, session)
+  GroundedTutoring._material (material) has (owner, scope: course, title)
+  view "(owner) owns (course) with (title)" with (course, owner)
+  graded is gradedTitle (title)
+  graded is among [false]
+then
+  Sessioning.use (session)
+```
+
+### Learning.Suggest:source#3
+
+Authored path: `Learning.Suggest`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 19.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 86.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 108.
+- Covered by [P2 learning journey](../design/stages/materials.md), line 113.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Suggest:source#2
+where
+  view "the tutor choice that applies to (owner)" with (owner) has (choice, status)
+  status is among ["SAVED", "DEFAULT"]
+  earlier, RequestBoundary.request (material, path: "/courses/skills/suggest", requestId, session)
+  GroundedTutoring._material (material) has (owner, scope: course, title)
+  view "(owner) owns (course) with (title)" with (course, owner)
+  graded is gradedTitle (title)
+  graded is among [false]
+  GroundedTutoring._sourceSet (owner, scope: course) has (sources)
+  materials is singleMaterial (material)
+  (selected, valid: true) is selectSources (materials, sources)
+  draft is suggestRequest (selected)
+  prepared is withChoice (choice, request: draft)
+then
+  TutorGenerating.generate (owner, request: prepared)
+```
+
+### Learning.Suggest:source#4
+
+Authored path: `Learning.Suggest`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 19.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 86.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 108.
+- Covered by [P2 learning journey](../design/stages/materials.md), line 113.
+
+```reaction
+when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Suggest:source#3
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Learning.Suggest
+then
+  Sessioning.use (session)
+```
+
+### Learning.Suggest:source#5
+
+Authored path: `Learning.Suggest`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 19.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 86.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 108.
+- Covered by [P2 learning journey](../design/stages/materials.md), line 113.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Suggest:source#4
+where
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Suggest:source#3
   (suggestions) is generationFields (answer)
   earlier, RequestBoundary.request (material, path: "/courses/skills/suggest", requestId, session)
 then
@@ -3396,7 +4732,7 @@ then
 
 Authored path: `Learning.Task`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 7.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 93.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 97.
 
 ```reaction
 when RequestBoundary.request (path: "/learning/task", requestId, session, skill)
@@ -3408,7 +4744,7 @@ then
 
 Authored path: `Learning.Task`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 7.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 93.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 97.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Task
@@ -3433,7 +4769,7 @@ then
 
 Authored path: `Learning.Task`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 7.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 93.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 97.
 
 ```reaction
 when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Task#2
@@ -3447,7 +4783,7 @@ then
 
 Authored path: `Learning.Task`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 7.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 93.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 97.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Task#3
@@ -3464,7 +4800,7 @@ then
 
 Authored path: `Learning.Task`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 7.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 93.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 97.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Task#3
@@ -3482,7 +4818,7 @@ then
 
 Authored path: `Learning.Task`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 7.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 93.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 97.
 
 ```reaction
 when GroundedTutoring.prepareTask (citations, criteria, definition, fresh: true, materials, mode: "CHECK", owner, question, topic: skill, task), asked by Learning.Task:current#4
@@ -3497,7 +4833,7 @@ then
 
 Authored path: `Learning.Transcript`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 9.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 98.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 102.
 
 ```reaction
 when RequestBoundary.request (path: "/learning/transcript", requestId, session, studySession, text, turnIndex)
@@ -3509,7 +4845,7 @@ then
 
 Authored path: `Learning.Transcript`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 9.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 98.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 102.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Transcript
@@ -3524,7 +4860,7 @@ then
 
 Authored path: `Learning.Transcript`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 9.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 98.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 102.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Transcript
@@ -3539,7 +4875,7 @@ then
 
 Authored path: `Learning.Transcript`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 9.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 98.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 102.
 
 ```reaction
 when GroundedTutoring.confirmTranscript (owner, session: studySession, text, turnIndex), asked by Learning.Transcript:owned#2
@@ -4606,6 +5942,7 @@ then
 ### Progress.ImportedEvidence
 
 Authored path: `Progress.ImportedEvidence`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 3.
 - Covered by [Progress reactions](../design/compositions/Progress.md), line 7.
 
 ```reaction
@@ -4620,6 +5957,7 @@ then
 ### Progress.InitializedEvidence
 
 Authored path: `Progress.InitializedEvidence`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 76.
 - Covered by [Progress reactions](../design/compositions/Progress.md), line 9.
 
 ```reaction
@@ -4654,6 +5992,7 @@ then
 ### Progress.RepairReadEvidence
 
 Authored path: `Progress.RepairReadEvidence`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 78.
 - Covered by [Progress reactions](../design/compositions/Progress.md), line 19.
 
 ```reaction
@@ -5355,6 +6694,9 @@ not listed here have no explicit input contract.
 - `/auth/me` — requires `session`
 - `/courses` — requires `session`
 - `/courses/create` — requires `session`, `title`
+- `/courses/graded/confirm` — requires `material`, `outsideHelp`, `performedOn`, `row`, `session`
+- `/courses/graded/extract` — requires `material`, `session`
+- `/courses/graded/read` — requires `material`, `session`
 - `/courses/materials/read` — requires `material`, `session`
 - `/courses/read` — requires `course`, `session`
 - `/courses/skills/archive` — requires `session`, `skill`

@@ -16,6 +16,10 @@ export const OpenSession = view("(owner) can change session (studySession)", ({ 
 export const OwnedCase = view("(owner) owns assessment (assessment)", ({ owner, assessment }, { skill, course, definition, task }) => where(
   Assessment._case({ case: assessment }).is({ author: owner, subject: skill, definition, task }), OwnedSkill({ owner, skill }).is({ course }),
 )).optional();
+// A practice or imported case, joined to its author and course without reading a task.
+export const OwnedAnyCase = view("(owner) owns practice or imported assessment (assessment)", ({ owner, assessment }, { skill, course, definition, imported }) => where(
+  Assessment._case({ case: assessment }).is({ author: owner, subject: skill, definition, imported }), OwnedSkill({ owner, skill }).is({ course }),
+)).optional();
 export const SkillContext = view("the current context of (skill) for (owner)", ({ owner, skill }, { context, definition, skills, tracks, sources }, { course }) => where(
   OwnedSkill({ owner, skill }).is({ course, definition }), Mapping._map({ course }).is({ skills }), Mastery._progress({ learner: owner }).is({ tracks }),
   Tutoring._sourceSet({ owner, scope: course }).is({ sources }), compute(computations.selectSkill, { skills, skill }, context),
@@ -47,4 +51,4 @@ export const NeedsEvidence = view("assessment (assessment) needs evidence for (o
   Assessment._caseData({ case: assessment }).is({ data }), Mastery._progress({ learner: owner }).is({ tracks }),
   compute(computations.evidenceUpdate, { data, tracks }, { needed: true }),
 )).optional();
-export const composition = { OwnedSkill, ActiveSkill, OwnedSession, OpenSession, OwnedCase, SkillContext, SkillData, SessionData, Progress, PlanData, PlanContext, CanReplan, NeedsEvidence };
+export const composition = { OwnedSkill, ActiveSkill, OwnedSession, OpenSession, OwnedCase, OwnedAnyCase, SkillContext, SkillData, SessionData, Progress, PlanData, PlanContext, CanReplan, NeedsEvidence };
