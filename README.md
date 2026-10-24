@@ -4,15 +4,18 @@ Learn course skills, check your understanding, and come back before you forget.
 
 StillGotIt turns your course materials into a tree of skills. For each skill, an AI tutor teaches from your own sources, gives you fresh practice, and assesses your work. The app estimates how well you know each skill and plans short reviews before you are likely to forget it.
 
-The app is built from ten concepts, connected by sync-engine endpoints, views, formers, and reactions. The [implementation guide](design/README.md) links each specification to its source code and to the generated read-back, and [runtime responsibilities](design/runtime.md) explains what the server handles outside the concepts.
+You can import PDFs (scanned ones too), Word, PowerPoint, and Excel files, notebooks, text and code files, photos (PNG, JPEG, WebP, HEIC, and HEIF), and audio and video recordings. The tutor transcribes each recording once, after it is imported. One upload holds up to 12 files and 95 MB.
+
+The app is built from ten concepts, each specified in [design/concepts](design/concepts/). Preferring is used twice: TutorPreferring keeps each learner's tutor model and thinking level, and ViewPreferring keeps their Home view. For that reason, `bun run check` counts it twice and reports 11 concepts. The concepts are connected by sync-engine endpoints, views, formers, and reactions. The [implementation guide](design/README.md) links each specification to its source code and to the generated read-back, and [runtime responsibilities](design/runtime.md) explains what the server handles outside the concepts.
 
 ## P3 beta
 
 - The app: **https://stillgotit.mit-sdg.dev**
 - Narrated journey video: [Your YouTube link]
 - [P3 status](P3.md): the journey, what changed, the validation, and the plan for P4
-- [Visual design study](design/visual-design.md)
-- [Saved test run](tests/output/p3-test-run.txt)
+- [Visual design study](design/visual-design.md): the [typography](design/visual-study/typography.svg) and [color](design/visual-study/color.svg) slides, and where each choice is used in the app
+- [Design handoff](design/revamp/README.md) for the Pixel Nature look
+- [Saved test run](tests/output/p3-test-run.txt), with the name of every test in [p3-test-run.xml](tests/output/p3-test-run.xml)
 
 ## Run locally
 
@@ -43,8 +46,9 @@ Without S3 settings, uploaded files are kept in `.data/files`, which git also ig
 | `MONGODB_URI` | The app's database. The database name is part of the address. |
 | `MONGODB_TEST_URI` | The server the tests use. If it is unset, tests use the local Docker server. |
 | `PUBLIC_ORIGIN` | The address people open, such as `https://<name>.mit-sdg.dev`. The server accepts changes only from this origin. |
-| `GEMINI_API_KEY` | The key for the AI tutor. Without it, the app still runs, but the AI features are turned off and say why. |
+| `GEMINI_API_KEY` | The key for the AI tutor. Without it, the app still runs, but the AI features are turned off and say why, and recordings cannot be imported. |
 | `GEMINI_MODEL` | Optional. The default is `gemini-3.8-flash`. |
+| `GEMINI_TRANSCRIBE_MODEL` | Optional. The model that transcribes imported recordings and videos. Without it, the app uses `GEMINI_MODEL`. |
 | `COMMONS_ORIGIN` | Optional. The Commons sign-in server. The default is `https://class.mit-sdg.dev`. |
 | `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_ENDPOINT`, `S3_REGION` | Optional. Where uploaded files are stored. The first three are required if any are set. |
 
@@ -52,7 +56,7 @@ The class platform sets `HOST`, `PORT`, and `NODE_ENV` itself. [.env.example](.e
 
 ## Run the tests
 
-The tests need Docker for the local MongoDB server, which `bun run db:up` starts. Each test file creates its own database, named `stillgotit_test_<id>`, and drops it when it finishes, so the tests never touch the app's data. The tests never call Gemini; they use fake responses instead, so they need no Gemini key. Start Docker first, then run these commands from a fresh clone:
+The tests run against a local MongoDB server in Docker, so Docker must be running before you start; `bun run db:up` then starts the server. Each test file creates its own database, named `stillgotit_test_<id>`, and drops it when it finishes, so the tests never touch the app's data. The tests never call Gemini; they use fake responses instead, so no Gemini key is needed. From a fresh clone, install the exact package versions in `bun.lock`, start MongoDB, and run the checks and the tests:
 
 ```sh
 bun install --frozen-lockfile

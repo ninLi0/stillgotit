@@ -131,10 +131,10 @@ For example, ink `#151515` has v = 21 / 255 = 0.0824 in each channel, so each ch
 ## Sources
 
 - **The design handoff.** [design/revamp/README.md](revamp/README.md) records the Pixel Nature look, with the clickable prototype `StillGotIt A5 - Pixel Nature.dc.html` and the pixel-art data in `pixel-art.js`. The handoff says its type and pixel palette come from the WhaleLife app's theme files, and the Plan sea's whale is WhaleLife's.
-- **The fonts.** All four typefaces are Google Fonts families under the [SIL Open Font License 1.1](https://openfontlicense.org), which allows them to be bundled with the app and embedded in the slides. The files in `frontend/public/fonts` carry these notices:
+- **The fonts.** All four typefaces are Google Fonts families under the [SIL Open Font License 1.1](https://scripts.sil.org/OFL), which allows them to be bundled with the app and embedded in the slides. The files in `frontend/public/fonts` carry these notices:
   - Pixelify Sans: Copyright 2021 The Pixelify Sans Project Authors (https://github.com/eifetx/Pixelify-Sans).
   - Instrument Sans: Copyright 2022 The Instrument Sans Project Authors (https://github.com/Instrument/instrument-sans).
   - Spline Sans Mono: Copyright 2022 The Spline Sans Mono Project Authors (https://github.com/SorkinType/SplineSansMono).
   - Newsreader: Copyright 2020 The Newsreader Project Authors (http://github.com/productiontype/Newsreader).
 - **The slides.** Pixelify Sans and Instrument Sans are embedded in each slide. The Spline Sans Mono and Newsreader samples are drawn as outlines taken from the app's own font files. The sprites, icons, and colors come from the app's code.
-- **The starting point.** Terraria (Re-Logic) and Stardew Valley (ConcernedApe) are named as inspiration only. Nothing from either game is copied into the app or the slides.
+- **The starting point.** Terraria (Re-Logic) and Stardew Valley (ConcernedApe) are named as inspiration only. No artwork or screenshot from either game appears on the slides.
