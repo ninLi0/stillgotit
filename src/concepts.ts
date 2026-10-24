@@ -8,7 +8,7 @@ import { sessioning } from "./concepts/Sessioning/registry.ts";
 import { skillMapping } from "./concepts/SkillMapping.registry.ts";
 import { groundedTutoring } from "./concepts/GroundedTutoring/registry.ts";
 import { singleMaterial, evidenceAttribution } from "./computations.ts";
-import { sessionSubject, attemptIsReady, correctionNote, dialogueIsCurrent, evidenceUpdate, generationDefinition, generationFields, gradeRequest, hasLessonQuestion, itemSubject, lessonRequest, planDetail, planRequest, prerequisitesReady, progressRows, responseInput, reviewApproved, selectSkill, selectSkillMaterials, selectSources, sessionMaterials, sessionRequest, studyDetail, submissionInput, suggestRequest, taskRequest } from "./computations/learning.ts";
+import { carriedEstimate, prerequisiteSet, prerequisiteToPractice, sessionSubject, attemptIsReady, correctionNote, dialogueIsCurrent, evidenceUpdate, generationDefinition, generationFields, gradeRequest, hasLessonQuestion, itemSubject, lessonRequest, planDetail, planRequest, prerequisitesReady, progressRows, responseInput, reviewApproved, selectSkill, selectSkillMaterials, selectSources, sessionMaterials, sessionRequest, studyDetail, submissionInput, suggestRequest, taskRequest } from "./computations/learning.ts";
 import { generating } from "./concepts/Generating/registry.ts";
 
 export const applicationConceptSet = conceptSet({
@@ -21,5 +21,5 @@ export const applicationConceptSet = conceptSet({
   StudyPlanning: studyPlanning,
   GroundedTutoring: groundedTutoring,
   TutorGenerating: generating,
-}, { singleMaterial, evidenceAttribution, sessionSubject, attemptIsReady, correctionNote, dialogueIsCurrent, evidenceUpdate, generationDefinition, generationFields, gradeRequest, hasLessonQuestion, itemSubject, lessonRequest, planDetail, planRequest, prerequisitesReady, progressRows, responseInput, reviewApproved, selectSkill, selectSkillMaterials, selectSources, sessionMaterials, sessionRequest, studyDetail, submissionInput, suggestRequest, taskRequest });
+}, { singleMaterial, evidenceAttribution, carriedEstimate, prerequisiteSet, prerequisiteToPractice, sessionSubject, attemptIsReady, correctionNote, dialogueIsCurrent, evidenceUpdate, generationDefinition, generationFields, gradeRequest, hasLessonQuestion, itemSubject, lessonRequest, planDetail, planRequest, prerequisitesReady, progressRows, responseInput, reviewApproved, selectSkill, selectSkillMaterials, selectSources, sessionMaterials, sessionRequest, studyDetail, submissionInput, suggestRequest, taskRequest });
 export const { concepts, computations } = applicationConceptSet;

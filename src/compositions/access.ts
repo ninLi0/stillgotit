@@ -13,6 +13,14 @@ const TaskReady = former("admit practice for (owner) and (skill)", ({ owner, ski
   Mastery._track({ learner: owner, subject: skill, definition }), C.prerequisitesReady({ skills, tracks, skill }),
   compute(C.selectSkillMaterials, { context }, materials), compute(C.selectSources, { sources, materials }, { valid: true }),
 ).form({ allowed: true })).optional();
+// When TaskReady declines, this names a prerequisite that is not ready, by the rule TaskReady uses.
+// No row means every prerequisite is ready, so the general practice explanation stays.
+const PracticePrerequisite = former("the prerequisite to work on before practicing (skill) for (owner)", ({ owner, skill }, { skills, tracks, title }) => where(
+  R.ActiveSkill({ owner, skill }), R.SkillContext({ owner, skill }).is({ skills, tracks }),
+  compute(C.prerequisiteToPractice, { skills, tracks, skill }, { found: true, title }),
+).form({ title })).optional();
+/** The practice explanation that names the prerequisite PracticePrerequisite found. */
+export const prerequisiteDetail = ({ title }: { title: string }) => `Work on “${title}” first. This skill builds on it.`;
 const ResponseReady = former("admit learner work in (studySession)", ({ owner, studySession, text, channel, attachment, dialogueLength }, { course, data, sources }) => where(
   R.OpenSession({ owner, studySession }).is({ course }), Tutoring._sessionData({ session: studySession }).is({ data }),
   Tutoring._sourceSet({ owner, scope: course }).is({ sources }), C.dialogueIsCurrent({ data, dialogueLength }),
@@ -53,12 +61,13 @@ const BeginReady = former("admit starting (item) in (course)", ({ owner, course,
   R.ActiveSkill({ owner, skill }).is({ course, definition }), Mapping._map({ course }).is({ skills }), Mastery._progress({ learner: owner }).is({ tracks }),
   C.prerequisitesReady({ skills, tracks, skill }),
 ).form({ allowed: true })).optional();
-export const composition = { LessonReady, TaskReady, ResponseReady, QuestionReady, ReplyReady, HintReady, TranscriptReady, AssessmentReady, RetryReady, RegradeReady, SuggestionReady, CourseReady, PlanReady, ItemReady, BeginReady };
+export const composition = { LessonReady, TaskReady, PracticePrerequisite, ResponseReady, QuestionReady, ReplyReady, HintReady, TranscriptReady, AssessmentReady, RetryReady, RegradeReady, SuggestionReady, CourseReady, PlanReady, ItemReady, BeginReady };
 
 // Transport admission uses these same declared reads before starting a causal flow.
 export const admissions = {
   "/learning/lesson": { check: LessonReady, fields: ["skill"], detail: "Confirm the skill and attach sources from this course before requesting a lesson." },
-  "/learning/task": { check: TaskReady, fields: ["skill"], detail: "Set starting confidence and check the prerequisites before starting fresh practice." },
+  "/learning/task": { check: TaskReady, fields: ["skill"], detail: "Set starting confidence and check the prerequisites before starting fresh practice.",
+    prerequisite: { check: PracticePrerequisite, detail: prerequisiteDetail } },
   "/learning/respond": { check: ResponseReady, fields: ["studySession", "text", "channel", "attachment", "dialogueLength"], detail: "Choose an open session, check the latest dialogue, and attach only your own course work." },
   "/learning/question": { check: QuestionReady, fields: ["studySession", "text", "channel", "attachment", "dialogueLength"], detail: "Choose an open lesson and check the latest dialogue before sending a question." },
   "/learning/reply": { check: ReplyReady, fields: ["studySession"], detail: "Send a question in an open lesson before asking for a reply." },

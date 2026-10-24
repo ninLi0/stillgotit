@@ -20,3 +20,10 @@ The adapter performs no domain writes and sequences no learning actions. The eng
 [BeginReady](former:Access.BeginReady) checks the corresponding command against current owned state.
 
 [QuestionReady](former:Access.QuestionReady) requires an open lesson, current dialogue length, and valid learner content.
+
+When [TaskReady](former:Access.TaskReady) declines, [PracticePrerequisite](former:Access.PracticePrerequisite) reads the same skill context and uses [prerequisiteToPractice](computation:prerequisiteToPractice) to look for a prerequisite that is not ready. If it finds one, the explanation names it: Work on “<title>” first. This skill builds on it. Otherwise the practice explanation stays: Set starting confidence and check the prerequisites before starting fresh practice.
+
+```computations
+prerequisiteToPractice(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows, skill: SkillMapping.Skill) : PrerequisiteChoice
+  Finds the prerequisite to work on first. It starts from the skill's direct prerequisites that are not ready by the rule prerequisitesReady uses. It follows prerequisites that are also not ready until it reaches one whose own prerequisites are all ready, taking the lowest skill identity at each step, and gives that skill's title. Answers found false when every direct prerequisite is ready.
+```

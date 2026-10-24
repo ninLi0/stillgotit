@@ -37,8 +37,14 @@ export function createApplicationHttp({ application, recovery, publicOrigin, clo
     const entry = admissions[path as keyof typeof admissions];
     if (!entry) return null;
     const values = Object.fromEntries(entry.fields.map((field) => [field, field === "assessment" ? body.case : body[field]]));
-    return Object.values(values).some((value) => value === undefined) || !await application.form(entry.check({ ...values, owner }))
-      ? entry : null;
+    const missing = Object.values(values).some((value) => value === undefined);
+    if (!missing && await application.form(entry.check({ ...values, owner }))) return null;
+    // A declined practice start names the prerequisite to work on first, when one is not ready.
+    if (!missing && "prerequisite" in entry) {
+      const found = await application.form(entry.prerequisite.check({ ...values, owner })) as { title?: unknown } | null;
+      if (found && typeof found.title === "string") return { entry, detail: entry.prerequisite.detail({ title: found.title }) };
+    }
+    return { entry, detail: entry.detail };
   }
 
   // Native callers use the same declared admission checks and learner lock as HTTP.
@@ -235,8 +241,9 @@ export function createApplicationHttp({ application, recovery, publicOrigin, clo
           if (entry) {
             const body = await readBody(request.clone());
             if (!body || !learningInput(body).ok) return failure("INVALID_REQUEST", 400);
-            if (await admission(path.slice(4), body, owner)) {
-              return Response.json({ error: "INVALID_REQUEST", detail: entry.detail }, { status: 400, headers: { "Cache-Control": "no-store" } });
+            const declined = await admission(path.slice(4), body, owner);
+            if (declined) {
+              return Response.json({ error: "INVALID_REQUEST", detail: declined.detail }, { status: 400, headers: { "Cache-Control": "no-store" } });
             }
           }
           failures?.take(owner);

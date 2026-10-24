@@ -140,6 +140,14 @@ export type StillGotItWire = {
         "origin": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_materials"]>>>, ["origin"]>>;
         "title": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_materials"]>>>, ["title"]>>;
       }[];
+      "prerequisites": {
+        "prerequisite": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_prerequisites"]>>>, ["prerequisite"]>>;
+        "skill": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_prerequisites"]>[0], ["skill"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_skills"]>>>, ["skill"]>]>>;
+      }[];
+      "skillSources": {
+        "material": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_materials"]>>>, ["material"]>>;
+        "skill": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_materials"]>[0], ["skill"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_skills"]>>>, ["skill"]>]>>;
+      }[];
       "skills": {
         "current": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_version"]>[0], ["version"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_skills"]>>>, ["current"]>]>>;
         "gate": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_version"]>>>, ["gate"]>>;
@@ -150,11 +158,26 @@ export type StillGotItWire = {
         "unit": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_skills"]>[0], ["unit"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_units"]>>>, ["unit"]>]>>;
       }[];
       "units": {
+        "emphasized": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_units"]>>>, ["emphasized"]>>;
         "title": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_units"]>>>, ["title"]>>;
         "unit": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_units"]>>>, ["unit"]>>;
       }[];
+      "versions": {
+        "gate": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_versions"]>>>, ["gate"]>>;
+        "outcome": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_versions"]>>>, ["outcome"]>>;
+        "skill": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_versions"]>[0], ["skill"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_skills"]>>>, ["skill"]>]>>;
+        "version": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_versions"]>>>, ["version"]>>;
+      }[];
     };
-    error: { error: AppWideError | "COURSE_UNAVAILABLE" | "INVALID_INPUT" | "NOT_SIGNED_IN" };
+    error: { error: AppWideError | "COURSE_UNAVAILABLE" | "EVIDENCE_DATE_MISMATCH" | "EVIDENCE_REVISION_NOT_NEW" | "EVIDENCE_TRACK_MISMATCH" | "EVIDENCE_TRACK_UNAVAILABLE" | "EXAM_TRADEOFF_CONFIRMATION_REQUIRED" | "INVALID_INITIAL_CONFIDENCE" | "INVALID_INPUT" | "INVALID_MASTERY_EVIDENCE" | "INVALID_PLAN_INPUT" | "MASTERY_TRACK_EXISTS" | "NOT_SIGNED_IN" | "PLAN_PREFERENCES_UNAVAILABLE" | "PLAN_SESSION_IN_PROGRESS" | "ROUTINE_PLAN_OUTDATED" | "ROUTINE_PLAN_UNAVAILABLE" | "ROUTINE_SESSION_IN_PROGRESS" };
+  };
+  "/courses/skills/archive": {
+    input: {
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+      "skill": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["archive"]>[0], ["skill"]>>;
+    };
+    output: Record<string, never>;
+    error: { error: AppWideError | "COURSE_UNAVAILABLE" | "INVALID_INPUT" | "NOT_SIGNED_IN" | "SKILL_ARCHIVE_UNAVAILABLE" | "SKILL_STILL_REQUIRED" };
   };
   "/courses/skills/confirm": {
     input: {
@@ -163,6 +186,16 @@ export type StillGotItWire = {
     };
     output: Record<string, never>;
     error: { error: AppWideError | "COURSE_UNAVAILABLE" | "INVALID_INPUT" | "MATERIAL_UNAVAILABLE" | "NOT_SIGNED_IN" | "SKILL_CONFIRM_UNAVAILABLE" | "SKILL_SOURCE_REQUIRED" };
+  };
+  "/courses/skills/details": {
+    input: {
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+      "skill": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["editDetails"]>[0], ["skill"]>>;
+      "title": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["editDetails"]>[0], ["title"]>>;
+      "unit": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["editDetails"]>[0], ["unit"]>>;
+    };
+    output: Record<string, never>;
+    error: { error: AppWideError | "COURSE_UNAVAILABLE" | "INVALID_INPUT" | "INVALID_SKILL_TITLE" | "NOT_SIGNED_IN" | "SKILL_DETAILS_UNAVAILABLE" | "SKILL_UNIT_MISMATCH" };
   };
   "/courses/skills/edit": {
     input: {
@@ -176,6 +209,15 @@ export type StillGotItWire = {
     };
     output: Record<string, never>;
     error: { error: AppWideError | "COURSE_UNAVAILABLE" | "DRAFT_REVISION_UNAVAILABLE" | "DRAFT_UNIT_MISMATCH" | "INVALID_DRAFT_CONTENT" | "INVALID_INPUT" | "MATERIAL_UNAVAILABLE" | "NOT_SIGNED_IN" };
+  };
+  "/courses/skills/prerequisites": {
+    input: {
+      "prerequisites": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["prerequisiteSet"]["fn"]>[0], ["prerequisites"]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+      "skill": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["setPrerequisites"]>[0], ["skill"]>>;
+    };
+    output: Record<string, never>;
+    error: { error: AppWideError | "COURSE_UNAVAILABLE" | "INVALID_INPUT" | "INVALID_SKILL_PREREQUISITES" | "NOT_SIGNED_IN" | "SKILL_PREREQUISITES_UNAVAILABLE" };
   };
   "/courses/skills/propose": {
     input: {
@@ -191,6 +233,36 @@ export type StillGotItWire = {
       "skill": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["propose"]>>, ["skill"]>>;
     };
     error: { error: AppWideError | "COURSE_UNAVAILABLE" | "INVALID_INPUT" | "INVALID_SKILL_PROPOSAL" | "INVALID_SKILL_PROPOSAL_KEY" | "MATERIAL_UNAVAILABLE" | "NOT_SIGNED_IN" | "PROPOSAL_UNIT_UNAVAILABLE" | "SKILL_PROPOSAL_CONFLICT" | "SKILL_PROPOSAL_DISCARDED" };
+  };
+  "/courses/skills/restore": {
+    input: {
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+      "skill": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["restore"]>[0], ["skill"]>>;
+    };
+    output: Record<string, never>;
+    error: { error: AppWideError | "COURSE_UNAVAILABLE" | "INVALID_INPUT" | "NOT_SIGNED_IN" | "SKILL_RESTORE_PREREQUISITES" | "SKILL_RESTORE_UNAVAILABLE" };
+  };
+  "/courses/skills/revise": {
+    input: {
+      "gate": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["reviseDefinition"]>[0], ["gate"]>>;
+      "outcome": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["reviseDefinition"]>[0], ["outcome"]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+      "skill": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["reviseDefinition"]>[0], ["skill"]>>;
+    };
+    output: {
+      "previous": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["reviseDefinition"]>>, ["previous"]>>;
+      "version": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["reviseDefinition"]>>, ["version"]>>;
+    };
+    error: { error: AppWideError | "COURSE_UNAVAILABLE" | "EVIDENCE_DATE_MISMATCH" | "EVIDENCE_REVISION_NOT_NEW" | "EVIDENCE_TRACK_MISMATCH" | "EVIDENCE_TRACK_UNAVAILABLE" | "EXAM_TRADEOFF_CONFIRMATION_REQUIRED" | "INVALID_INITIAL_CONFIDENCE" | "INVALID_INPUT" | "INVALID_MASTERY_EVIDENCE" | "INVALID_PLAN_INPUT" | "INVALID_SKILL_DEFINITION" | "MASTERY_TRACK_EXISTS" | "NOT_SIGNED_IN" | "PLAN_PREFERENCES_UNAVAILABLE" | "PLAN_SESSION_IN_PROGRESS" | "ROUTINE_PLAN_OUTDATED" | "ROUTINE_PLAN_UNAVAILABLE" | "ROUTINE_SESSION_IN_PROGRESS" | "SKILL_DEFINITION_UNAVAILABLE" | "SKILL_DEFINITION_UNCHANGED" };
+  };
+  "/courses/skills/sources/add": {
+    input: {
+      "material": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["attachMaterial"]>[0], ["material"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_material"]>[0], ["material"]>]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+      "skill": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["attachMaterial"]>[0], ["skill"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_skill"]>[0], ["skill"]>]>>;
+    };
+    output: Record<string, never>;
+    error: { error: AppWideError | "COURSE_UNAVAILABLE" | "INVALID_INPUT" | "MATERIAL_UNAVAILABLE" | "NOT_SIGNED_IN" | "SKILL_MATERIAL_UNAVAILABLE" };
   };
   "/courses/skills/suggest": {
     input: {
@@ -212,6 +284,15 @@ export type StillGotItWire = {
       "unit": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["addUnit"]>>, ["unit"]>>;
     };
     error: { error: AppWideError | "INVALID_INPUT" | "INVALID_UNIT_TITLE" | "NOT_SIGNED_IN" | "UNIT_COURSE_UNAVAILABLE" };
+  };
+  "/courses/units/emphasis": {
+    input: {
+      "emphasized": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["setEmphasis"]>[0], ["emphasized"]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+      "unit": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["setEmphasis"]>[0], ["unit"]>>;
+    };
+    output: Record<string, never>;
+    error: { error: AppWideError | "COURSE_UNAVAILABLE" | "INVALID_INPUT" | "NOT_SIGNED_IN" | "UNIT_EMPHASIS_UNAVAILABLE" };
   };
   "/internal/materials/add": {
     input: {
@@ -578,6 +659,14 @@ export type StillGotItHttp = {
         "origin": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_materials"]>>>, ["origin"]>>;
         "title": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_materials"]>>>, ["title"]>>;
       }[];
+      "prerequisites": {
+        "prerequisite": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_prerequisites"]>>>, ["prerequisite"]>>;
+        "skill": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_prerequisites"]>[0], ["skill"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_skills"]>>>, ["skill"]>]>>;
+      }[];
+      "skillSources": {
+        "material": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_materials"]>>>, ["material"]>>;
+        "skill": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_materials"]>[0], ["skill"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_skills"]>>>, ["skill"]>]>>;
+      }[];
       "skills": {
         "current": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_version"]>[0], ["version"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_skills"]>>>, ["current"]>]>>;
         "gate": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_version"]>>>, ["gate"]>>;
@@ -588,15 +677,38 @@ export type StillGotItHttp = {
         "unit": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_skills"]>[0], ["unit"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_units"]>>>, ["unit"]>]>>;
       }[];
       "units": {
+        "emphasized": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_units"]>>>, ["emphasized"]>>;
         "title": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_units"]>>>, ["title"]>>;
         "unit": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_units"]>>>, ["unit"]>>;
+      }[];
+      "versions": {
+        "gate": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_versions"]>>>, ["gate"]>>;
+        "outcome": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_versions"]>>>, ["outcome"]>>;
+        "skill": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_versions"]>[0], ["skill"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_skills"]>>>, ["skill"]>]>>;
+        "version": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_versions"]>>>, ["version"]>>;
       }[];
     };
     error: { error: HttpAppWideError | "FORBIDDEN" | "INVALID_REQUEST" | "UNAUTHORIZED" };
   };
+  "/courses/skills/archive": {
+    input: {
+      "skill": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["archive"]>[0], ["skill"]>>;
+    };
+    output: Record<string, never>;
+    error: { error: HttpAppWideError | "CONFLICT" | "FORBIDDEN" | "INVALID_REQUEST" | "UNAUTHORIZED" };
+  };
   "/courses/skills/confirm": {
     input: {
       "skill": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["confirm"]>[0], ["skill"]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_materials"]>[0], ["skill"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_skill"]>[0], ["skill"]>]>]>>;
+    };
+    output: Record<string, never>;
+    error: { error: HttpAppWideError | "CONFLICT" | "FORBIDDEN" | "INVALID_REQUEST" | "UNAUTHORIZED" };
+  };
+  "/courses/skills/details": {
+    input: {
+      "skill": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["editDetails"]>[0], ["skill"]>>;
+      "title": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["editDetails"]>[0], ["title"]>>;
+      "unit": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["editDetails"]>[0], ["unit"]>>;
     };
     output: Record<string, never>;
     error: { error: HttpAppWideError | "CONFLICT" | "FORBIDDEN" | "INVALID_REQUEST" | "UNAUTHORIZED" };
@@ -613,6 +725,14 @@ export type StillGotItHttp = {
     output: Record<string, never>;
     error: { error: HttpAppWideError | "CONFLICT" | "FORBIDDEN" | "INVALID_REQUEST" | "UNAUTHORIZED" };
   };
+  "/courses/skills/prerequisites": {
+    input: {
+      "prerequisites": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["prerequisiteSet"]["fn"]>[0], ["prerequisites"]>>;
+      "skill": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["setPrerequisites"]>[0], ["skill"]>>;
+    };
+    output: Record<string, never>;
+    error: { error: HttpAppWideError | "CONFLICT" | "FORBIDDEN" | "INVALID_REQUEST" | "UNAUTHORIZED" };
+  };
   "/courses/skills/propose": {
     input: {
       "gate": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["propose"]>[0], ["gate"]>>;
@@ -625,6 +745,33 @@ export type StillGotItHttp = {
     output: {
       "skill": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["propose"]>>, ["skill"]>>;
     };
+    error: { error: HttpAppWideError | "CONFLICT" | "FORBIDDEN" | "INVALID_REQUEST" | "UNAUTHORIZED" };
+  };
+  "/courses/skills/restore": {
+    input: {
+      "skill": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["restore"]>[0], ["skill"]>>;
+    };
+    output: Record<string, never>;
+    error: { error: HttpAppWideError | "CONFLICT" | "FORBIDDEN" | "INVALID_REQUEST" | "UNAUTHORIZED" };
+  };
+  "/courses/skills/revise": {
+    input: {
+      "gate": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["reviseDefinition"]>[0], ["gate"]>>;
+      "outcome": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["reviseDefinition"]>[0], ["outcome"]>>;
+      "skill": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["reviseDefinition"]>[0], ["skill"]>>;
+    };
+    output: {
+      "previous": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["reviseDefinition"]>>, ["previous"]>>;
+      "version": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["reviseDefinition"]>>, ["version"]>>;
+    };
+    error: { error: HttpAppWideError | "CONFLICT" | "FORBIDDEN" | "INVALID_REQUEST" | "UNAUTHORIZED" };
+  };
+  "/courses/skills/sources/add": {
+    input: {
+      "material": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["attachMaterial"]>[0], ["material"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_material"]>[0], ["material"]>]>>;
+      "skill": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["attachMaterial"]>[0], ["skill"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_skill"]>[0], ["skill"]>]>>;
+    };
+    output: Record<string, never>;
     error: { error: HttpAppWideError | "CONFLICT" | "FORBIDDEN" | "INVALID_REQUEST" | "UNAUTHORIZED" };
   };
   "/courses/skills/suggest": {
@@ -644,6 +791,14 @@ export type StillGotItHttp = {
     output: {
       "unit": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["addUnit"]>>, ["unit"]>>;
     };
+    error: { error: HttpAppWideError | "FORBIDDEN" | "INVALID_REQUEST" | "UNAUTHORIZED" };
+  };
+  "/courses/units/emphasis": {
+    input: {
+      "emphasized": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["setEmphasis"]>[0], ["emphasized"]>>;
+      "unit": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["setEmphasis"]>[0], ["unit"]>>;
+    };
+    output: Record<string, never>;
     error: { error: HttpAppWideError | "FORBIDDEN" | "INVALID_REQUEST" | "UNAUTHORIZED" };
   };
   "/internal/materials/add": {

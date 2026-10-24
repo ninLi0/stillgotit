@@ -1,9 +1,9 @@
 import { endpoint, receive, respond } from "@mit-sdg/sync-engine/boundary";
-import { compute, each, former, no, view, where } from "@mit-sdg/sync-engine/language";
+import { compute, each, former, no, now, reaction, returned, view, when, where } from "@mit-sdg/sync-engine/language";
 import { concepts, computations } from "../concepts.ts";
-import { courseInput, courseListOutput, recordOutput, validators, materialInput, proposalInput, proposalSaveInput, structuredOutput } from "./reusable/inputs.ts";
+import { courseInput, courseListOutput, emphasisInput, prerequisitesInput, recordOutput, skillTextInput, validators, materialInput, proposalInput, proposalSaveInput, structuredOutput } from "./reusable/inputs.ts";
 
-const { Sessioning, SkillMapping, GroundedTutoring } = concepts;
+const { Sessioning, SkillMapping, GroundedTutoring, MasteryEstimating } = concepts;
 
 const OwnedCourse = view("(owner) owns (course) with (title)", ({ owner, course }, { title }) =>
   where(SkillMapping._course({ course }).is({ owner, title })),
@@ -45,8 +45,8 @@ const Materials = former("the source summaries for (owner) in (course)", ({ owne
     .form({ material, title, locator, origin }),
 );
 
-const Units = former("the units in (course)", ({ course }, { unit, title }) =>
-  each(SkillMapping._units({ course }).is({ unit, title })).arranged(unit).form({ unit, title }),
+const Units = former("the units in (course)", ({ course }, { unit, title, emphasized }) =>
+  each(SkillMapping._units({ course }).is({ unit, title, emphasized })).arranged(unit).form({ unit, title, emphasized }),
 );
 
 const Skills = former("the skill definitions in (course)", ({ course }, { unit, skill, title, current, status, outcome, gate }) =>
@@ -56,9 +56,36 @@ const Skills = former("the skill definitions in (course)", ({ course }, { unit, 
     .form({ unit, skill, title, current, status, outcome, gate }),
 );
 
+// Link lists cover skills in every status, like Skills, so archived skills keep their history on the page.
+// A selection has one arrangement key. Rows sort by skill and, within a skill, keep the query's order:
+// _prerequisites and _materials return rows by the linked identity.
+const Prerequisites = former("the prerequisite links in (course)", ({ course }, { unit, skill, prerequisite }) =>
+  each(SkillMapping._units({ course }).is({ unit }))
+    .where(SkillMapping._skills({ unit }).is({ skill }), SkillMapping._prerequisites({ skill }).is({ prerequisite }))
+    .arranged(skill)
+    .form({ skill, prerequisite }),
+);
+
+const SkillSources = former("the skill sources in (course)", ({ course }, { unit, skill, material }) =>
+  each(SkillMapping._units({ course }).is({ unit }))
+    .where(SkillMapping._skills({ unit }).is({ skill }), SkillMapping._materials({ skill }).is({ material }))
+    .arranged(skill)
+    .form({ skill, material }),
+);
+
+// Within a skill, rows keep the newest-first order of _versions; the first row is the current version.
+const Versions = former("the requirements versions in (course)", ({ course }, { unit, skill, version, outcome, gate }) =>
+  each(SkillMapping._units({ course }).is({ unit }))
+    .where(SkillMapping._skills({ unit }).is({ skill }), SkillMapping._versions({ skill }).is({ version, outcome, gate }))
+    .arranged(skill)
+    .form({ skill, version, outcome, gate }),
+);
+
+// The read answers at the settlement frontier, after RepairRevisedTrack has finished.
 const ReadCourse = endpoint("/courses/read", ({ session, course, owner }) =>
-  receive({ session, course }).then(Sessioning.use({ session }).responds({ subject: owner })).then(
-    where(OwnedCourse({ owner, course })).then(respond({ materials: Materials({ owner, course }), units: Units({ course }), skills: Skills({ course }) })).named("owned"),
+  receive({ session, course }).then(Sessioning.use({ session }).responds({ subject: owner })).afterFlowSettles().then(
+    where(OwnedCourse({ owner, course })).then(respond({ materials: Materials({ owner, course }), units: Units({ course }), skills: Skills({ course }),
+      prerequisites: Prerequisites({ course }), skillSources: SkillSources({ course }), versions: Versions({ course }) })).named("owned"),
     where(no(OwnedCourse({ owner, course }))).then(respond({ error: "COURSE_UNAVAILABLE" })).named("missing"),
   ), { validators: { ...validators, output: structuredOutput } },
 );
@@ -125,5 +152,86 @@ const EditDraft = endpoint("/courses/skills/edit", ({ session, skill, unit, mate
   ), { validators: { ...validators, input: proposalInput } },
 );
 
+// Confirmed-skill and unit changes. Each requires an owned record first; an unknown record and another
+// learner's record both get COURSE_UNAVAILABLE. The one SkillMapping action then enforces status and
+// prerequisite rules, and its refusal is the endpoint's answer with the action's own code.
+const EditSkillDetails = endpoint("/courses/skills/details", ({ session, skill, unit, title, owner }) =>
+  receive({ session, skill, unit, title }).then(Sessioning.use({ session }).responds({ subject: owner })).then(
+    where(OwnedSkill({ owner, skill })).then(SkillMapping.editDetails({ owner, skill, unit, title }).responds({})).then(respond({})).named("owned"),
+    where(no(OwnedSkill({ owner, skill }))).then(respond({ error: "COURSE_UNAVAILABLE" })).named("missing"),
+  ), { validators: { ...validators, input: skillTextInput } },
+);
+
+// RevisedTrack runs in this request's flow. The answer is formed when the revision returns, and the
+// transport sends it once the flow has settled, so RevisedTrack has finished by then.
+const ReviseSkill = endpoint("/courses/skills/revise", ({ session, skill, outcome, gate, owner, previous, version }) =>
+  receive({ session, skill, outcome, gate }).then(Sessioning.use({ session }).responds({ subject: owner })).then(
+    where(OwnedSkill({ owner, skill })).then(SkillMapping.reviseDefinition({ owner, skill, outcome, gate }).responds({ previous, version }))
+      .then(respond({ previous, version })).named("owned"),
+    where(no(OwnedSkill({ owner, skill }))).then(respond({ error: "COURSE_UNAVAILABLE" })).named("missing"),
+  ), { validators: { ...validators, input: skillTextInput, output: recordOutput(["previous", "version"]) } },
+);
+
+// The new version's track starts from the previous track's estimate at the flow's instant. Evidence is
+// not copied. No previous track, or an existing track for the new version, means there is nothing to do.
+const RevisedTrack = reaction(({ owner, skill, previous, version, at, confidence }) =>
+  when(SkillMapping.reviseDefinition({ owner, skill }).responds({ previous, version }))
+    .where(MasteryEstimating._track({ learner: owner, subject: skill, definition: previous }),
+      no(MasteryEstimating._track({ learner: owner, subject: skill, definition: version })), now(at),
+      MasteryEstimating._estimate({ learner: owner, subject: skill, definition: previous, at }).is({ value: confidence }))
+    .then(MasteryEstimating.initialize({ learner: owner, subject: skill, definition: version, confidence, basis: "PREVIOUS_DEFINITION" })));
+
+// Recovery for a revision whose track write failed. It runs on the course read's successful session check,
+// outside the learner's lock, and starts a missing current-version track from the most recently started
+// earlier track. An existing current-version track counts as done, so repeated reads add nothing. The
+// reaction cannot read the request's course, so it looks at every course of the signed-in learner.
+const RepairRevisedTrack = reaction(({ identity, owner, course, unit, skill, current, tracks, confidence }) =>
+  when(returned({ concept: "Sessioning", action: "use", result: identity }, { by: "Courses.ReadCourse" }))
+    .where(compute(computations.sessionSubject, { identity }, { owner }), SkillMapping._courses({ owner }).is({ course }), SkillMapping._units({ course }).is({ unit }),
+      SkillMapping._skills({ unit }).is({ skill, current, status: "CONFIRMED" }), no(MasteryEstimating._track({ learner: owner, subject: skill, definition: current })),
+      MasteryEstimating._progress({ learner: owner }).is({ tracks }), compute(computations.carriedEstimate, { tracks, skill, current }, { found: true, confidence }))
+    .then(MasteryEstimating.initialize({ learner: owner, subject: skill, definition: current, confidence, basis: "PREVIOUS_DEFINITION" })));
+
+// Like ProposeSkill, the material must belong to the learner and to the skill's course.
+const AddSkillSource = endpoint("/courses/skills/sources/add", ({ session, skill, material, owner, course }) =>
+  receive({ session, skill, material }).then(Sessioning.use({ session }).responds({ subject: owner })).then(
+    where(OwnedSkill({ owner, skill }).is({ course }), GroundedTutoring._material({ material }).is({ owner, scope: course }))
+      .then(SkillMapping.attachMaterial({ owner, skill, material }).responds({})).then(respond({})).named("owned"),
+    where(no(OwnedSkill({ owner, skill }))).then(respond({ error: "COURSE_UNAVAILABLE" })).named("missing"),
+    where(OwnedSkill({ owner, skill }).is({ course }), no(GroundedTutoring._material({ material }).is({ owner, scope: course })))
+      .then(respond({ error: "MATERIAL_UNAVAILABLE" })).named("source"),
+  ), { validators },
+);
+
+const SetSkillPrerequisites = endpoint("/courses/skills/prerequisites", ({ session, skill, prerequisites, owner, required }) =>
+  receive({ session, skill, prerequisites }).then(Sessioning.use({ session }).responds({ subject: owner })).then(
+    where(OwnedSkill({ owner, skill }), compute(computations.prerequisiteSet, { prerequisites }, required))
+      .then(SkillMapping.setPrerequisites({ owner, skill, prerequisites: required }).responds({})).then(respond({})).named("owned"),
+    where(no(OwnedSkill({ owner, skill }))).then(respond({ error: "COURSE_UNAVAILABLE" })).named("missing"),
+  ), { validators: { ...validators, input: prerequisitesInput } },
+);
+
+const ArchiveSkill = endpoint("/courses/skills/archive", ({ session, skill, owner }) =>
+  receive({ session, skill }).then(Sessioning.use({ session }).responds({ subject: owner })).then(
+    where(OwnedSkill({ owner, skill })).then(SkillMapping.archive({ owner, skill }).responds({})).then(respond({})).named("owned"),
+    where(no(OwnedSkill({ owner, skill }))).then(respond({ error: "COURSE_UNAVAILABLE" })).named("missing"),
+  ), { validators },
+);
+
+const RestoreSkill = endpoint("/courses/skills/restore", ({ session, skill, owner }) =>
+  receive({ session, skill }).then(Sessioning.use({ session }).responds({ subject: owner })).then(
+    where(OwnedSkill({ owner, skill })).then(SkillMapping.restore({ owner, skill }).responds({})).then(respond({})).named("owned"),
+    where(no(OwnedSkill({ owner, skill }))).then(respond({ error: "COURSE_UNAVAILABLE" })).named("missing"),
+  ), { validators },
+);
+
+const SetUnitEmphasis = endpoint("/courses/units/emphasis", ({ session, unit, emphasized, owner }) =>
+  receive({ session, unit, emphasized }).then(Sessioning.use({ session }).responds({ subject: owner })).then(
+    where(OwnedUnit({ owner, unit })).then(SkillMapping.setEmphasis({ owner, unit, emphasized }).responds({})).then(respond({})).named("owned"),
+    where(no(OwnedUnit({ owner, unit }))).then(respond({ error: "COURSE_UNAVAILABLE" })).named("missing"),
+  ), { validators: { ...validators, input: emphasisInput } },
+);
+
 export const composition = { OwnedCourse, OwnedUnit, OwnedSkill, CourseList, ListCourses, CreateCourse,
-  UnavailableSkillMaterial, Materials, Units, Skills, ReadCourse, ReadMaterial, AddUnit, AddMaterial, ProposeSkill, ConfirmSkill, EditDraft };
+  UnavailableSkillMaterial, Materials, Units, Skills, Prerequisites, SkillSources, Versions, ReadCourse, ReadMaterial, AddUnit, AddMaterial, ProposeSkill, ConfirmSkill, EditDraft,
+  EditSkillDetails, ReviseSkill, RevisedTrack, RepairRevisedTrack, AddSkillSource, SetSkillPrerequisites, ArchiveSkill, RestoreSkill, SetUnitEmphasis };

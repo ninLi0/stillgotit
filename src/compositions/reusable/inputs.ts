@@ -64,6 +64,33 @@ export const proposalSaveInput: EndpointValidator = (value) => {
     : { ok: false, detail: "Provide the original request key when saving a skill draft." };
 };
 
+/** Confirmed-skill text changes. Blank text reaches SkillMapping, which refuses it with its own message. */
+export const skillTextInput: EndpointValidator = (value) => {
+  if (!structuredInput(value).ok) return { ok: false };
+  return { ok: Object.entries(value as Record<string, unknown>).every(([key, field]) =>
+    (key === "session" && field === null) || (typeof field === "string" && field.length <= 16000)) };
+};
+
+/** A skill and the complete list of its prerequisite skills; an empty list clears them. */
+export const prerequisitesInput: EndpointValidator = (value) => {
+  if (!structuredInput(value).ok) return { ok: false };
+  const ok = Object.entries(value as Record<string, unknown>).every(([key, field]) =>
+    key === "session" ? field === null || typeof field === "string"
+    : key === "prerequisites" ? Array.isArray(field) && field.every((id) => typeof id === "string" && id.length <= 4096)
+    : typeof field === "string" && field.length <= 4096);
+  return ok ? { ok: true } : { ok: false, detail: "Send the skill and a list of its prerequisite skills." };
+};
+
+/** SkillMapping.setEmphasis accepts only true or false, so any other value is refused before the action runs. */
+export const emphasisInput: EndpointValidator = (value) => {
+  if (!structuredInput(value).ok) return { ok: false };
+  const ok = Object.entries(value as Record<string, unknown>).every(([key, field]) =>
+    key === "session" ? field === null || typeof field === "string"
+    : key === "emphasized" ? typeof field === "boolean"
+    : typeof field === "string" && field.length <= 4096);
+  return ok ? { ok: true } : { ok: false, detail: "Choose whether your professor emphasized this unit." };
+};
+
 export const materialInput: EndpointValidator = (value) => {
   if (!structuredInput(value).ok) return { ok: false };
   const record = value as Record<string, unknown>;

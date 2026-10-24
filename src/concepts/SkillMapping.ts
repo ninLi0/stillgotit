@@ -33,6 +33,9 @@ interface UnitDocument {
   _id: Unit;
   course: Course;
   title: string;
+  // Whether the learner marked this unit as one the professor stressed. Units
+  // saved before this field existed have none and are not emphasized.
+  emphasized?: boolean;
 }
 
 interface SkillDocument {
@@ -50,6 +53,9 @@ interface VersionDocument {
   skill: Skill;
   outcome: string;
   gate: string;
+  // A version that reviseDefinition creates names the version it replaced.
+  // Proposal and draft versions have none, so a history ends there.
+  previous?: Version;
 }
 
 interface ProposalDocument {
@@ -120,6 +126,15 @@ export class InvalidUnitTitleError extends Error {
   constructor() {
     super("Enter a unit title.");
     this.name = "InvalidUnitTitleError";
+  }
+}
+
+export class UnitEmphasisUnavailableError extends Error {
+  readonly code = "UNIT_EMPHASIS_UNAVAILABLE";
+
+  constructor() {
+    super("Choose a unit in one of your courses.");
+    this.name = "UnitEmphasisUnavailableError";
   }
 }
 
@@ -347,6 +362,7 @@ export class SkillMapping {
     _skill: "optional",
     _materials: "many",
     _prerequisites: "many",
+    _versions: "many",
     _version: "optional",
     _map: "one",
   } as const;
@@ -408,9 +424,12 @@ export class SkillMapping {
 
   async #removeUnusedVersion(skill: Skill, version: Version) {
     // A lost reply can hide an update that did apply. Keep a version in use.
-    if (!await this.skills.findOne({ _id: skill, current: version })) {
-      await this.versions.deleteOne({ _id: version, skill });
-    }
+    if (await this.skills.findOne({ _id: skill, current: version })) return;
+    // After such an update, a later revision may already have replaced this
+    // version. That revision saved its version, naming this one as previous,
+    // before it switched, so this check finds it and keeps the history whole.
+    if (await this.versions.findOne({ skill, previous: version }, { projection: { _id: 1 } })) return;
+    await this.versions.deleteOne({ _id: version, skill });
   }
 
   // Prerequisite and status checks read the whole course, then write one
@@ -492,8 +511,36 @@ export class SkillMapping {
     }
 
     const unit = randomUUID();
-    await this.units.insertOne({ _id: unit, course, title });
+    await this.units.insertOne({ _id: unit, course, title, emphasized: false });
     return { unit };
+  }
+
+  async setEmphasis({ owner, unit, emphasized }: {
+    owner: User;
+    unit: Unit;
+    emphasized: boolean;
+  }): Promise<Record<string, never>> {
+    // Units are never removed or moved, and a course never changes owner, so
+    // the ownership checked here still holds when the one write below runs.
+    const course = await this.#ownedCourse(unit, owner);
+    if (!course) {
+      throw new UnitEmphasisUnavailableError();
+    }
+    // The specification types this input as a Flag and declares no refusal
+    // for another value, so a wrong type is a caller fault that saves nothing.
+    if (typeof emphasized !== "boolean") {
+      throw new TypeError("The emphasized flag must be true or false.");
+    }
+
+    // Setting the saved value again matches the unit and changes nothing.
+    const updated = await this.units.updateOne(
+      { _id: unit, course: course._id },
+      { $set: { emphasized } },
+    );
+    if (updated.matchedCount !== 1) {
+      throw new UnitEmphasisUnavailableError();
+    }
+    return {};
   }
 
   async propose({ owner, unit, proposalKey, title, outcome, gate, materials }: {
@@ -730,10 +777,11 @@ export class SkillMapping {
         throw new SkillDefinitionUnchangedError();
       }
 
-      // Save the version first. The switch applies only from the version read
-      // above, so the result always names the version it replaced.
+      // Save the version, with the version it replaces, first. The switch
+      // applies only from the version read above, so both the saved link and
+      // the result always name the version this revision actually replaced.
       const version = randomUUID();
-      await this.versions.insertOne({ _id: version, skill, outcome, gate });
+      await this.versions.insertOne({ _id: version, skill, outcome, gate, previous });
       const updated = await this.#updateWithVersion(
         skill,
         version,
@@ -919,10 +967,12 @@ export class SkillMapping {
   }
 
   async _units({ course }: { course: Course }): Promise<
-    { unit: Unit; title: string }[]
+    { unit: Unit; title: string; emphasized: boolean }[]
   > {
     const rows = await this.units.find({ course }).sort({ _id: 1 }).toArray();
-    return rows.map(({ _id, title }) => ({ unit: _id, title }));
+    return rows.map(({ _id, title, emphasized }) => ({
+      unit: _id, title, emphasized: emphasized === true,
+    }));
   }
 
   async _unit({ unit }: { unit: Unit }): Promise<
@@ -958,6 +1008,34 @@ export class SkillMapping {
   async _prerequisites({ skill }: { skill: Skill }): Promise<{ prerequisite: Skill }[]> {
     const row = await this.skills.findOne({ _id: skill });
     return row ? row.prerequisites.sort().map((prerequisite) => ({ prerequisite })) : [];
+  }
+
+  async _versions({ skill }: { skill: Skill }): Promise<
+    { version: Version; outcome: string; gate: string }[]
+  > {
+    // A link can go missing between the two reads below only when another
+    // request changed the skill, as when a draft is discarded. Read again then.
+    for (let tries = 0; tries < WRITE_ATTEMPTS; tries++) {
+      const record = await this.skills.findOne({ _id: skill }, { projection: { current: 1 } });
+      // Discarding removes the skill first, so its leftover versions are not history.
+      if (!record) return [];
+      // A version is saved before a skill or a later version names it, and
+      // versions never change, so this read after the skill read holds the
+      // whole chain from the current version back.
+      const saved = new Map((await this.versions.find({ skill }).toArray()).map((row) => [row._id, row]));
+      const rows: { version: Version; outcome: string; gate: string }[] = [];
+      const seen = new Set<Version>();
+      let next: Version | undefined = record.current;
+      while (next !== undefined) {
+        const row = saved.get(next);
+        if (!row || seen.has(next)) break;
+        seen.add(next);
+        rows.push({ version: row._id, outcome: row.outcome, gate: row.gate });
+        next = row.previous;
+      }
+      if (next === undefined) return rows;
+    }
+    throw new Error("The skill's requirements history is incomplete.");
   }
 
   async _version({ version }: { version: Version }): Promise<

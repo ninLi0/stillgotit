@@ -122,7 +122,7 @@ describe("SkillMapping course storage", () => {
     expect(exitCode).toBe(0);
     expect(JSON.parse(stdout)).toEqual({
       course: [{ owner, title }],
-      units: [{ unit, title: unitTitle }],
+      units: [{ unit, title: unitTitle, emphasized: false }],
     });
   });
 });
@@ -137,7 +137,7 @@ describe("SkillMapping units", () => {
 
     expect(unit).toBeString();
     expect(await skills._unit({ unit })).toEqual([{ course, title }]);
-    expect(await skills._units({ course })).toEqual([{ unit, title }]);
+    expect(await skills._units({ course })).toEqual([{ unit, title, emphasized: false }]);
     expect(await skills._course({ course })).toEqual(before);
   });
 
@@ -198,7 +198,7 @@ describe("SkillMapping units", () => {
     const expected = [];
     for (const title of ["Matrix multiplication", "Linear maps", "Matrix multiplication"]) {
       const { unit } = await skills.addUnit({ owner, course, title });
-      expected.push({ unit, title });
+      expected.push({ unit, title, emphasized: false });
     }
     const other = await skills.addUnit({
       owner,
@@ -214,10 +214,10 @@ describe("SkillMapping units", () => {
 
     expect(await skills._units({ course })).toEqual(expected);
     expect(await skills._units({ course: otherCourse.course })).toEqual([
-      { unit: other.unit, title: "Motion" },
+      { unit: other.unit, title: "Motion", emphasized: false },
     ]);
     expect(await skills._units({ course: otherLearnerCourse.course })).toEqual([
-      { unit: otherLearnerUnit.unit, title: "Energy" },
+      { unit: otherLearnerUnit.unit, title: "Energy", emphasized: false },
     ]);
   });
 
