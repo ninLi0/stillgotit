@@ -45,14 +45,13 @@ const ACTIONS = {
   "/courses/skills/prerequisites": "setPrerequisites", "/courses/skills/archive": "archive", "/courses/skills/restore": "restore",
 } as const;
 
-async function setup({ clock }: { clock?: () => Date } = {}) {
+async function setup({ clock, tutor = {
+  // Course editing never asks the tutor; a call would mean a flow reached generation by mistake.
+  suggest: async () => { throw new Error("The course editing tests do not request suggestions."); },
+  generate: async () => { throw new Error("The course editing tests do not generate tutoring."); },
+} }: { clock?: () => Date; tutor?: Pick<CourseTutor, "generate" | "suggest"> } = {}) {
   const connection = await connectMongo({ uri: process.env.MONGODB_TEST_URI ?? localMongoUri, database: `stillgotit_test_${crypto.randomUUID().replaceAll("-", "")}` });
   const provider = new MemoryProvider(), runtimes: Awaited<ReturnType<typeof createRuntime>>[] = [], owners: string[] = [];
-  // Course editing never asks the tutor; a call would mean a flow reached generation by mistake.
-  const tutor: Pick<CourseTutor, "generate" | "suggest"> = {
-    suggest: async () => { throw new Error("The course editing tests do not request suggestions."); },
-    generate: async () => { throw new Error("The course editing tests do not generate tutoring."); },
-  };
   const open = async () => {
     const runtime = await createRuntime({ database: connection.db, provider, providerOrigin: "https://commons.example", publicOrigin: ORIGIN, tutor, ...(clock ? { clock } : {}) });
     runtimes.push(runtime); return runtime;
@@ -135,12 +134,12 @@ async function snapshot(app: App, learner: Learner, course: string) {
 
 /**
  * Checks that an owned request is refused with the action's own refusal: the native gateway answers with the
- * action's code, and SkillMapping states that code with the design's sentence. Over HTTP the body carries only
- * the public error the host maps the code to; neither the code nor the sentence reaches the browser.
+ * action's code, and SkillMapping states that code with the design's sentence. Over HTTP the body carries the
+ * public error the host maps the code to, with the same sentence as `detail`; the code does not reach the browser.
  */
 async function expectActionRefusal(app: App, learner: Learner, path: keyof typeof ACTIONS, input: Record<string, unknown>, code: string) {
-  expect(await learner.invoke(path, input), path).toEqual({ ok: false, error: { kind: "domain", value: code } });
-  expect(await learner.post(path, input), path).toEqual({ status: HTTP[code]!.status, body: { error: HTTP[code]!.error } });
+  expect(await learner.invoke(path, input), path).toEqual({ ok: false, error: { kind: "domain", value: code, detail: SENTENCES[code] } });
+  expect(await learner.post(path, input), path).toEqual({ status: HTTP[code]!.status, body: { error: HTTP[code]!.error, detail: SENTENCES[code] } });
   // The same input sent to the action itself is refused with that code and the design's sentence, changing nothing.
   const direct = (app.concepts.SkillMapping[ACTIONS[path]] as (input: Record<string, unknown>) => Promise<unknown>);
   const actionInput = path === "/courses/skills/prerequisites" ? { ...input, prerequisites: [...new Set(input.prerequisites as string[])] } : input;
@@ -617,4 +616,68 @@ test("practice admission names the prerequisite to work on first, and keeps its 
   expect(await form(Access.PracticePrerequisite({ owner, skill: unstarted }))).toBeNull();
   expect(await learner.post("/learning/task", { skill: unstarted })).toMatchObject({ status: 400,
     body: { error: "INVALID_REQUEST", detail: "Set starting confidence and check the prerequisites before starting fresh practice." } });
+}, 60_000);
+
+test("the seven course changes wait for the learner's lock, over HTTP and through the native gateway", async () => {
+  // A suggestion holds the learner's lock while the tutor works. This tutor works until the test lets it answer.
+  let arrived = Promise.withResolvers<void>(), answer = Promise.withResolvers<void>();
+  const app = await setup({ tutor: {
+    suggest: async () => { arrived.resolve(); await answer.promise; return { unitTitle: "Products", skills: [] }; },
+    generate: async () => { throw new Error("The lock test does not generate tutoring."); },
+  } });
+  const { learner, course, source, unit, skills: [a, b, c, d, e] } = await app.course("lock", ["A", "B", "C", "D", "E"]);
+  const second = await app.material(learner, course, "Second notes");
+  await learner.ok("/courses/skills/archive", { skill: d });
+
+  /** Sends every change while the lock is held, checks that none ran, then lets the suggestion finish first. */
+  async function whileLocked(send: (path: string, input: Record<string, unknown>) => Promise<unknown>, changes: [string, Record<string, unknown>][]) {
+    const before = await snapshot(app, learner, course), done: string[] = [];
+    arrived = Promise.withResolvers(); answer = Promise.withResolvers();
+    const suggesting = learner.post("/courses/skills/suggest", { material: source }).then((result) => { done.push("/courses/skills/suggest"); return result; });
+    await arrived.promise;
+    const answers = changes.map(([path, input]) => send(path, input).then((result) => { done.push(path); return result; }));
+    // The suggestion always gets its answer, so a failed check here cannot leave the lock held during cleanup.
+    try {
+      await Bun.sleep(300);
+      expect(done).toEqual([]);
+      expect(await snapshot(app, learner, course)).toEqual(before);
+    } finally { answer.resolve(); }
+    expect(await suggesting).toMatchObject({ status: 200 });
+    const results = await Promise.all(answers);
+    expect(done[0]).toBe("/courses/skills/suggest");
+    expect(done.slice(1).sort()).toEqual(changes.map(([path]) => path).sort());
+    return results;
+  }
+
+  const overHttp = await whileLocked(learner.post, [
+    ["/courses/skills/details", { skill: a, unit, title: "Renamed over HTTP" }],
+    ["/courses/skills/revise", { skill: b, outcome: "Outcome over HTTP", gate: "Gate over HTTP" }],
+    ["/courses/skills/sources/add", { skill: c, material: second }],
+    ["/courses/skills/prerequisites", { skill: b, prerequisites: [a] }],
+    ["/courses/skills/archive", { skill: e }],
+    ["/courses/skills/restore", { skill: d }],
+    ["/courses/units/emphasis", { unit, emphasized: true }],
+  ]);
+  for (const result of overHttp) expect(result).toMatchObject({ status: 200 });
+  let read = await learner.ok("/courses/read", { course });
+  const row = (skill: string) => read.skills.find((r: { skill: string }) => r.skill === skill);
+  expect([row(a).title, row(b).outcome, row(d).status, row(e).status]).toEqual(["Renamed over HTTP", "Outcome over HTTP", "CONFIRMED", "ARCHIVED"]);
+  expect(read.skillSources).toContainEqual({ skill: c, material: second });
+  expect(read.prerequisites).toEqual([{ skill: b, prerequisite: a }]);
+  expect(read.units.find((r: { unit: string }) => r.unit === unit).emphasized).toBe(true);
+
+  const natively = await whileLocked(learner.invoke, [
+    ["/courses/skills/details", { skill: a, unit, title: "Renamed natively" }],
+    ["/courses/skills/revise", { skill: b, outcome: "Outcome natively", gate: "Gate natively" }],
+    ["/courses/skills/sources/add", { skill: c, material: second }],
+    ["/courses/skills/prerequisites", { skill: b, prerequisites: [] }],
+    ["/courses/skills/archive", { skill: d }],
+    ["/courses/skills/restore", { skill: e }],
+    ["/courses/units/emphasis", { unit, emphasized: false }],
+  ]);
+  for (const result of natively) expect(result).toMatchObject({ ok: true });
+  read = await learner.ok("/courses/read", { course });
+  expect([row(a).title, row(b).outcome, row(d).status, row(e).status]).toEqual(["Renamed natively", "Outcome natively", "ARCHIVED", "CONFIRMED"]);
+  expect(read.prerequisites).toEqual([]);
+  expect(read.units.find((r: { unit: string }) => r.unit === unit).emphasized).toBe(false);
 }, 60_000);

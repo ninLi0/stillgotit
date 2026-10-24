@@ -7,6 +7,7 @@ import { executionLimits } from "../src/assembly.ts";
 import { MemoryProvider } from "../src/concepts/Federating/provider.ts";
 import type { User } from "../src/concepts/Registering/Registering.ts";
 import { StudyPlanning } from "../src/concepts/StudyPlanning/StudyPlanning.ts";
+import * as concept from "../src/concepts/StudyPlanning/refusals.ts";
 import type { CourseTutor } from "../src/host/tutor.ts";
 import { createRuntime } from "../src/host/runtime.ts";
 import { connectMongo, localMongoUri } from "../src/storage/mongo.ts";
@@ -100,7 +101,10 @@ async function setup() {
 }
 
 const refusedBy = (value: string) => ({ ok: false, error: { kind: "domain", value } }) as const;
-const invalidRequest = { status: 400, body: { error: "INVALID_REQUEST" } };
+// Over HTTP a refusal is its category with its sentence as `detail`: the planning concept's message, or the composition's own sentence.
+const refused = (detail: string) => ({ status: 400, body: { error: "INVALID_REQUEST", detail } });
+const message = (Refusal: new () => Error) => new Refusal().message;
+const SKILLS_REFUSAL = "Choose confirmed skills from this course, each once.", PROPOSAL_REFUSAL = "Choose one of your proposed plans.";
 const examWorkIn = (items: { candidate: Candidate }[], exam: string) => items.filter(({ candidate }) => candidate.examRefs.includes(exam));
 
 test("setting an exam needs a budget, today or later, and confirmed course skills; the same date replaces its skills; removal proposes again", async () => {
@@ -110,19 +114,19 @@ test("setting an exam needs a budget, today or later, and confirmed course skill
   const { skill: draft } = await maya.ok("/courses/skills/propose", { proposalKey: crypto.randomUUID(), unit, material, title: "Draft", outcome: "o", gate: "g" });
 
   // Before a budget exists, the planning concept refuses the exam.
-  expect(await maya.post("/planning/exams/set", { course, date: day(10), covered: [a] })).toEqual(invalidRequest);
+  expect(await maya.post("/planning/exams/set", { course, date: day(10), covered: [a] })).toEqual(refused(message(concept.ExamPreferencesUnavailable)));
   expect(await maya.direct("/planning/exams/set", { course, date: day(10), covered: [a] })).toEqual(refusedBy("EXAM_PREFERENCES_UNAVAILABLE"));
   await maya.ok("/planning/configure", { course, dailyMinutes: 60 });
   const routine = await maya.read(course);
 
   // A past date and an empty skill list reach the planning concept's own refusal.
   for (const input of [{ date: day(-1), covered: [a] }, { date: day(10), covered: [] }]) {
-    expect(await maya.post("/planning/exams/set", { course, ...input })).toEqual(invalidRequest);
+    expect(await maya.post("/planning/exams/set", { course, ...input })).toEqual(refused(message(concept.InvalidExamDetails)));
     expect(await maya.direct("/planning/exams/set", { course, ...input })).toEqual(refusedBy("INVALID_EXAM_DETAILS"));
   }
   // A repeated skill, a draft, or a skill from another course is refused before the concept is called.
   for (const covered of [[a, a], [a, draft], [other.skills[0]], ["missing"]]) {
-    expect(await maya.post("/planning/exams/set", { course, date: day(10), covered })).toEqual(invalidRequest);
+    expect(await maya.post("/planning/exams/set", { course, date: day(10), covered })).toEqual(refused(SKILLS_REFUSAL));
     expect(await maya.direct("/planning/exams/set", { course, date: day(10), covered })).toEqual(refusedBy("EXAM_SKILLS_UNAVAILABLE"));
   }
   expect((await maya.read(course)).exams).toEqual([]);
@@ -155,7 +159,7 @@ test("setting an exam needs a budget, today or later, and confirmed course skill
   expect(read.data.plan!.horizonEnd).toBe(day(6));
   expect(read.data.plan!.items.every(({ candidate }) => candidate.examRefs.length === 0)).toBe(true);
   expect(await maya.ok("/planning/exams/remove", { course, date: day(10) })).toEqual({ exam, refreshed: true });
-  expect(await maya.post("/planning/exams/remove", { course, date: day(11) })).toEqual(invalidRequest);
+  expect(await maya.post("/planning/exams/remove", { course, date: day(11) })).toEqual(refused(message(concept.ExamRemoveUnavailable)));
   expect(await maya.direct("/planning/exams/remove", { course, date: day(11) })).toEqual(refusedBy("EXAM_REMOVE_UNAVAILABLE"));
   // Setting the date again restores the same exam.
   expect(await maya.ok("/planning/exams/set", { course, date: day(10), covered: [c] })).toEqual({ exam, refreshed: true });
@@ -199,7 +203,7 @@ test("new exam cuts wait for confirmation in order; approved cuts later refresh 
 
   // Only a plan of this learner and course can be confirmed here.
   for (const plan of ["missing", otherCoursePlan]) {
-    expect(await lee.post("/planning/tradeoffs/confirm", { course, plan })).toEqual(invalidRequest);
+    expect(await lee.post("/planning/tradeoffs/confirm", { course, plan })).toEqual(refused(PROPOSAL_REFUSAL));
     expect(await lee.direct("/planning/tradeoffs/confirm", { course, plan })).toEqual(refusedBy("PROPOSAL_UNAVAILABLE"));
     expect(await lee.direct("/planning/tradeoffs/decline", { course, plan })).toEqual(refusedBy("PROPOSAL_UNAVAILABLE"));
   }
@@ -207,7 +211,7 @@ test("new exam cuts wait for confirmation in order; approved cuts later refresh 
   read = await lee.read(course);
   expect(read.data.plan).toMatchObject({ plan: pending, status: "ACTIVE", examUrgent: true });
   expect([read.proposal, read.proposalItems, read.cuts]).toEqual([[], [], []]);
-  expect(await lee.post("/planning/tradeoffs/confirm", { course, plan: pending })).toEqual(invalidRequest);
+  expect(await lee.post("/planning/tradeoffs/confirm", { course, plan: pending })).toEqual(refused(message(concept.TradeoffPlanUnavailable)));
   expect(await lee.direct("/planning/tradeoffs/confirm", { course, plan: pending })).toEqual(refusedBy("TRADEOFF_PLAN_UNAVAILABLE"));
 
   // The approved cuts no longer need confirmation: a routine refresh activates by itself.
@@ -228,7 +232,7 @@ test("new exam cuts wait for confirmation in order; approved cuts later refresh 
   expect(read.data.plan!.plan).toBe(refreshed);
   expect([read.proposal, read.proposalItems, read.cuts]).toEqual([[], [], []]);
   expect((await app.runtime.application.concepts.StudyPlanning._plan({ plan: declined }))[0]!.status).toBe("DECLINED");
-  expect(await lee.post("/planning/tradeoffs/decline", { course, plan: declined })).toEqual(invalidRequest);
+  expect(await lee.post("/planning/tradeoffs/decline", { course, plan: declined })).toEqual(refused(message(concept.PlanDeclineUnavailable)));
   expect(await lee.direct("/planning/tradeoffs/decline", { course, plan: declined })).toEqual(refusedBy("PLAN_DECLINE_UNAVAILABLE"));
 }, 60_000);
 
@@ -243,7 +247,7 @@ test("confirming waits for the current activity and current inputs; declining is
   await ana.ok("/planning/begin", { course, item: routine.data.next!.item });
   let read = await ana.read(course);
   expect(read.proposal[0]).toMatchObject({ plan: pending, sessionInProgress: true, locallyCurrent: true, contextCurrent: true });
-  expect(await ana.post("/planning/tradeoffs/confirm", { course, plan: pending })).toEqual(invalidRequest);
+  expect(await ana.post("/planning/tradeoffs/confirm", { course, plan: pending })).toEqual(refused(message(concept.TradeoffSessionInProgress)));
   expect(await ana.direct("/planning/tradeoffs/confirm", { course, plan: pending })).toEqual(refusedBy("TRADEOFF_SESSION_IN_PROGRESS"));
   expect(await ana.ok("/planning/tradeoffs/decline", { course, plan: pending })).toEqual({ plan: pending });
   read = await ana.read(course);
@@ -259,7 +263,7 @@ test("confirming waits for the current activity and current inputs; declining is
   // An exam saved without a refresh changes the local inputs, so the waiting proposal is out of date.
   await app.planning.setExam({ learner: ana.user, scope: course, date: day(5), covered: [skills[0]!] });
   expect((await ana.read(course)).proposal[0]).toMatchObject({ plan: waiting, locallyCurrent: false, sessionInProgress: false });
-  expect(await ana.post("/planning/tradeoffs/confirm", { course, plan: waiting })).toEqual(invalidRequest);
+  expect(await ana.post("/planning/tradeoffs/confirm", { course, plan: waiting })).toEqual(refused(message(concept.TradeoffPlanOutdated)));
   expect(await ana.direct("/planning/tradeoffs/confirm", { course, plan: waiting })).toEqual(refusedBy("TRADEOFF_PLAN_OUTDATED"));
 }, 60_000);
 
@@ -286,7 +290,7 @@ test("another learner's course is refused at admission with the sentence and by 
       ["/planning/propose", {}], ["/planning/begin", { item }], ["/planning/finish", { item, actualMinutes: 5 }], ["/planning/stop", { item, actualMinutes: 5 }],
       ["/planning/miss", { item }], ["/planning/tradeoffs/confirm", { plan: "missing" }]];
     for (const [path, input] of endpoints) expect(await outsider.direct(path, { course: target, ...input }), path).toEqual(refusedBy("COURSE_UNAVAILABLE"));
-    expect(await outsider.post("/planning/read", { course: target })).toEqual({ status: 403, body: { error: "FORBIDDEN" } });
+    expect(await outsider.post("/planning/read", { course: target })).toEqual({ status: 403, body: { error: "FORBIDDEN", detail: OWN_COURSE } });
   }
   // Nothing of the owner's changed, and the owner's own requests still work.
   const after = await owner.read(course);

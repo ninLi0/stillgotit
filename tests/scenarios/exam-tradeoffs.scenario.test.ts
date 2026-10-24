@@ -29,12 +29,14 @@ const EXAM_DAY = day(3);
 const PREPARATION_FIRST = `Preparation for the exam on ${EXAM_DAY} comes first.`;
 const WAITING = "Your plan will update when you finish or stop your current activity.";
 const OWN_COURSE = "Choose one of your own courses.";
-// The composition's own refusal for covered skills (Planning.md, SetExam).
+// The composition's own refusals for covered skills (Planning.md, SetExam) and for a plan of another course or learner.
 const SKILLS_REFUSAL = "Choose confirmed skills from this course, each once.";
+const PROPOSAL_REFUSAL = "Choose one of your proposed plans.";
 // What the screen shows for a bare refusal it cannot explain (frontend/src/api.ts). No refusal may end up showing this.
 const GENERIC = "Check the field and try again.";
 const CUT_REASON = "This activity does not fit before the exam within its dates and the available budget.";
-const invalidRequest = { status: 400, body: { error: "INVALID_REQUEST" } };
+// Over HTTP a refusal is its category with its sentence as `detail`: the planning concept's message or the composition's own.
+const refused = (detail: string) => ({ status: 400, body: { error: "INVALID_REQUEST", detail } });
 const signedOut = { status: 401, body: { error: "UNAUTHORIZED" } };
 const refusedBy = (value: string) => ({ ok: false, error: { kind: "domain", value } }) as const;
 
@@ -210,7 +212,7 @@ describe("Exam dates and confirmed tradeoffs: one learner's journey through HTTP
     const attempts: [string, ExamInput][] = [["a date before today", { date: day(-1), covered: [vectors] }], ["no covered skill", { date: day(4), covered: [] }]];
     for (const [refusal, input] of attempts) {
       const answer = await owner.post("/planning/exams/set", { course, ...input });
-      expect(answer, refusal).toEqual(invalidRequest);
+      expect(answer, refusal).toEqual(refused(new concept.InvalidExamDetails().message));
       expect(await owner.direct("/planning/exams/set", { course, ...input }), refusal).toEqual(refusedBy("INVALID_EXAM_DETAILS"));
       // The page checks the same rule before it sends, so normally the request is never made.
       expect(examProblem(input, before.data, skills), refusal).toBe(new concept.InvalidExamDetails().message);
@@ -229,7 +231,7 @@ describe("Exam dates and confirmed tradeoffs: one learner's journey through HTTP
       ["an unconfirmed skill on a new date", { date: day(4), covered: [draft] }]];
     for (const [refusal, input] of attempts) {
       const answer = await owner.post("/planning/exams/set", { course, ...input });
-      expect(answer, refusal).toEqual(invalidRequest);
+      expect(answer, refusal).toEqual(refused(SKILLS_REFUSAL));
       expect(await owner.direct("/planning/exams/set", { course, ...input }), refusal).toEqual(refusedBy("EXAM_SKILLS_UNAVAILABLE"));
       expect(examProblem(input, before.data, skills), refusal).toBe(SKILLS_REFUSAL);
       await hear(refusal, answer, SKILLS_REFUSAL, examExplanation(owner, course, input));
@@ -298,7 +300,7 @@ describe("Exam dates and confirmed tradeoffs: one learner's journey through HTTP
     }
     // Another learner can neither read the owner's course nor change anything in it.
     const reading = await outsider.post("/planning/read", { course });
-    expect(reading).toEqual({ status: 403, body: { error: "FORBIDDEN" } });
+    expect(reading).toEqual({ status: 403, body: { error: "FORBIDDEN", detail: OWN_COURSE } });
     await hear("another learner reads the course", reading, OWN_COURSE, async () => "");
     for (const [path, input] of attempts) {
       const answer = await outsider.post(path, { course, ...input });
@@ -308,7 +310,7 @@ describe("Exam dates and confirmed tradeoffs: one learner's journey through HTTP
     // Naming their own course does not reach the owner's proposal either.
     for (const [path, confirming] of [["/planning/tradeoffs/confirm", true], ["/planning/tradeoffs/decline", false]] as const) {
       const answer = await outsider.post(path, { course: own.course, plan: firstProposal });
-      expect(answer, path).toEqual(invalidRequest);
+      expect(answer, path).toEqual(refused(PROPOSAL_REFUSAL));
       expect(await outsider.direct(path, { course: own.course, plan: firstProposal }), path).toEqual(refusedBy("PROPOSAL_UNAVAILABLE"));
       await hear(`another learner's own course with the owner's plan at ${path}`, answer, new concept.TradeoffPlanUnavailable().message,
         tradeoffExplanation(outsider, own.course, firstProposal, confirming));
@@ -333,7 +335,7 @@ describe("Exam dates and confirmed tradeoffs: one learner's journey through HTTP
     expect(read.proposal[0]).toMatchObject({ plan: firstProposal, sessionInProgress: true, locallyCurrent: true, contextCurrent: true });
 
     const answer = await owner.post("/planning/tradeoffs/confirm", { course, plan: firstProposal });
-    expect(answer).toEqual(invalidRequest);
+    expect(answer).toEqual(refused(new concept.TradeoffSessionInProgress().message));
     expect(await owner.direct("/planning/tradeoffs/confirm", { course, plan: firstProposal })).toEqual(refusedBy("TRADEOFF_SESSION_IN_PROGRESS"));
     await hear("confirming during an activity", answer, new concept.TradeoffSessionInProgress().message, tradeoffExplanation(owner, course, firstProposal, true));
     read = await owner.read(course);
@@ -389,7 +391,7 @@ describe("Exam dates and confirmed tradeoffs: one learner's journey through HTTP
     let read = await owner.read(course);
     expect(read.proposal[0]).toMatchObject({ plan: stale, locallyCurrent: true, contextCurrent: false, sessionInProgress: false });
     const answer = await owner.post("/planning/tradeoffs/confirm", { course, plan: stale });
-    expect(answer).toEqual(invalidRequest);
+    expect(answer).toEqual(refused(new concept.TradeoffPlanOutdated().message));
     expect(await owner.direct("/planning/tradeoffs/confirm", { course, plan: stale })).toEqual(refusedBy("TRADEOFF_PLAN_OUTDATED"));
     await hear("confirming an out-of-date proposal", answer, new concept.TradeoffPlanOutdated().message, tradeoffExplanation(owner, course, stale, true));
     read = await owner.read(course);
@@ -467,7 +469,7 @@ describe("Exam dates and confirmed tradeoffs: one learner's journey through HTTP
     // The dependent proposal was replaced and can no longer be confirmed.
     expect(await statusOf(dependent)).toBe("SUPERSEDED");
     const answer = await owner.post("/planning/tradeoffs/confirm", { course, plan: dependent });
-    expect(answer).toEqual(invalidRequest);
+    expect(answer).toEqual(refused(new concept.TradeoffPlanUnavailable().message));
     expect(await owner.direct("/planning/tradeoffs/confirm", { course, plan: dependent })).toEqual(refusedBy("TRADEOFF_PLAN_UNAVAILABLE"));
     await hear("confirming a proposal replaced after the exam was removed", answer, new concept.TradeoffPlanUnavailable().message, tradeoffExplanation(owner, course, dependent, true));
     // The new proposal needed no cuts, so it activated: every skill is back to a routine review over seven days.
@@ -510,7 +512,7 @@ describe("Exam dates and confirmed tradeoffs: one learner's journey through HTTP
     const decline = { course, plan: retriedProposal };
     expect(await owner.post("/planning/tradeoffs/decline", decline)).toEqual({ status: 200, body: { plan: retriedProposal } });
     let answer = await owner.post("/planning/tradeoffs/decline", decline);
-    expect(answer).toEqual(invalidRequest);
+    expect(answer).toEqual(refused(new concept.PlanDeclineUnavailable().message));
     expect(await owner.direct("/planning/tradeoffs/decline", decline)).toEqual(refusedBy("PLAN_DECLINE_UNAVAILABLE"));
     await hear("declining again after a lost reply", answer, new concept.PlanDeclineUnavailable().message, tradeoffExplanation(owner, course, retriedProposal, false));
     let read = await owner.read(course);
@@ -524,7 +526,7 @@ describe("Exam dates and confirmed tradeoffs: one learner's journey through HTTP
     const confirm = { course, plan: again };
     expect(await owner.post("/planning/tradeoffs/confirm", confirm)).toEqual({ status: 200, body: { plan: again } });
     answer = await owner.post("/planning/tradeoffs/confirm", confirm);
-    expect(answer).toEqual(invalidRequest);
+    expect(answer).toEqual(refused(new concept.TradeoffPlanUnavailable().message));
     expect(await owner.direct("/planning/tradeoffs/confirm", confirm)).toEqual(refusedBy("TRADEOFF_PLAN_UNAVAILABLE"));
     await hear("confirming again after a lost reply", answer, new concept.TradeoffPlanUnavailable().message, tradeoffExplanation(owner, course, again, true));
     read = await owner.read(course);
@@ -546,7 +548,7 @@ describe("Exam dates and confirmed tradeoffs: one learner's journey through HTTP
       .toEqual([expect.objectContaining({ exam, active: false })]);
   }, 60_000);
 
-  test("Refusals reach the learner as the specific reason, not 'Check the field and try again' (the page supplies the reason a bare HTTP refusal leaves out)", async () => {
+  test("Refusals reach the learner as the specific reason, not 'Check the field and try again' (the server sends each refusal's sentence as its detail)", async () => {
     await journey();
     expect(heard.map(({ refusal }) => refusal)).toEqual([
       "a date before today", "no covered skill", "an unconfirmed skill on the exam's date", "an unconfirmed skill on a new date",
@@ -560,9 +562,8 @@ describe("Exam dates and confirmed tradeoffs: one learner's journey through HTTP
       expect(sentence, refusal).toBe(expected);
       expect(sentence, refusal).not.toBe(GENERIC);
     }
-    // Only admission sends its sentence over HTTP. Every other refusal arrives as a bare INVALID_REQUEST, so the sentence the
-    // learner reads comes from the page's own checks and a fresh read, not from the server.
-    const withDetail = heard.filter(({ answer }) => typeof answer.body.detail === "string").map(({ refusal }) => refusal);
-    expect(withDetail).toEqual(heard.filter(({ refusal }) => refusal.startsWith("another learner calls")).map(({ refusal }) => refusal));
+    // Every refusal arrives with its sentence: admission's own, the concept's message, or the composition's. The page shows
+    // the server's sentence, so it needs no fresh read to explain a refusal.
+    for (const { refusal, answer, expected } of heard) expect(answer.body.detail, refusal).toBe(expected);
   }, 60_000);
 });

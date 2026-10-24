@@ -2,6 +2,7 @@ import { afterAll, expect, test } from "bun:test";
 import { createRuntime } from "../src/host/runtime.ts";
 import { MemoryProvider } from "../src/concepts/Federating/provider.ts";
 import { AssessmentReviewing } from "../src/concepts/AssessmentReviewing/AssessmentReviewing.ts";
+import * as mastery from "../src/concepts/MasteryEstimating/refusals.ts";
 import { connectMongo, localMongoUri } from "../src/storage/mongo.ts";
 import type { CourseTutor } from "../src/host/tutor.ts";
 import { rm } from "node:fs/promises";
@@ -13,6 +14,8 @@ afterAll(async () => { for (const cleanup of cleanups.reverse()) await cleanup()
 const UNAVAILABLE_SKILL = "Choose one of your confirmed skills before adjusting its estimate.";
 const RESPOND_DECLINED = "Choose an open session, check the latest dialogue, and attach only your own work from this course, each file once.";
 const QUESTION_DECLINED = "Choose an open lesson, check the latest dialogue, and attach only your own work from this course, each file once.";
+// A concept refusal reaches HTTP and the native gateway with the concept's message as `detail`.
+const message = (Refusal: new () => Error) => new Refusal().message;
 const decay = (value: number, days: number) => value * 2 ** (-days / 60);
 const studyDate = (at: Date) => at.toLocaleDateString("en-CA", { timeZone: "America/New_York" });
 
@@ -110,15 +113,18 @@ test("Adjust saves one adjustment that Read shows with its reason and the new es
   expect(await adjustments(app, track)).toHaveLength(1);
 
   // The same key with a different value or reason is a conflict, and nothing changes.
-  expect(await learner.post("/learning/adjust", { ...input, value: 71 })).toMatchObject({ status: 409, body: { error: "CONFLICT" } });
-  expect(await native.gateway("/learning/adjust", { ...input, reason: "A different reason" })).toMatchObject({ ok: false, error: { kind: "domain", value: "ADJUSTMENT_KEY_CONFLICT" } });
-  // Admission checks only the skill, so the concept decides the key, value, and reason.
-  expect(await learner.post("/learning/adjust", { ...input, adjustmentKey: "  " })).toMatchObject({ status: 400, body: { error: "INVALID_REQUEST" } });
-  expect(await native.gateway("/learning/adjust", { ...input, adjustmentKey: "" })).toMatchObject({ ok: false, error: { kind: "domain", value: "INVALID_ADJUSTMENT_KEY" } });
+  const conflict = message(mastery.AdjustmentKeyConflict);
+  expect(await learner.post("/learning/adjust", { ...input, value: 71 })).toEqual({ status: 409, body: { error: "CONFLICT", detail: conflict } });
+  expect(await native.gateway("/learning/adjust", { ...input, reason: "A different reason" })).toEqual({ ok: false, error: { kind: "domain", value: "ADJUSTMENT_KEY_CONFLICT", detail: conflict } });
+  // Admission checks only the skill, so the concept decides the key, value, and reason, and its message reaches the learner.
+  const blankKey = message(mastery.InvalidAdjustmentKey), invalidAdjustment = message(mastery.InvalidMasteryAdjustment);
+  expect(await learner.post("/learning/adjust", { ...input, adjustmentKey: "  " })).toEqual({ status: 400, body: { error: "INVALID_REQUEST", detail: blankKey } });
+  expect(await native.gateway("/learning/adjust", { ...input, adjustmentKey: "" })).toEqual({ ok: false, error: { kind: "domain", value: "INVALID_ADJUSTMENT_KEY", detail: blankKey } });
   for (const invalid of [{ value: 140 }, { value: -5 }, { reason: "   " }]) {
     const attempt = { ...input, adjustmentKey: crypto.randomUUID(), ...invalid };
-    expect(await learner.post("/learning/adjust", attempt)).toMatchObject({ status: 400, body: { error: "INVALID_REQUEST" } });
-    expect(await native.gateway("/learning/adjust", { ...attempt, adjustmentKey: crypto.randomUUID() })).toMatchObject({ ok: false, error: { kind: "domain", value: "INVALID_MASTERY_ADJUSTMENT" } });
+    expect(await learner.post("/learning/adjust", attempt)).toEqual({ status: 400, body: { error: "INVALID_REQUEST", detail: invalidAdjustment } });
+    expect(await native.gateway("/learning/adjust", { ...attempt, adjustmentKey: crypto.randomUUID() }))
+      .toEqual({ ok: false, error: { kind: "domain", value: "INVALID_MASTERY_ADJUSTMENT", detail: invalidAdjustment } });
   }
   // Request validation still refuses a value that is not a number.
   expect(await learner.post("/learning/adjust", { ...input, adjustmentKey: crypto.randomUUID(), value: "70" })).toMatchObject({ status: 400 });
@@ -149,8 +155,10 @@ test("Adjust declines an unknown, another learner's, or a draft skill alike, and
   // A confirmed skill without a starting estimate passes admission; the concept refuses it.
   const { skill: unstarted } = await learner.ok("/courses/skills/propose", { proposalKey: crypto.randomUUID(), unit, material, title: "Transposes", outcome: "Transpose matrices", gate: "Two transposes" });
   await learner.ok("/courses/skills/confirm", { skill: unstarted });
-  expect(await learner.post("/learning/adjust", { ...input, skill: unstarted })).toEqual({ status: 400, body: { error: "INVALID_REQUEST" } });
-  expect(await owner.gateway("/learning/adjust", { ...input, adjustmentKey: crypto.randomUUID(), skill: unstarted })).toMatchObject({ ok: false, error: { kind: "domain", value: "ADJUSTMENT_TRACK_UNAVAILABLE" } });
+  const unstartedTrack = message(mastery.AdjustmentTrackUnavailable);
+  expect(await learner.post("/learning/adjust", { ...input, skill: unstarted })).toEqual({ status: 400, body: { error: "INVALID_REQUEST", detail: unstartedTrack } });
+  expect(await owner.gateway("/learning/adjust", { ...input, adjustmentKey: crypto.randomUUID(), skill: unstarted }))
+    .toEqual({ ok: false, error: { kind: "domain", value: "ADJUSTMENT_TRACK_UNAVAILABLE", detail: unstartedTrack } });
   expect(await app.concepts.MasteryEstimating._tracks({ learner: user, subject: unstarted } as never)).toEqual([]);
 }, 60_000);
 

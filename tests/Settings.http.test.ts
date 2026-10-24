@@ -14,6 +14,8 @@ afterAll(async () => { for (const cleanup of cleanups.reverse()) await cleanup()
 const UNKNOWN_MODEL = "That model isn't offered. Choose one of the models in the Tutor panel.";
 const UNSUPPORTED_LEVEL = "That model doesn't offer this thinking level. Choose one of the levels shown for it.";
 const NO_LONGER_OFFERED = "The tutor model or thinking level you chose is no longer offered. Choose another one in the Tutor panel.";
+// Sessioning's sentence for NOT_SIGNED_IN, which reaches the browser as the refusal's `detail`.
+const SIGNED_OUT = "Your session has ended. Sign in again.";
 const DEFAULT = defaultChoice({});
 const LITE_HIGH: TutorChoice = { model: "gemini-3.5-flash-lite", level: "HIGH" };
 const PRO_LOW: TutorChoice = { model: "gemini-3.1-pro-preview", level: "LOW" };
@@ -119,14 +121,14 @@ test("the settings endpoints read, choose, and clear the signed-in learner's cho
   // Choosing the default model at its default level saves it as the learner's own choice.
   expect(await laptop.ok("/settings/tutor/choose", { ...DEFAULT })).toEqual(settings(DEFAULT, "SAVED"));
 
-  // Without a session every settings endpoint is refused, and the native gateway reports the refusal codes.
+  // Without a session every settings endpoint is refused, and the native gateway reports the refusal codes with their sentences.
   for (const path of ["/settings/tutor", "/settings/tutor/choose", "/settings/tutor/clear"]) {
-    expect(await laptop.post(path, path.endsWith("choose") ? PRO_LOW : {}, false), path).toEqual({ status: 401, body: { error: "UNAUTHORIZED" } });
+    expect(await laptop.post(path, path.endsWith("choose") ? PRO_LOW : {}, false), path).toEqual({ status: 401, body: { error: "UNAUTHORIZED", detail: SIGNED_OUT } });
   }
   expect(await app.runtime.gateway.invoke("/settings/tutor/choose", { session: laptop.session, model: "gemini-9.9-nonexistent", level: "LOW" }))
-    .toEqual({ ok: false, error: { kind: "domain", value: "UNKNOWN_TUTOR_MODEL" } });
+    .toEqual({ ok: false, error: { kind: "domain", value: "UNKNOWN_TUTOR_MODEL", detail: UNKNOWN_MODEL } });
   expect(await app.runtime.gateway.invoke("/settings/tutor/choose", { session: laptop.session, model: "gemini-3.8-flash", level: "MINIMAL" }))
-    .toEqual({ ok: false, error: { kind: "domain", value: "UNSUPPORTED_THINKING_LEVEL" } });
+    .toEqual({ ok: false, error: { kind: "domain", value: "UNSUPPORTED_THINKING_LEVEL", detail: UNSUPPORTED_LEVEL } });
   expect(await app.runtime.gateway.invoke("/settings/tutor", { session: laptop.session })).toEqual({ ok: true, value: settings(DEFAULT, "SAVED") });
 }, 30_000);
 
