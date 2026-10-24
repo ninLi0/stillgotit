@@ -1,6 +1,6 @@
 $ sync-engine check && sync-engine artifacts check && tsc --noEmit && bun run check:frontend
-Concept action/query source check passed for 9 concepts.
-Application diagnostic check passed with 40 advisories (use --show-advisories to list them).
+Concept action/query source check passed for 11 concepts.
+Application diagnostic check passed with 68 advisories (use --show-advisories to list them).
 $ vue-tsc --noEmit -p frontend/tsconfig.json
 $ vite build --config frontend/vite.config.ts
 vite v8.3.4 building client environment for production...
@@ -8,50 +8,68 @@ transforming...
 [plugin rolldown:vite-resolve] Module "node:util" has been externalized for browser compatibility, imported by "/Users/ericni/6.1040/projects/stillgotit/node_modules/@mit-sdg/sync-engine/dist/engine/utils/runtime.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
 [plugin rolldown:vite-resolve] Module "node:crypto" has been externalized for browser compatibility, imported by "/Users/ericni/6.1040/projects/stillgotit/node_modules/@mit-sdg/sync-engine/dist/engine/utils/runtime.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
 [plugin rolldown:vite-resolve] Module "node:crypto" has been externalized for browser compatibility, imported by "/Users/ericni/6.1040/projects/stillgotit/node_modules/@mit-sdg/sync-engine/dist/engine/reactions/concepts/concept-spec.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
-✓ 215 modules transformed.
+[plugin rolldown:vite-resolve] Module "node:timers" has been externalized for browser compatibility, imported by "/Users/ericni/6.1040/projects/stillgotit/node_modules/@mit-sdg/sync-engine/dist/engine/reactions/runtime/batching.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+✓ 316 modules transformed.
 rendering chunks...
 computing gzip size...
-frontend/dist/index.html                                                   0.49 kB │ gzip:  0.29 kB
-frontend/dist/assets/nunito-sans-vietnamese-400-normal-V2dSmW1H.woff2      5.28 kB
-frontend/dist/assets/nunito-sans-vietnamese-700-normal-CZwaiz_e.woff2      5.28 kB
-frontend/dist/assets/nunito-sans-vietnamese-600-normal-DD7cNabE.woff2      5.35 kB
-frontend/dist/assets/nunito-sans-cyrillic-700-normal-BJ2iHHyS.woff2        7.12 kB
-frontend/dist/assets/nunito-sans-cyrillic-400-normal-DUb-KqT8.woff2        7.18 kB
-frontend/dist/assets/nunito-sans-cyrillic-600-normal-D4TuIAT6.woff2        7.18 kB
-frontend/dist/assets/nunito-sans-vietnamese-700-normal-BwTSkH1V.woff       7.34 kB
-frontend/dist/assets/nunito-sans-vietnamese-400-normal-D5dwM7ZL.woff       7.37 kB
-frontend/dist/assets/nunito-sans-vietnamese-600-normal-BW3IEr32.woff       7.41 kB
-frontend/dist/assets/nunito-sans-cyrillic-ext-700-normal-GO46tfsI.woff2    8.89 kB
-frontend/dist/assets/nunito-sans-cyrillic-ext-400-normal-El6lRT8b.woff2    8.90 kB
-frontend/dist/assets/nunito-sans-cyrillic-ext-600-normal-CVjnjZn6.woff2    8.96 kB
-frontend/dist/assets/nunito-sans-cyrillic-700-normal-DG2UZxR9.woff         8.98 kB
-frontend/dist/assets/nunito-sans-cyrillic-400-normal-DDHmqnIJ.woff         9.04 kB
-frontend/dist/assets/nunito-sans-cyrillic-600-normal-CKMyzy87.woff         9.04 kB
-frontend/dist/assets/nunito-sans-cyrillic-ext-700-normal-Cqve7k0J.woff    11.38 kB
-frontend/dist/assets/nunito-sans-cyrillic-ext-400-normal-fk07B0hk.woff    11.42 kB
-frontend/dist/assets/nunito-sans-cyrillic-ext-600-normal-DZXkk6dX.woff    11.48 kB
-frontend/dist/assets/nunito-sans-latin-ext-400-normal-BoHsJHPR.woff2      13.70 kB
-frontend/dist/assets/nunito-sans-latin-ext-700-normal-DBq_Pukt.woff2      13.72 kB
-frontend/dist/assets/nunito-sans-latin-ext-600-normal-nHO2odcJ.woff2      13.76 kB
-frontend/dist/assets/nunito-sans-latin-700-normal-CICRJDmU.woff2          13.83 kB
-frontend/dist/assets/nunito-sans-latin-400-normal-AkRraKH2.woff2          13.89 kB
-frontend/dist/assets/nunito-sans-latin-600-normal-BtVRvDNj.woff2          14.00 kB
-frontend/dist/assets/nunito-sans-latin-700-normal-CLVG92B9.woff           17.40 kB
-frontend/dist/assets/nunito-sans-latin-400-normal-DY9yCUyQ.woff           17.51 kB
-frontend/dist/assets/nunito-sans-latin-600-normal-DLks-Kj1.woff           17.64 kB
-frontend/dist/assets/nunito-sans-latin-ext-700-normal-jHN8vCOt.woff       18.48 kB
-frontend/dist/assets/nunito-sans-latin-ext-400-normal-CHwj-NZB.woff       18.54 kB
-frontend/dist/assets/nunito-sans-latin-ext-600-normal-DEh-VjuY.woff       18.58 kB
-frontend/dist/assets/index-CvOf09Dr.css                                   46.71 kB │ gzip:  9.18 kB
-frontend/dist/assets/index-DuBkxf9B.js                                   145.37 kB │ gzip: 51.72 kB
+frontend/dist/index.html                              0.49 kB │ gzip:   0.29 kB
+frontend/dist/assets/pdf.worker.min-Dkey6ZUl.mjs  1,321.30 kB
+frontend/dist/assets/index-DX8rC0ao.css             117.65 kB │ gzip:  20.94 kB
+frontend/dist/assets/pdf.worker.min-WWY7VKxM.js       0.06 kB │ gzip:   0.08 kB
+frontend/dist/assets/markdown-it-DjB7RcUx.js         98.10 kB │ gzip:  41.27 kB
+frontend/dist/assets/index-B7FiJyyF.js              361.98 kB │ gzip: 122.34 kB
+frontend/dist/assets/pdf-5Y36EPkG.js                487.55 kB │ gzip: 148.15 kB
 
-✓ built in 229ms
-$ bun test --timeout 15000
+✓ built in 621ms
 bun test v1.4.2 (744846f84)
+
+tests/TutorFiles.test.ts:
+Gemini request failed: HTTP 503 UNAVAILABLE Overloaded.
+Gemini Files API request failed: HTTP 500 INTERNAL Backend error.
+Gemini request failed: HTTP 403 PERMISSION_DENIED You do not have permission to access the File file2 or it may not exist.
+
+tests/MaterialImport.http.test.ts:
+Transcribing a recording of import 2114cec0-8790-4f9f-b7fc-681b38637817 failed (TIMEOUT).
+Transcribing a recording of import 79fe4977-0146-40bd-a161-73f3cfb369e5 failed (NO_SPEECH).
+Saving import 17a5da62-a381-4d20-bcdb-fc78b79a295c (import key 718e1f06-67c6-40ba-bce4-24663389f264) was refused: INVALID_INPUT. No material was saved for this key.
+
+tests/Importing.http.test.ts:
+{"requestId":"4d7a31da-03d3-4ab6-8e09-e279feb817f8","level":"warn","message":"Reaction \"DeliverRefusalToAsker\" answered a request on \"?\" after it stopped pending. Reactions that can answer the same request must partition their conditions; registration order never decides. A timeout can also make an answer arrive late.","timestamp":"2026-10-24T03:39:13.859Z"}
+{"requestId":"60ebeeef-a352-4591-94e7-fc2bc3602df4","level":"warn","message":"Reaction \"DeliverRefusalToAsker\" answered a request on \"?\" after it stopped pending. Reactions that can answer the same request must partition their conditions; registration order never decides. A timeout can also make an answer arrive late.","timestamp":"2026-10-24T03:39:13.913Z"}
+{"requestId":"5165b25f-11e7-4706-bc62-9577eb70dc7a","level":"warn","message":"Reaction \"DeliverRefusalToAsker\" answered a request on \"?\" after it stopped pending. Reactions that can answer the same request must partition their conditions; registration order never decides. A timeout can also make an answer arrive late.","timestamp":"2026-10-24T03:39:15.383Z"}
+{"requestId":"93e7de6d-314e-4125-8205-93180ab9dd8e","level":"warn","message":"Reaction \"DeliverRefusalToAsker\" answered a request on \"?\" after it stopped pending. Reactions that can answer the same request must partition their conditions; registration order never decides. A timeout can also make an answer arrive late.","timestamp":"2026-10-24T03:39:15.426Z"}
 
 tests/Gemini.http.test.ts:
 Gemini request failed: HTTP 429 RESOURCE_EXHAUSTED Resource has been exhausted.
 Gemini request failed: HTTP 403 PERMISSION_DENIED Permission denied.
+Gemini request failed: HTTP 404 NOT_FOUND models/gemini-3.1-pro-preview is not found for API version v1beta, or is not supported for generateContent. Call ModelService.ListModels to see the list of available models and their supported methods.
+Gemini request failed: HTTP 400 INVALID_ARGUMENT API key not valid. Please pass a valid API key.
+Gemini request failed: HTTP 400 INVALID_ARGUMENT Request contains an invalid argument.
+
+tests/Courses.http.test.ts:
+{"action":"initialize","actionId":"8724000e-074d-4a4d-a6ca-bd7fe37b195f","error":{"name":"Error"},"level":"error","message":"Consequence action faulted","timestamp":"2026-10-24T03:39:28.477Z"}
+{"action":"initialize","actionId":"9e7844cd-15ef-4c69-be9c-20e7eda6ccf6","error":{"name":"Error"},"level":"error","message":"Consequence action faulted","timestamp":"2026-10-24T03:39:29.210Z"}
+{"action":"initialize","actionId":"d097423f-cbb2-4497-a1d8-50faf33e8d12","error":{"name":"Error"},"level":"error","message":"Consequence action faulted","timestamp":"2026-10-24T03:39:29.220Z"}
+
+tests/Gemini.choice.test.ts:
+Gemini request failed: HTTP 404 NOT_FOUND models/gemini-3.1-pro-preview is not found for API version v1beta, or is not supported for generateContent. Call ModelService.ListModels to see the list of available models and their supported methods.
+Gemini request failed: HTTP 404 NOT_FOUND models/gemini-9.9-nonexistent is not found for API version v1beta, or is not supported for generateContent. Call ModelService.ListModels to see the list of available models and their supported methods.
+Gemini request failed: HTTP 404 NOT_FOUND models/gemini-3.8-flash-lite is not found for API version v1beta, or is not supported for generateContent. Call ModelService.ListModels to see the list of available models and their supported methods.
+Gemini request failed: HTTP 403 PERMISSION_DENIED Permission denied on resource models/gemini-3.1-pro-preview.
+Gemini request failed: HTTP 403 PERMISSION_DENIED Method doesn't allow unregistered callers.
+Gemini request failed: HTTP 400 INVALID_ARGUMENT API key not valid for models/gemini-3.1-pro-preview.
+Gemini request failed: HTTP 400 INVALID_ARGUMENT Thinking level MINIMAL is not supported for this model. Please retry with other thinking level.
+Gemini request failed: HTTP 400 INVALID_ARGUMENT Thinking level MINIMAL is not supported for this model. Please retry with other thinking level.
+Gemini request failed: HTTP 400 INVALID_ARGUMENT Invalid value at 'generation_config.thinking_config.thinking_level' (type.googleapis.com/google.ai.generativelanguage.v1beta.ThinkingConfig.ThinkingLevel), "ultra"
+Gemini request failed: HTTP 429 RESOURCE_EXHAUSTED You exceeded your current quota, please check your plan and billing details.
+Gemini request failed: HTTP 429 RESOURCE_EXHAUSTED Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_input_token_count, limit: 0, model: gemini-3.1-pro-preview
+Gemini request failed: HTTP 429 RESOURCE_EXHAUSTED You exceeded your current quota, please check your plan and billing details.
+Gemini request failed: HTTP 429 RESOURCE_EXHAUSTED You exceeded your current quota, please check your plan and billing details.
+Gemini request failed: HTTP 429 RESOURCE_EXHAUSTED Rate limit for model gemini-3.1-pro-preview. Retry in 20s.
+Gemini request failed: HTTP 400 FAILED_PRECONDITION Please enable billing on your project.
+Gemini request failed: HTTP 503 UNAVAILABLE The model gemini-3.1-pro-preview is overloaded.
+Gemini request failed: HTTP 404 NOT_FOUND models/gemini-dictation-model is not found for API version v1beta.
+Gemini request failed: HTTP 429 RESOURCE_EXHAUSTED Quota exceeded for metric: x, limit: 0, model: gemini-dictation-model
 
 tests/Gemini.test.ts:
 Gemini request failed: HTTP 429 RESOURCE_EXHAUSTED You exceeded your current quota, please check your plan and billing details.
@@ -62,12 +80,33 @@ Gemini request failed: HTTP 404 NOT_FOUND models/unknown is not found.
 Gemini request failed: HTTP 400 FAILED_PRECONDITION Please enable billing on your project.
 Gemini request failed: HTTP 400 INVALID_ARGUMENT Request contains an invalid argument.
 Gemini request failed: HTTP 503 UNAVAILABLE The model is overloaded.
+Gemini Files API request failed: HTTP 429 RESOURCE_EXHAUSTED Too many requests.
+Gemini Files API request failed: HTTP 400 INVALID_ARGUMENT API key not valid.
+Gemini Files API request failed: HTTP 413 INVALID_ARGUMENT Request payload size exceeds the limit.
+Gemini Files API request failed: HTTP 500 INTERNAL Internal error.
+Gemini request failed: HTTP 403 PERMISSION_DENIED You do not have permission to access the File abc123 or it may not exist.
+Gemini request failed: HTTP 400 INVALID_ARGUMENT The File abc123 is not in an ACTIVE state and usage is not allowed.
+Gemini request failed: HTTP 400 INVALID_ARGUMENT The input token count (1500000) exceeds the maximum number of tokens allowed (1048576).
+Gemini request failed: HTTP 400 INVALID_ARGUMENT Unable to process input image. Please retry or report in https://developers.generativeai.google/guide/troubleshooting
 
 tests/Onboarding.http.test.ts:
-{"action":"link","actionId":"f43d3b83-b6a7-4d85-ac57-070a8e239a77","error":{"name":"MongoServerError"},"level":"error","message":"Consequence action faulted","timestamp":"2026-10-23T03:23:04.064Z"}
+{"action":"link","actionId":"44d77840-c8bc-4d41-93d4-44000ecb8a2f","error":{"name":"MongoServerError"},"level":"error","message":"Consequence action faulted","timestamp":"2026-10-24T03:39:58.611Z"}
 
- 472 pass
+tests/scenarios/graded-import.scenario.test.ts:
+{"requestId":"46e1cf47-fc15-4ba4-8870-319ef6d5041e","level":"warn","message":"Reaction \"DeliverRefusalToAsker\" answered a request on \"?\" after it stopped pending. Reactions that can answer the same request must partition their conditions; registration order never decides. A timeout can also make an answer arrive late.","timestamp":"2026-10-24T03:40:08.880Z"}
+{"requestId":"58dc8ce1-9596-4c0a-b75d-451634f5b135","level":"warn","message":"Reaction \"DeliverRefusalToAsker\" answered a request on \"?\" after it stopped pending. Reactions that can answer the same request must partition their conditions; registration order never decides. A timeout can also make an answer arrive late.","timestamp":"2026-10-24T03:40:08.967Z"}
+{"requestId":"1c47ddd5-357a-470e-966f-14419cbe57eb","level":"warn","message":"Reaction \"DeliverRefusalToAsker\" answered a request on \"?\" after it stopped pending. Reactions that can answer the same request must partition their conditions; registration order never decides. A timeout can also make an answer arrive late.","timestamp":"2026-10-24T03:40:09.036Z"}
+
+tests/scenarios/import-anything.scenario.test.ts:
+Gemini request failed: HTTP 403 PERMISSION_DENIED You do not have permission to access the File file2 or it may not exist.
+Transcribing a recording of import 92f3a6ad-3d27-471e-8277-2b106327a186 failed (NO_SPEECH).
+Gemini request failed: HTTP 400 INVALID_ARGUMENT API key not valid. Please pass a valid API key.
+Transcribing a recording of import 94072dc0-e825-40f3-9c60-cae3475758ee failed (WRONG_KEY).
+Gemini request failed: HTTP 400 INVALID_ARGUMENT API key not valid. Please pass a valid API key.
+Transcribing a recording of import fad04b7a-22ae-4ed5-a01c-8c8a0a7742f5 failed (WRONG_KEY).
+
+ 920 pass
  0 fail
- 3279 expect() calls
-Ran 472 tests across 45 files. [77.08s]
+ 8573 expect() calls
+Ran 920 tests across 72 files. [167.04s]
 exit 0
