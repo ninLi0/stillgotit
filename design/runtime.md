@@ -66,7 +66,7 @@ A download goes through the declared material-read endpoint, which checks the ow
 
 ## Lessons, practice, and evidence
 
-Declared views join the learner's skills, their current requirements, and the source material before a Generating action asks the tutor. The host checks the returned text and its citations. The endpoint then rechecks the skill's definition, and if the definition changed during generation, it reports a conflict instead of saving content under the new requirements. Existing sessions keep their original requirements and sources. A submitted photo is read as the learner's own work, separately from any reference solution.
+Declared views join the learner's skills, their current requirements, and the source material before a Generating action asks the tutor. The host checks the returned text and its citations. A citation of the learner's own attached work is dropped, since that work is sent to be read and is not a course material; an answer that cites nothing else is refused with a sentence the learner can act on. The endpoint then rechecks the skill's definition, and if the definition changed during generation, it reports a conflict instead of saving content under the new requirements. Existing sessions keep their original requirements and sources. A submitted photo is read as the learner's own work, separately from any reference solution.
 
 Practice checks whether prerequisites are ready. Lesson explanations stay available even when prerequisites need work. A hint is recorded before it is shown, and a recorded hint or declared outside help rules out an independent-success judgment.
 

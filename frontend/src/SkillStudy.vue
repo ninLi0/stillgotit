@@ -99,11 +99,19 @@ async function send() {
     const input = { studySession: session.session, text: draft.text, channel: draft.ch, attachments: draft.sent.map((item) => item.material), dialogueLength: session.dialogue.length };
     try {
       const result = session.lesson ? await api.learning.question(input) : await api.learning.respond(input);
-      // The draft and every photo come back on failure; the reloaded history exposes any saved question and its retry button.
       unwrap(result);
       reviewed.value = false;
       draft.sent.forEach(forgetPreview);
-    } catch (problem) { draft.restore(); throw problem; }
+    } catch (problem) {
+      // The server may have saved the question and failed only on the tutor's reply. Then the reloaded thread shows it with its
+      // retry button and the draft stays out of the box, so sending again cannot post it twice. Otherwise the draft and every photo come back.
+      await load().catch(() => undefined);
+      const now = current.value;
+      const saved = !!now && now.session === session.session &&
+        now.dialogue.slice(session.dialogue.length).some((item) => item.turn.speaker === "LEARNER" && item.turn.text === draft.text);
+      if (saved) draft.sent.forEach(forgetPreview); else draft.restore();
+      throw problem;
+    }
     finally { pending.value = null; }
   });
 }
