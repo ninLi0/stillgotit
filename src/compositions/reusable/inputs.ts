@@ -84,3 +84,28 @@ export const learningInput: EndpointValidator = (value) => {
     : typeof field === "string" && field.length <= (key === "text" || key === "request" || key === "reason" ? 12000 : 300));
   return ok ? { ok: true } : { ok: false, detail: "Check the supplied text, numbers, and review choices." };
 };
+
+/** The longest value each graded row field may hold. The text limits are the EXTRACT answer rules; the others bound identities and labels. */
+const gradedRowLimits = { label: 100, mark: 50, feedback: 2000, excerpt: 500, rationale: 500, proposedResult: 300, skill: 300, result: 300 } as const;
+const gradedMaterial = (field: unknown) => typeof field === "string" && field.trim().length > 0 && field.length <= 300;
+const gradedRow = (field: unknown) => typeof field === "object" && field !== null && !Array.isArray(field) &&
+  Object.keys(field).length === Object.keys(gradedRowLimits).length &&
+  Object.entries(gradedRowLimits).every(([key, limit]) => { const text = (field as Record<string, unknown>)[key]; return typeof text === "string" && text.length <= limit; });
+
+/** A graded command carries exactly its named fields, plus the session, and nothing else. */
+function gradedCommand(fields: Record<string, (field: unknown) => boolean>, detail: string): EndpointValidator {
+  return (value) => {
+    if (!structuredInput(value).ok) return { ok: false };
+    const record = value as Record<string, unknown>;
+    const ok = Object.entries(record).every(([key, field]) => key === "session" ? field === null || typeof field === "string" : Object.hasOwn(fields, key)) &&
+      Object.entries(fields).every(([key, check]) => Object.hasOwn(record, key) && check(record[key]));
+    return ok ? { ok: true } : { ok: false, detail };
+  };
+}
+
+/** The host's check for Extract, before admission. */
+export const gradedExtractInput = gradedCommand({ material: gradedMaterial }, "Choose graded work from one of your courses.");
+/** The host's check for Confirm, before admission: the endpoint still checks the date and the row's content. One row stays within the body limit. */
+export const gradedConfirmInput = gradedCommand({
+  material: gradedMaterial, performedOn: (field) => typeof field === "string", outsideHelp: (field) => typeof field === "boolean", row: gradedRow,
+}, "Send the performance date, the help declaration, and one question as it was extracted.");

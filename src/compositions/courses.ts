@@ -1,5 +1,5 @@
 import { endpoint, receive, respond } from "@mit-sdg/sync-engine/boundary";
-import { compute, each, former, no, view, where } from "@mit-sdg/sync-engine/language";
+import { compute, each, former, is, no, view, where } from "@mit-sdg/sync-engine/language";
 import { concepts, computations } from "../concepts.ts";
 import { courseInput, courseListOutput, recordOutput, validators, materialInput, proposalInput, proposalSaveInput, structuredOutput } from "./reusable/inputs.ts";
 
@@ -88,15 +88,19 @@ const AddMaterial = endpoint("/internal/materials/add", ({ session, course, impo
     ), { validators: { ...validators, input: materialInput, output: recordOutput(["material"]) } },
 );
 
-const ProposeSkill = endpoint("/courses/skills/propose", ({ session, unit, proposalKey, material, materials, title, outcome, gate, owner, course, skill }) =>
+// The graded-work check applies only to the learner's own material in the unit's course: graded work is evidence, not a teaching source.
+const ProposeSkill = endpoint("/courses/skills/propose", ({ session, unit, proposalKey, material, materials, title, outcome, gate, owner, course, skill, materialTitle, graded }) =>
   receive({ session, unit, proposalKey, material, title, outcome, gate }).then(Sessioning.use({ session }).responds({ subject: owner })).then(
-    where(OwnedUnit({ owner, unit }).is({ course }), GroundedTutoring._material({ material }).is({ owner, scope: course }),
-      compute(computations.singleMaterial, { material }, materials))
+    where(OwnedUnit({ owner, unit }).is({ course }), GroundedTutoring._material({ material }).is({ owner, scope: course, title: materialTitle }),
+      compute(computations.gradedTitle, { title: materialTitle }, graded), is.among(graded, [false]), compute(computations.singleMaterial, { material }, materials))
       .then(SkillMapping.propose({ owner, unit, proposalKey, title, outcome, gate, materials }).responds({ skill }))
       .then(respond({ skill })).named("owned"),
     where(no(OwnedUnit({ owner, unit }))).then(respond({ error: "COURSE_UNAVAILABLE" })).named("missing"),
     where(OwnedUnit({ owner, unit }).is({ course }), no(GroundedTutoring._material({ material }).is({ owner, scope: course })))
       .then(respond({ error: "MATERIAL_UNAVAILABLE" })).named("source"),
+    where(OwnedUnit({ owner, unit }).is({ course }), GroundedTutoring._material({ material }).is({ owner, scope: course, title: materialTitle }),
+      compute(computations.gradedTitle, { title: materialTitle }, graded), is.among(graded, [true]))
+      .then(respond({ error: "GRADED_MATERIAL_NOT_SOURCE" })).named("graded"),
   ), { validators: { ...validators, input: proposalSaveInput, output: recordOutput(["skill"]) } },
 );
 
@@ -113,15 +117,19 @@ const ConfirmSkill = endpoint("/courses/skills/confirm", ({ session, skill, owne
   ), { validators },
 );
 
-const EditDraft = endpoint("/courses/skills/edit", ({ session, skill, unit, material, materials, title, outcome, gate, owner, course }) =>
+// The same refusals as ProposeSkill, then the graded-work check for the learner's own material in that course.
+const EditDraft = endpoint("/courses/skills/edit", ({ session, skill, unit, material, materials, title, outcome, gate, owner, course, materialTitle, graded }) =>
   receive({ session, skill, unit, material, title, outcome, gate }).then(Sessioning.use({ session }).responds({ subject: owner })).then(
-    where(OwnedUnit({ owner, unit }).is({ course }), GroundedTutoring._material({ material }).is({ owner, scope: course }),
-      compute(computations.singleMaterial, { material }, materials))
+    where(OwnedUnit({ owner, unit }).is({ course }), GroundedTutoring._material({ material }).is({ owner, scope: course, title: materialTitle }),
+      compute(computations.gradedTitle, { title: materialTitle }, graded), is.among(graded, [false]), compute(computations.singleMaterial, { material }, materials))
       .then(SkillMapping.reviseDraft({ owner, skill, unit, title, outcome, gate, materials }).responds({}))
       .then(respond({})).named("owned"),
     where(no(OwnedUnit({ owner, unit }))).then(respond({ error: "COURSE_UNAVAILABLE" })).named("missing"),
     where(OwnedUnit({ owner, unit }).is({ course }), no(GroundedTutoring._material({ material }).is({ owner, scope: course })))
       .then(respond({ error: "MATERIAL_UNAVAILABLE" })).named("source"),
+    where(OwnedUnit({ owner, unit }).is({ course }), GroundedTutoring._material({ material }).is({ owner, scope: course, title: materialTitle }),
+      compute(computations.gradedTitle, { title: materialTitle }, graded), is.among(graded, [true]))
+      .then(respond({ error: "GRADED_MATERIAL_NOT_SOURCE" })).named("graded"),
   ), { validators: { ...validators, input: proposalInput } },
 );
 

@@ -2,6 +2,7 @@ import { compute, former, no, where } from "@mit-sdg/sync-engine/language";
 import { concepts, computations as C } from "../concepts.ts";
 import { composition as Courses } from "./courses.ts";
 import * as R from "./learning-reads.ts";
+import { composition as Importing } from "./importing.ts";
 const { SkillMapping: Mapping, GroundedTutoring: Tutoring, AssessmentReviewing: Assessment, MasteryEstimating: Mastery, StudyPlanning: Planning } = concepts;
 
 const LessonReady = former("admit a lesson for (owner) and (skill)", ({ owner, skill }, { context, sources, materials }) => where(
@@ -37,12 +38,15 @@ const AssessmentReady = former("admit review of (studySession)", ({ owner, study
 const RetryReady = former("admit retry of (studySession)", ({ owner, studySession }, { assessment }) => where(
   R.OwnedSession({ owner, studySession }), Assessment._byTask({ author: owner, task: studySession }).is({ case: assessment }), no(Assessment._effectiveJudgment({ case: assessment })),
 ).form({ allowed: true })).optional();
+// Admits Correct and Regrade for a practice or imported case. Regrade refuses an imported case itself.
 const RegradeReady = former("admit revision of (assessment)", ({ owner, assessment, basedOn }) => where(
-  R.OwnedCase({ owner, assessment }), Assessment._effectiveJudgment({ case: assessment }).is({ judgment: basedOn }),
+  R.OwnedAnyCase({ owner, assessment }), Assessment._effectiveJudgment({ case: assessment }).is({ judgment: basedOn }),
 ).form({ allowed: true })).optional();
 const SuggestionReady = former("admit suggestions from (material)", ({ owner, material }, { course }) => where(
   Tutoring._material({ material }).is({ owner, scope: course }), Courses.OwnedCourse({ owner, course }),
 ).form({ allowed: true })).optional();
+// The same answer for an unknown material, another learner's material, one outside the learner's courses, and an ungraded material.
+const GradedReady = former("admit graded work (material) for (owner)", ({ owner, material }) => where(Importing.GradedMaterial({ owner, material })).form({ allowed: true })).optional();
 const CourseReady = former("admit access to (course) for (owner)", ({ owner, course }) => where(Courses.OwnedCourse({ owner, course })).form({ allowed: true })).optional();
 const PlanReady = former("admit a routine plan in (course)", ({ owner, course }) => where(R.CanReplan({ owner, course })).form({ allowed: true })).optional();
 const ItemReady = former("admit progress on (item) in (course)", ({ owner, course, item }) => where(
@@ -53,7 +57,7 @@ const BeginReady = former("admit starting (item) in (course)", ({ owner, course,
   R.ActiveSkill({ owner, skill }).is({ course, definition }), Mapping._map({ course }).is({ skills }), Mastery._progress({ learner: owner }).is({ tracks }),
   C.prerequisitesReady({ skills, tracks, skill }),
 ).form({ allowed: true })).optional();
-export const composition = { LessonReady, TaskReady, ResponseReady, QuestionReady, ReplyReady, HintReady, TranscriptReady, AssessmentReady, RetryReady, RegradeReady, SuggestionReady, CourseReady, PlanReady, ItemReady, BeginReady };
+export const composition = { LessonReady, TaskReady, ResponseReady, QuestionReady, ReplyReady, HintReady, TranscriptReady, AssessmentReady, RetryReady, RegradeReady, SuggestionReady, GradedReady, CourseReady, PlanReady, ItemReady, BeginReady };
 
 // Transport admission uses these same declared reads before starting a causal flow.
 export const admissions = {
@@ -69,6 +73,8 @@ export const admissions = {
   "/learning/regrade": { check: RegradeReady, fields: ["assessment", "basedOn"], detail: "Choose your own assessment and review its latest judgment before requesting a regrade." },
   "/learning/correct": { check: RegradeReady, fields: ["assessment", "basedOn"], detail: "Choose your own assessment and review its latest judgment before correcting it." },
   "/courses/skills/suggest": { check: SuggestionReady, fields: ["material"], detail: "Choose a source from your own course." },
+  "/courses/graded/extract": { check: GradedReady, fields: ["material"], detail: "Choose graded work that you imported into one of your courses." },
+  "/courses/graded/confirm": { check: GradedReady, fields: ["material"], detail: "Choose graded work that you imported into one of your courses." },
   "/planning/configure": { check: CourseReady, fields: ["course"], detail: "Choose your own course before setting its study budget." },
   "/planning/propose": { check: PlanReady, fields: ["course"], detail: "Set a daily budget and finish or stop the current activity before updating the plan." },
   "/planning/begin": { check: BeginReady, fields: ["course", "item"], detail: "Choose your own current activity and check its prerequisites. Update the plan if requirements changed." },

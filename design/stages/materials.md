@@ -6,7 +6,7 @@ This stage connects course materials, skill review, tutoring, assessment, master
 concrete TutorRequest
   A server-prepared generation request containing its purpose, owned sources, saved context, and optional learner work.
 concrete TutorAnswer
-  Validated generated text, citations, material identities, optional judgment values, and skill suggestions.
+  Validated generated text, citations, material identities, optional judgment values, skill suggestions, and extracted graded rows.
 ```
 
 ```instances
@@ -126,4 +126,4 @@ Uploads accept up to 12 files and 25 MB in total. PDF pages are read as text, an
 
 ## Learning application
 
-[Learning flows](../compositions/Learning.md), [shared reads](../compositions/LearningReads.md), [progress reactions](../compositions/Progress.md), and [planning endpoints](../compositions/Planning.md) define the rest of this stage. The host forwards JSON requests to these declared endpoints. It does not sequence tutoring, assessment, mastery, or planning actions.
+[Learning flows](../compositions/Learning.md), [shared reads](../compositions/LearningReads.md), [progress reactions](../compositions/Progress.md), and [planning endpoints](../compositions/Planning.md) define the rest of this stage. The host forwards JSON requests to these declared endpoints. It does not sequence tutoring, assessment, mastery, or planning actions. [Importing graded work](../compositions/Importing.md) turns returned, graded coursework into imported assessment evidence.

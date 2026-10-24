@@ -10,6 +10,7 @@ import { groundedTutoring } from "./concepts/GroundedTutoring/registry.ts";
 import { singleMaterial, evidenceAttribution } from "./computations.ts";
 import { sessionSubject, attemptIsReady, correctionNote, dialogueIsCurrent, evidenceUpdate, generationDefinition, generationFields, gradeRequest, hasLessonQuestion, itemSubject, lessonRequest, planDetail, planRequest, prerequisitesReady, progressRows, responseInput, reviewApproved, selectSkill, selectSkillMaterials, selectSources, sessionMaterials, sessionRequest, studyDetail, submissionInput, suggestRequest, taskRequest } from "./computations/learning.ts";
 import { generating } from "./concepts/Generating/registry.ts";
+import { extractRequest, gradedImport, gradedKey, gradedReview, gradedSource, gradedTitle, gradedToday, hasConfirmedSkill, hasGradedRows } from "./computations/importing.ts";
 
 export const applicationConceptSet = conceptSet({
   Registering: registering,
@@ -21,5 +22,6 @@ export const applicationConceptSet = conceptSet({
   StudyPlanning: studyPlanning,
   GroundedTutoring: groundedTutoring,
   TutorGenerating: generating,
-}, { singleMaterial, evidenceAttribution, sessionSubject, attemptIsReady, correctionNote, dialogueIsCurrent, evidenceUpdate, generationDefinition, generationFields, gradeRequest, hasLessonQuestion, itemSubject, lessonRequest, planDetail, planRequest, prerequisitesReady, progressRows, responseInput, reviewApproved, selectSkill, selectSkillMaterials, selectSources, sessionMaterials, sessionRequest, studyDetail, submissionInput, suggestRequest, taskRequest });
+}, { singleMaterial, evidenceAttribution, sessionSubject, attemptIsReady, correctionNote, dialogueIsCurrent, evidenceUpdate, generationDefinition, generationFields, gradeRequest, hasLessonQuestion, itemSubject, lessonRequest, planDetail, planRequest, prerequisitesReady, progressRows, responseInput, reviewApproved, selectSkill, selectSkillMaterials, selectSources, sessionMaterials, sessionRequest, studyDetail, submissionInput, suggestRequest, taskRequest,
+  gradedTitle, hasConfirmedSkill, extractRequest, hasGradedRows, gradedToday, gradedReview, gradedKey, gradedImport, gradedSource });
 export const { concepts, computations } = applicationConceptSet;
