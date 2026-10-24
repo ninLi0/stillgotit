@@ -1,4 +1,14 @@
 <script setup lang="ts">
+/**
+ * One saved material's files, each with its readable parts: text blocks, scanned pages ("Page N has no selectable
+ * text. The tutor reads it as an image." with "Show page N"), images with a download fallback when the browser cannot
+ * show them (HEIC), and recordings with a player and their time-range transcript segments. It reads the material
+ * itself and loads a file's bytes only when that file is opened.
+ *
+ * Props: `material`, the material to show; `location` (optional), a cited location to open at, such as
+ * `key/page/3` or `key/time/12:30-12:45`; `titled` (optional), show the material's title as a heading.
+ * Events: `loaded(source)`, once the material is read, with the `/courses/materials/read` answer.
+ */
 import { computed, nextTick, onBeforeUnmount, reactive, ref, shallowRef, watch } from "vue";
 import { api, unwrap } from "./api.ts";
 import { materialFile } from "./host-api.ts";
