@@ -9,6 +9,7 @@ import { pdf, png } from "../fixtures/office.ts";
 import type { Gemini, GeminiPart } from "../../src/host/gemini.ts";
 import type { ExtractContext, ExtractedRow } from "../../src/tutor-types.ts";
 import type { User } from "../../src/concepts/Registering/Registering.ts";
+import { refusalDetail } from "../../src/host/http-policy.ts";
 
 /*
  * The journey in the graded-import brief, end to end through HTTP. One learner imports a returned midterm into a course with two
@@ -22,6 +23,9 @@ const ORIGIN = "http://localhost:5173", DAY = 86_400_000, ZONE = "America/New_Yo
 const SENTENCE = "Choose graded work that you imported into one of your courses.";
 /** Every concept or endpoint refusal reaches the browser as this, without its code; the native gateway keeps the code. */
 const BARE = { status: 400, body: { error: "INVALID_REQUEST" } };
+// A refusal whose design gives a sentence now carries it to the browser (host pass, D31).
+const declined = (code: string) => ({ status: 400, body: { error: "INVALID_REQUEST", detail: refusalDetail("/courses/graded/confirm", code) } });
+const FORBIDDEN = { status: 403, body: { error: "FORBIDDEN", detail: SENTENCE } };
 const cleanups: (() => Promise<void>)[] = [];
 afterAll(async () => { for (const cleanup of cleanups.reverse()) await cleanup(); });
 
@@ -136,7 +140,7 @@ async function saved() {
 }
 /** The same request through the host's native gateway, which keeps the refusal's own code. */
 const native = (path: string, body: Record<string, unknown>) => app.runtime.gateway.invoke(path, { session, ...body }, { timeoutMs: 5000 });
-const refused = (value: string) => ({ ok: false, error: { kind: "domain", value } }) as const;
+const refused = (value: string) => { const detail = refusalDetail("/courses/graded/confirm", value); return detail === undefined ? ({ ok: false, error: { kind: "domain", value } } as const) : ({ ok: false, error: { kind: "domain", value, detail } } as const); };
 
 beforeAll(async () => {
   app = await setup();
@@ -184,7 +188,7 @@ describe("Import graded coursework as evidence", () => {
     expect(opened.imported).toEqual([]);
     expect([earlier, newYorkDate(Date.now())]).toContain(opened.today);
     today = opened.today;
-    expect(await learner.post("/courses/graded/read", { material: notes })).toEqual({ status: 403, body: { error: "FORBIDDEN" } });
+    expect(await learner.post("/courses/graded/read", { material: notes })).toEqual(FORBIDDEN);
   }, LIMIT);
 
   test("The tutor reads each question's mark and feedback and proposes which course skill it shows and how well.", async () => {
@@ -293,7 +297,7 @@ describe("Import graded coursework as evidence", () => {
   test("The `sourceKey` identifies the material, question, and skill, so a repeat confirm is refused by the concept rather than duplicated.", async () => {
     const before = await saved();
     const repeat = { material: graded, performedOn, outsideHelp: false, row: confirmRow(rows[0]!) };
-    expect(await learner.post("/courses/graded/confirm", repeat)).toEqual(BARE);
+    expect(await learner.post("/courses/graded/confirm", repeat)).toEqual(declined("GRADED_SOURCE_USED"));
     expect(await native("/courses/graded/confirm", repeat)).toEqual(refused("GRADED_SOURCE_USED"));
     // The same question with other spacing, another date, and another result is still the same question.
     const respaced = { ...repeat, performedOn: shift(performedOn, -1), row: { ...repeat.row, label: "  Question 1 ", result: "SLIP" } };
@@ -308,7 +312,7 @@ describe("Import graded coursework as evidence", () => {
     // The learner maps the bonus question to Products, then leaves the date blank or picks tomorrow.
     for (const [date, code] of [["", "GRADED_DATE_INVALID"], [shift(today, 1), "GRADED_DATE_FUTURE"]] as const) {
       const body = { material: graded, performedOn: date, outsideHelp: false, row: confirmRow(rows[2]!, { skill: products }) };
-      expect(await learner.post("/courses/graded/confirm", body), code).toEqual(BARE);
+      expect(await learner.post("/courses/graded/confirm", body), code).toEqual(declined(code));
       expect(await native("/courses/graded/confirm", body), code).toEqual(refused(code));
     }
     expect(await saved()).toEqual(before);
@@ -318,7 +322,7 @@ describe("Import graded coursework as evidence", () => {
     const before = await saved();
     const body = { material: graded, performedOn, outsideHelp: false, row: confirmRow(rows[2]!) };
     expect(body.row.skill).toBe("");
-    expect(await learner.post("/courses/graded/confirm", body)).toEqual(BARE);
+    expect(await learner.post("/courses/graded/confirm", body)).toEqual(declined("GRADED_ROW_UNMAPPED"));
     expect(await native("/courses/graded/confirm", body)).toEqual(refused("GRADED_ROW_UNMAPPED"));
     expect(await saved()).toEqual(before);
   }, LIMIT);
@@ -326,7 +330,7 @@ describe("Import graded coursework as evidence", () => {
   test("A result of INDEPENDENT is allowed only when the learner declared no help; otherwise the strongest result is SUPPORTED.", async () => {
     const before = await saved();
     const body = { material: graded, performedOn, outsideHelp: true, row: confirmRow(rows[2]!, { skill: products, result: "INDEPENDENT" }) };
-    expect(await learner.post("/courses/graded/confirm", body)).toEqual(BARE);
+    expect(await learner.post("/courses/graded/confirm", body)).toEqual(declined("GRADED_HELP_CONFLICT"));
     expect(await native("/courses/graded/confirm", body)).toEqual(refused("GRADED_HELP_CONFLICT"));
     expect(await saved()).toEqual(before);
   }, LIMIT);
@@ -335,7 +339,7 @@ describe("Import graded coursework as evidence", () => {
     const before = await saved();
     // A confirmed skill of the learner's own Physics course is outside the graded work's course.
     const body = { material: graded, performedOn, outsideHelp: false, row: confirmRow(rows[2]!, { skill: outside }) };
-    expect(await learner.post("/courses/graded/confirm", body)).toEqual(BARE);
+    expect(await learner.post("/courses/graded/confirm", body)).toEqual(declined("GRADED_SKILL_UNAVAILABLE"));
     expect(await native("/courses/graded/confirm", body)).toEqual(refused("GRADED_SKILL_UNAVAILABLE"));
     expect(await saved()).toEqual(before);
   }, LIMIT);
@@ -347,14 +351,14 @@ describe("Import graded coursework as evidence", () => {
     const attempts: [string, Record<string, unknown>][] = [["/courses/skills/suggest", { material: graded }],
       ["/courses/skills/propose", { proposalKey: crypto.randomUUID(), unit: productsUnit, material: graded, ...draft }]];
     for (const [path, body] of attempts) {
-      expect(await learner.post(path, body), path).toEqual(BARE);
+      expect(await learner.post(path, body), path).toEqual(declined("GRADED_MATERIAL_NOT_SOURCE"));
       expect(await native(path, body), path).toEqual(refused("GRADED_MATERIAL_NOT_SOURCE"));
     }
     expect((await learner.ok("/courses/read", { course })).skills).toEqual(skills);
     // A draft from the notes cannot be moved onto the graded work either.
     const { skill: drafted } = await learner.ok("/courses/skills/propose", { proposalKey: crypto.randomUUID(), unit: productsUnit, material: notes, ...draft });
     const edit = { skill: drafted, unit: productsUnit, material: graded, ...draft, title: "Order matters" };
-    expect(await learner.post("/courses/skills/edit", edit)).toEqual(BARE);
+    expect(await learner.post("/courses/skills/edit", edit)).toEqual(declined("GRADED_MATERIAL_NOT_SOURCE"));
     expect(await native("/courses/skills/edit", edit)).toEqual(refused("GRADED_MATERIAL_NOT_SOURCE"));
     expect(await app.runtime.application.concepts.SkillMapping._materials({ skill: drafted })).toEqual([{ material: notes }]);
     expect(((await learner.ok("/courses/read", { course })).skills as { skill: string; title: string }[]).find((row) => row.skill === drafted)?.title).toBe(draft.title);
@@ -371,7 +375,7 @@ describe("Import graded coursework as evidence", () => {
     const current = (await readSkill(dimensions)).cases[0]!;
     const claim = { case: second, basedOn: current.judgment.judgment, result: "INDEPENDENT", reason: "The grader misread my answer: I wrote that AB is 2x2." };
     // Manual correction. Claiming that the import met the full demonstration gate is refused and changes nothing.
-    expect(await learner.post("/learning/correct", { ...claim, gateMet: true })).toEqual(BARE);
+    expect(await learner.post("/learning/correct", { ...claim, gateMet: true })).toEqual(declined("IMPORTED_GATE_UNAVAILABLE"));
     expect(await native("/learning/correct", { ...claim, gateMet: true })).toEqual(refused("IMPORTED_GATE_UNAVAILABLE"));
     expect((await readSkill(dimensions)).cases[0]!.history).toHaveLength(1);
     // The same correction with the gate kept false is accepted. It becomes the effective judgment and replaces the import's mastery input.
@@ -386,7 +390,7 @@ describe("Import graded coursework as evidence", () => {
     expect((await readImports()).imported.find((row) => row.case === second)).toMatchObject({ mark: "6/10", result: "INDEPENDENT" });
     // Regrade. Importing.md: an imported case has no practice task to regrade, so Regrade refuses it before any clarification or tutor request.
     const asked = app.calls.length, regrade = { case: second, basedOn: judgment, reason: "Please look at my final size again." };
-    expect(await learner.post("/learning/regrade", regrade)).toEqual(BARE);
+    expect(await learner.post("/learning/regrade", regrade)).toEqual(declined("REGRADE_IMPORTED_UNAVAILABLE"));
     expect(await native("/learning/regrade", regrade)).toEqual(refused("REGRADE_IMPORTED_UNAVAILABLE"));
     expect(app.calls.length).toBe(asked);
     const after = (await readSkill(dimensions)).cases[0]!;
@@ -402,7 +406,7 @@ describe("Import graded coursework as evidence", () => {
     // Without a session, each graded endpoint is refused.
     const signedOut = app.browser();
     const attempts: [string, Record<string, unknown>][] = [["/courses/graded/extract", { material: graded }], ["/courses/graded/confirm", confirm], ["/courses/graded/read", { material: graded }]];
-    for (const [path, body] of attempts) expect(await signedOut.post(path, body), path).toEqual({ status: 401, body: { error: "UNAUTHORIZED" } });
+    for (const [path, body] of attempts) expect(await signedOut.post(path, body), path).toMatchObject({ status: 401, body: { error: "UNAUTHORIZED" } });
     // A classmate can neither have the tutor read this learner's graded work nor import a question from it, even into this learner's skill.
     expect(await classmate.post("/courses/graded/extract", { material: graded })).toEqual({ status: 400, body: { error: "INVALID_REQUEST", detail: SENTENCE } });
     expect(await classmate.post("/courses/graded/confirm", confirm)).toEqual({ status: 400, body: { error: "INVALID_REQUEST", detail: SENTENCE } });
@@ -413,7 +417,7 @@ describe("Import graded coursework as evidence", () => {
 
   test("Another learner's imports are never visible.", async () => {
     const before = await saved();
-    expect(await classmate.post("/courses/graded/read", { material: graded })).toEqual({ status: 403, body: { error: "FORBIDDEN" } });
+    expect(await classmate.post("/courses/graded/read", { material: graded })).toEqual(FORBIDDEN);
     // Nor are they visible through the skill page's read of this learner's skill.
     expect(await classmate.post("/learning/read", { skill: products })).toEqual(BARE);
     expect(await saved()).toEqual(before);

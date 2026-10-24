@@ -20,6 +20,8 @@ const GOOGLE = "https://generativelanguage.googleapis.com/v1beta/models";
 const UNKNOWN_MODEL = "That model isn't offered. Choose one of the models in the Tutor panel.";
 const UNSUPPORTED_LEVEL = "That model doesn't offer this thinking level. Choose one of the levels shown for it.";
 const NO_LONGER_OFFERED = "The tutor model or thinking level you chose is no longer offered. Choose another one in the Tutor panel.";
+// Sessioning's sentence for NOT_SIGNED_IN, which reaches the browser as the refusal's `detail`.
+const SIGNED_OUT = "Your session has ended. Sign in again.";
 
 // The catalog table from design/compositions/Settings.md, "The model catalog". The expected records are built from
 // this table, not from the implementation's own catalog.
@@ -366,7 +368,7 @@ describe("model-picker: one learner's journey through HTTP, a second learner bes
     expect(sent.map(carried)).toEqual([[address("gemini-3.5-flash-lite"), { thinkingLevel: "high" }]]);
     // Without a session, every settings endpoint is refused.
     for (const path of ["/settings/tutor", "/settings/tutor/choose", "/settings/tutor/clear"]) {
-      expect(await sam.post(path, path.endsWith("choose") ? LITE_HIGH : {}, false), path).toEqual({ status: 401, body: { error: "UNAUTHORIZED" } });
+      expect(await sam.post(path, path.endsWith("choose") ? LITE_HIGH : {}, false), path).toEqual({ status: 401, body: { error: "UNAUTHORIZED", detail: SIGNED_OUT } });
     }
   }, 30_000);
 });

@@ -1,4 +1,14 @@
 import { httpPolicy } from "@mit-sdg/sync-engine-http/policy";
+import { tutorRefusals } from "../compositions/settings.ts";
+import { assessmentReviewing } from "../concepts/AssessmentReviewing/registry.ts";
+import { commonsFederating } from "../concepts/Federating/registry.ts";
+import { generating } from "../concepts/Generating/registry.ts";
+import { groundedTutoring } from "../concepts/GroundedTutoring/registry.ts";
+import { masteryEstimating } from "../concepts/MasteryEstimating/registry.ts";
+import { registering } from "../concepts/Registering/registry.ts";
+import { sessioning } from "../concepts/Sessioning/registry.ts";
+import { skillMapping } from "../concepts/SkillMapping.registry.ts";
+import { studyPlanning } from "../concepts/StudyPlanning/registry.ts";
 
 export const SESSION_COOKIE = "__Host-stillgotit-session";
 export const ATTEMPT_COOKIE = "__Host-stillgotit-sign-in";
@@ -159,4 +169,52 @@ export function stillGotItPolicy(publicOrigin: string, requestBodyBytes = BODY_L
       },
     },
   });
+}
+
+// The adapter sends a refusal only as its public category above, so http.ts adds the refusal's sentence as `detail`.
+// A concept's sentences come from its specification, which states the same sentence its refusal class carries.
+const conceptSentences: Readonly<Record<string, string>> = Object.fromEntries(
+  [registering, commonsFederating, sessioning, skillMapping, groundedTutoring, assessmentReviewing, masteryEstimating, studyPlanning, generating]
+    .flatMap(({ specification }) => specification.actions.flatMap(({ refusals }) => refusals.map(({ code, message }) => [code, message]))));
+
+/**
+ * The sentence for each refusal code, on every endpoint that answers it. The engine keeps only the code of a
+ * composition's answer, so the compositions' sentences are restated here from their designs.
+ */
+export const refusalDetails: Readonly<Record<string, string>> = {
+  ...conceptSentences,
+  // Planning.md.
+  EXAM_SKILLS_UNAVAILABLE: "Choose confirmed skills from this course, each once.",
+  PROPOSAL_UNAVAILABLE: "Choose one of your proposed plans.",
+  // Settings.md: the two ChooseTutor refusals.
+  ...tutorRefusals,
+  // Importing.md: Confirm's checks. GRADED_SOURCE_USED is AssessmentReviewing's own refusal, so its sentence comes from the concept.
+  GRADED_DATE_INVALID: "Enter the date the work was performed.",
+  GRADED_DATE_FUTURE: "The performance date cannot be after today.",
+  GRADED_ROW_INVALID: "Review the extracted rows again.",
+  GRADED_ROW_UNMAPPED: "Map the question to a skill.",
+  GRADED_HELP_CONFLICT: "With help, the strongest result is “Success with help”.",
+  GRADED_SKILL_UNAVAILABLE: "Map the question to a confirmed skill in this course.",
+  // Importing.md, Courses.md and Learning.md: the graded-work checks before and after Confirm.
+  GRADED_MATERIAL_UNAVAILABLE: "Choose graded work that you imported into one of your courses.",
+  GRADED_SKILLS_UNAVAILABLE: "Confirm at least one skill in this course before importing graded work.",
+  GRADED_MARKS_MISSING: "No question marks were found, and a total score alone cannot update individual skills.",
+  GRADED_MATERIAL_NOT_SOURCE: "Graded work is evidence, not a teaching source.",
+  IMPORTED_GATE_UNAVAILABLE: "Imported coursework cannot show the complete demonstration gate.",
+  REGRADE_IMPORTED_UNAVAILABLE: "Imported coursework has no practice task to regrade, so correct it manually instead.",
+};
+
+/** Codes whose design gives a sentence only on some endpoints. Other endpoints answer the same code without one. */
+export const scopedRefusalDetails: Readonly<Record<string, { readonly applies: (path: string) => boolean; readonly detail: string }>> = {
+  // Planning.md: every planning endpoint answers a course that is not the learner's with this sentence.
+  COURSE_UNAVAILABLE: { applies: (path) => path.startsWith("/planning/"), detail: "Choose one of your own courses." },
+  // Learning.md: Adjust answers a skill that is not one of the learner's confirmed skills with this sentence.
+  SKILL_UNAVAILABLE: { applies: (path) => path === "/learning/adjust", detail: "Choose one of your confirmed skills before adjusting its estimate." },
+};
+
+/** The sentence for refusal `code` from the endpoint at `path` (without `/api`), or undefined when its design gives none. */
+export function refusalDetail(path: string, code: string): string | undefined {
+  const scoped = Object.hasOwn(scopedRefusalDetails, code) ? scopedRefusalDetails[code] : undefined;
+  if (scoped) return scoped.applies(path) ? scoped.detail : undefined;
+  return Object.hasOwn(refusalDetails, code) ? refusalDetails[code] : undefined;
 }

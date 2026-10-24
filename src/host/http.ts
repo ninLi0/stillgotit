@@ -2,13 +2,14 @@ import { admissions, composition as Access } from "../compositions/access.ts";
 import { tutorRefusals } from "../compositions/settings.ts";
 import { gradedConfirmInput, gradedExtractInput, learningInput, structuredInput, tutorChoiceInput } from "../compositions/reusable/inputs.ts";
 import { levelSupported, modelOffered } from "../computations/tutor.ts";
+import { AsyncLocalStorage } from "node:async_hooks";
 import { createHttpHandler } from "@mit-sdg/sync-engine-http/handler";
-import { createGateway, type EndpointValidator, type Invoker, type InvocationResult } from "@mit-sdg/sync-engine/boundary";
+import { createGateway, type EndpointValidator, type Invoker, type InvocationResult, type InvokeOptions } from "@mit-sdg/sync-engine/boundary";
 import { executionLimits, type assembleApplication } from "../assembly.ts";
 import type { Attempt } from "../concepts/Federating/Federating.ts";
 import type { Session } from "../concepts/Sessioning/Sessioning.ts";
 import type { RegistrationRecoveryStore } from "../storage/RegistrationRecoveryStore.ts";
-import { ATTEMPT_COOKIE, BODY_LIMIT, SESSION_COOKIE, stillGotItPolicy } from "./http-policy.ts";
+import { ATTEMPT_COOKIE, BODY_LIMIT, SESSION_COOKIE, refusalDetail, stillGotItPolicy } from "./http-policy.ts";
 import { KeyedLocks } from "./locks.ts";
 import type { Gemini } from "./gemini.ts";
 import type { TutorFailures } from "./tutor-generation.ts";
@@ -23,6 +24,16 @@ const gradedCommands: Record<string, EndpointValidator> = { "/courses/graded/ext
 /** Commands that run under the learner's lock after admission, with the tutor's failure reason added over HTTP. Paths exclude `/api`. */
 const learnerCommand = (path: string) => path.startsWith("/learning/") || path.startsWith("/planning/") || path === "/courses/skills/suggest" || Object.hasOwn(gradedCommands, path);
 const commandInput = (path: string, value: unknown) => (gradedCommands[path] ?? learningInput)(value);
+/** Course changes that run under the learner's lock, over HTTP and through the native gateway. Paths exclude `/api`. */
+const courseCommands = new Set(["/courses/create", "/courses/units/add", "/courses/units/emphasis", "/courses/skills/propose",
+  "/courses/skills/edit", "/courses/skills/confirm", "/courses/skills/details", "/courses/skills/revise", "/courses/skills/sources/add",
+  "/courses/skills/prerequisites", "/courses/skills/archive", "/courses/skills/restore"]);
+
+/**
+ * An answer from the exported runtime gateway. A refusal whose code has a sentence also carries that sentence as
+ * `detail` beside its code, as the same refusal does over HTTP.
+ */
+export type RuntimeAnswer = InvocationResult | { ok: false; error: { kind: "domain"; value: unknown; detail: string } };
 
 export function createApplicationHttp({ application, recovery, publicOrigin, clock = () => new Date(), gemini, failures, files, imports }: {
   application: Application;
@@ -35,6 +46,17 @@ export function createApplicationHttp({ application, recovery, publicOrigin, clo
   imports?: MaterialImportStore;
 }) {
   const rawGateway = createGateway({ application, executionLimits });
+  // The HTTP adapter answers a refusal with its public category alone, but the gateway's answer still names the code:
+  // `{ kind: "domain", value: CODE }`. The adapter accepts only the gateway that createGateway registered for this
+  // application, so the code is noted by wrapping that gateway's own invoke. `explained` then adds the code's sentence.
+  const refusals = new AsyncLocalStorage<{ code?: string }>();
+  const invokeGateway = rawGateway.invoke.bind(rawGateway);
+  rawGateway.invoke = async (path, input, options) => {
+    const result = await invokeGateway(path, input, options);
+    const waiting = refusals.getStore();
+    if (waiting && !result.ok && result.error.kind === "domain" && typeof result.error.value === "string") waiting.code = result.error.value;
+    return result;
+  };
   const policy = stillGotItPolicy(publicOrigin);
   const inner = createHttpHandler({ application, gateway: rawGateway, policy });
   const preparedInner = createHttpHandler({ application, gateway: rawGateway, policy: stillGotItPolicy(publicOrigin, 4 * 1024 * 1024) });
@@ -60,12 +82,30 @@ export function createApplicationHttp({ application, recovery, publicOrigin, clo
     return null;
   }
 
+  /**
+   * The adapter's response to `request`. When it is a refusal whose code has a sentence, the sentence is added as
+   * `detail`. A response that already explains itself, or that is not that code's refusal, is returned unchanged.
+   */
+  async function explained(handler: (request: Request) => Promise<Response>, request: Request): Promise<Response> {
+    const waiting: { code?: string } = {};
+    const response = await refusals.run(waiting, () => handler(request));
+    const code = waiting.code;
+    const detail = code === undefined ? undefined : refusalDetail(new URL(request.url).pathname.slice("/api".length), code);
+    if (code === undefined || detail === undefined || response.ok) return response;
+    const body = await response.clone().json().catch(() => null) as unknown;
+    if (body === null || typeof body !== "object" || Array.isArray(body) || "detail" in body ||
+      (body as { error?: unknown }).error !== policy.publicErrors?.[code]) return response;
+    const headers = new Headers(response.headers);
+    headers.delete("Content-Length");
+    return new Response(JSON.stringify({ ...body, detail }), { status: response.status, statusText: response.statusText, headers });
+  }
+
   // Native callers use the same declared admission checks and learner lock as HTTP.
   // The raw invoker remains internal; it assumes these application preconditions.
   const admittedInvoker: Invoker<Record<string, { input: unknown; output: unknown }>> = {
     async invoke(path, input, options = {}) {
       const learning = learnerCommand(path);
-      const courseMutation = ["/courses/create", "/courses/units/add", "/courses/skills/propose", "/courses/skills/edit", "/courses/skills/confirm"].includes(path);
+      const courseMutation = courseCommands.has(path);
       if (!learning && !courseMutation) {
         return rawGateway.invoke(path, input, options);
       }
@@ -91,12 +131,24 @@ export function createApplicationHttp({ application, recovery, publicOrigin, clo
       }
     },
   };
-  const gateway = createGateway({ executionLimits, application: {
+  const admittedGateway = createGateway({ executionLimits, application: {
     publicInterface: application.publicInterface,
     invoker: admittedInvoker,
     beginDrain: () => rawGateway.beginDrain(),
     whenIdle: () => rawGateway.whenIdle(),
   } });
+  // A refusal from the gateway carries only its code. Native callers also get the code's sentence as `detail` beside it,
+  // as HTTP callers do; createGateway drops any other field of a refusal, so the sentence is added after it.
+  const gateway = {
+    beginDrain: () => admittedGateway.beginDrain(),
+    whenIdle: () => admittedGateway.whenIdle(),
+    async invoke(path: string, input: unknown, options?: InvokeOptions): Promise<RuntimeAnswer> {
+      const result = await admittedGateway.invoke(path, input, options);
+      if (result.ok || result.error.kind !== "domain" || typeof result.error.value !== "string") return result;
+      const detail = refusalDetail(path, result.error.value);
+      return detail === undefined ? result : { ok: false, error: { kind: "domain", value: result.error.value, detail } };
+    },
+  };
 
   async function learner(request: Request) {
     const session = cookie(request.headers.get("Cookie"), SESSION_COOKIE);
@@ -138,7 +190,7 @@ export function createApplicationHttp({ application, recovery, publicOrigin, clo
         if (!await application.form(Access.CourseReady({ owner, course }))) return failure("FORBIDDEN", 403);
         if (operation.stage === "COMPLETE") return Response.json({ material: operation.material });
         const prepared = operation.prepared!;
-        const response = await preparedInner(internal(request, { course, importKey: prepared.importKey, title: prepared.title,
+        const response = await explained(preparedInner, internal(request, { course, importKey: prepared.importKey, title: prepared.title,
           locator: prepared.locator, content: prepared.content, originals: prepared.originals, origin: prepared.origin }));
         await rawGateway.whenIdle();
         if (!response.ok) return response;
@@ -201,14 +253,14 @@ export function createApplicationHttp({ application, recovery, publicOrigin, clo
         body: JSON.stringify({ username, recoveryKey }),
       });
 
-      let response = await inner(prepared());
+      let response = await explained(inner, prepared());
       await rawGateway.whenIdle();
       // A competing registration or link may have completed. Re-read before one bounded retry.
       if (response.status === 409 && identity.expiresAt > clock()) {
         const [savedLink] = await CommonsFederating._user({ attempt });
         const [savedAccount] = recoveryKey ? await Registering._byRecoveryKey({ recoveryKey }) : [];
         if (savedLink || savedAccount) {
-          response = await inner(prepared());
+          response = await explained(inner, prepared());
           await rawGateway.whenIdle();
         }
       }
@@ -261,9 +313,9 @@ export function createApplicationHttp({ application, recovery, publicOrigin, clo
           }
           failures?.take(owner);
           let response: Response;
-          try { response = await inner(request); }
+          try { response = await explained(inner, request); }
           finally { await rawGateway.whenIdle(); }
-          // GENERATION_FAILED reaches HTTP as a bare INVALID_REQUEST. Add the provider's reason so the learner knows to retry.
+          // GENERATION_FAILED carries Generating's general sentence. The provider's reason replaces it, so the learner knows why and can retry.
           const reason = failures?.take(owner);
           return reason && response.status === 400
             ? Response.json({ error: "INVALID_REQUEST", detail: reason }, { status: 400, headers: { "Cache-Control": "no-store" } }) : response;
@@ -272,7 +324,7 @@ export function createApplicationHttp({ application, recovery, publicOrigin, clo
       // Tutor settings take no learner lock, so saving a choice never waits behind a running lesson.
       if (path === "/api/settings/tutor/choose") {
         const body = await readBody(request.clone());
-        const response = await inner(request);
+        const response = await explained(inner, request);
         // The adapter reports either ChooseTutor refusal as INVALID_REQUEST. The same declared computations name which
         // one the flow returned; the catalog is fixed while the server runs, so they always agree with the flow.
         if (response.status !== 400 || !body || !tutorChoiceInput(body).ok) return response;
@@ -290,22 +342,21 @@ export function createApplicationHttp({ application, recovery, publicOrigin, clo
         const attempt = cookie(request.headers.get("Cookie"), ATTEMPT_COOKIE);
         if (!attempt) return failure("FORBIDDEN", 403);
         return await locks.run(`attempt:${attempt}`, async () => {
-          try { return await inner(request); }
+          try { return await explained(inner, request); }
           finally { await rawGateway.whenIdle(); }
         });
       }
-      if (path === "/api/courses/create" || path === "/api/courses/units/add" ||
-        ["/api/courses/skills/propose", "/api/courses/skills/edit", "/api/courses/skills/confirm"].includes(path)) {
+      if (path.startsWith("/api/") && courseCommands.has(path.slice(4))) {
         const session = cookie(request.headers.get("Cookie"), SESSION_COOKIE);
-        if (!session) return await inner(request);
+        if (!session) return await explained(inner, request);
         const identity = await Sessioning.use({ session: session as Session });
-        if ("error" in identity) return await inner(request);
+        if ("error" in identity) return await explained(inner, request);
         return await locks.run(`user:${identity.subject}`, async () => {
-          try { return await inner(request); }
+          try { return await explained(inner, request); }
           finally { await rawGateway.whenIdle(); }
         });
       }
-      return await inner(request);
+      return await explained(inner, request);
     } catch (error) {
       if (multipart || path.startsWith("/api/ai/") || (path.startsWith("/api/") && learnerCommand(path.slice(4)))) {
         const detail = error instanceof Error && error.name !== "MongoServerError" ? error.message : "This operation could not finish. Your saved work is available to retry.";

@@ -323,8 +323,9 @@ async function confirmImport() {
       let reason = explain(result);
       // A declared refusal imported nothing. Without one the row may have been imported, so it stays as sent until ReadImports settles it.
       if (["INVALID_REQUEST", "UNAUTHORIZED", "FORBIDDEN"].includes(String(result.error))) { row.pending = false; persist(); }
-      if (isBare(result as { error: unknown; detail?: unknown })) {
-        // Already imported, by a lost reply or another tab, if ReadImports now lists this label and skill.
+      if (String(result.error) === "INVALID_REQUEST") {
+        // Already imported, by a lost reply or another tab, if ReadImports now lists this label and skill. The used-source
+        // refusal now arrives with its sentence, so every declined row is checked against the imports, not only a bare one.
         try {
           await readImports(material);
           if (alreadyImported(row, imports.value)) { markImported(current, row); done.push(row); continue; }

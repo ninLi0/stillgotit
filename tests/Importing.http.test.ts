@@ -10,6 +10,7 @@ import { createGateway } from "@mit-sdg/sync-engine/boundary";
 import { executionLimits } from "../src/assembly.ts";
 import { pdf, png } from "./fixtures/office.ts";
 import type { ExtractContext } from "../src/tutor-types.ts";
+import { refusalDetail } from "../src/host/http-policy.ts";
 import type { Material } from "../src/concepts/GroundedTutoring/GroundedTutoring.ts";
 import type { Result } from "../src/concepts/AssessmentReviewing/AssessmentReviewing.ts";
 import type { User } from "../src/concepts/Registering/Registering.ts";
@@ -108,9 +109,9 @@ test("Correct accepts an imported case and keeps its gate false; a gate claim is
   const imported = await importCase(app, fixture, "Question 2", "SLIP", new Date(Date.now() - 3 * DAY));
   const gate = await app.runtime.gateway.invoke("/learning/correct", { session: fixture.session, case: imported.case, basedOn: imported.judgment,
     result: "INDEPENDENT", gateMet: true, reason: "The grader misread my last entry." }, { timeoutMs: 5000 });
-  expect(gate).toEqual({ ok: false, error: { kind: "domain", value: "IMPORTED_GATE_UNAVAILABLE" } });
+  expect(gate).toEqual({ ok: false, error: { kind: "domain", value: "IMPORTED_GATE_UNAVAILABLE", detail: "Imported coursework cannot show the complete demonstration gate." } });
   expect(await fixture.learner.post("/learning/correct", { case: imported.case, basedOn: imported.judgment, result: "INDEPENDENT", gateMet: true,
-    reason: "The grader misread my last entry." })).toEqual({ status: 400, body: { error: "INVALID_REQUEST" } });
+    reason: "The grader misread my last entry." })).toEqual({ status: 400, body: { error: "INVALID_REQUEST", detail: "Imported coursework cannot show the complete demonstration gate." } });
   expect(await app.runtime.application.concepts.AssessmentReviewing._judgments({ case: imported.case })).toHaveLength(1);
 
   const corrected = await fixture.learner.ok("/learning/correct", { case: imported.case, basedOn: imported.judgment, result: "INDEPENDENT", gateMet: false,
@@ -126,11 +127,11 @@ test("Correct accepts an imported case and keeps its gate false; a gate claim is
   expect(await app.runtime.gateway.invoke("/learning/correct", { session: fixture.session, case: imported.case, basedOn: imported.judgment,
     result: "GAP", gateMet: false, reason: "Stale view" }, { timeoutMs: 5000 })).toEqual({ ok: false, error: { kind: "framework", code: "INVALID_INPUT",
     detail: "Choose your own assessment and review its latest judgment before correcting it." } });
-  // A concept refusal reaches callers as its code only: the gateway gives the code, and HTTP gives the public kind without the concept's message.
+  // A concept refusal reaches callers with its code and the concept's own sentence: the gateway beside the code, and HTTP beside the public kind.
   const blank = { case: imported.case, basedOn: corrected.judgment, result: "GAP", gateMet: false, reason: "   " };
   expect(await app.runtime.gateway.invoke("/learning/correct", { session: fixture.session, ...blank }, { timeoutMs: 5000 }))
-    .toEqual({ ok: false, error: { kind: "domain", value: "INVALID_REVISED_JUDGMENT" } });
-  expect(await fixture.learner.post("/learning/correct", blank)).toEqual({ status: 400, body: { error: "INVALID_REQUEST" } });
+    .toEqual({ ok: false, error: { kind: "domain", value: "INVALID_REVISED_JUDGMENT", detail: "Provide an explanation and a result consistent with the saved work and assistance." } });
+  expect(await fixture.learner.post("/learning/correct", blank)).toEqual({ status: 400, body: { error: "INVALID_REQUEST", detail: "Provide an explanation and a result consistent with the saved work and assistance." } });
 }, 60_000);
 
 test("Regrade refuses an imported case before saving a clarification or contacting the tutor", async () => {
@@ -139,9 +140,9 @@ test("Regrade refuses an imported case before saving a clarification or contacti
   const before = app.generated;
   const refused = await app.runtime.gateway.invoke("/learning/regrade", { session: fixture.session, case: imported.case, basedOn: imported.judgment,
     reason: "Please look at my final entry again." }, { timeoutMs: 5000 });
-  expect(refused).toEqual({ ok: false, error: { kind: "domain", value: "REGRADE_IMPORTED_UNAVAILABLE" } });
+  expect(refused).toEqual({ ok: false, error: { kind: "domain", value: "REGRADE_IMPORTED_UNAVAILABLE", detail: "Imported coursework has no practice task to regrade, so correct it manually instead." } });
   expect(await fixture.learner.post("/learning/regrade", { case: imported.case, basedOn: imported.judgment, reason: "Please look at my final entry again." }))
-    .toEqual({ status: 400, body: { error: "INVALID_REQUEST" } });
+    .toEqual({ status: 400, body: { error: "INVALID_REQUEST", detail: "Imported coursework has no practice task to regrade, so correct it manually instead." } });
   expect(app.generated).toBe(before);
   expect(await app.runtime.application.concepts.AssessmentReviewing._clarifications({ case: imported.case })).toEqual([]);
   expect(await app.runtime.application.concepts.AssessmentReviewing._judgments({ case: imported.case })).toHaveLength(1);
@@ -209,9 +210,9 @@ test("graded endpoints and admission give one answer for missing, foreign, outsi
   for (const material of [foreign, fixture.material, crypto.randomUUID() as Material]) {
     expect(await app.runtime.application.form(Access.GradedReady({ owner: fixture.user, material })), material).toBeNull();
     expect(await app.runtime.gateway.invoke("/courses/graded/read", { session: fixture.session, material }, { timeoutMs: 5000 }), material)
-      .toEqual({ ok: false, error: { kind: "domain", value: "GRADED_MATERIAL_UNAVAILABLE" } });
+      .toEqual({ ok: false, error: { kind: "domain", value: "GRADED_MATERIAL_UNAVAILABLE", detail: "Choose graded work that you imported into one of your courses." } });
     // HTTP presents the refusal as its public error kind only; another learner's imports are never shown.
-    expect(await fixture.learner.post("/courses/graded/read", { material }), material).toEqual({ status: 403, body: { error: "FORBIDDEN" } });
+    expect(await fixture.learner.post("/courses/graded/read", { material }), material).toEqual({ status: 403, body: { error: "FORBIDDEN", detail: "Choose graded work that you imported into one of your courses." } });
   }
   expect((await fixture.learner.post("/courses/graded/read", { material: "" })).status).toBe(400);
   expect((await fixture.learner.post("/courses/graded/read", {})).status).toBe(400);
@@ -231,16 +232,16 @@ test("graded work cannot become a skill source, but other materials keep their o
   const { unit: foreignUnit } = await outsider.learner.ok("/courses/units/add", { course: outsider.course, title: "Their unit" });
   const draft = { title: "From graded work", outcome: "Multiply", gate: "Two products" };
   const propose = (input: Record<string, unknown>) => app.runtime.gateway.invoke("/courses/skills/propose", { session, proposalKey: crypto.randomUUID(), ...draft, ...input }, { timeoutMs: 5000 });
-  expect(await propose({ unit, material: graded })).toEqual({ ok: false, error: { kind: "domain", value: "GRADED_MATERIAL_NOT_SOURCE" } });
+  expect(await propose({ unit, material: graded })).toEqual({ ok: false, error: { kind: "domain", value: "GRADED_MATERIAL_NOT_SOURCE", detail: "Graded work is evidence, not a teaching source." } });
   expect(await propose({ unit, material: elsewhere })).toEqual({ ok: false, error: { kind: "domain", value: "MATERIAL_UNAVAILABLE" } });
   expect(await propose({ unit, material: foreign })).toEqual({ ok: false, error: { kind: "domain", value: "MATERIAL_UNAVAILABLE" } });
   expect(await propose({ unit: foreignUnit, material: graded })).toEqual({ ok: false, error: { kind: "domain", value: "COURSE_UNAVAILABLE" } });
-  expect(await learner.post("/courses/skills/propose", { proposalKey: crypto.randomUUID(), unit, material: graded, ...draft })).toEqual({ status: 400, body: { error: "INVALID_REQUEST" } });
+  expect(await learner.post("/courses/skills/propose", { proposalKey: crypto.randomUUID(), unit, material: graded, ...draft })).toEqual({ status: 400, body: { error: "INVALID_REQUEST", detail: "Graded work is evidence, not a teaching source." } });
 
   const { skill } = await learner.ok("/courses/skills/propose", { proposalKey: crypto.randomUUID(), unit, material: fixture.material, ...draft });
   const edit = (input: Record<string, unknown>) => app.runtime.gateway.invoke("/courses/skills/edit", { session, skill, unit, ...draft, title: "Edited", ...input }, { timeoutMs: 5000 });
-  expect(await edit({ material: graded })).toEqual({ ok: false, error: { kind: "domain", value: "GRADED_MATERIAL_NOT_SOURCE" } });
-  expect(await learner.post("/courses/skills/edit", { skill, unit, ...draft, title: "Edited", material: graded })).toEqual({ status: 400, body: { error: "INVALID_REQUEST" } });
+  expect(await edit({ material: graded })).toEqual({ ok: false, error: { kind: "domain", value: "GRADED_MATERIAL_NOT_SOURCE", detail: "Graded work is evidence, not a teaching source." } });
+  expect(await learner.post("/courses/skills/edit", { skill, unit, ...draft, title: "Edited", material: graded })).toEqual({ status: 400, body: { error: "INVALID_REQUEST", detail: "Graded work is evidence, not a teaching source." } });
   expect(await edit({ material: foreign })).toEqual({ ok: false, error: { kind: "domain", value: "MATERIAL_UNAVAILABLE" } });
   expect(await edit({ unit: foreignUnit, material: graded })).toEqual({ ok: false, error: { kind: "domain", value: "COURSE_UNAVAILABLE" } });
   expect(await edit({ material: fixture.material })).toEqual({ ok: true, value: {} });
@@ -280,16 +281,16 @@ test("Extract refuses a total score, an invalid answer, and work it cannot use, 
   const invoke = (material: string) => app.runtime.gateway.invoke("/courses/graded/extract", { session, material }, { timeoutMs: 5000 });
   // Only a total score: no question marks were found.
   app.extract(() => ({ rows: [] }));
-  expect(await invoke(graded)).toEqual({ ok: false, error: { kind: "domain", value: "GRADED_MARKS_MISSING" } });
-  expect(await learner.post("/courses/graded/extract", { material: graded })).toEqual({ status: 400, body: { error: "INVALID_REQUEST" } });
+  expect(await invoke(graded)).toEqual({ ok: false, error: { kind: "domain", value: "GRADED_MARKS_MISSING", detail: "No question marks were found, and a total score alone cannot update individual skills." } });
+  expect(await learner.post("/courses/graded/extract", { material: graded })).toEqual({ status: 400, body: { error: "INVALID_REQUEST", detail: "No question marks were found, and a total score alone cannot update individual skills." } });
   // A row naming a skill outside the listed confirmed skills refuses the whole answer.
   app.extract(() => ({ rows: [extracted("Question 1", outsider.skill)] }));
-  expect(await invoke(graded)).toEqual({ ok: false, error: { kind: "domain", value: "GENERATION_FAILED" } });
+  expect(await invoke(graded)).toEqual({ ok: false, error: { kind: "domain", value: "GENERATION_FAILED", detail: "The tutor could not finish. Check your connection and retry. Your saved work is still available." } });
   // Over HTTP the learner sees the recorded reason, as on the learning paths.
   expect(await learner.post("/courses/graded/extract", { material: graded })).toEqual({ status: 400,
     body: { error: "INVALID_REQUEST", detail: "The tutor could not produce a usable answer. Try again. Your saved work is still available." } });
   app.extract((context) => ({ rows: [extracted("Question 1", context.skills[0]!.skill, { mark: "" })] }));
-  expect(await invoke(graded)).toEqual({ ok: false, error: { kind: "domain", value: "GENERATION_FAILED" } });
+  expect(await invoke(graded)).toEqual({ ok: false, error: { kind: "domain", value: "GENERATION_FAILED", detail: "The tutor could not finish. Check your connection and retry. Your saved work is still available." } });
 
   const asked = app.generated;
   const foreign = (await outsider.learner.ok("/courses/materials/add", upload(outsider.course, "Graded work: Their midterm")) as { material: Material }).material;
@@ -303,8 +304,8 @@ test("Extract refuses a total score, an invalid answer, and work it cannot use, 
   // A course without a confirmed skill has nothing to map questions to.
   const { course: empty } = await learner.ok("/courses/create", { title: "No skills yet" });
   const unmapped = (await learner.ok("/courses/materials/add", upload(empty, "Graded work: Quiz")) as { material: Material }).material;
-  expect(await invoke(unmapped)).toEqual({ ok: false, error: { kind: "domain", value: "GRADED_SKILLS_UNAVAILABLE" } });
-  expect(await learner.post("/courses/graded/extract", { material: unmapped })).toEqual({ status: 400, body: { error: "INVALID_REQUEST" } });
+  expect(await invoke(unmapped)).toEqual({ ok: false, error: { kind: "domain", value: "GRADED_SKILLS_UNAVAILABLE", detail: "Confirm at least one skill in this course before importing graded work." } });
+  expect(await learner.post("/courses/graded/extract", { material: unmapped })).toEqual({ status: 400, body: { error: "INVALID_REQUEST", detail: "Confirm at least one skill in this course before importing graded work." } });
   expect(app.generated).toBe(asked);
   // The session is checked again after the tutor answers.
   app.extract((context) => ({ rows: [extracted("Question 1", context.skills[0]!.skill)] }));
@@ -321,8 +322,8 @@ test("Suggest refuses graded work before contacting the tutor, after the ownersh
   const foreign = (await outsider.learner.ok("/courses/materials/add", upload(outsider.course, "Graded work: Their midterm")) as { material: Material }).material;
   const asked = app.suggested;
   expect(await app.runtime.gateway.invoke("/courses/skills/suggest", { session, material: graded }, { timeoutMs: 5000 }))
-    .toEqual({ ok: false, error: { kind: "domain", value: "GRADED_MATERIAL_NOT_SOURCE" } });
-  expect(await learner.post("/courses/skills/suggest", { material: graded })).toEqual({ status: 400, body: { error: "INVALID_REQUEST" } });
+    .toEqual({ ok: false, error: { kind: "domain", value: "GRADED_MATERIAL_NOT_SOURCE", detail: "Graded work is evidence, not a teaching source." } });
+  expect(await learner.post("/courses/skills/suggest", { material: graded })).toEqual({ status: 400, body: { error: "INVALID_REQUEST", detail: "Graded work is evidence, not a teaching source." } });
   // Another learner's material keeps the existing admission refusal, whatever its title.
   expect(await learner.post("/courses/skills/suggest", { material: foreign })).toEqual({ status: 400, body: { error: "INVALID_REQUEST", detail: "Choose a source from your own course." } });
   expect(app.suggested).toBe(asked);
@@ -417,15 +418,17 @@ test("Confirm answers each failed check in the stated order and imports nothing"
     // The endpoint's own answer, without the host's admission.
     expect(await app.raw.invoke("/courses/graded/confirm", { session, ...body }, { timeoutMs: 5000 }), code).toEqual({ ok: false, error: { kind: "domain", value: code } });
     if (code === "GRADED_MATERIAL_UNAVAILABLE") continue;
-    // Through the host: the native gateway gives the code, and the browser receives only the public kind.
-    expect(await app.runtime.gateway.invoke("/courses/graded/confirm", { session, ...body }, { timeoutMs: 5000 }), code).toEqual({ ok: false, error: { kind: "domain", value: code } });
-    expect(await learner.post("/courses/graded/confirm", body), code).toEqual({ status: 400, body: { error: "INVALID_REQUEST" } });
+    // Through the host: the native gateway gives the code with its sentence, and the browser receives the public kind with the same sentence.
+    const detail = refusalDetail("/courses/graded/confirm", code);
+    expect(detail, code).toBeString();
+    expect(await app.runtime.gateway.invoke("/courses/graded/confirm", { session, ...body }, { timeoutMs: 5000 }), code).toEqual({ ok: false, error: { kind: "domain", value: code, detail } });
+    expect(await learner.post("/courses/graded/confirm", body), code).toEqual({ status: 400, body: { error: "INVALID_REQUEST", detail } });
   }
   // Every other way the row's content breaks the extraction's rules answers GRADED_ROW_INVALID.
   const { mark: _mark, ...withoutMark } = question(skill);
   for (const row of [question(skill, { label: "  " }), question(skill, { rationale: " " }), question(skill, { result: "PASS" }), question(skill, { proposedResult: "independent" })]) {
     expect(await app.runtime.gateway.invoke("/courses/graded/confirm", { session, material: graded, performedOn: today, outsideHelp: false, row }, { timeoutMs: 5000 }))
-      .toEqual({ ok: false, error: { kind: "domain", value: "GRADED_ROW_INVALID" } });
+      .toEqual({ ok: false, error: { kind: "domain", value: "GRADED_ROW_INVALID", detail: "Review the extracted rows again." } });
   }
   // A missing or non-string field is refused by the host first; the endpoint's own check still answers a caller that skips the host.
   for (const row of [withoutMark, { ...question(skill), mark: 4 }]) {
@@ -434,19 +437,20 @@ test("Confirm answers each failed check in the stated order and imports nothing"
   }
   for (const performedOn of ["", " ", "2026-13-01", "10/20/2026", "yesterday"]) {
     expect(await app.runtime.gateway.invoke("/courses/graded/confirm", { session, material: graded, performedOn, outsideHelp: false, row: question(skill) }, { timeoutMs: 5000 }), performedOn)
-      .toEqual({ ok: false, error: { kind: "domain", value: "GRADED_DATE_INVALID" } });
+      .toEqual({ ok: false, error: { kind: "domain", value: "GRADED_DATE_INVALID", detail: "Enter the date the work was performed." } });
   }
   // Another course's confirmed skill is not available either.
   expect(await app.runtime.gateway.invoke("/courses/graded/confirm", { session, material: graded, performedOn: today, outsideHelp: false, row: question(outsider.skill) }, { timeoutMs: 5000 }))
-    .toEqual({ ok: false, error: { kind: "domain", value: "GRADED_SKILL_UNAVAILABLE" } });
+    .toEqual({ ok: false, error: { kind: "domain", value: "GRADED_SKILL_UNAVAILABLE", detail: "Map the question to a confirmed skill in this course." } });
   expect(await saved()).toBe(0);
   expect(await Assessment._cases({ author: outsider.user, subject: outsider.skill })).toEqual([]);
 
   // The same question and skill again is refused with the concept's code, even with other spacing, a new date, or a new result.
   const confirmed = await learner.ok("/courses/graded/confirm", { material: graded, performedOn: today, outsideHelp: false, row: question(skill) }) as { case: string };
   const repeat = { material: graded, performedOn: shift(today, -1), outsideHelp: false, row: question(skill, { label: " Question 2  ", result: "GAP" }) };
-  expect(await app.runtime.gateway.invoke("/courses/graded/confirm", { session, ...repeat }, { timeoutMs: 5000 })).toEqual({ ok: false, error: { kind: "domain", value: "GRADED_SOURCE_USED" } });
-  expect(await learner.post("/courses/graded/confirm", repeat)).toEqual({ status: 400, body: { error: "INVALID_REQUEST" } });
+  const used = refusalDetail("/courses/graded/confirm", "GRADED_SOURCE_USED");
+  expect(await app.runtime.gateway.invoke("/courses/graded/confirm", { session, ...repeat }, { timeoutMs: 5000 })).toEqual({ ok: false, error: { kind: "domain", value: "GRADED_SOURCE_USED", detail: used } });
+  expect(await learner.post("/courses/graded/confirm", repeat)).toEqual({ status: 400, body: { error: "INVALID_REQUEST", detail: used } });
   expect((await Assessment._cases({ author: user, subject: skill })).map((row) => row.case)).toEqual([confirmed.case]);
   // The source key includes the skill, so the same label may be imported for another skill.
   expect(await learner.post("/courses/graded/confirm", { ...repeat, row: question(fixture.second) })).toMatchObject({ status: 200 });
@@ -529,5 +533,5 @@ test("Extract tells the learner when an original is too large to send in full, b
   // The reason is taken once: a later refusal that is not the tutor's carries no stale reason.
   const { course: empty } = await learner.ok("/courses/create", { title: "No skills yet" });
   const unmapped = (await learner.ok("/courses/materials/add", upload(empty, "Graded work: Quiz")) as { material: Material }).material;
-  expect(await learner.post("/courses/graded/extract", { material: unmapped })).toEqual({ status: 400, body: { error: "INVALID_REQUEST" } });
+  expect(await learner.post("/courses/graded/extract", { material: unmapped })).toEqual({ status: 400, body: { error: "INVALID_REQUEST", detail: "Confirm at least one skill in this course before importing graded work." } });
 }, 60_000);

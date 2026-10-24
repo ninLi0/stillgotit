@@ -4,6 +4,7 @@ import { rm } from "node:fs/promises";
 import { resolve } from "node:path";
 import { MemoryProvider } from "../../src/concepts/Federating/provider.ts";
 import { createRuntime } from "../../src/host/runtime.ts";
+import * as mapping from "../../src/concepts/SkillMapping.ts";
 import type { CourseTutor } from "../../src/host/tutor.ts";
 import { connectMongo, localMongoUri } from "../../src/storage/mongo.ts";
 
@@ -14,6 +15,8 @@ import { connectMongo, localMongoUri } from "../../src/storage/mongo.ts";
 
 const ORIGIN = "http://localhost:5173", MINUTE = 60_000, DAY = 86_400_000, cleanups: (() => Promise<void>)[] = [];
 afterAll(async () => { for (const cleanup of cleanups.reverse()) await cleanup(); });
+// The sentence a SkillMapping refusal carries, which reaches the learner as the answer's `detail`.
+const message = (Refusal: new () => Error) => new Refusal().message;
 
 // Responses are JSON, so their rows are untyped here.
 type Data = any;
@@ -335,24 +338,24 @@ describe("After confirming a skill, a learner can keep it accurate", () => {
     const { learner, course, multiply, dimensions } = await journey();
     const start = await learner.ok("/courses/read", { course });
     expect(start.prerequisites).toEqual([{ skill: multiply, prerequisite: dimensions }]);
-    // Over HTTP each refusal carries only its public error kind. The page turns that kind into the action's own
-    // sentence (frontend/src/ManageSkills.vue); that text is checked in the browser.
-    const refusals: [string, Record<string, unknown>, number, string][] = [
-      ["/courses/skills/details", { skill: multiply, unit: saved.inverses, title: "   " }, 400, "INVALID_REQUEST"],
-      ["/courses/skills/revise", { skill: multiply, ...REVISED }, 409, "CONFLICT"],
-      ["/courses/skills/prerequisites", { skill: multiply, prerequisites: [multiply] }, 400, "INVALID_REQUEST"],
-      ["/courses/skills/prerequisites", { skill: dimensions, prerequisites: [multiply] }, 400, "INVALID_REQUEST"],
-      ["/courses/skills/archive", { skill: dimensions }, 409, "CONFLICT"],
+    // Over HTTP each refusal carries its public error kind and the action's own sentence as `detail`, which the page
+    // shows (frontend/src/ManageSkills.vue); that text is checked in the browser.
+    const refusals: [string, Record<string, unknown>, number, string, string][] = [
+      ["/courses/skills/details", { skill: multiply, unit: saved.inverses, title: "   " }, 400, "INVALID_REQUEST", message(mapping.InvalidSkillTitleError)],
+      ["/courses/skills/revise", { skill: multiply, ...REVISED }, 409, "CONFLICT", message(mapping.SkillDefinitionUnchangedError)],
+      ["/courses/skills/prerequisites", { skill: multiply, prerequisites: [multiply] }, 400, "INVALID_REQUEST", message(mapping.InvalidSkillPrerequisitesError)],
+      ["/courses/skills/prerequisites", { skill: dimensions, prerequisites: [multiply] }, 400, "INVALID_REQUEST", message(mapping.InvalidSkillPrerequisitesError)],
+      ["/courses/skills/archive", { skill: dimensions }, 409, "CONFLICT", message(mapping.SkillStillRequiredError)],
     ];
-    for (const [path, input, status, error] of refusals) {
-      expect(await learner.post(path, input), path).toEqual({ status, body: { error } });
+    for (const [path, input, status, error, detail] of refusals) {
+      expect(await learner.post(path, input), path).toEqual({ status, body: { error, detail } });
       expect(await learner.ok("/courses/read", { course }), path).toEqual(start);
     }
     // Restoring a skill whose prerequisite is archived: archive the skill, then its prerequisite, then try to restore the skill first.
     expect(await learner.ok("/courses/skills/archive", { skill: multiply })).toEqual({});
     expect(await learner.ok("/courses/skills/archive", { skill: dimensions })).toEqual({});
     const archived = await learner.ok("/courses/read", { course });
-    expect(await learner.post("/courses/skills/restore", { skill: multiply })).toEqual({ status: 409, body: { error: "CONFLICT" } });
+    expect(await learner.post("/courses/skills/restore", { skill: multiply })).toEqual({ status: 409, body: { error: "CONFLICT", detail: message(mapping.SkillRestorePrerequisitesError) } });
     expect(await learner.ok("/courses/read", { course })).toEqual(archived);
     expect(skillRow(archived, multiply).status).toBe("ARCHIVED");
     // Restoring the prerequisite first lets the skill come back, and the course is as it was.
@@ -509,7 +512,7 @@ describe("If a reply is lost, the change stays saved, and the page's next course
     expect(tracks).toEqual(expect.arrayContaining([
       expect.objectContaining({ definition: first!.version, startingBasis: "SELF_REPORTED" }),
       expect.objectContaining({ definition: skillRow(read, multiply).current, startingBasis: "PREVIOUS_DEFINITION" })]));
-    expect(retry).toEqual({ status: 409, body: { error: "CONFLICT" } });
+    expect(retry).toEqual({ status: 409, body: { error: "CONFLICT", detail: message(mapping.SkillDefinitionUnchangedError) } });
   }, 60_000);
 
   test("Attaching a material the skill already has succeeds and changes nothing.", async () => {
@@ -530,14 +533,14 @@ describe("If a reply is lost, the change stays saved, and the page's next course
     const { multiply } = await retrying();
     const { read, retry } = await lostReply("/courses/skills/archive", { skill: multiply });
     expect(skillRow(read, multiply).status).toBe("ARCHIVED");
-    expect(retry).toEqual({ status: 409, body: { error: "CONFLICT" } });
+    expect(retry).toEqual({ status: 409, body: { error: "CONFLICT", detail: message(mapping.SkillArchiveUnavailableError) } });
   }, 60_000);
 
   test("The action refuses a skill that is not archived, including one already restored.", async () => {
     const { multiply } = await retrying();
     const { read, retry } = await lostReply("/courses/skills/restore", { skill: multiply });
     expect(skillRow(read, multiply).status).toBe("CONFIRMED");
-    expect(retry).toEqual({ status: 409, body: { error: "CONFLICT" } });
+    expect(retry).toEqual({ status: 409, body: { error: "CONFLICT", detail: message(mapping.SkillRestoreUnavailableError) } });
   }, 60_000);
 
   test("Setting the saved value again succeeds and changes nothing.", async () => {
