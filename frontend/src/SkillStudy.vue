@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onDeactivated, onMounted, ref, shallowRef, watch } from "vue";
-import { uploadMaterial } from "./host-api.ts";
+import { useAttachUpload } from "./attach-upload.ts";
 import SpeechInput from "./SpeechInput.vue";
 import ListenButton from "./ListenButton.vue";
 import SourcesUsed from "./SourcesUsed.vue";
@@ -89,21 +89,22 @@ async function send() {
   });
 }
 function forgetPreview(item: Attachment) { if (item.preview) { URL.revokeObjectURL(item.preview); previews.delete(item.preview); } }
-/** Each photo is uploaded to this skill's course as its own material, in the order chosen. A failed photo does not stop the rest. */
+const attach = useAttachUpload(() => props.course);
+/**
+ * Each photo is uploaded to this skill's course as its own material, in the order chosen. A failed photo does not stop
+ * the rest, and it keeps its request ID, so choosing it again never saves it twice.
+ */
 async function uploadWork(event: Event) {
-  const picker = event.target as HTMLInputElement, files = Array.from(picker.files ?? []);
-  // Clear the picker so the same photo can be chosen again after removing it.
-  picker.value = "";
+  const files = attach.take(event);
   if (!files.length) return;
   await act(async () => {
     const problems: string[] = [];
     for (const file of files) {
       try {
-        const form = new FormData(); form.set("course", props.course); form.set("title", `My work: ${file.name}`); form.set("requestId", crypto.randomUUID()); form.append("files", file);
-        const result = await uploadMaterial(form);
+        const material = await attach.upload(file);
         const preview = file.type.startsWith("image/") ? URL.createObjectURL(file) : "";
         if (preview) previews.add(preview);
-        attachments.value = [...attachments.value, { material: result.material, name: file.name, preview }];
+        attachments.value = [...attachments.value, { material, name: file.name, preview }];
       } catch (problem) {
         problems.push(`${file.name} was not attached. ${problem instanceof Error ? problem.message : "Try again."}`);
       }

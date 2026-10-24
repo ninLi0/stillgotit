@@ -517,7 +517,7 @@ test("two confirms of the same question run one after the other, and the second 
 
 test("Extract tells the learner when an original is too large to send in full, before contacting the tutor", async () => {
   let asked = 0;
-  const tutor = new CourseTutor({ json: async () => { asked++; return { rows: [] }; } }, { read: async () => Buffer.alloc(15 * MB + 1, 1) });
+  const tutor = new CourseTutor({ json: async () => { asked++; return { rows: [] }; } }, { read: async () => Buffer.alloc(15 * MB + 1, 1), size: async () => 15 * MB + 1 });
   const app = await setup({ tutor }), fixture = await learnerWithSkill(app, "extract-large"), { learner, course } = fixture;
   const scanned = new FormData(); scanned.set("course", course); scanned.set("title", "Graded work: Midterm 1"); scanned.set("requestId", crypto.randomUUID());
   scanned.append("files", new File([pdf(["Question 1 (4/5)"]) as Uint8Array<ArrayBuffer>], "midterm.pdf", { type: "application/pdf" }));

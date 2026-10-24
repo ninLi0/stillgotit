@@ -42,6 +42,6 @@ export default {
   design: {
     version: 1,
     documents: [new URL("./design/stages/materials.md", import.meta.url),
-      ...["Courses", "Learning", "Importing", "LearningReads", "Progress", "Planning", "LearningComputations", "LearningAccess", "Settings"].map((name) => new URL(`./design/compositions/${name}.md`, import.meta.url))],
+      ...["Courses", "Learning", "Importing", "LearningReads", "Progress", "Planning", "LearningComputations", "LearningAccess", "Settings", "Materials"].map((name) => new URL(`./design/compositions/${name}.md`, import.meta.url))],
   },
 };

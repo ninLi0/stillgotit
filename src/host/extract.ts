@@ -3,67 +3,143 @@ import { extname } from "node:path";
 import { unzipSync, zipSync } from "fflate";
 import mammoth from "mammoth";
 import { extractText, getDocumentProxy } from "unpdf";
-import type { MediaRendition, MediaValue } from "../concepts/GroundedTutoring/media.ts";
+import type { ImageMediaType, MediaRendition, MediaValue } from "../concepts/GroundedTutoring/media.ts";
+import { imageType, isPdf, OggVideo, readRecording, WindowsAudio, recordingFamilies, type RecordingInfo } from "./media-detect.ts";
+import { Refusal } from "./refusal.ts";
 
 export const MAX_PAGES = 50, MAX_TEXT = 500_000, MAX_EXPANDED = 50 * 1024 * 1024, MAX_ROWS = 20_000, MAX_COLUMNS = 200;
-export const UNSUPPORTED = "This file type can't be imported. Upload a PDF, image, text, notebook, Word, PowerPoint, or Excel file.";
+/** Recordings and videos may be at most 2 hours long, so a whole transcript fits in one answer from the model. */
+export const MAX_RECORDING_SECONDS = 2 * 60 * 60;
+export const UNSUPPORTED = "This file type can't be imported. Upload a PDF, image, audio recording, video, text, notebook, Word, PowerPoint, or Excel file.";
+export const ARCHIVE = "ZIP and other archive files can't be imported. Unzip them and choose the files inside.";
+export const OLD_OFFICE = "This older Office format can't be imported. Save the file as .docx, .pptx, or .xlsx, or export it to PDF.";
+export const OTHER_IMAGE = "This image format can't be imported. Upload a PNG, JPEG, WebP, HEIC, or HEIF image.";
+export const OTHER_AUDIO = "This audio format can't be imported. Save the recording as MP3 or M4A and import it again.";
+export const OTHER_VIDEO = "This video format can't be imported. Save the video as MP4 and import it again.";
+export const IMAGE_UNREADABLE = "This image can't be read. Upload a PNG, JPEG, WebP, HEIC, or HEIF image.";
+export const RECORDING_UNREADABLE = "This recording can't be read. Check that it plays, then save it as MP3, M4A, or MP4 and import it again.";
+export const RECORDING_TOO_LONG = "Recordings and videos can be at most 2 hours long. Split the recording and import each part.";
+export const TOO_MUCH_TEXT = "This material contains too much text. Import a smaller unit.";
 export const OFFICE_LIMITATION = "Images and charts in this file aren't included. Export it to PDF to keep them.";
+export const AUDIO_LIMITATION = "This transcript was written by the AI tutor from the recording. Words and times may contain mistakes. Play the recording to check.";
+export const VIDEO_LIMITATION = "This transcript was written by the AI tutor from the video. It includes short notes about text and diagrams on screen, but not the pictures themselves. Words and times may contain mistakes. Play the video to check.";
 const NOTEBOOK_LIMITATION = "Notebook source cells are read without executing code. Saved graphical outputs are not interpreted.";
-const OLD_OFFICE = "This older Office format can't be imported. Save the file as .docx, .pptx, or .xlsx, or export it to PDF.";
-const OTHER_IMAGE = "This image format can't be imported. Upload a PNG, JPEG, or WebP image.";
 const TOO_LARGE = "This file is too large to read once it is unpacked. Import a smaller unit.";
 const unreadable = (kind: string) => `This ${kind} can't be read. Check that it opens, or export it to PDF.`;
 
-type Kind = "pdf" | "image" | "docx" | "pptx" | "xlsx" | "notebook" | "text";
-const kinds: Record<string, Kind | string> = {
-  ".pdf": "pdf", ".png": "image", ".jpg": "image", ".jpeg": "image", ".webp": "image", ".docx": "docx", ".pptx": "pptx",
-  ".xlsx": "xlsx", ".xlsm": "xlsx", ".ipynb": "notebook",
-  ".doc": OLD_OFFICE, ".dot": OLD_OFFICE, ".ppt": OLD_OFFICE, ".pps": OLD_OFFICE, ".pot": OLD_OFFICE, ".xls": OLD_OFFICE, ".xlt": OLD_OFFICE,
-  ".gif": OTHER_IMAGE, ".bmp": OTHER_IMAGE, ".tif": OTHER_IMAGE, ".tiff": OTHER_IMAGE, ".heic": OTHER_IMAGE, ".heif": OTHER_IMAGE, ".avif": OTHER_IMAGE,
+export type Kind = "pdf" | "image" | "recording" | "docx" | "pptx" | "xlsx" | "notebook" | "text";
+/** How one file is read. PDFs, images, and recordings carry the media type detected from their bytes. */
+export type Detected =
+  | { kind: "pdf"; mediaType: "application/pdf" }
+  | { kind: "image"; mediaType: ImageMediaType }
+  | { kind: "recording"; mediaType: string; recording: RecordingInfo }
+  | { kind: "docx" | "pptx" | "xlsx" | "notebook" | "text"; mediaType?: undefined };
+
+const named: Record<string, Kind | string> = {
+  ".pdf": "pdf", ".png": "image", ".jpg": "image", ".jpeg": "image", ".webp": "image", ".heic": "image", ".heif": "image",
+  ".docx": "docx", ".pptx": "pptx", ".xlsx": "xlsx", ".xlsm": "xlsx", ".ipynb": "notebook",
 };
-// Formats that decode as text but are not meant to be read as text, plus common binaries.
-for (const extension of [".zip", ".7z", ".rar", ".tar", ".gz", ".tgz", ".bz2", ".xz", ".rtf", ".odt", ".odp", ".ods", ".pages", ".key", ".numbers",
-  ".mp3", ".m4a", ".wav", ".ogg", ".flac", ".aac", ".webm", ".mp4", ".mpeg", ".mpga", ".mov", ".avi", ".mkv", ".exe", ".dmg", ".bin"]) kinds[extension] = UNSUPPORTED;
+const refusedNames: [string, string[]][] = [
+  [ARCHIVE, [".zip", ".7z", ".rar", ".tar", ".gz", ".tgz", ".bz2", ".xz"]],
+  [OLD_OFFICE, [".doc", ".dot", ".ppt", ".pps", ".pot", ".xls", ".xlt"]],
+  [OTHER_IMAGE, [".gif", ".bmp", ".tif", ".tiff", ".avif"]],
+  [OTHER_AUDIO, [".wma", ".amr", ".caf", ".pcm", ".raw"]],
+  [OTHER_VIDEO, [".mkv", ".ogv"]],
+  // Formats that may decode as text but are not meant to be read as text, plus common binaries.
+  [UNSUPPORTED, [".rtf", ".odt", ".odp", ".ods", ".pages", ".key", ".numbers", ".exe", ".dmg", ".bin"]],
+];
+for (const [sentence, extensions] of refusedNames) for (const extension of extensions) named[extension] = sentence;
+for (const extension of Object.keys(recordingFamilies)) named[extension] = "recording";
 
 const utf8 = new TextDecoder("utf-8", { fatal: true });
 function decodeText(bytes: Uint8Array): string | null {
   try { const text = utf8.decode(bytes); return text.includes("\0") ? null : text; } catch { return null; }
 }
 
-/** Returns how a file is read, or throws a learner-facing refusal. Text is recognized by content. */
-export function classify(name: string, bytes: Uint8Array): Kind {
-  const kind = kinds[extname(name).toLowerCase()];
-  if (kind === undefined) { if (decodeText(bytes) === null) throw new Error(UNSUPPORTED); return "text"; }
-  if (!["pdf", "image", "docx", "pptx", "xlsx", "notebook"].includes(kind)) throw new Error(kind);
-  return kind as Kind;
+/**
+ * How much of a file `classify` needs: the whole file for recordings and text (unknown names and `.ts`),
+ * the start for PDFs and images, and nothing for Office files and notebooks, which are checked while reading.
+ */
+export function bytesNeeded(name: string): "all" | "start" | "none" {
+  const kind = named[extname(name).toLowerCase()];
+  return kind === undefined || kind === "recording" ? "all" : kind === "pdf" || kind === "image" ? "start" : "none";
+}
+export const START_BYTES = 4096;
+
+/** Returns how a file is read, from its name and its bytes, or throws a learner-facing refusal. */
+export function classify(name: string, bytes: Uint8Array): Detected {
+  const extension = extname(name).toLowerCase(), kind = named[extension];
+  // `.ts` names both TypeScript source and MPEG transport streams. Only text is readable.
+  if (extension === ".ts") { if (decodeText(bytes) === null) throw new Refusal(OTHER_VIDEO); return { kind: "text" }; }
+  if (kind === undefined) { if (decodeText(bytes) === null) throw new Refusal(UNSUPPORTED); return { kind: "text" }; }
+  if (kind === "pdf") { if (!isPdf(bytes)) throw new Refusal(unreadable("PDF")); return { kind, mediaType: "application/pdf" }; }
+  if (kind === "image") {
+    // A photo named .heic whose bytes are JPEG is saved as JPEG.
+    const mediaType = imageType(bytes);
+    if (!mediaType) throw new Refusal(IMAGE_UNREADABLE);
+    return { kind, mediaType };
+  }
+  if (kind === "recording") {
+    let recording: RecordingInfo | null;
+    try { recording = readRecording(recordingFamilies[extension]!, extension, bytes); }
+    catch (error) {
+      if (error instanceof OggVideo) throw new Refusal(OTHER_VIDEO);
+      if (error instanceof WindowsAudio) throw new Refusal(OTHER_AUDIO);
+      throw error;
+    }
+    if (!recording) throw new Refusal(RECORDING_UNREADABLE);
+    if (recording.seconds > MAX_RECORDING_SECONDS) throw new Refusal(RECORDING_TOO_LONG);
+    return { kind, mediaType: recording.mediaType, recording };
+  }
+  if (kind === "docx" || kind === "pptx" || kind === "xlsx" || kind === "notebook") return { kind };
+  throw new Refusal(kind);
 }
 
-export interface Source { file: string; name: string; mediaType: string; bytes: Uint8Array }
+/** The material's content: every text rendition in file and rendition order, as `[location]` and its text. */
+export function joinContent(originals: readonly MediaValue[]): string {
+  return originals.flatMap((file) => file.renditions.flatMap((part) => part.kind === "TEXT" ? [`[${part.location}]\n${part.text}`] : [])).join("\n\n");
+}
 
-/** Collects renditions for one import. The location key format matches earlier imports. */
-export async function extract(sources: readonly Source[]): Promise<{ originals: MediaValue[]; content: string }> {
-  const originals: MediaValue[] = [], texts: string[] = [];
-  let size = 0;
-  for (const { file, name, mediaType, bytes } of sources) {
+/** The first 16 hexadecimal characters of the SHA-256 digest of the file reference. */
+export const locationKey = (file: string) => createHash("sha256").update(file).digest("hex").slice(0, 16);
+
+/** One file to read. `bytes` may be the received upload, which is copied once when its turn comes. */
+export interface Source { file: string; name: string; mediaType: string; bytes: Uint8Array | Blob; detected?: Detected }
+
+/**
+ * Collects renditions for one import. The location key format matches earlier imports. Recordings and videos
+ * get no renditions here; their transcripts are added after transcription. `recordings` names each distinct
+ * retained recording once: identical files share one reference, so one transcript serves every original that has it.
+ */
+export async function extract(sources: readonly Source[]): Promise<{ originals: MediaValue[]; content: string; recordings: string[] }> {
+  const originals: MediaValue[] = [], recordings: string[] = [];
+  let length = 0, parts = 0;
+  for (const { file, name, mediaType, bytes: received, detected: known } of sources) {
     const renditions: MediaRendition[] = [], limitations: string[] = [];
-    const key = createHash("sha256").update(file).digest("hex").slice(0, 16);
+    const key = locationKey(file);
     const add = (location: string, text: string) => {
       if (!text.trim()) return false;
-      const part = `[${location}]\n${text}`;
-      texts.push(part); size += part.length;
-      if (size > MAX_TEXT) throw new Error("This material contains too much text. Import a smaller unit.");
+      // Count the exact content length, including the blank line between parts.
+      length += location.length + text.length + 3 + (parts++ ? 2 : 0);
+      if (length > MAX_TEXT) throw new Refusal(TOO_MUCH_TEXT);
       renditions.push({ kind: "TEXT", location, text });
       return true;
     };
-    const kind = classify(name, bytes);
-    if (kind === "pdf") await pdf(bytes, key, add, limitations);
-    else if (kind === "image") renditions.push({ kind: "IMAGE", location: `${key}/image`, file, mediaType: imageType(bytes) });
-    else if (kind === "docx") { add(`${key}/document`, await docx(bytes)); limitations.push(OFFICE_LIMITATION); }
-    else if (kind === "pptx") { slides(bytes).forEach((text, i) => add(`${key}/slide/${i + 1}`, text)); limitations.push(OFFICE_LIMITATION); }
-    else if (kind === "xlsx") { for (const sheet of sheets(bytes)) add(`${key}/sheet/${sheet.name}/rows/1-${sheet.last}`, sheet.text); limitations.push(OFFICE_LIMITATION); }
-    else if (kind === "notebook") { notebook(bytes).forEach((text, i) => add(`${key}/cell/${i + 1}`, text)); limitations.push(NOTEBOOK_LIMITATION); }
+    // Each file is copied once from the received bytes when it is read, and that copy goes to its reader.
+    const copied = !(received instanceof Uint8Array), bytes = received instanceof Uint8Array ? received
+      : known?.kind === "recording" ? new Uint8Array() : await received.bytes();
+    const detected = known ?? classify(name, bytes);
+    if (detected.kind === "recording") { if (!recordings.includes(file)) recordings.push(file); }
+    else if (detected.kind === "pdf") await pdf(copied ? bytes : bytes.slice(), key, add, renditions, limitations);
+    else if (detected.kind === "image") renditions.push({ kind: "IMAGE", location: `${key}/image`, file, mediaType: detected.mediaType });
+    else if (detected.kind === "docx") { add(`${key}/document`, await docx(bytes)); limitations.push(OFFICE_LIMITATION); }
+    else if (detected.kind === "pptx") { slides(bytes).forEach((text, i) => add(`${key}/slide/${i + 1}`, text)); limitations.push(OFFICE_LIMITATION); }
+    else if (detected.kind === "xlsx") { for (const sheet of sheets(bytes)) add(`${key}/sheet/${sheet.name}/rows/1-${sheet.last}`, sheet.text); limitations.push(OFFICE_LIMITATION); }
+    else if (detected.kind === "notebook") { notebook(bytes).forEach((text, i) => add(`${key}/cell/${i + 1}`, text)); limitations.push(NOTEBOOK_LIMITATION); }
     else {
-      const lines = decodeText(bytes)!.split(/\r\n|[\n\r\v\f\x1c-\x1e\x85]/);
+      const text = decodeText(bytes);
+      if (text === null) throw new Refusal(UNSUPPORTED);
+      const lines = text.split(/\r\n|[\n\r\v\f\x1c-\x1e\x85]/);
       if (lines.at(-1) === "") lines.pop();
       for (let start = 0; start < lines.length; start += 100) {
         add(`${key}/lines/${start + 1}-${Math.min(start + 100, lines.length)}`, lines.slice(start, start + 100).join("\n"));
@@ -71,53 +147,51 @@ export async function extract(sources: readonly Source[]): Promise<{ originals: 
     }
     originals.push({ file, name, mediaType, renditions, limitations });
   }
-  return { originals, content: texts.join("\n\n") };
+  return { originals, content: joinContent(originals), recordings };
 }
 
-async function pdf(bytes: Uint8Array, key: string, add: (location: string, text: string) => boolean, limitations: string[]) {
+/** Text for each page with text, and a page rendition for each page without it. No page images are made. */
+async function pdf(bytes: Uint8Array, key: string, add: (location: string, text: string) => boolean, renditions: MediaRendition[], limitations: string[]) {
   let file: Awaited<ReturnType<typeof getDocumentProxy>>;
-  // pdf.js may take ownership of the buffer it reads, so it gets a copy.
-  try { file = await getDocumentProxy(bytes.slice(), { verbosity: 0 }); }
-  catch (error) { throw new Error((error as Error)?.name === "PasswordException" ? "This PDF needs a password. Upload an unlocked copy." : unreadable("PDF")); }
+  // pdf.js may take ownership of the buffer it reads, so it always gets its own copy.
+  try { file = await getDocumentProxy(bytes, { verbosity: 0 }); }
+  catch (error) { throw new Refusal((error as Error)?.name === "PasswordException" ? "This PDF needs a password. Upload an unlocked copy." : unreadable("PDF")); }
   try {
-    if (file.numPages > MAX_PAGES) throw new Error(`A source can contain at most ${MAX_PAGES} pages. Import a smaller unit.`);
+    if (file.numPages > MAX_PAGES) throw new Refusal(`A source can contain at most ${MAX_PAGES} pages. Import a smaller unit.`);
     let pages: string[];
-    try { pages = (await extractText(file, { mergePages: false })).text; } catch { throw new Error(unreadable("PDF")); }
-    const blank = pages.flatMap((text, i) => add(`${key}/page/${i + 1}`, text) ? [] : [i + 1]);
-    if (blank.length === pages.length) limitations.push("This PDF has no selectable text. It may be a scanned document.");
-    else if (blank.length) limitations.push(`${blank.length === 1 ? "Page" : "Pages"} ${series(blank)} ${blank.length === 1 ? "has" : "have"} no selectable text.`);
+    try { pages = (await extractText(file, { mergePages: false })).text; } catch { throw new Refusal(unreadable("PDF")); }
+    const blank: number[] = [];
+    pages.forEach((text, i) => {
+      const location = `${key}/page/${i + 1}`;
+      if (!add(location, text)) { blank.push(i + 1); renditions.push({ kind: "PAGE", location, page: i + 1 }); }
+    });
+    if (blank.length && blank.length === pages.length) limitations.push("This PDF has no selectable text. The tutor reads its pages as images.");
+    else if (blank.length === 1) limitations.push(`Page ${blank[0]} has no selectable text. The tutor reads that page as an image.`);
+    else if (blank.length) limitations.push(`Pages ${series(blank)} have no selectable text. The tutor reads those pages as images.`);
   } finally { await file.loadingTask.destroy().catch(() => undefined); }
 }
 
 const series = (items: number[]) => items.length < 3 ? items.join(" and ") : `${items.slice(0, -1).join(", ")}, and ${items.at(-1)}`;
-
-function imageType(bytes: Uint8Array): "image/png" | "image/jpeg" | "image/webp" {
-  const ascii = (from: number, to: number) => String.fromCharCode(...bytes.subarray(from, to));
-  if (bytes[0] === 0x89 && ascii(1, 4) === "PNG") return "image/png";
-  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
-  if (ascii(0, 4) === "RIFF" && ascii(8, 12) === "WEBP") return "image/webp";
-  throw new Error("This image can't be read. Upload a PNG, JPEG, or WebP image.");
-}
 
 /** Unzips only wanted entries. fflate never inflates past an entry's declared size, so the sum bounds memory. */
 function unzip(bytes: Uint8Array, wanted: (name: string) => boolean, kind: string): Record<string, Uint8Array> {
   let entries = 0, total = 0;
   try {
     return unzipSync(bytes, { filter: (entry) => {
-      if (++entries > 10_000) throw new Error(TOO_LARGE);
+      if (++entries > 10_000) throw new Refusal(TOO_LARGE);
       if (!wanted(entry.name)) return false;
       total += entry.originalSize;
-      if (total > MAX_EXPANDED) throw new Error(TOO_LARGE);
+      if (total > MAX_EXPANDED) throw new Refusal(TOO_LARGE);
       return true;
     } });
-  } catch (error) { throw new Error((error as Error)?.message === TOO_LARGE ? TOO_LARGE : unreadable(kind)); }
+  } catch (error) { throw new Refusal((error as Error)?.message === TOO_LARGE ? TOO_LARGE : unreadable(kind)); }
 }
 
 async function docx(bytes: Uint8Array): Promise<string> {
   // mammoth unzips without size checks, so it reads a bounded copy that holds only the XML parts.
   const parts = unzip(bytes, (name) => /\.(xml|rels)$/i.test(name), "Word file");
   try { return (await mammoth.extractRawText({ buffer: Buffer.from(zipSync(parts, { level: 0 })) })).value.trim(); }
-  catch { throw new Error(unreadable("Word file")); }
+  catch { throw new Refusal(unreadable("Word file")); }
 }
 
 type Tag = { close: boolean; name: string; attributes: string; empty: boolean } | { text: string };
@@ -169,7 +243,7 @@ function slides(bytes: Uint8Array): string[] {
   const part = /^ppt\/slides\/slide(\d+)\.xml$/;
   const files = unzip(bytes, (name) => part.test(name) || name === "ppt/presentation.xml" || name === "ppt/_rels/presentation.xml.rels", "PowerPoint file");
   const order = ordered(files, "ppt/presentation.xml", "ppt/_rels/presentation.xml.rels", "sldId", "ppt/", part);
-  if (order.length > MAX_PAGES) throw new Error("This presentation has too many slides. Import a smaller unit.");
+  if (order.length > MAX_PAGES) throw new Refusal("This presentation has too many slides. Import a smaller unit.");
   return order.map(({ path }) => {
     const lines: string[] = [];
     let line = "", inText = false, fallback = 0;
@@ -213,13 +287,13 @@ function sheets(bytes: Uint8Array): { name: string; last: number; text: string }
       if (tagName === "rPh" && !tag.empty) phonetic += tag.close ? -1 : 1;
       if (tagName === "row" && !tag.close) {
         row = Number(attribute(tag.attributes, "r")) || row + 1; col = 0; cells = [];
-        if (row > MAX_ROWS) throw new Error("This sheet is too large for one import. Select a smaller range.");
+        if (row > MAX_ROWS) throw new Refusal("This sheet is too large for one import. Select a smaller range.");
       }
       if (tagName === "row" && (tag.close || tag.empty)) { if (cells.length) { rows.push(cells.join(" | ")); last = row; } cells = []; }
       if (tagName === "c" && !tag.close) {
         const ref = attribute(tag.attributes, "r"), match = ref ? /^([A-Z]+)(\d+)$/i.exec(ref) : null;
         col = match ? column(match[1]!) : col + 1;
-        if (col > MAX_COLUMNS) throw new Error("This sheet is too large for one import. Select a smaller range.");
+        if (col > MAX_COLUMNS) throw new Refusal("This sheet is too large for one import. Select a smaller range.");
         cell = tag.empty ? null : { ref: letters(col) + row, type: attribute(tag.attributes, "t") }; value = ""; formula = "";
       }
       if (cell && (tagName === "v" || tagName === "f" || (tagName === "t" && cell.type === "inlineStr"))) field = tag.close || tag.empty ? null : tagName as "v" | "f" | "t";
@@ -238,8 +312,8 @@ function sheets(bytes: Uint8Array): { name: string; last: number; text: string }
 function notebook(bytes: Uint8Array): string[] {
   let cells: unknown;
   try { cells = (JSON.parse(decodeText(bytes)!) as { cells?: unknown }).cells; }
-  catch { throw new Error("This notebook can't be read. Check that it is a valid Jupyter notebook file."); }
-  if (!Array.isArray(cells)) throw new Error("This notebook can't be read. Check that it is a valid Jupyter notebook file.");
+  catch { throw new Refusal("This notebook can't be read. Check that it is a valid Jupyter notebook file."); }
+  if (!Array.isArray(cells)) throw new Refusal("This notebook can't be read. Check that it is a valid Jupyter notebook file.");
   return cells.map((cell) => {
     const source = (cell as { source?: unknown } | null)?.source;
     return Array.isArray(source) ? source.filter((line) => typeof line === "string").join("") : typeof source === "string" ? source : "";

@@ -15,16 +15,31 @@ import { Gemini } from "./gemini.ts";
 import { MaterialFiles } from "./material-files.ts";
 import { MaterialImportStore } from "../storage/MaterialImportStore.ts";
 import { CourseTutor } from "./tutor.ts";
+import { ProviderFiles } from "./provider-files.ts";
+import { TranscriptionWorker, type TranscriptionWorkerOptions } from "./transcription-worker.ts";
+import type { MaterialRouteOptions } from "./material-routes.ts";
 import { TutorGenerating } from "../concepts/Generating/registry.ts";
 import { TutorPreferring, ViewPreferring } from "../concepts.ts";
 import { TutorFailures, tutorGenerator } from "./tutor-generation.ts";
 
-export async function createRuntime({ database, provider, providerOrigin, publicOrigin, clock = () => new Date(), tutor: suppliedTutor, gemini = new Gemini() }: {
+/**
+ * Assembles the application and its host. The transcription worker is created here but started by the server
+ * (`runtime.worker.start()`), so tests and tools that create a runtime do not transcribe in the background.
+ */
+export async function createRuntime({ database, provider, providerOrigin, publicOrigin, clock = () => new Date(), tutor: suppliedTutor, gemini = new Gemini(),
+  files = new MaterialFiles(), limits, transcribeModel = process.env.GEMINI_TRANSCRIBE_MODEL, worker: workerOptions = {} }: {
   database: Db; provider: Provider; providerOrigin: string; publicOrigin: string; clock?: () => Date;
-  tutor?: Pick<CourseTutor, "suggest" | "generate">; gemini?: Gemini;
+  tutor?: Pick<CourseTutor, "suggest" | "generate">; gemini?: Gemini; files?: MaterialFiles;
+  /** Shorter upload and listing limits, for tests. */
+  limits?: MaterialRouteOptions["limits"];
+  /** `GEMINI_TRANSCRIBE_MODEL`. Without it, transcription uses the server's tutor model. */
+  transcribeModel?: string;
+  worker?: Partial<Pick<TranscriptionWorkerOptions, "intervalMs" | "renewMs" | "log">>;
 }) {
-  const files = new MaterialFiles(), imports = new MaterialImportStore(database), failures = new TutorFailures();
-  const tutor = suppliedTutor ?? new CourseTutor(gemini, files);
+  const imports = new MaterialImportStore(database, "MaterialImport", clock), failures = new TutorFailures();
+  const providerFiles = new ProviderFiles(database, gemini, files, clock);
+  const tutor = suppliedTutor ?? new CourseTutor(gemini, files, providerFiles);
+  const worker = new TranscriptionWorker({ imports, files, gemini, providers: providerFiles, model: transcribeModel?.trim() || undefined, clock, ...workerOptions });
   const application = assembleApplication({
     TutorGenerating: new TutorGenerating(tutorGenerator(tutor, failures)),
     TutorPreferring: new TutorPreferring(database, "TutorPreferring"),
@@ -39,6 +54,6 @@ export async function createRuntime({ database, provider, providerOrigin, public
     GroundedTutoring: new GroundedTutoring(database, "GroundedTutoring", clock),
   }, clock);
   const recovery = new RegistrationRecoveryStore(database, providerOrigin);
-  const http = createApplicationHttp({ application, recovery, publicOrigin, clock, gemini, failures, files, imports });
-  return { application, recovery, gemini, files, imports, tutor, ...http };
+  const http = createApplicationHttp({ application, recovery, publicOrigin, clock, gemini, failures, files, imports, transcription: worker, limits });
+  return { application, recovery, gemini, files, imports, tutor, providerFiles, worker, ...http };
 }

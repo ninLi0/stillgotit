@@ -245,7 +245,7 @@ async function upload() {
     try { saved = await uploadMaterial(form); }
     catch (failure) {
       const message = failure instanceof Error ? failure.message : "The request could not finish. Your saved work is still available.";
-      // Until the importer reads PDFs without text, a scanned PDF is refused. Photos of its pages work.
+      // Scanned PDFs are read, so this refusal now means the files had nothing to read. Photos of the pages still work.
       filesError.value = message === sentences.noReadableContent ? [message, sentences.photosInstead] : [message];
       focusLater(() => filesErrorBox.value);
       return;
@@ -415,11 +415,11 @@ defineExpose({ startUpload });
         <p id="graded-name-hint" class="hint">It is saved in your course materials as “{{ GRADED_PREFIX }}{{ workName.trim() || 'Midterm 1' }}”.</p>
         <p v-if="nameError" id="graded-name-error" class="field-error" role="alert">{{ nameError }}</p>
         <label for="graded-files">Files</label>
-        <input id="graded-files" ref="fileInput" type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/png,image/jpeg,image/webp" :disabled="busy" :aria-describedby="describedBy('graded-files-hint', !!filesError.length && 'graded-files-error')" @change="filesChanged" />
+        <input id="graded-files" ref="fileInput" type="file" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.heic,.heif,application/pdf,image/png,image/jpeg,image/webp,image/heic,image/heif" :disabled="busy" :aria-describedby="describedBy('graded-files-hint', !!filesError.length && 'graded-files-error')" @change="filesChanged" />
         <ul v-if="files.length" class="graded-files">
           <li v-for="(file, index) in files" :key="file.name + index"><span>{{ file.name }} <small>{{ fileSize(file.size) }}</small></span><button type="button" class="quiet" :disabled="busy" :aria-label="`Remove ${file.name}`" @click="removeFile(index)">Remove</button></li>
         </ul>
-        <p id="graded-files-hint" class="hint">A PDF, with or without a text layer, or photos of the pages (PNG, JPEG, or WebP). Each file can be up to 15 MB, and all files together up to 25 MB.</p>
+        <p id="graded-files-hint" class="hint">A PDF, with or without a text layer, or photos of the pages (PNG, JPEG, WebP, HEIC, or HEIF). Each file can be up to 15 MB, and all files together up to 25 MB.</p>
         <div v-if="filesError.length" id="graded-files-error" ref="filesErrorBox" class="field-error" role="alert" tabindex="-1"><p v-for="line in filesError" :key="line">{{ line }}</p></div>
         <p class="graded-info"><InfoBubble label="About long papers" :text="`One import reads at most 50 questions, so upload a longer paper in parts. ${sentences.separateUploads}`" /></p>
         <div class="graded-actions"><div class="action"><button class="primary sand" :disabled="busy || !!uploadReason" :aria-describedby="uploadReason ? 'graded-upload-reason' : undefined">{{ busy ? 'Uploading…' : 'Upload and read the marks' }}</button></div></div>

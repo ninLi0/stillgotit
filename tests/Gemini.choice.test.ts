@@ -39,7 +39,7 @@ describe("a tutor request carries the learner's validated model and thinking lev
   test("it goes to models/<model>:generateContent with the lowercase level in thinkingConfig beside the JSON schema", async () => {
     for (const entry of TUTOR_MODELS) for (const level of entry.levels) {
       const { calls, gemini } = fake();
-      await new CourseTutor(gemini(), { read: async () => Buffer.from("") }).generate("sam", [source], "Explain.", {}, schema, [], { model: entry.model, level });
+      await new CourseTutor(gemini(), { read: async () => Buffer.from(""), size: async () => 0 }).generate("sam", [source], "Explain.", {}, schema, [], { model: entry.model, level });
       const [call] = calls;
       expect(call!.url).toBe(`${API}/${entry.model}:generateContent`);
       expect(call!.url).not.toContain(KEY);
@@ -50,7 +50,7 @@ describe("a tutor request carries the learner's validated model and thinking lev
 
   test("skill suggestions carry the pair too", async () => {
     const { calls, gemini } = fake(() => answer(JSON.stringify({ unitTitle: "Products", skills: [{ title: "Multiply", outcome: "Compute products.", gate: "Solve two products." }] })));
-    await new CourseTutor(gemini(), { read: async () => Buffer.from("") }).suggest("sam", source, PRO);
+    await new CourseTutor(gemini(), { read: async () => Buffer.from(""), size: async () => 0 }).suggest("sam", source, PRO);
     expect(calls[0]!.url).toBe(`${API}/gemini-3.1-pro-preview:generateContent`);
     expect(calls[0]!.body!.generationConfig.thinkingConfig).toEqual({ thinkingLevel: "high" });
   });
@@ -58,7 +58,7 @@ describe("a tutor request carries the learner's validated model and thinking lev
   test("a tutor request or a suggestion request without a pair is refused before any file is read or Google is contacted", async () => {
     const { calls, gemini } = fake();
     const reads: string[] = [];
-    const tutor = new CourseTutor(gemini(), { read: async (_owner, file) => { reads.push(file); return Buffer.from(""); } });
+    const tutor = new CourseTutor(gemini(), { read: async (_owner, file) => { reads.push(file); return Buffer.from(""); }, size: async () => 0 });
     for (const choice of [undefined, { model: "", level: "LOW" }, { model: "gemini-3.8-flash", level: "low" }, { model: "gemini-3.8-flash" }, null]) {
       expect((await failure(tutor.generate("sam", [source], "Explain.", {}, schema, [], choice as TutorChoice))).message).toBe("A tutor request needs a validated model and thinking level.");
       expect((await failure(tutor.suggest("sam", source, choice as TutorChoice))).message).toBe("A tutor request needs a validated model and thinking level.");
@@ -111,7 +111,7 @@ describe("refusals name the chosen model or level only when Google's response id
   for (const [name, choice, reply, message] of cases) {
     test(name, async () => {
       const { calls, gemini } = fake(reply);
-      const error = await failure(gemini().json("Rules", [{ text: "Hi" }], schema, choice));
+      const error = await failure(gemini().json("Rules", [{ text: "Hi" }], schema, { choice }));
       expect(error).toBeInstanceOf(GeminiError);
       expect(error.message).toBe(message);
       expect(error.message).not.toMatch(/not found for API|Permission denied|Quota exceeded|Invalid value|Rate limit|overloaded/);
@@ -121,7 +121,7 @@ describe("refusals name the chosen model or level only when Google's response id
 
   test("a slow tutor request suggests a lower thinking level", async () => {
     const slow = fake(({ init }) => new Promise<Response>((_, reject) => init.signal!.addEventListener("abort", () => reject(init.signal!.reason))));
-    expect((await failure(slow.gemini({ timeoutMs: 30 }).json("Rules", [{ text: "Hi" }], schema, PRO))).message)
+    expect((await failure(slow.gemini({ timeoutMs: 30 }).json("Rules", [{ text: "Hi" }], schema, { choice: PRO }))).message)
       .toBe("The tutor took too long to answer. Try again with a shorter request, less material, or a lower thinking level.");
   });
 });

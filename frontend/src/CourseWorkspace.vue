@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { api, unwrap, type Course } from "./api.ts";
-import { aiStatus, uploadMaterial, type AIStatus } from "./host-api.ts";
+import { aiStatus, type AIStatus } from "./host-api.ts";
 import { DraftSaveQueue } from "./draft-save-queue.ts";
 import { focusedControl, restoreFocus } from "./focus.ts";
+import { fileSize, readyNotice, submitImport } from "./material-imports.ts";
+import MaterialImports from "./MaterialImports.vue";
 import SkillTree from "./SkillTree.vue";
 import SkillStudy from "./SkillStudy.vue";
 import StudyPlanner from "./StudyPlanner.vue";
@@ -38,6 +40,9 @@ type Original = { file: string; name: string; mediaType?: string; limitations: s
 const data = ref<CourseData>({ materials: [], units: [], skills: [], prerequisites: [], skillSources: [], versions: [] });
 const busy = ref(false), message = ref(""), error = ref(""), justConfirmed = ref<string | null>(null);
 const notice = ref<HTMLElement | null>(null), setupError = ref<HTMLElement | null>(null);
+// announcement names materials an import listing saved; it stays until the learner leaves Materials or starts
+// an action. importsShown is true while the file list has an unfinished import or a listing error to show.
+const announcement = ref(""), importsShown = ref(false);
 // Start empty: typing into a prefilled name merges the two names.
 const materialTitle = ref(""), chosenFiles = ref<File[]>([]), requestId = ref(crypto.randomUUID());
 const material = ref<MaterialId | "">(""), selectedSkill = ref<string | null>(null), unit = ref(""), newUnit = ref("Matrix multiplication");
@@ -66,7 +71,7 @@ let viewRestored = false;
 // Messages belong to the view where they happened. When the control that changed the view is hidden, focus the new view's heading.
 watch(view, async () => {
   if (!viewRestored) return;
-  error.value = ""; message.value = ""; justConfirmed.value = null;
+  error.value = ""; message.value = ""; justConfirmed.value = null; if (view.value !== "setup") announcement.value = "";
   await nextTick();
   const active = document.activeElement;
   if (!active || active === document.body || !active.getClientRects().length) {
@@ -76,7 +81,7 @@ watch(view, async () => {
 
 async function task(work: () => Promise<void>) {
   const previous = focusedControl();
-  busy.value = true; error.value = ""; message.value = ""; justConfirmed.value = null;
+  busy.value = true; error.value = ""; message.value = ""; announcement.value = ""; justConfirmed.value = null;
   try { await work(); } catch (problem) { error.value = problem instanceof Error ? problem.message : "The request could not finish."; }
   finally {
     busy.value = false; await nextTick();
@@ -131,18 +136,23 @@ function removeFile(index: number) {
   requestId.value = crypto.randomUUID();
   if (!chosenFiles.value.length && fileInput.value) fileInput.value.value = "";
 }
-function fileSize(bytes: number) { return bytes < 1_000_000 ? `${Math.max(1, Math.round(bytes / 1000))} KB` : `${(bytes / 1_000_000).toFixed(1)} MB`; }
 function fileKind(name: string) { const dot = name.lastIndexOf("."); return dot > 0 ? name.slice(dot + 1).toUpperCase().slice(0, 4) : "FILE"; }
 async function upload() {
   await task(async () => {
     const form = new FormData();
     form.set("course", props.course.course); form.set("title", materialTitle.value.trim()); form.set("requestId", requestId.value);
     for (const file of chosenFiles.value) form.append("files", file);
-    const saved = await uploadMaterial(form);
-    material.value = saved.material; await refresh(); await readMaterial();
-    adding.value = false; showPreview.value = true;
-    message.value = "Material saved. Check the readable text, then find skills in it.";
+    const saved = await submitImport(form, resetImport);
+    chosenFiles.value = []; materialTitle.value = ""; if (fileInput.value) fileInput.value.value = ""; adding.value = false;
+    // A saved material opens in the detail pane. An import that finishes later shows as a card in the file list.
+    if (saved.material) { material.value = saved.material; matTab.value = "preview"; jumpLocation.value = undefined; await refresh(); await readMaterial(); showPreview.value = true; }
+    message.value = saved.message;
   });
+}
+/** An unfinished import was saved, or left the file list: reload the course, then name the materials it saved. */
+async function importReady(saved: MaterialId[]) {
+  try { await refresh(); } catch (problem) { error.value = problem instanceof Error ? problem.message : "The course could not be reloaded. Reload the page to see your materials."; }
+  if (saved.length) announcement.value = readyNotice(saved, data.value.materials);
 }
 async function readMaterial() {
   if (!material.value) return;
@@ -488,14 +498,14 @@ watch(view, (now) => { if (now === "setup" && material.value && !preview.value) 
       <header class="mat-head">
         <PixelIcon name="school" :size="24" /><h1 id="setup-title" class="display mat-title" tabindex="-1">Materials</h1>
         <span class="hint mat-count">{{ data.materials.length }} {{ data.materials.length === 1 ? 'file' : 'files' }}</span>
-        <InfoBubble label="About your files" text="Your files and answers are stored on the class server and sent to Google Gemini to create lessons and feedback. Don't upload anything private." />
+        <InfoBubble label="About your files" text="Your files and answers are stored on the class server and sent to Google Gemini to create lessons and feedback. Google keeps copies of large files and recordings for up to 48 hours. Don't upload anything private." />
         <div class="mat-actions">
           <button ref="gradedButton" type="button" class="secondary sand" @click="openGraded">Import graded work</button>
           <button v-if="data.materials.length" class="primary sand add-material" type="button" :aria-expanded="adding" aria-controls="add-panel" @click="adding = !adding">{{ adding ? 'Close' : '+ Add material' }}</button>
         </div>
       </header>
       <div role="alert"><p v-if="error && view === 'setup'" ref="setupError" class="error" tabindex="-1">{{ error }}</p></div>
-      <div role="status"><p v-if="message" ref="notice" class="notice" tabindex="-1">{{ message }} <button v-if="justConfirmed" class="quiet" @click="showOnTree(justConfirmed)">See it on your tree</button></p></div>
+      <div role="status"><p v-if="message" ref="notice" class="notice" tabindex="-1">{{ message }} <button v-if="justConfirmed" class="quiet" @click="showOnTree(justConfirmed)">See it on your tree</button></p><p v-if="announcement" class="notice">{{ announcement }}</p></div>
       <div v-if="drafts.length" class="draft-banner">
         <span class="draft-tile" aria-hidden="true">{{ drafts.length }}</span>
         <span class="draft-text">{{ drafts.length }} suggested {{ drafts.length === 1 ? 'skill' : 'skills' }} to review{{ draftFile ? ` found in ${draftFile.title}` : '' }}</span>
@@ -511,7 +521,7 @@ watch(view, (now) => { if (now === "setup" && material.value && !preview.value) 
                 <li v-for="(file, index) in chosenFiles" :key="file.name + index" class="file-card"><span class="file-kind" aria-hidden="true">{{ fileKind(file.name) }}</span><span class="file-name">{{ file.name }}<small>{{ fileSize(file.size) }}</small></span><button type="button" class="file-remove" :disabled="busy" :aria-label="`Remove ${file.name}`" @click="removeFile(index)">×</button></li>
               </ul>
               <p v-else class="drop-title"><span aria-hidden="true">＋</span> Drop course files here, or <label for="lesson-files" class="drop-choose">choose files</label></p>
-              <p id="file-types" class="hint">PDF, Word, PowerPoint, Excel, text, notebook, or image (PNG, JPEG, WebP) files. Up to 25 MB total.</p>
+              <p id="file-types" class="hint">PDF (including scans), Word, PowerPoint, Excel, text, notebook, image (PNG, JPEG, WebP, HEIC, HEIF), audio, or video files. Up to 12 files and 95 MB in total. Recordings and videos can be up to 2 hours long.</p>
             </div>
             <label for="lesson-title">Material title</label><input id="lesson-title" v-model="materialTitle" maxlength="160" required placeholder="For example, Lecture 4 notes" :disabled="busy" @input="resetImport" />
             <div class="import-actions"><p v-if="!chosenFiles.length" id="import-reason" class="hint reason">Choose at least one file to import.</p><button class="primary sand" :disabled="busy || !chosenFiles.length" :aria-describedby="chosenFiles.length ? undefined : 'import-reason'">{{ busy ? 'Working…' : 'Import material' }}</button></div>
@@ -554,10 +564,12 @@ watch(view, (now) => { if (now === "setup" && material.value && !preview.value) 
           <button class="primary sand" :disabled="busy" @click="saveDrafts">{{ busy ? 'Saving…' : 'Retry saving drafts' }}</button>
         </section>
 
-        <div v-if="data.materials.length" class="mat-grid">
+        <!-- Shown while the course has a file or an unfinished import, so the import cards keep listing before the first file is saved. -->
+        <div v-show="data.materials.length || importsShown" class="mat-grid">
           <nav class="file-list" aria-label="Files">
             <p class="eyebrow">Files</p>
-            <ul>
+            <MaterialImports :course="course.course" :active="view === 'setup'" :busy="busy" @shown="importsShown = $event" @ready="importReady" @removed="(id) => { if (id === requestId) resetImport(); }" />
+            <ul v-if="data.materials.length">
               <li v-for="source in data.materials" :key="source.material">
                 <button type="button" class="file-row" :class="{ current: material === source.material }" :aria-current="material === source.material ? 'true' : undefined" @click="selectMaterial(source.material)">
                   <span class="doc-tile"><PixelIcon :rows="docIcon(iconKind(source.material))" :size="24" /></span>

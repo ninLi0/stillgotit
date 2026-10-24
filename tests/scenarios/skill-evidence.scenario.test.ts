@@ -255,7 +255,7 @@ describe("Evidence behind each skill's estimate", () => {
     expect((await read()).sessions.find((item: { session: string }) => item.session === session.session).dialogue).toEqual(session.dialogue);
   }, 60_000);
 
-  test("Opening a source shows the text at the cited location and names the file and location as the labels do today (\"Lecture 4, page 1\").", async () => {
+  test("Opening a source shows the text at the cited location and names the file and location as the labels do today (\"Lecture 4 · Page 1\").", async () => {
     const { lesson } = await learner.ok("/learning/lesson", { skill, request: "Explain why the inner dimensions must match." });
     const session = (await read()).sessions.find((item: { session: string }) => item.session === lesson);
     const [citation] = session.citations as { material: string; location: string }[];
@@ -266,7 +266,7 @@ describe("Evidence behind each skill's estimate", () => {
     const passages = material.originals.flatMap((file: { renditions: { kind: string; location: string; text?: string }[] }) => file.renditions.filter((part) => part.location === citation!.location));
     expect(passages).toEqual([{ kind: "TEXT", location: citation!.location, text: LESSON_TEXT }]);
     // The page labels the passage with the material's title and the place in it.
-    expect(sourceLabel(citation!.location, material.title)).toBe("Matrix multiplication, lines 1–2");
+    expect(sourceLabel(citation!.location, material.title)).toBe("Matrix multiplication · Lines 1–2");
     // Another learner cannot read the passage.
     expect(await other.post("/courses/materials/read", { material: citation!.material })).toEqual({ status: 403, body: { error: "FORBIDDEN" } });
   }, 60_000);
@@ -279,7 +279,7 @@ describe("Evidence behind each skill's estimate", () => {
     const session = (await learner.ok("/learning/read", { skill: reading })).sessions.find((item: { session: string }) => item.session === lesson);
     const [citation] = session.citations as { material: string; location: string }[];
     expect(citation!.material).toBe(whiteboard);
-    expect(sourceLabel(citation!.location, "Whiteboard")).toBe("Whiteboard, image");
+    expect(sourceLabel(citation!.location, "Whiteboard")).toBe("Whiteboard · Image");
 
     // The cited location is an image rendition, and the host download returns that exact image to its owner.
     const material = await learner.ok("/courses/materials/read", { material: whiteboard });

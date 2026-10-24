@@ -9,7 +9,7 @@ type Citation = StillGotItHttp["/learning/read"]["output"]["data"]["sessions"][n
 type MaterialData = StillGotItHttp["/courses/materials/read"]["output"];
 type Rendition = MaterialData["originals"][number]["renditions"][number];
 type Loaded<T> = { state: "loading" } | { state: "ready"; value: T } | { state: "failed"; message: string };
-type Part = { kind: "TEXT"; text: string } | { kind: "IMAGE"; image: Loaded<string> };
+type Part = { kind: "TEXT"; text: string } | { kind: "IMAGE"; image: Loaded<string> } | { kind: "PAGE"; page: number };
 // `titles` names each course material, for labels before its passage is opened. `idPrefix` keeps element ids unique.
 // `variant` picks the look: "chips" under a tutor answer ("From <source> ↗"), or "rail" for the Taught from card.
 // Choosing a source opens its passage here, as before, and also emits `open` so the shell can show it in Materials.
@@ -35,8 +35,10 @@ function readFailure(result: { error: unknown; detail?: unknown }) {
 const entries = computed(() => props.citations.map((citation, index) => {
   const read = reads.get(citation.material);
   const label = sourceLabel(citation.location, read?.state === "ready" ? read.value.title : props.titles[citation.material]);
-  const parts: Part[] = read?.state === "ready" ? matching(citation, read.value).map((part) => part.kind === "TEXT"
-    ? { kind: "TEXT", text: part.text } : { kind: "IMAGE", image: images.get(imageKey(citation, part.file)) ?? { state: "loading" } }) : [];
+  // A scanned page has no text to quote here; Materials shows the page itself.
+  const parts: Part[] = read?.state === "ready" ? matching(citation, read.value).map((part): Part => part.kind === "TEXT"
+    ? { kind: "TEXT", text: part.text } : part.kind === "PAGE" ? { kind: "PAGE", page: part.page }
+      : { kind: "IMAGE", image: images.get(imageKey(citation, part.file)) ?? { state: "loading" } }) : [];
   return { citation, key: keyOf(citation), id: `${props.idPrefix}-${index}`, label, open: open.has(keyOf(citation)),
     read: read ?? { state: "loading" } as Loaded<MaterialData>, parts };
 }));
@@ -106,6 +108,7 @@ onBeforeUnmount(() => objectUrls.forEach((url) => URL.revokeObjectURL(url)));
               <template v-if="entry.parts.length">
                 <template v-for="(part, partIndex) in entry.parts" :key="partIndex">
                   <p v-if="part.kind === 'TEXT'" class="passage-text" tabindex="0">{{ part.text }}</p>
+                  <p v-else-if="part.kind === 'PAGE'" class="hint">Page {{ part.page }} has no selectable text. The tutor reads it as an image.</p>
                   <figure v-else class="passage-figure">
                     <img v-if="part.image.state === 'ready'" :src="part.image.value" :alt="entry.label" />
                     <div v-else-if="part.image.state === 'failed'" class="passage-problem" role="alert">

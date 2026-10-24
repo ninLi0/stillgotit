@@ -4,6 +4,7 @@ import type { MarkdownIt } from "markdown-it";
 import type { StillGotItHttp } from "../../generated/wire.ts";
 import { api, errorMessage, failureText } from "./api.ts";
 import { materialFile } from "./host-api.ts";
+import MaterialMedia from "./MaterialMedia.vue";
 import PixelIcon from "./PixelIcon.vue";
 import ViewerPdfCanvas from "./ViewerPdfCanvas.vue";
 import { docIcon } from "./pixel-art.ts";
@@ -20,6 +21,8 @@ import {
 // and loads each retained file through the host's checked file route, never by a direct file URL.
 // PDFs are drawn with pdf.js; slides show their saved text in a 16:9 frame (there is no slide image); photos are the
 // retained image; Markdown is rendered; text and code read in a column; other files show their text by location.
+// Recordings and HEIC or HEIF photos ("media" pages) are shown by MaterialMedia.vue, mounted for that one file: a player
+// beside the transcript segments, or the photo with a download when the browser cannot draw it.
 const props = defineProps<{ material: string; title: string; skills: ViewerSkill[]; initialLocation?: string }>();
 const emit = defineEmits<{ ask: [request: AskAboutPage]; "open-skill": [skill: string]; "review-draft": [skill: string] }>();
 
@@ -28,8 +31,8 @@ type FileState = { state: "loading" } | { state: "ready" } | { state: "failed"; 
 
 const ZOOM_MIN = 60, ZOOM_MAX = 200, ZOOM_STEP = 10, THUMB_RAIL = 104, RAIL_MIN_PANE = 520, FLASH_MS = 1800;
 // Each kind's page width at 100%, as the design sets them.
-const BASE: Record<FileKind, number> = { pdf: 500, slides: 640, image: 420, markdown: 580, text: 580, code: 580, other: 580 };
-const ICON_KIND: Record<FileKind, string> = { pdf: "PDF", slides: "PPTX", image: "IMG", markdown: "MD", text: "OTHER", code: "OTHER", other: "OTHER" };
+const BASE: Record<FileKind, number> = { pdf: 500, slides: 640, image: 420, markdown: 580, text: 580, code: 580, media: 580, other: 580 };
+const ICON_KIND: Record<FileKind, string> = { pdf: "PDF", slides: "PPTX", image: "IMG", markdown: "MD", text: "OTHER", code: "OTHER", media: "OTHER", other: "OTHER" };
 
 const root = ref<HTMLElement | null>(null), scroller = ref<HTMLElement | null>(null), rail = ref<HTMLElement | null>(null);
 const read = shallowRef<MaterialRead | null>(null);
@@ -39,6 +42,9 @@ const files = reactive<Record<string, FileState>>({});
 const pdfCounts = reactive<Record<string, number>>({});
 const keys = reactive<Record<string, string>>({});
 const imageUrls = reactive<Record<string, string>>({});
+// The cited location each media page opens at, by file reference. MaterialMedia goes to it when it changes.
+const mediaLocations = reactive<Record<string, string>>({});
+const materialId = computed(() => props.material as MaterialId);
 // pdf.js documents stay outside Vue's reactivity; `docVersion` tells the template when one is added or removed.
 const docs = new Map<string, PDFDocumentProxy>();
 const docVersion = ref(0);
@@ -71,6 +77,7 @@ const pageLabel = computed(() => {
   if (!item) return "";
   if (item.unit) return `${item.unit} ${item.number} of ${item.count}`;
   if (pages.value.length > 1) return `File ${index.value + 1} of ${pages.value.length}`;
+  if (item.kind === "media") return item.media === "recording" ? "Recording" : "Photo";
   return item.kind === "markdown" ? "Markdown · rendered" : item.kind === "code" ? "Code" : item.kind === "text" ? "Text" : "Readable text";
 });
 const askLocation = computed(() => {
@@ -112,7 +119,7 @@ function release() {
   for (const doc of docs.values()) void doc.loadingTask.destroy().catch(() => undefined);
   docs.clear(); docVersion.value++;
   for (const url of Object.values(imageUrls)) URL.revokeObjectURL(url);
-  for (const record of [files, pdfCounts, keys, imageUrls] as Record<string, unknown>[]) for (const key of Object.keys(record)) delete record[key];
+  for (const record of [files, pdfCounts, keys, imageUrls, mediaLocations] as Record<string, unknown>[]) for (const key of Object.keys(record)) delete record[key];
   markdownCache.clear();
 }
 
@@ -162,7 +169,7 @@ async function loadFile(original: Original, mine = generation) {
   files[original.file] = { state: "loading" };
   try {
     if (kind === "pdf") {
-      const blob = await materialFile(props.material, original.file, "application/pdf");
+      const blob = await materialFile(materialId.value, original.file, "application/pdf");
       if (mine !== generation) return;
       let doc: PDFDocumentProxy;
       // pdf.js reports damaged files in its own words, so the learner sees the app's sentence instead.
@@ -173,7 +180,7 @@ async function loadFile(original: Original, mine = generation) {
     } else {
       for (const image of original.renditions.filter((part): part is ImageRendition => part.kind === "IMAGE")) {
         if (imageUrls[image.file]) continue;
-        const blob = await materialFile(props.material, image.file, image.mediaType);
+        const blob = await materialFile(materialId.value, image.file, image.mediaType);
         if (mine !== generation) return;
         imageUrls[image.file] = URL.createObjectURL(blob);
       }
@@ -229,6 +236,7 @@ function tryJump() {
   }
   pending.value = null;
   go(pages.value.indexOf(hit));
+  if (hit.kind === "media") mediaLocations[hit.file] = location;
   toHighlight.value = { key: hit.key, location };
 }
 
@@ -395,6 +403,11 @@ onBeforeUnmount(() => {
           <div v-if="page.text && pdfDoc(page.file) && fileState?.state !== 'failed'" class="sr-only">{{ page.text }}</div>
         </div>
 
+        <!-- Recordings and HEIC photos: MaterialMedia reads the material and loads this file's bytes itself. -->
+        <div v-else-if="page.kind === 'media'" class="stage media-stage">
+          <MaterialMedia :key="page.key" class="media-view" :material="materialId" :file="page.file" :location="mediaLocations[page.file]" />
+        </div>
+
         <!-- Everything else scales with CSS zoom from its design width. -->
         <div v-else class="stage" :style="{ zoom: scale }">
           <article v-if="page.kind === 'slides'" class="slide" :class="{ flash: flashPage === page.key, dense: slideDense }">
@@ -490,6 +503,8 @@ onBeforeUnmount(() => {
 .canvas { position: relative; overflow: auto; padding: 24px; outline-offset: -3px; }
 .file-caption { margin: -8px 0 12px; overflow: hidden; color: var(--faint); font-size: 12px; font-weight: 600; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
 .stage { width: max-content; margin: 0 auto; }
+.media-stage { width: min(100%, 640px); }
+.media-view { padding: 14px; border-radius: 12px; background: #FFFFFF; box-shadow: 0 0 0 1px var(--card-border); }
 
 .page-frame { position: relative; background: #FFFFFF; box-shadow: 0 1px 2px rgba(0, 0, 0, .08), 0 10px 24px rgba(0, 0, 0, .08); }
 .page-frame.placeholder { display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 14px; }

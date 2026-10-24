@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
-import { DEFAULT_MODEL, Gemini, GeminiError, objectSchema } from "../src/host/gemini.ts";
+import { DEFAULT_MODEL, FALLBACK_OUTPUT_LIMIT, FilesApiError, Gemini, GeminiError, objectSchema } from "../src/host/gemini.ts";
+import { fakeGemini, googleError as filesError } from "./fixtures/fake-gemini.ts";
 import { CourseTutor } from "../src/host/tutor.ts";
 import type { Material, MaterialData } from "../src/concepts/GroundedTutoring/GroundedTutoring.ts";
 
@@ -118,19 +119,25 @@ test("dictation sends the recording inline with its audio type and returns the t
   await expect(silent.gemini().transcribe(recording)).rejects.toThrow("No speech was detected");
 });
 
-test("the tutor sends source text, original PDFs and images inline, and text only for large PDFs", async () => {
+test("the tutor sends each source's text and how its files were sent, with small PDFs and images inline", async () => {
   const { calls, gemini } = fake(() => answer('{"explanation":"Rows meet columns.","citations":[]}'));
   const stored: Record<string, Buffer> = {
-    "lesson.pdf": Buffer.from("%PDF-1.7 small"), "page.png": Buffer.from("png-bytes"),
-    "photo.jpg": Buffer.from("jpeg-bytes"), "huge.pdf": Buffer.alloc(15 * 1024 * 1024 + 1, 1), "work.png": Buffer.from("work-bytes"),
+    "lesson.pdf": Buffer.from("%PDF-1.7 small"), "scan.pdf": Buffer.from("%PDF-1.7 scan"), "photo.heic": Buffer.from("heic-bytes"),
+    "photo.jpg": Buffer.from("jpeg-bytes"), "work.png": Buffer.from("work-bytes"), "lecture.mp4": Buffer.from("video-bytes"),
   };
   const reads: string[] = [];
-  const tutor = new CourseTutor(gemini(), { read: async (owner, file) => { expect(owner).toBe("sam"); reads.push(file); return stored[file]!; } });
+  const files = { read: async (owner: string, file: string) => { expect(owner).toBe("sam"); reads.push(file); return stored[file]!; },
+    size: async (_owner: string, file: string) => stored[file]!.length };
+  const tutor = new CourseTutor(gemini(), files);
   const data: MaterialData<string, string> = { owner: "sam", scope: "course", title: "Matrices", locator: "upload:1", content: "Rows times columns.", origin: "COURSE", originals: [
-    { file: "lesson.pdf", name: "Lesson.pdf", mediaType: "application/pdf", limitations: [],
-      renditions: [{ kind: "TEXT", location: "Lesson.pdf/page/1", text: "Rows times columns." }, { kind: "IMAGE", location: "Lesson.pdf/figure/1", file: "page.png", mediaType: "image/png" }] },
+    { file: "lesson.pdf", name: "Lesson.pdf", mediaType: "application/pdf", limitations: [], renditions: [{ kind: "TEXT", location: "k1/page/1", text: "Rows times columns." }] },
+    { file: "scan.pdf", name: "Scan.pdf", mediaType: "application/pdf", limitations: ["This PDF has no selectable text. The tutor reads its pages as images."],
+      renditions: [{ kind: "PAGE", location: "k2/page/1", page: 1 }] },
+    { file: "photo.heic", name: "Board.heic", mediaType: "image/heic", limitations: [], renditions: [{ kind: "IMAGE", location: "k3/image", file: "photo.heic", mediaType: "image/heic" }] },
     { file: "photo.jpg", name: "Board.jpg", mediaType: "image/jpeg", limitations: [], renditions: [] },
-    { file: "huge.pdf", name: "Huge.pdf", mediaType: "application/pdf", limitations: ["Page 9 had no text."], renditions: [{ kind: "TEXT", location: "Huge.pdf/page/1", text: "Long notes." }] },
+    { file: "lecture.mp4", name: "Lecture.mp4", mediaType: "video/mp4", limitations: ["This transcript was written by the AI tutor from the video."],
+      renditions: [{ kind: "TEXT", location: "k5/time/00:00-00:21", text: "Today we multiply." }] },
+    { file: "notes.md", name: "Notes.md", mediaType: "text/markdown", limitations: [], renditions: [{ kind: "TEXT", location: "k6/lines/1-1", text: "Notes" }] },
   ] };
   const work = [{ file: "work.png", name: "My work.png", mediaType: "image/png", limitations: [], renditions: [] }];
   await tutor.generate("sam", [{ material: "m1" as Material, data }], "Explain.", { request: "Teach me" }, schema, work, { model: DEFAULT_MODEL, level: "MEDIUM" });
@@ -138,19 +145,134 @@ test("the tutor sends source text, original PDFs and images inline, and text onl
   expect(systemInstruction.parts[0].text).toContain("careful course tutor");
   expect(systemInstruction.parts[0].text).toEndWith("Explain.");
   const source = JSON.parse(parts[0].text);
-  expect(source).toMatchObject({ material: "m1", title: "Matrices", content: "Rows times columns." });
-  expect(source.sources[2].limitations).toEqual(["Page 9 had no text.", expect.stringContaining("larger than 15 MB, so only its extracted text was sent")]);
-  expect(source.sources[2].limitations[1]).toContain("visuals were left out");
+  expect(source).toMatchObject({ material: "m1", title: "Matrices", locator: "upload:1", content: "Rows times columns." });
+  expect(source.sources.map((item: { name: string; mediaType: string; locations: string[]; sent: string }) => [item.name, item.mediaType, item.locations, item.sent])).toEqual([
+    ["Lesson.pdf", "application/pdf", ["k1/page/1"], "The original PDF is attached inline, so pages without selectable text can be read from it."],
+    ["Scan.pdf", "application/pdf", ["k2/page/1"], "The original PDF is attached inline, so pages without selectable text can be read from it."],
+    ["Board.heic", "image/heic", ["k3/image"], "The image is attached inline."],
+    ["Board.jpg", "image/jpeg", [], "The image is attached inline."],
+    ["Lecture.mp4", "video/mp4", ["k5/time/00:00-00:21"], "Sent as its transcript, which is in the content and locations. The recording itself is not attached."],
+    ["Notes.md", "text/markdown", ["k6/lines/1-1"], "Sent as text only."],
+  ]);
+  expect(source.sources[1].limitations).toEqual(["This PDF has no selectable text. The tutor reads its pages as images."]);
   const inline = parts.filter((part: { inlineData?: unknown }) => part.inlineData).map((part: { inlineData: { mimeType: string; data: string } }) => part.inlineData);
   expect(inline).toEqual([
     { mimeType: "application/pdf", data: stored["lesson.pdf"]!.toString("base64") },
-    { mimeType: "image/png", data: stored["page.png"]!.toString("base64") },
+    { mimeType: "application/pdf", data: stored["scan.pdf"]!.toString("base64") },
+    { mimeType: "image/heic", data: stored["photo.heic"]!.toString("base64") },
     { mimeType: "image/jpeg", data: stored["photo.jpg"]!.toString("base64") },
     { mimeType: "image/png", data: stored["work.png"]!.toString("base64") },
   ]);
-  expect(parts.some((part: { text?: string }) => part.text?.includes("the original PDF Lesson.pdf"))).toBe(true);
-  expect(parts.some((part: { text?: string }) => part.text?.includes("Huge.pdf") && !part.text.startsWith("{"))).toBe(false);
+  expect(parts.some((part: { text?: string }) => part.text?.includes("the original PDF Scan.pdf"))).toBe(true);
   expect(parts.at(-1)).toEqual({ text: JSON.stringify({ request: "Teach me" }) });
-  expect(reads.sort()).toEqual(["huge.pdf", "lesson.pdf", "page.png", "photo.jpg", "work.png"]);
+  // The recording is never read: its transcript is already text.
+  expect(reads.sort()).toEqual(["lesson.pdf", "photo.heic", "photo.jpg", "scan.pdf", "work.png"]);
   await expect(tutor.generate("leo", [{ material: "m1" as Material, data }], "Explain.", {}, schema, [], { model: DEFAULT_MODEL, level: "MEDIUM" })).rejects.toThrow("Choose one of your materials.");
+});
+
+test("a request carries at most 40 images and notes the ones left out", async () => {
+  const { calls, gemini } = fake(() => answer('{"explanation":"Rows meet columns.","citations":[]}'));
+  const tutor = new CourseTutor(gemini(), { read: async () => Buffer.from("png"), size: async () => 3 });
+  const originals = Array.from({ length: 41 }, (_, i) => ({ file: `p${i}.png`, name: `Page ${i + 1}.png`, mediaType: "image/png", limitations: [],
+    renditions: [{ kind: "IMAGE" as const, location: `k${i}/image`, file: `p${i}.png`, mediaType: "image/png" as const }] }));
+  const data: MaterialData<string, string> = { owner: "sam", scope: "course", title: "Photos", locator: "upload:1", content: "", origin: "COURSE", originals };
+  await tutor.generate("sam", [{ material: "m1" as Material, data }], "Explain.", {}, schema, [], { model: DEFAULT_MODEL, level: "MEDIUM" });
+  const { parts } = calls[0]!.body.contents[0];
+  expect(parts.filter((part: { inlineData?: unknown }) => part.inlineData)).toHaveLength(40);
+  expect(JSON.parse(parts[0].text).sources[40].sent).toBe("An image was left out because one request carries at most 40 images.");
+});
+
+test("generation settings, the model, and the time limit can be set per call", async () => {
+  const { calls, gemini } = fake();
+  await gemini().json("Rules", [{ text: "Hi" }], schema, { model: "gemini-transcribe", timeoutMs: 600_000,
+    generationConfig: { thinkingConfig: { thinkingLevel: "low" }, maxOutputTokens: 65536, mediaResolution: "MEDIA_RESOLUTION_LOW" } });
+  expect(calls[0]!.url).toEndWith("/models/gemini-transcribe:generateContent");
+  expect(calls[0]!.body.generationConfig).toEqual({ responseMimeType: "application/json", responseJsonSchema: schema,
+    thinkingConfig: { thinkingLevel: "low" }, maxOutputTokens: 65536, mediaResolution: "MEDIA_RESOLUTION_LOW" });
+  const stop = new AbortController();
+  const slow = fake(({ init }) => new Promise<Response>((_, reject) => init.signal!.addEventListener("abort", () => reject(init.signal!.reason))));
+  const pending = slow.gemini().json("Rules", [{ text: "Hi" }], schema, { signal: stop.signal });
+  stop.abort();
+  expect((await failure(pending)).message).toContain("took too long");
+});
+
+test("the largest output size is read once from the model list, with a fallback", async () => {
+  const google = fakeGemini({ outputTokenLimit: 131_072 });
+  const client = new Gemini({ key: KEY, fetch: google.fetch, model: "gemini-test" });
+  expect(await client.outputLimit()).toBe(131_072);
+  expect(await client.outputLimit("models/gemini-test")).toBe(131_072);
+  expect(google.calls).toHaveLength(1);
+  expect(google.calls[0]!.url).toBe("https://generativelanguage.googleapis.com/v1beta/models/gemini-test");
+  expect(google.calls[0]!.headers.get("x-goog-api-key")).toBe(KEY);
+  const down = fakeGemini({ outputTokenLimit: null });
+  expect(await new Gemini({ key: KEY, fetch: down.fetch }).outputLimit()).toBe(FALLBACK_OUTPUT_LIMIT);
+  const none = fakeGemini();
+  expect(await new Gemini({ key: "", fetch: none.fetch }).outputLimit()).toBe(FALLBACK_OUTPUT_LIMIT);
+  expect(none.calls).toHaveLength(0);
+});
+
+test("a Files API upload starts with the key in a header, sends raw bytes to Google's upload address, and waits for ACTIVE", async () => {
+  const google = fakeGemini({ processing: 2 });
+  const client = new Gemini({ key: KEY, fetch: google.fetch, pollMs: 1 });
+  const bytes = new Uint8Array(1000).fill(7);
+  const uploaded = await client.uploadFile(bytes, { mimeType: "application/pdf", displayName: "a".repeat(64) });
+  expect(uploaded).toMatchObject({ name: "files/file2", state: "PROCESSING", mimeType: "application/pdf", uri: "https://generativelanguage.googleapis.com/v1beta/files/file2" });
+  const [start, finish] = google.calls;
+  expect(start!.url).toBe("https://generativelanguage.googleapis.com/upload/v1beta/files");
+  expect(Object.fromEntries(start!.headers)).toMatchObject({ "x-goog-api-key": KEY, "x-goog-upload-protocol": "resumable", "x-goog-upload-command": "start",
+    "x-goog-upload-header-content-length": "1000", "x-goog-upload-header-content-type": "application/pdf", "content-type": "application/json" });
+  expect(start!.body).toEqual({ file: { display_name: "a".repeat(64) } });
+  expect(finish!.url).toStartWith("https://generativelanguage.googleapis.com/upload/v1beta/files?upload_id=");
+  expect(finish!.headers.get("x-goog-api-key")).toBeNull();
+  expect(Object.fromEntries(finish!.headers)).toMatchObject({ "x-goog-upload-offset": "0", "x-goog-upload-command": "upload, finalize" });
+  expect(finish!.bytes).toBe(1000);
+  const active = await client.waitForActive(uploaded);
+  expect(active.state).toBe("ACTIVE");
+  expect(google.calls.slice(2).map((call) => [call.method, call.url])).toEqual([
+    ["GET", "https://generativelanguage.googleapis.com/v1beta/files/file2"], ["GET", "https://generativelanguage.googleapis.com/v1beta/files/file2"]]);
+  expect(active.expirationTime).toEqual(expect.any(String));
+});
+
+test("Files API failures are classified without exposing Google's text", async () => {
+  const failed = fakeGemini({ failProcessing: true });
+  const client = new Gemini({ key: KEY, fetch: failed.fetch, pollMs: 1 });
+  const file = await client.uploadFile(new Uint8Array(10), { mimeType: "video/mp4", displayName: "digest" });
+  await expect(client.waitForActive(file)).rejects.toMatchObject({ reason: "FILE_UNREADABLE" });
+  const cases: [Response, FilesApiError["reason"]][] = [
+    [filesError(429, { status: "RESOURCE_EXHAUSTED", message: "Too many requests." }), "BUSY"],
+    [filesError(400, { status: "INVALID_ARGUMENT", message: "API key not valid.", details: [{ reason: "API_KEY_INVALID" }] }), "SETUP"],
+    [filesError(413, { status: "INVALID_ARGUMENT", message: "Request payload size exceeds the limit." }), "TOO_LARGE"],
+    [filesError(500, { status: "INTERNAL", message: "Internal error." }), "BUSY"],
+  ];
+  for (const [response, reason] of cases) {
+    const google = fakeGemini({ startUpload: () => response.clone() });
+    const error = await failure(new Gemini({ key: KEY, fetch: google.fetch }).uploadFile(new Uint8Array(1), { mimeType: "application/pdf", displayName: "d" }));
+    expect(error).toBeInstanceOf(FilesApiError);
+    expect((error as FilesApiError).reason).toBe(reason);
+  }
+  // An upload address that is not Google's is never sent the bytes.
+  const elsewhere = fakeGemini({ startUpload: () => new Response(null, { headers: { "x-goog-upload-url": "https://attacker.example/upload" } }) });
+  await expect(new Gemini({ key: KEY, fetch: elsewhere.fetch }).uploadFile(new Uint8Array(1), { mimeType: "application/pdf", displayName: "d" }))
+    .rejects.toMatchObject({ reason: "REJECTED" });
+  expect(elsewhere.calls).toHaveLength(1);
+  await expect(new Gemini({ key: "", fetch: elsewhere.fetch }).uploadFile(new Uint8Array(1), { mimeType: "application/pdf", displayName: "d" }))
+    .rejects.toMatchObject({ reason: "UNAVAILABLE" });
+});
+
+test("a request whose stored file is gone, too large, or unreadable gets its own explanation", async () => {
+  const cases: [Response, RegExp][] = [
+    [googleError(403, { status: "PERMISSION_DENIED", message: "You do not have permission to access the File abc123 or it may not exist." }), /copy of a course file had expired/],
+    [googleError(400, { status: "INVALID_ARGUMENT", message: "The File abc123 is not in an ACTIVE state and usage is not allowed." }), /copy of a course file had expired/],
+    [googleError(400, { status: "INVALID_ARGUMENT", message: "The input token count (1500000) exceeds the maximum number of tokens allowed (1048576)." }), /too large for the tutor to read at once/],
+    [googleError(400, { status: "INVALID_ARGUMENT", message: "Unable to process input image. Please retry or report in https://developers.generativeai.google/guide/troubleshooting" }), /could not read one of this skill's course files/],
+  ];
+  for (const [response, message] of cases) {
+    const { gemini } = fake(() => response.clone());
+    const error = await failure(gemini().json("Rules", [{ fileData: { mimeType: "application/pdf", fileUri: "https://generativelanguage.googleapis.com/v1beta/files/abc123" } }], schema));
+    expect(error.message, message.source).toMatch(message);
+  }
+  expect(new GeminiError("FILE_UPLOAD", undefined, "Lecture 3.pdf").message).toBe("The tutor could not receive the course file “Lecture 3.pdf”. Try again in a minute.");
+  expect(new GeminiError("FILE_EXPIRED").message).toBe("The tutor's copy of a course file had expired. Try again.");
+  expect(new GeminiError("TOO_LARGE").message).toBe("This skill's course files are too large for the tutor to read at once. Import the material again in smaller parts and find skills in each part, or ask the app owner for help.");
+  expect(new GeminiError("FILE_UNREADABLE").message).toBe("The AI service could not read one of this skill's course files. Ask the app owner for help.");
 });

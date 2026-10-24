@@ -153,6 +153,7 @@ describe("GroundedTutoring import retries", () => {
       limitations,
       renditions: renditions.map((item) => item.kind === "TEXT"
         ? { text: item.text, location: item.location, kind: item.kind }
+        : item.kind === "PAGE" ? { page: item.page, location: item.location, kind: item.kind }
         : { mediaType: item.mediaType, file: item.file, location: item.location, kind: item.kind }),
       mediaType, name, file,
     }));

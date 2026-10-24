@@ -43,10 +43,10 @@ const fixtureTutor: Pick<CourseTutor, "suggest" | "generate"> = {
 // STILLGOTIT_LIVE_AI=1 uses the real Gemini key from .env. All learning state still belongs to the test database.
 const live = process.env.STILLGOTIT_LIVE_AI === "1", gemini = new Gemini();
 if (live && !gemini.status().available) throw new Error("Set GEMINI_API_KEY in .env for the live test.");
-const tutor: Pick<CourseTutor, "suggest" | "generate"> = live ? new CourseTutor({ json: async (instructions, parts, schema, choice) => {
+const tutor: Pick<CourseTutor, "suggest" | "generate"> = live ? new CourseTutor({ json: async (instructions, parts, schema, options) => {
   const started = performance.now();
-  console.log(`Live ${choice?.model ?? gemini.model} request started.`);
-  try { const result = await gemini.json(instructions, parts, schema, choice);
+  console.log(`Live ${options?.choice?.model ?? gemini.model} request started.`);
+  try { const result = await gemini.json(instructions, parts, schema, options);
     console.log(`Live provider request completed in ${Math.round(performance.now() - started)} ms.`); return result; }
   catch (error) { console.log(`Live provider request failed after ${Math.round(performance.now() - started)} ms (${error instanceof Error ? error.message : "unknown error"}).`); throw error; }
 } }, new MaterialFiles()) : fixtureTutor;

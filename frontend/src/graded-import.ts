@@ -28,7 +28,7 @@ export const sentences = {
   unmapped: "Map the question to a skill.",
   helpConflict: "With help, the strongest result is “Success with help”.",
   skillUnavailable: "Map the question to a confirmed skill in this course.",
-  noReadableContent: "No readable content was found. Use an unlocked document, clear image, or text file.",
+  noReadableContent: "No readable content was found in these files. Check that they aren't empty, or export documents that contain pictures to PDF and import the PDF.",
   photosInstead: "Upload photos of the pages instead.",
   pdfTooLarge: "This PDF is larger than 15 MB, so the tutor cannot see its marks. Upload photos of its pages instead.",
   photoTooLarge: "This photo is larger than 15 MB, so the tutor cannot read it. Upload a smaller photo of the page.",
@@ -47,14 +47,14 @@ export const FILE_LIMIT = 15 * 1024 * 1024, UPLOAD_LIMIT = 25 * 1024 * 1024, UPL
 /** The host's title limit, less the graded prefix. */
 export const NAME_LIMIT = 160 - GRADED_PREFIX.length;
 const isPdf = (file: File) => /\.pdf$/i.test(file.name);
-const isPhoto = (file: File) => /\.(png|jpe?g|webp)$/i.test(file.name);
+const isPhoto = (file: File) => /\.(png|jpe?g|webp|hei[cf])$/i.test(file.name);
 
 /** The first reason these files cannot be graded work, or an empty string. */
 export function filesProblem(files: readonly File[]): string {
   if (!files.length) return "Choose the graded work to upload.";
   if (files.length > UPLOAD_COUNT || files.reduce((total, file) => total + file.size, 0) > UPLOAD_LIMIT) return "Choose up to 12 files with a combined size of 25 MB or less.";
   for (const file of files) {
-    if (!isPdf(file) && !isPhoto(file)) return "Upload graded work as a PDF or as photos of the pages (PNG, JPEG, or WebP).";
+    if (!isPdf(file) && !isPhoto(file)) return "Upload graded work as a PDF or as photos of the pages (PNG, JPEG, WebP, HEIC, or HEIF).";
     if (file.size > FILE_LIMIT) return isPdf(file) ? sentences.pdfTooLarge : sentences.photoTooLarge;
   }
   return "";

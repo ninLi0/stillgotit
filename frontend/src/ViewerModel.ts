@@ -5,7 +5,8 @@ import type { ViewerSkill } from "./revamp-types.ts";
 // Locations look like `key/page/N`, `key/slide/N`, `key/image`, `key/lines/A-B`, `key/cell/N`, `key/document` or
 // `key/sheet/NAME/rows/A-B`, where `key` is the first 16 hexadecimal characters of SHA-256 of the file reference
 // (design/material-data.md). PDFs, slides and images get one page each; text, Markdown, code and other documents get one
-// scrolling page per file, split into sections by location.
+// scrolling page per file, split into sections by location. Recordings (`key/time/A-B` transcript segments) and HEIC or
+// HEIF photos, which most browsers cannot draw, are "media": one page per file, which MaterialMedia.vue shows.
 
 export type MaterialRead = StillGotItHttp["/courses/materials/read"]["output"];
 export type Original = MaterialRead["originals"][number];
@@ -13,7 +14,7 @@ export type Rendition = Original["renditions"][number];
 export type ImageRendition = Extract<Rendition, { kind: "IMAGE" }>;
 export type TextRendition = Extract<Rendition, { kind: "TEXT" }>;
 
-export type FileKind = "pdf" | "slides" | "image" | "markdown" | "text" | "code" | "other";
+export type FileKind = "pdf" | "slides" | "image" | "markdown" | "text" | "code" | "media" | "other";
 /** One block of readable text in a document page, at one source location. */
 export type Section = { location: string; label: string; text: string; mono: boolean };
 export type ViewerPage = {
@@ -32,8 +33,10 @@ export type ViewerPage = {
   /** The readable text saved at this location, for PDF, slide and image pages. */
   text: string;
   image?: ImageRendition;
-  /** The document's sections, for text, Markdown, code and other files. */
+  /** The document's sections, for text, Markdown, code and other files, and a recording's transcript segments. */
   sections: Section[];
+  /** For a media page: a recording to play, or a photo the browser may not be able to draw. */
+  media?: "recording" | "photo";
 };
 
 export const PAGED: readonly FileKind[] = ["pdf", "slides", "image"];
@@ -57,9 +60,14 @@ function extension(name: string): string {
   return dot < 0 ? base : base.slice(dot + 1);
 }
 
-/** How the viewer shows one retained file: by its name first, as the importer reads it, then by its locations. */
+const isRecording = (original: Original) => /^(audio|video)\//i.test(original.mediaType) ||
+  original.renditions.some((part) => locationTail(part.location).startsWith("time/"));
+const isHeic = (original: Original, ext: string) => /^image\/hei[cf]$/i.test(original.mediaType) || ext === "heic" || ext === "heif";
+
+/** How the viewer shows one retained file: recordings and HEIC photos first, then by its name, as the importer reads it, then by its locations. */
 export function fileKind(original: Original): FileKind {
   const ext = extension(original.name);
+  if (isRecording(original) || isHeic(original, ext)) return "media";
   if (ext === "pdf" || original.mediaType === "application/pdf") return "pdf";
   if (original.renditions.some((part) => part.kind === "IMAGE") || ["png", "jpg", "jpeg", "webp"].includes(ext)) return "image";
   if (ext === "pptx") return "slides";
@@ -133,6 +141,11 @@ export function buildPages(read: MaterialRead, pdfCounts: Record<string, number>
       const images = original.renditions.filter((part): part is ImageRendition => part.kind === "IMAGE");
       images.forEach((image, i) => pages.push({ ...base, key: `${original.file}#${i + 1}`, number: i + 1, count: images.length, location: image.location,
         unit: graded ? "Photo" : "Image", text: textAt(original, image.location), image }));
+    } else if (kind === "media") {
+      const recording = isRecording(original);
+      const sections = original.renditions.flatMap((part) => part.kind === "TEXT" ? [{ location: part.location, label: locationLabel(part.location), text: part.text, mono: false }] : []);
+      const location = original.renditions[0]?.location ?? (key ? `${key}/document` : "content");
+      pages.push({ ...base, key: `${original.file}#1`, number: 1, count: 1, location, unit: "", sections, media: recording ? "recording" : "photo" });
     } else {
       const texts = original.renditions.filter((part): part is TextRendition => part.kind === "TEXT");
       if (kind === "text" || kind === "markdown" || kind === "code") texts.sort((a, b) => linesStart(a.location) - linesStart(b.location));
@@ -197,6 +210,7 @@ export function askLabel(page: ViewerPage | undefined): string {
   if (page.kind === "slides") return "Ask about this slide";
   if (page.kind === "image") return page.unit === "Photo" ? "Ask about this photo" : "Ask about this image";
   if (page.kind === "code") return "Ask about this code";
+  if (page.kind === "media") return page.media === "recording" ? "Ask about this recording" : "Ask about this photo";
   if (page.kind === "markdown" || page.kind === "text") return "Ask about these notes";
   return "Ask about this section";
 }
@@ -206,6 +220,7 @@ export function askQuestion(page: ViewerPage, location: string, title: string): 
   if (page.kind === "pdf") return `Can you explain page ${page.number} of ${title}?`;
   if (page.kind === "slides") return `Can you explain slide ${page.number} of ${title}?`;
   if (page.kind === "image") return page.count > 1 ? `Can you explain ${page.unit.toLowerCase()} ${page.number} of ${title}?` : `Can you explain the image in ${title}?`;
+  if (page.kind === "media") return page.media === "recording" ? `Can you explain the recording ${page.fileName} in ${title}?` : `Can you explain the photo in ${title}?`;
   const tail = locationTail(location);
   if (location === "content" || tail === "document" || page.sections.length <= 1) return `Can you explain ${title}?`;
   const label = locationLabel(location);

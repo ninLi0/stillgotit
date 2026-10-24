@@ -119,7 +119,7 @@ describe("EXTRACT originals", () => {
   function tutor(stored: Record<string, Buffer>) {
     const calls: { parts: { text?: string; inlineData?: { mimeType: string; data: string } }[]; schema: unknown }[] = [];
     const course = new CourseTutor({ json: async (_instructions, parts, schema) => { calls.push({ parts: parts as never, schema }); return { rows: [] }; } },
-      { read: async (fileOwner, file) => { expect(fileOwner).toBe(owner); return stored[file]!; } });
+      { read: async (fileOwner, file) => { expect(fileOwner).toBe(owner); return stored[file]!; }, size: async (_owner, file) => stored[file]!.length });
     return { calls, course };
   }
 
@@ -131,6 +131,16 @@ describe("EXTRACT originals", () => {
     // Both originals together exceed the 30 MB budget the other kinds use, but extraction never falls back to text.
     expect(inline).toEqual([{ mimeType: "application/pdf", data: stored[pdf.file]!.toString("base64") }, { mimeType: "image/jpeg", data: stored[photo.file]!.toString("base64") }]);
     expect(calls[0]!.parts.at(-1)).toEqual({ text: JSON.stringify(context) });
+  });
+
+  test("a scanned PDF, whose pages have no text, goes inline in full like any other original", async () => {
+    const scanned: MediaValue = { ...pdf, limitations: ["This PDF has no selectable text. The tutor reads its pages as images."],
+      renditions: [{ kind: "PAGE", location: "k/page/1", page: 1 }, { kind: "PAGE", location: "k/page/2", page: 2 }] };
+    const stored = { [scanned.file]: Buffer.alloc(2 * MB, 3) };
+    const { calls, course } = tutor(stored);
+    await tutorGenerator(course)(owner, request({ sources: [{ material, data: data([scanned]) }] }));
+    expect(calls[0]!.parts.flatMap((part) => part.inlineData ? [part.inlineData] : [])).toEqual([{ mimeType: "application/pdf", data: stored[scanned.file]!.toString("base64") }]);
+    expect(JSON.parse(calls[0]!.parts[0]!.text!).sources[0].locations).toEqual(["k/page/1", "k/page/2"]);
   });
 
   test("a PDF over 15 MB is refused before the tutor is contacted, with its own reason", async () => {
@@ -149,10 +159,15 @@ describe("EXTRACT originals", () => {
     expect(failures.take(owner)).toBe("This photo is larger than 15 MB, so the tutor cannot read it. Upload a smaller photo of the page. Your saved work is still available.");
   });
 
-  test("other kinds still send a large PDF's text with a note instead of refusing", async () => {
-    const { calls, course } = tutor({ [pdf.file]: Buffer.alloc(15 * MB + 1, 1) });
+  test("other kinds send a large PDF by Files API reference instead of refusing", async () => {
+    const stored = { [pdf.file]: Buffer.alloc(15 * MB + 1, 1) }, calls: { parts: { text?: string; inlineData?: unknown; fileData?: unknown }[] }[] = [];
+    const fileUri = "https://generativelanguage.googleapis.com/v1beta/files/midterm";
+    const course = new CourseTutor({ json: async (_instructions, parts) => { calls.push({ parts: parts as never }); return { rows: [] }; } },
+      { read: async (_owner, file) => stored[file]!, size: async (_owner, file) => stored[file]!.length },
+      { reference: async () => ({ key: "reference-1", mimeType: "application/pdf", fileUri }), forget: async () => undefined });
     await course.generate(owner, [{ material, data: data([pdf]) }], "Explain.", {}, {}, [], { model: "gemini-3.8-flash", level: "MEDIUM" });
     expect(calls[0]!.parts.some((part) => part.inlineData)).toBe(false);
-    expect(JSON.parse(calls[0]!.parts[0]!.text!).sources[0].limitations[1]).toContain("only its extracted text was sent");
+    expect(calls[0]!.parts).toContainEqual({ fileData: { mimeType: "application/pdf", fileUri } });
+    expect(JSON.parse(calls[0]!.parts[0]!.text!).sources[0].sent).toContain("attached by file reference");
   });
 });

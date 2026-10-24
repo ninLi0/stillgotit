@@ -3,9 +3,10 @@ import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { Collection, type Document, type Filter, MongoError } from "mongodb";
 import {
-  ImportRequestConflict, InvalidImportRequest, MaterialImportStore,
-  type ImportIdentity, type ImportOperation, type ImportRequest,
+  ImportAlreadySaved, ImportNotRetryable, ImportProgressConflict, ImportRequestConflict, InvalidImportRequest, MaterialImportStore,
+  type ImportFailure, type ImportIdentity, type ImportOperation, type ImportRequest,
 } from "../src/storage/MaterialImportStore.ts";
+import type { MediaValue } from "../src/concepts/GroundedTutoring/media.ts";
 import { connectMongo, localMongoUri } from "../src/storage/mongo.ts";
 
 type Start = ImportIdentity & { request: ImportRequest };
@@ -43,6 +44,8 @@ function start(): Start {
 }
 
 function identity({ owner, requestId }: Start): ImportIdentity { return { owner, requestId }; }
+/** What a separate process reads back: dates arrive as text. */
+const json = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 
 test("import checkpoints freeze preparation and survive a lost reply and restart", async () => {
   const { store, name, records } = setup(), input = start(), id = identity(input);
@@ -67,7 +70,7 @@ test("import checkpoints freeze preparation and survive a lost reply and restart
   const complete = await restarted.complete({ ...id, revision: recovered.revision, material: "saved-material" });
   expect(complete.stage).toBe("COMPLETE");
   expect(await restarted.complete({ ...id, revision: recovered.revision, material: "saved-material" })).toEqual(complete);
-  expect((await recoverInNewProcess(name, input)).retried).toEqual(complete);
+  expect((await recoverInNewProcess(name, input)).retried).toEqual(json(complete));
   expect(await restarted.get({ ...id, owner: "other" })).toBeNull();
 });
 
@@ -135,7 +138,7 @@ describe("MaterialImportStore", () => {
     const { store, records } = setup();
     const input = start();
     const saved = await store.getOrCreate(input);
-    expect(saved).toEqual({ ...input, kind: "MATERIAL_IMPORT", importKey: expect.any(String), stage: "CREATED", revision: 0 });
+    expect(saved).toEqual({ ...input, kind: "MATERIAL_IMPORT", importKey: expect.any(String), createdAt: expect.any(Date), stage: "CREATED", revision: 0 });
     expect(saved.importKey).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
     const before = await records.find().toArray();
     expect(before).toEqual([{ _id: expect.anything(), ...saved }]);
@@ -288,7 +291,7 @@ describe("MaterialImportStore", () => {
     const before = await records.find().toArray();
     expect(before).toHaveLength(1);
     const { _id: _, ...saved } = before[0]!;
-    expect(await recoverInNewProcess(name, input)).toEqual({ found: saved, retried: saved });
+    expect(await recoverInNewProcess(name, input)).toEqual(json({ found: saved, retried: saved }));
     expect(await records.find().toArray()).toEqual(before);
   });
 
@@ -300,7 +303,7 @@ describe("MaterialImportStore", () => {
     try { saved = await new MaterialImportStore(writer.db, name).getOrCreate(input); }
     finally { await writer.client.close(); }
     const before = await records.find().toArray();
-    expect(await recoverInNewProcess(name, input)).toEqual({ found: saved, retried: saved });
+    expect(await recoverInNewProcess(name, input)).toEqual(json({ found: saved, retried: saved }));
     expect(await records.find().toArray()).toEqual(before);
   });
 
@@ -336,5 +339,241 @@ describe("MaterialImportStore", () => {
     await reader.client.close();
     await expect(store.get(identity(start()))).rejects.toBeInstanceOf(MongoError);
     await expect(store.getOrCreate(start())).rejects.toBeInstanceOf(MongoError);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Transcription progress
+
+const MINUTE = 60_000;
+const at = (minutes: number) => new Date(Date.UTC(2026, 9, 23, 12, 0) + minutes * MINUTE);
+const busy: ImportFailure = { reason: "BUSY", sentence: "The AI service is busy. Try again in a few minutes.", retryable: true };
+const unreadable: ImportFailure = { reason: "UNREADABLE", sentence: "The AI service could not read this recording.", retryable: false };
+const segments = [{ start: 0, end: 21, text: "Today we find eigenvalues." }, { start: 21, end: 50, text: "First solve det(A − λI) = 0." }];
+
+function transcriptionFixture() {
+  let now = at(0);
+  const name = `MaterialImport_${randomUUID()}`;
+  const store = new MaterialImportStore(connection!.db, name, () => now);
+  return { name, store, setNow: (time: Date) => { now = time; } };
+}
+
+/** Saves an import with one document and `count` recordings through SOURCES_SAVED to TRANSCRIBING. */
+async function transcribing(store: MaterialImportStore, owner: string, requestId: string, { count = 2, course = "course-linear-algebra" } = {}) {
+  const key = randomUUID(), file = (n: number, ext: string): MediaValue => ({ file: `${key}/${String(n).repeat(64)}.${ext}`, name: `file-${n}.${ext}`,
+    mediaType: ext === "md" ? "text/markdown" : "audio/wav", renditions: [], limitations: [] });
+  const files = [file(0, "md"), ...Array.from({ length: count }, (_, i) => file(i + 1, "wav"))];
+  const request: ImportRequest = { scope: course, title: `Lecture ${requestId}`, origin: "COURSE",
+    sources: files.map((item, i) => ({ kind: "UPLOAD", name: item.name, size: 10, sha256: String(i).repeat(64) })) };
+  await store.getOrCreate({ owner, requestId, request });
+  await store.saveSources({ owner, requestId, revision: 0, sources: files });
+  const partial = [{ ...files[0]!, renditions: [{ kind: "TEXT" as const, location: "k/lines/1-1", text: "Notes" }] }, ...files.slice(1)];
+  const operation = await store.startTranscription({ owner, requestId, revision: 1, partial, recordings: files.slice(1).map((item) => item.file) });
+  return { operation, files, partial, recordings: files.slice(1).map((item) => item.file) };
+}
+
+describe("Transcription progress", () => {
+  test("startTranscription saves the documents as read and one waiting entry per recording", async () => {
+    const { store } = transcriptionFixture();
+    const { operation, partial, recordings } = await transcribing(store, "sam", "r1");
+    expect(operation).toMatchObject({ stage: "TRANSCRIBING", revision: 2, partial,
+      recordings: recordings.map((file) => ({ file, status: "WAITING", attempts: 0 })) });
+    expect(operation.createdAt).toEqual(at(0));
+    // An exact replay returns current progress; a stale or changed one conflicts.
+    expect(await store.startTranscription({ owner: "sam", requestId: "r1", revision: 1, partial, recordings })).toEqual(operation);
+    await expect(store.startTranscription({ owner: "sam", requestId: "r1", revision: 1, partial, recordings: recordings.slice(0, 1) })).rejects.toBeInstanceOf(ImportProgressConflict);
+  });
+
+  test("startTranscription refuses partial lists that do not match the saved sources", async () => {
+    const { store } = transcriptionFixture();
+    const key = randomUUID(), file = (n: number): MediaValue => ({ file: `${key}/${String(n).repeat(64)}.wav`, name: `f${n}.wav`, mediaType: "audio/wav", renditions: [], limitations: [] });
+    const request: ImportRequest = { scope: "c", title: "T", origin: "COURSE", sources: [1, 2].map((n) => ({ kind: "UPLOAD", name: `f${n}.wav`, size: 1, sha256: String(n).repeat(64) })) };
+    await store.getOrCreate({ owner: "sam", requestId: "r", request });
+    await store.saveSources({ owner: "sam", requestId: "r", revision: 0, sources: [file(1), file(2)] });
+    const conflict = ImportProgressConflict;
+    await expect(store.startTranscription({ owner: "sam", requestId: "r", revision: 1, partial: [file(2), file(1)], recordings: [file(1).file] })).rejects.toBeInstanceOf(conflict);
+    await expect(store.startTranscription({ owner: "sam", requestId: "r", revision: 1, partial: [file(1), file(2)], recordings: ["missing"] })).rejects.toBeInstanceOf(conflict);
+    const transcribed = { ...file(1), renditions: [{ kind: "TEXT" as const, location: "k/time/00:00-00:10", text: "Hi" }] };
+    await expect(store.startTranscription({ owner: "sam", requestId: "r", revision: 1, partial: [transcribed, file(2)], recordings: [file(1).file] })).rejects.toBeInstanceOf(conflict);
+    await expect(store.startTranscription({ owner: "sam", requestId: "r", revision: 1, partial: [file(1), file(2)], recordings: [] })).rejects.toBeInstanceOf(InvalidImportRequest);
+    await expect(store.startTranscription({ owner: "sam", requestId: "r", revision: 0, partial: [file(1), file(2)], recordings: [file(1).file] })).rejects.toBeInstanceOf(conflict);
+    expect((await store.get({ owner: "sam", requestId: "r" }))?.stage).toBe("SOURCES_SAVED");
+  });
+
+  test("two workers never claim the same recording, and a claim leaves the revision unchanged", async () => {
+    const { store, name } = transcriptionFixture();
+    const { operation, recordings } = await transcribing(store, "sam", "r1");
+    const second = new MaterialImportStore(connection!.db, name);
+    const claims = await Promise.all([store.claim({ now: at(0), token: "a", until: at(5) }), second.claim({ now: at(0), token: "b", until: at(5) })]);
+    expect(claims.map((claim) => claim?.file).sort()).toEqual([...recordings].sort());
+    expect(await store.claim({ now: at(1), token: "c", until: at(6) })).toBeNull();
+    const saved = await store.get({ owner: "sam", requestId: "r1" });
+    expect(saved?.revision).toBe(operation.revision);
+    expect(saved?.recordings?.map((item) => item.claim?.token).sort()).toEqual(["a", "b"]);
+  });
+
+  test("claims alternate between learners, wrapping around, and take each learner's oldest import first", async () => {
+    const { store, setNow } = transcriptionFixture();
+    await transcribing(store, "learner-b", "b-old", { count: 2 });
+    setNow(at(1));
+    await transcribing(store, "learner-a", "a-only", { count: 2 });
+    setNow(at(2));
+    await transcribing(store, "learner-b", "b-new", { count: 1 });
+    const order: string[] = [];
+    let previous: string | undefined;
+    for (let i = 0; i < 5; i++) {
+      const claim = await store.claim({ now: at(3), token: `t${i}`, until: at(8), previous });
+      expect(claim).not.toBeNull();
+      order.push(`${claim!.owner}:${claim!.requestId}`);
+      previous = claim!.owner;
+    }
+    expect(order).toEqual(["learner-a:a-only", "learner-b:b-old", "learner-a:a-only", "learner-b:b-old", "learner-b:b-new"]);
+    expect(await store.claim({ now: at(3), token: "t5", until: at(8), previous })).toBeNull();
+  });
+
+  test("a claim that ended while its worker was stopped can be claimed again, and the old worker can no longer renew or save", async () => {
+    const { store } = transcriptionFixture();
+    await transcribing(store, "sam", "r1", { count: 1 });
+    const first = await store.claim({ now: at(0), token: "old", until: at(5) });
+    expect(await store.renew({ ...first!, token: "old", until: at(6) })).toBe(true);
+    expect(await store.claim({ now: at(5), token: "new", until: at(10) })).toBeNull();
+    const second = await store.claim({ now: at(7), token: "new", until: at(12) });
+    expect(second).toEqual(first);
+    expect(await store.renew({ ...first!, token: "old", until: at(13) })).toBe(false);
+    await expect(store.saveTranscript({ ...first!, token: "old", segments })).rejects.toBeInstanceOf(ImportProgressConflict);
+    const done = await store.saveTranscript({ ...second!, token: "new", segments });
+    expect(done.recordings![0]).toEqual({ file: first!.file, status: "DONE", attempts: 0, segments });
+  });
+
+  test("transcript saves replay, check their segments, and require the claim", async () => {
+    const { store } = transcriptionFixture();
+    await transcribing(store, "sam", "r1", { count: 1 });
+    const claim = (await store.claim({ now: at(0), token: "w", until: at(5) }))!;
+    for (const bad of [[], [{ start: 0, end: 0, text: "x" }], [{ start: 0, end: 10, text: " " }], [{ start: 5, end: 10, text: "a" }, { start: 4, end: 12, text: "b" }],
+      [{ start: 0.5, end: 10, text: "a" }], [{ start: 0, end: 10, text: "a", extra: 1 }]]) {
+      await expect(store.saveTranscript({ ...claim, token: "w", segments: bad as typeof segments })).rejects.toBeInstanceOf(InvalidImportRequest);
+    }
+    await expect(store.saveTranscript({ ...claim, token: "other", segments })).rejects.toBeInstanceOf(ImportProgressConflict);
+    const saved = await store.saveTranscript({ ...claim, token: "w", segments });
+    expect(await store.saveTranscript({ ...claim, token: "w", segments })).toEqual(saved);
+    await expect(store.saveTranscript({ ...claim, token: "w", segments: segments.slice(0, 1) })).rejects.toBeInstanceOf(ImportProgressConflict);
+  });
+
+  test("automatic retries wait, count attempts, and are not claimed early; a final failure stops the import's claims", async () => {
+    const { store } = transcriptionFixture();
+    const { recordings } = await transcribing(store, "sam", "r1", { count: 2 });
+    const first = (await store.claim({ now: at(0), token: "w1", until: at(5) }))!;
+    const waiting = await store.failTranscript({ ...first, token: "w1", failure: busy, retryAt: at(1) });
+    expect(waiting.recordings!.find((item) => item.file === first.file)).toEqual({ file: first.file, status: "WAITING", attempts: 1, retryAt: at(1) });
+    const second = (await store.claim({ now: at(0), token: "w2", until: at(5) }))!;
+    expect(second.file).not.toBe(first.file);
+    expect(await store.claim({ now: at(0.5), token: "w3", until: at(5) })).toBeNull();
+    expect((await store.claim({ now: at(1), token: "w3", until: at(6) }))?.file).toBe(first.file);
+    // The other recording cannot be retried, so the waiting one is no longer claimed.
+    const failed = await store.failTranscript({ ...second, token: "w2", failure: unreadable });
+    expect(failed.recordings!.find((item) => item.file === second.file)).toEqual({ file: second.file, status: "FAILED", attempts: 0, failure: unreadable });
+    await store.failTranscript({ ...first, token: "w3", failure: busy, retryAt: at(2) });
+    expect(await store.claim({ now: at(10), token: "w4", until: at(15) })).toBeNull();
+    expect(recordings).toContain(first.file);
+  });
+
+  test("the learner's retry resets retryable failures and is refused for a failure that cannot be retried, even while another recording waits", async () => {
+    const { store } = transcriptionFixture();
+    await transcribing(store, "sam", "r1", { count: 2 });
+    const first = (await store.claim({ now: at(0), token: "w1", until: at(5) }))!;
+    await store.failTranscript({ ...first, token: "w1", failure: { ...busy, reason: "TIMEOUT" } });
+    const failed = (await store.get({ owner: "sam", requestId: "r1" }))!;
+    const retried = (await store.retry({ owner: "sam", requestId: "r1" }))!;
+    expect(retried.revision).toBe(failed.revision + 1);
+    expect(retried.recordings!.find((item) => item.file === first.file)).toEqual({ file: first.file, status: "WAITING", attempts: 0 });
+    // No failure: unchanged.
+    expect(await store.retry({ owner: "sam", requestId: "r1" })).toEqual(retried);
+    const again = (await store.claim({ now: at(1), token: "w2", until: at(6) }))!;
+    await store.failTranscript({ ...again, token: "w2", failure: unreadable });
+    await expect(store.retry({ owner: "sam", requestId: "r1" })).rejects.toBeInstanceOf(ImportNotRetryable);
+    expect(await store.retry({ owner: "sam", requestId: "missing" })).toBeNull();
+  });
+
+  test("imports whose recordings are all done are preparable after a stop, oldest first, until a preparation failure or READY", async () => {
+    const { store, name, setNow } = transcriptionFixture();
+    for (const [minute, requestId] of [[0, "older"], [1, "newer"]] as const) {
+      setNow(at(minute));
+      await transcribing(store, "sam", requestId, { count: 1 });
+      const claim = (await store.claim({ now: at(minute), token: requestId, until: at(minute + 5) }))!;
+      await store.saveTranscript({ ...claim, token: requestId, segments });
+    }
+    // A new store instance stands in for a restarted process.
+    const restarted = new MaterialImportStore(connection!.db, name);
+    const ready = await restarted.preparable();
+    expect(ready.map((item) => item.requestId)).toEqual(["older", "newer"]);
+    const limit: ImportFailure = { reason: "TEXT_LIMIT", sentence: "This material contains too much text. Remove this import and import a smaller unit.", retryable: false };
+    const failed = await restarted.failPreparation({ owner: "sam", requestId: "older", revision: ready[0]!.revision, failure: limit });
+    expect(failed.failure).toEqual(limit);
+    await expect(restarted.retry({ owner: "sam", requestId: "older" })).rejects.toBeInstanceOf(ImportNotRetryable);
+    const newer = ready[1]!;
+    const prepared = { owner: "sam", importKey: newer.importKey, scope: newer.request.scope, title: newer.request.title, locator: `upload:${newer.importKey}`,
+      content: "[k/lines/1-1]\nNotes", originals: newer.partial!, origin: "COURSE" as const };
+    expect((await restarted.savePrepared({ owner: "sam", requestId: "newer", revision: newer.revision, prepared })).stage).toBe("READY");
+    expect(await restarted.preparable()).toEqual([]);
+    // A waiting import cannot be prepared.
+    await transcribing(store, "sam", "waiting", { count: 1 });
+    const waiting = (await store.get({ owner: "sam", requestId: "waiting" }))!;
+    await expect(store.savePrepared({ owner: "sam", requestId: "waiting", revision: waiting.revision, prepared: { ...prepared, importKey: waiting.importKey, title: waiting.request.title } }))
+      .rejects.toBeInstanceOf(ImportProgressConflict);
+  });
+
+  test("removing an import during a claim drops the worker's save, and its files are listed for deletion until recorded", async () => {
+    const { store, name } = transcriptionFixture();
+    await transcribing(store, "sam", "r1", { count: 1 });
+    const claim = (await store.claim({ now: at(0), token: "w", until: at(5) }))!;
+    const discarded = (await store.discard({ owner: "sam", requestId: "r1" }))!;
+    expect(discarded).toMatchObject({ stage: "DISCARDED", filesDeleted: false });
+    expect(discarded.recordings![0]!.claim).toBeUndefined();
+    await expect(store.saveTranscript({ ...claim, token: "w", segments })).rejects.toBeInstanceOf(ImportProgressConflict);
+    expect(await store.renew({ ...claim, token: "w", until: at(6) })).toBe(false);
+    expect(await store.discard({ owner: "sam", requestId: "r1" })).toEqual(discarded);
+    const restarted = new MaterialImportStore(connection!.db, name);
+    expect((await restarted.deletable()).map((item) => item.requestId)).toEqual(["r1"]);
+    const deleted = await restarted.markFilesDeleted({ owner: "sam", requestId: "r1" });
+    expect(deleted.filesDeleted).toBe(true);
+    expect(await restarted.markFilesDeleted({ owner: "sam", requestId: "r1" })).toEqual(deleted);
+    expect(await restarted.deletable()).toEqual([]);
+    expect(await store.discard({ owner: "sam", requestId: "missing" })).toBeNull();
+  });
+
+  test("a READY import is discarded only with the host's invalid-input report; COMPLETE imports are never discarded", async () => {
+    const { store } = transcriptionFixture();
+    const input = start(), id = identity(input), created = await store.getOrCreate(input);
+    const source = [{ file: `${created.importKey}/${"a".repeat(64)}.pdf`, name: "lesson.pdf", mediaType: "application/pdf", renditions: [], limitations: [] }];
+    const saved = await store.saveSources({ ...id, revision: 0, sources: source });
+    const prepared = { owner: input.owner, importKey: created.importKey, scope: input.request.scope, title: input.request.title,
+      locator: `upload:${created.importKey}`, content: "Matrix multiplication", originals: source, origin: input.request.origin };
+    const ready = await store.savePrepared({ ...id, revision: saved.revision, prepared });
+    await expect(store.discard(id)).rejects.toBeInstanceOf(ImportAlreadySaved);
+    await expect(store.markFilesDeleted(id)).rejects.toBeInstanceOf(ImportProgressConflict);
+    expect(await store.discard({ ...id, invalidInput: true })).toMatchObject({ stage: "DISCARDED", filesDeleted: false, revision: ready.revision + 1 });
+    const other = { ...input, requestId: "complete" }, made = await store.getOrCreate(other);
+    const otherSaved = await store.saveSources({ ...identity(other), revision: 0, sources: source });
+    const otherReady = await store.savePrepared({ ...identity(other), revision: otherSaved.revision, prepared: { ...prepared, importKey: made.importKey, locator: `upload:${made.importKey}` } });
+    await store.complete({ ...identity(other), revision: otherReady.revision, material: "m1" });
+    await expect(store.discard({ ...identity(other), invalidInput: true })).rejects.toBeInstanceOf(ImportAlreadySaved);
+  });
+
+  test("the pending list holds one learner's TRANSCRIBING and READY imports in one course, oldest first, and reads create nothing", async () => {
+    const { store, setNow } = transcriptionFixture();
+    const freshName = `MaterialImport_${randomUUID()}`, fresh = new MaterialImportStore(connection!.db, freshName);
+    expect(await fresh.pending({ owner: "sam", course: "c" })).toEqual([]);
+    expect(await fresh.preparable()).toEqual([]);
+    expect(await fresh.deletable()).toEqual([]);
+    expect(await connection!.db.listCollections({ name: `${freshName.toLowerCase()}.operations` }).toArray()).toEqual([]);
+    await expect(store.pending({ owner: " ", course: "c" })).rejects.toBeInstanceOf(InvalidImportRequest);
+    setNow(at(2)); await transcribing(store, "sam", "b-later");
+    setNow(at(1)); await transcribing(store, "sam", "z-earlier");
+    setNow(at(2)); await transcribing(store, "sam", "a-later");
+    await transcribing(store, "leo", "leo");
+    await transcribing(store, "sam", "other-course", { course: "course-physics" });
+    await transcribing(store, "sam", "removed");
+    await store.discard({ owner: "sam", requestId: "removed" });
+    expect((await store.pending({ owner: "sam", course: "course-linear-algebra" })).map((item) => item.requestId)).toEqual(["z-earlier", "a-later", "b-later"]);
   });
 });
