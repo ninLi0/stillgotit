@@ -24,6 +24,15 @@ const fixtureTutor: Pick<CourseTutor, "suggest" | "generate"> = {
   generate: async (_owner, sources, _instruction, context, schema) => {
     const properties = schema.properties as Record<string, unknown>, source = sources[0]!;
     const citations = [{ material: source.material, location: source.data.originals[0]?.renditions[0]?.location ?? "content" }];
+    // Graded-work extraction: three marked questions, two mapped to the course's first skills and one left unmapped.
+    if (properties.rows) {
+      const skills = ((context as { skills?: { skill: string }[] }).skills ?? []).map((row) => row.skill);
+      return { rows: [
+        { label: "Question 1", mark: "8/10", feedback: "Right method; one arithmetic slip in the last entry.", excerpt: "AB = [[4, 4], [10, 8]]", skill: skills[0] ?? "", result: "SLIP", rationale: "The method was right, but one entry was miscomputed." },
+        { label: "Question 2", mark: "10/10", feedback: "", excerpt: "A 2 × 3 times a 3 × 4 gives a 2 × 4 matrix.", skill: skills[1] ?? skills[0] ?? "", result: "INDEPENDENT", rationale: "The answer is fully correct." },
+        { label: "Question 3", mark: "3/10", feedback: "The dimensions were not checked before multiplying.", excerpt: "", skill: "", result: "GAP", rationale: "The approach did not fit the problem." },
+      ] };
+    }
     if (properties.explanation) return { explanation: "A matrix product combines rows from the first matrix with columns from the second.\n\nFor example, the row [1, 2] and column [3, 4] produce 1 × 3 + 2 × 4 = 11. Each output entry uses one row and one column.\n\nThe inner dimensions must match. A 2 × 3 matrix times a 3 × 4 matrix produces a 2 × 4 matrix.\n\nWhy would changing the order change the result?", citations };
     if (properties.question) return { question: "1. Multiply A = [[1, 2], [3, 4]] by B = [[2, 0], [1, 2]].\n\n2. Multiply C = [[2, 1], [0, 3]] by D = [[1, 2], [4, 0]].\n\nShow how you form each entry. Explain why changing the order can change the answer.", citations };
     if (properties.rationale) return { result: (context as { help: string }).help === "NONE" ? "INDEPENDENT" : "SUPPORTED", gateMet: (context as { help: string }).help === "NONE",
