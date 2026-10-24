@@ -274,7 +274,7 @@ onUnmounted(() => {
             <PixelIcon :sprite="c.sprite" :size="21" /><strong>{{ c.n }}</strong><span>{{ c.label }}</span>
           </li>
         </ul>
-        <button type="button" class="forest-regrow" :aria-label="`Regrow the forest with a new design, currently design ${design}`" @click="emit('regrow')">Regrow · design {{ design }}</button>
+        <button type="button" class="forest-regrow" title="Draw the trees again. Your skills stay the same." @click="emit('regrow')">Regrow</button>
         <button type="button" class="primary meadow forest-back" aria-label="Back to desk: close the course forest" @click="emit('close')">Back to desk</button>
       </div>
     </header>

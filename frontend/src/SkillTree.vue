@@ -159,7 +159,7 @@ onBeforeUnmount(() => {
         <ul class="legend" aria-label="Leaf key">
           <li v-for="stage in legend" :key="stage"><PixelIcon :sprite="stage" :size="14" />{{ STAGE_LABELS[stage] }}</li>
         </ul>
-        <button v-if="leafCount" type="button" class="regrow" title="Draw new trees. Your skills stay the same." @click="regrow">Regrow · design {{ design }}</button>
+        <button v-if="leafCount" type="button" class="regrow" title="Draw the trees again. Your skills stay the same." @click="regrow">Regrow</button>
       </div>
     </header>
     <div ref="scroller" class="grove-scroll">

@@ -66,7 +66,23 @@ async function act(work: () => Promise<void>, success = "") {
     restoreFocus(previous, () => (error.value ? errorBox.value : noticeBox.value) ?? (composerInput.value?.disabled === false ? composerInput.value : heading.value));
   }
 }
-async function startLesson() { await act(async () => { const result = unwrap(await api.learning.lesson({ skill: props.skill, request: response.value.trim() })); response.value = ""; channel.value = "TEXT"; freshLesson.value = false; selected.value = result.lesson; }); }
+// While the tutor answers, the message leaves the box and waits in the thread as "Sending". A failure puts it back.
+const pending = ref<{ text: string; files: string[] } | null>(null);
+function takeDraft() {
+  const text = response.value, sent = attachments.value, ch = channel.value;
+  pending.value = { text, files: sent.map((item) => item.name) };
+  response.value = ""; attachments.value = []; channel.value = "TEXT";
+  void scrollToLatest();
+  return { text, sent, ch, restore() { response.value = text; attachments.value = sent; channel.value = ch; pending.value = null; } };
+}
+async function startLesson() {
+  const draft = takeDraft();
+  await act(async () => {
+    try { const result = unwrap(await api.learning.lesson({ skill: props.skill, request: draft.text.trim() })); freshLesson.value = false; selected.value = result.lesson; }
+    catch (problem) { draft.restore(); throw problem; }
+    finally { pending.value = null; }
+  });
+}
 function newLesson() { if (busy.value || recording.value) return; freshLesson.value = true; selected.value = ""; reviewOpen.value = false; error.value = ""; notice.value = ""; }
 function selectSession(id: StudySession["session"]) { if (busy.value || recording.value) return; freshLesson.value = false; selected.value = id; reviewOpen.value = false; error.value = ""; notice.value = ""; }
 async function submitMessage() { if (!canSend.value) return; if (current.value) await send(); else await startLesson(); }
@@ -76,16 +92,19 @@ function enterToSend(event: KeyboardEvent) { if (event.key === "Enter" && !event
 async function scrollToLatest() { await nextTick(); if (thread.value) thread.value.scrollTop = thread.value.scrollHeight; }
 async function startTask() { await act(async () => { const result = unwrap(await api.learning.task({ skill: props.skill })); freshLesson.value = false; selected.value = result.task; reviewOpen.value = false; reviewed.value = false; unseen.value = true; outsideHelp.value = false; }); }
 async function send() {
+  const session = current.value; if (!session) return;
+  const draft = takeDraft();
   await act(async () => {
-    const session = current.value; if (!session) return;
     // Photos go in the order the learner attached them.
-    const sent = attachments.value;
-    const input = { studySession: session.session, text: response.value, channel: channel.value, attachments: sent.map((item) => item.material), dialogueLength: session.dialogue.length };
-    const result = session.lesson ? await api.learning.question(input) : await api.learning.respond(input);
-    // Keep the draft and every photo on failure; the reloaded history exposes any saved question and its retry button.
-    unwrap(result);
-    response.value = ""; channel.value = "TEXT"; attachments.value = []; reviewed.value = false;
-    sent.forEach(forgetPreview);
+    const input = { studySession: session.session, text: draft.text, channel: draft.ch, attachments: draft.sent.map((item) => item.material), dialogueLength: session.dialogue.length };
+    try {
+      const result = session.lesson ? await api.learning.question(input) : await api.learning.respond(input);
+      // The draft and every photo come back on failure; the reloaded history exposes any saved question and its retry button.
+      unwrap(result);
+      reviewed.value = false;
+      draft.sent.forEach(forgetPreview);
+    } catch (problem) { draft.restore(); throw problem; }
+    finally { pending.value = null; }
   });
 }
 function forgetPreview(item: Attachment) { if (item.preview) { URL.revokeObjectURL(item.preview); previews.delete(item.preview); } }
@@ -274,7 +293,7 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
           <div v-if="data && !data.track" class="confidence-note">
             <form @submit.prevent="saveConfidence"><label for="confidence">How confident do you feel?</label><div class="confidence"><input id="confidence" v-model.number="confidence" type="range" min="0" max="100" :disabled="busy" /><output>{{ confidence }}%</output><button :disabled="busy" class="secondary dawn small-button">Set starting point</button></div><p class="hint">A rough estimate is fine. Your practice will refine it.</p></form>
           </div>
-          <div v-if="!current && data" class="chat-welcome">
+          <div v-if="!current && data && !pending" class="chat-welcome">
             <PixelIcon name="leaf" :size="48" /><h2>Let's work through it.</h2><p>{{ data.skill.outcome }}</p>
             <div class="prompt-choices"><button :disabled="busy" @click="choosePrompt('Explain this skill with a worked example.')">Show me an example</button><button :disabled="busy" @click="choosePrompt('Explain why this method works, using a concrete example.')">Help me understand why</button><button :disabled="busy" @click="choosePrompt('Walk me through guided practice. Ask one question at a time.')">Guide me through practice</button></div>
           </div>
@@ -291,7 +310,7 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
               <div v-if="item.turn.speaker === 'TUTOR'" class="prose-blocks"><template v-for="(part, partIndex) in blocks(item.turn.text)" :key="partIndex"><pre v-if="part.code" class="code-block">{{ part.text }}</pre><p v-else class="prose">{{ part.text }}</p></template></div>
               <p v-else class="prose">{{ item.turn.text }}</p>
               <p v-for="(file, fileIndex) in item.turn.media" :key="file.file" class="attachment-label"><span class="attach-thumb" aria-hidden="true" />{{ item.turn.media.length > 1 ? `Attachment ${fileIndex + 1} of ${item.turn.media.length}` : 'Attachment' }} · {{ file.name }}</p><p v-if="answerLabel('turn', current.session, item.turnIndex)" class="tutor-label">{{ answerLabel('turn', current.session, item.turnIndex) }}</p></article>
-            <button v-if="current.lesson && current.dialogue.at(-1)?.turn.speaker === 'LEARNER'" class="message-action" :disabled="busy || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="retryReply">Retry tutor reply</button>
+            <button v-if="current.lesson && current.dialogue.at(-1)?.turn.speaker === 'LEARNER' && !pending" class="message-action" :disabled="busy || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="retryReply">Retry tutor reply</button>
             <div v-if="current.task && current.status === 'OPEN' && current.dialogue.some(item => item.turn.speaker === 'LEARNER' && item.turn.purpose === 'RESPONSE')" class="review-step">
               <button class="secondary dawn" :disabled="busy || recording" :aria-expanded="reviewOpen" @click="reviewOpen = !reviewOpen">{{ reviewOpen ? 'Close review' : 'Review and assess my work' }}</button>
               <div v-if="reviewOpen" class="attempt-review">
@@ -316,6 +335,8 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
           <p v-if="busy" class="working" role="status"><PixelIcon name="leaf" :size="18" /> Working on it…</p>
           <div role="status"><p v-if="notice && !busy" ref="noticeBox" class="notice" tabindex="-1">{{ notice }}</p></div>
           <div role="alert"><p v-if="error" ref="errorBox" class="error" tabindex="-1">{{ error }}</p></div>
+          <article v-if="pending" class="message from-you pending" aria-live="polite"><span class="sr-only">You</span><p class="prose">{{ pending.text }}</p><p v-for="(name, fileIndex) in pending.files" :key="fileIndex" class="attachment-label"><span class="attach-thumb" aria-hidden="true" />Attachment · {{ name }}</p><p class="sending">Sending…</p></article>
+          <article v-if="pending" class="message from-tutor thinking" aria-hidden="true"><div class="speaker-row"><span class="speaker"><PixelIcon name="leaf" :size="18" /> StillGotIt</span></div><p class="prose dots"><span>·</span><span>·</span><span>·</span></p></article>
         </div>
       </div>
       <div class="composer-area">
@@ -340,8 +361,9 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
         </div>
       </div>
     </div>
-    <aside id="learn-rail" class="rail" aria-label="Mastery, goal, evidence and sources" :hidden="narrow && !evidenceOpen ? true : undefined">
-      <div v-if="narrow" class="rail-close"><button ref="railClose" type="button" class="quiet" @click="closeRail">Close</button></div>
+    <div v-if="narrow && evidenceOpen" class="rail-backdrop" aria-hidden="true" @click="closeRail" />
+    <aside id="learn-rail" class="rail" aria-label="Mastery, goal, evidence and sources" :hidden="narrow && !evidenceOpen ? true : undefined" @keydown.esc.stop="narrow && closeRail()">
+      <div v-if="narrow" class="rail-close"><span class="rail-title">Mastery and evidence</span><button ref="railClose" type="button" class="rail-x" aria-label="Close mastery and evidence" @click="closeRail"><span aria-hidden="true">✕</span></button></div>
       <section class="rail-card">
         <div class="rail-head"><p class="eyebrow rail-eyebrow">Your mastery</p><InfoBubble :text="masteryNote" label="About your mastery estimate" /></div>
         <div class="mastery-row"><span class="sprite-tile green"><PixelIcon :sprite="stage" :size="35" /></span><div class="mastery-figure"><strong>{{ pctText }}</strong><MasteryCells :value="pct" :cells="10" /></div></div>
@@ -497,8 +519,17 @@ button.mastery-chip:hover{border-color:#C9C1F0}
 .rail{border-left:1px solid #EEEAF7;background:#FAF9FE;overflow-y:auto;overflow-x:hidden;padding:16px 14px;display:flex;flex-direction:column;gap:10px;min-height:0}
 .narrow .rail{position:absolute;top:0;right:0;bottom:0;width:312px;max-width:100%;z-index:20;box-shadow:-12px 0 32px rgba(20,20,20,.12);animation:railIn 200ms ease-out}
 .rail[hidden]{display:none}
-.rail-close{display:flex;justify-content:flex-end}
-.rail-close .quiet{font-size:13px;color:var(--muted)}
+.rail-backdrop{position:absolute;inset:0;z-index:19;background:rgba(21,21,21,.28)}
+.rail-close{position:sticky;top:-16px;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:8px;margin:-16px -14px 0;padding:12px 12px 8px 16px;background:#FAF9FE}
+.rail-title{font:400 15px var(--font-display);color:var(--ink)}
+.rail-x{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;padding:0;border:0;border-radius:10px;background:#EEEAF7;color:var(--ink);font-size:15px;line-height:1}
+.rail-x:hover{background:#E2DEF6}
+.message.pending{opacity:.85}
+.sending{margin:4px 0 0;font-size:11px;font-weight:600;color:var(--muted)}
+.thinking .dots{display:inline-flex;gap:3px;font-size:22px;line-height:1;color:var(--muted)}
+.thinking .dots span{animation:sgDot 1.2s ease-in-out infinite}.thinking .dots span:nth-child(2){animation-delay:.2s}.thinking .dots span:nth-child(3){animation-delay:.4s}
+@keyframes sgDot{0%,80%,100%{opacity:.25;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
+@media (prefers-reduced-motion:reduce){.thinking .dots span{animation:none;opacity:.6}}
 .rail-card{background:#FFFFFF;border-radius:18px;padding:16px;box-shadow:0 0 0 1px #ECE9F5;flex:none}
 .rail-card.goal{display:flex;flex-direction:column;gap:6px}
 .rail-eyebrow{color:#7A7397;white-space:nowrap}

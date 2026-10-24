@@ -6,18 +6,22 @@ import { rng, WHALE } from "./pixel-art.ts";
 // Day 0 is the learner's sailboat, the other days are buoys, and the exam day (when an active exam falls in the week)
 // is a rock island with a striped lighthouse. The WhaleLife whale swims from today toward the lighthouse.
 // A 450ms tick drives the motion; under prefers-reduced-motion the scene is drawn once.
-const props = defineProps<{ examDay: number | null; examTitle?: string; examDate?: string }>();
-const U = 4, HEIGHT = 200, TICK = 450;
+// `centers` are the day columns' horizontal centres in CSS pixels, measured by the planner, so every mark sits over its column.
+const props = defineProps<{ examDay: number | null; examTitle?: string; examDate?: string; width?: number; height?: number; centers?: number[]; horizon?: number }>();
+const U = 4, HEIGHT = 136, TICK = 450;
 const wrap = ref<HTMLElement | null>(null), canvas = ref<HTMLCanvasElement | null>(null);
 const size = ref({ w: 900, h: HEIGHT });
 let tick = 0, timer: ReturnType<typeof setInterval> | undefined, observer: ResizeObserver | undefined, motion: MediaQueryList | undefined;
 
 const geo = computed(() => {
-  const W = Math.ceil(size.value.w / U), H = Math.ceil(size.value.h / U), Hz = Math.round(H * 0.36);
-  return { W, H, Hz, cx: (i: number) => Math.round((i + 0.5) * W / 7) };
+  const W = Math.ceil(size.value.w / U), H = Math.ceil(size.value.h / U), centers = props.centers ?? [];
+  const Hz = props.horizon ? Math.min(H - 20, Math.max(16, Math.round(props.horizon / U))) : Math.round(H * 0.47);
+  return { W, H, Hz, cx: (i: number) => { const c = centers[i]; return c === undefined ? Math.round((i + 0.5) * W / 7) : Math.round(c / U); } };
 });
 const examAt = computed(() => props.examDay !== null && props.examDay >= 0 && props.examDay <= 6 ? props.examDay : null);
-const signStyle = computed(() => examAt.value === null ? undefined : { left: `${geo.value.cx(examAt.value) * U}px`, top: `${(geo.value.Hz + 15) * U}px` });
+// With the planner's columns over the sea, the day planks name today and the exam, so the sea keeps its own labels only on its own.
+const labelled = computed(() => props.horizon === undefined);
+const signStyle = computed(() => examAt.value === null || !labelled.value ? undefined : { left: `${geo.value.cx(examAt.value) * U}px`, top: `${(geo.value.Hz + 15) * U}px` });
 const youStyle = computed(() => ({ left: `${geo.value.cx(0) * U}px`, top: `${(geo.value.Hz + 11) * U}px` }));
 const description = computed(() => examAt.value === null ? "This week at sea. You are at today; no exam falls this week."
   : `This week at sea. You are at today, and the ${props.examTitle || "exam"} on ${props.examDate || "its day"} is the lighthouse.`);
@@ -34,7 +38,9 @@ function draw() {
   // Sky in solid bands, the sun, drifting clouds.
   const sky = ["#D3EAF4", "#DCEFF6", "#E6F4F7", "#F0F7F3"], bh = Math.ceil(Hz / sky.length);
   sky.forEach((c, i) => rect(0, i * bh, W, bh, c));
-  for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) { const q = dx * dx + dy * dy; if (q <= 17) cell(Math.round(W * 0.5) + dx, Math.round(Hz * 0.45) + dy, q <= 5 ? "#F3CD7A" : "#F9E3A8"); }
+  // With day planks in the sky, the sun sits high at the right, clear of them.
+  const sunX = props.horizon === undefined ? Math.round(W * 0.5) : W - 11, sunY = props.horizon === undefined ? Math.round(Hz * 0.45) : 6;
+  for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) { const q = dx * dx + dy * dy; if (q <= 17) cell(sunX + dx, sunY + dy, q <= 5 ? "#F3CD7A" : "#F9E3A8"); }
   const R = rng(21);
   for (let i = 0; i < Math.max(3, Math.floor(W / 50)); i++) {
     const cw = 8 + Math.floor(R() * 10), x = Math.floor((R() * W + tk * (0.3 + (i % 3) * 0.15)) % (W + 30)) - 15, y = 2 + Math.floor(R() * Math.round(Hz * 0.5));
@@ -65,7 +71,8 @@ function draw() {
   for (let r = 0; r < 8; r++) rect(bx + 1, by - 9 + r, Math.floor(r * 0.7) + 1, 1, "#FFFFFF");
   cell(bx, by - 10, "#E3A233"); rect(bx - 6, by + 2, 13, 1, "#80CBE6");
   // The whale, mirrored to face right at 2px per unit, swims from today toward the lighthouse and spouts about every 6 seconds.
-  const span = Math.max(10, target - c0 - 22), wx = c0 + 8 + ((tk * 0.6) % span), wy = Hz + 11 + (tk % 3 === 0 ? 1 : 0), ox = wx * U, oy = wy * U, s = 2;
+  const depth = props.horizon === undefined ? 11 : Math.max(11, Math.round((H - Hz) * 0.5));
+  const span = Math.max(10, target - c0 - 22), wx = c0 + 8 + ((tk * 0.6) % span), wy = Hz + depth + (tk % 3 === 0 ? 1 : 0), ox = wx * U, oy = wy * U, s = 2;
   for (const [x, y, w, h, c] of WHALE) { ctx.fillStyle = c; ctx.fillRect(ox + (26 - x - w) * s, oy + y * s, w * s, h * s); }
   if (tk % 14 < 3) { ctx.fillStyle = "#E3F4FA"; ctx.fillRect(ox + 17 * s, oy - 4 * s, 2 * s, 3 * s); ctx.fillRect(ox + 15 * s, oy - 6 * s, 2 * s, 2 * s); ctx.fillRect(ox + 19 * s, oy - 6 * s, 2 * s, 2 * s); }
 }
@@ -88,22 +95,22 @@ onMounted(() => {
   if (wrap.value) observer.observe(wrap.value);
   measure(); start();
 });
-watch(() => [props.examDay, size.value], () => draw(), { flush: "post" });
+watch(() => [props.examDay, props.centers, props.horizon, size.value], () => draw(), { flush: "post" });
 onBeforeUnmount(() => { if (timer) clearInterval(timer); observer?.disconnect(); motion?.removeEventListener("change", start); });
 </script>
 
 <template>
-  <section class="plan-sea" role="img" :aria-label="description">
+  <section class="plan-sea" role="img" :aria-label="description" :style="{ width: width ? `${width}px` : undefined, height: height ? `${height}px` : undefined }">
     <div ref="wrap" class="sea-wrap">
       <canvas ref="canvas" aria-hidden="true" />
       <span v-if="signStyle" class="sea-sign" :style="signStyle" aria-hidden="true"><span class="sign-title">{{ examTitle || 'Exam' }}</span><span class="sign-date">{{ examDate }}</span></span>
-      <span class="sea-you" :style="youStyle" aria-hidden="true">You · today</span>
+      <span v-if="labelled" class="sea-you" :style="youStyle" aria-hidden="true">You · today</span>
     </div>
   </section>
 </template>
 
 <style scoped>
-.plan-sea{position:relative;height:200px;border-radius:24px;overflow:hidden;border:1px solid #CFE7F2;background:#9BD7EC}
+.plan-sea{position:relative;height:136px;border-radius:16px;overflow:hidden;border:1px solid #CFE7F2;background:#9BD7EC}
 .sea-wrap{position:absolute;inset:0}
 canvas{position:absolute;left:0;top:0;image-rendering:pixelated}
 .sea-sign{position:absolute;transform:translate(-50%,-100%);display:flex;flex-direction:column;align-items:center;padding:3px 9px 4px;background:#E9D6A8;box-shadow:inset 0 -2px 0 #CDB884,0 0 0 2px #C08324;white-space:nowrap;pointer-events:none}
