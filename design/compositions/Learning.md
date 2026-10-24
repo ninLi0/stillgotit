@@ -16,6 +16,8 @@ The frontend sends learner choices through the generated client. The session coo
 
 The host serializes mutation requests per learner for the single-process P2 app. Conditions observe state; the concepts enforce their own atomic constraints. Source-version checks are repeated after slow provider work. Failed causal work is reported rather than presenting an incomplete response as success.
 
+Each provider request sends its owned sources in the form the tutor reads best, as the [materials composition](Materials.md) describes. Text, recording transcripts, and every file's locations go as text. An original PDF or image goes inline when it is 15 MB or less and the request's inline files stay within 30 MB, and goes by Files API reference otherwise. A file that cannot reach the provider fails the request with its own explanation, like other provider failures, and saved work stays available.
+
 ```endpoints
 Learning.Read at /learning/read
 Learning.Progress at /learning/progress

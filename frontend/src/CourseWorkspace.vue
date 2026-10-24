@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { api, unwrap, type Course } from "./api.ts";
-import { aiStatus, uploadMaterial, type AIStatus } from "./host-api.ts";
+import { aiStatus, HostError, importMaterial, listImports, refusalStartsNewImport, removeImport, retryImport, type AIStatus, type ImportEntry, type ImportListing, type UploadAnswer } from "./host-api.ts";
 import { DraftSaveQueue } from "./draft-save-queue.ts";
 import { focusedControl, restoreFocus } from "./focus.ts";
+import MaterialViewer from "./MaterialViewer.vue";
 import SkillTree from "./SkillTree.vue";
 import SkillStudy from "./SkillStudy.vue";
 import StudyPlanner from "./StudyPlanner.vue";
@@ -21,10 +22,14 @@ type Suggestion = { title: string; outcome: string; gate: string };
 const data = ref<CourseData>({ materials: [], units: [], skills: [] });
 const busy = ref(false), message = ref(""), error = ref(""), justConfirmed = ref<string | null>(null);
 const notice = ref<HTMLElement | null>(null), setupError = ref<HTMLElement | null>(null);
+// Unfinished imports shown above the saved materials. importErrors holds each import's refusal, shown in its card.
+// announcement names materials a listing saved; it stays until the learner leaves Course materials or starts an action.
+const imports = ref<ImportEntry[]>([]), importsError = ref(""), importErrors = reactive<Record<string, string>>({}), importBusy = ref<string | null>(null), announcement = ref("");
 // Start empty: typing into a prefilled name merges the two names.
 const materialTitle = ref(""), chosenFiles = ref<File[]>([]), requestId = ref(crypto.randomUUID());
 const material = ref<MaterialId | "">(""), selectedSkill = ref<string | null>(null), unit = ref(""), newUnit = ref("Matrix multiplication");
-const suggestions = ref<Suggestion[]>([]), preview = ref<{ title: string; content: string; originals: { file: string; name: string; limitations: string[] }[] } | null>(null);
+// previewFiles is the number of files in the material open in the library, once its viewer has read it.
+const suggestions = ref<Suggestion[]>([]), previewFiles = ref<number | null>(null);
 // Off until the server confirms it has a Gemini key.
 const ai = ref<AIStatus>({ available: false, reason: "" });
 const progress = ref<Record<string, number>>({}), revision = ref(0);
@@ -54,7 +59,7 @@ watch(view, async () => {
 
 async function task(work: () => Promise<void>) {
   const previous = focusedControl();
-  busy.value = true; error.value = ""; message.value = ""; justConfirmed.value = null;
+  busy.value = true; error.value = ""; message.value = ""; announcement.value = ""; justConfirmed.value = null;
   try { await work(); } catch (problem) { error.value = problem instanceof Error ? problem.message : "The request could not finish."; }
   finally {
     busy.value = false; await nextTick();
@@ -93,13 +98,16 @@ function filesChanged(event: Event) {
   if (chosenFiles.value.length === 1) materialTitle.value = chosenFiles.value[0]!.name.replace(/\.[^.]+$/, "");
 }
 function resetImport() { requestId.value = crypto.randomUUID(); }
+function clearForm() { chosenFiles.value = []; materialTitle.value = ""; if (fileInput.value) fileInput.value.value = ""; }
 const fileInput = ref<HTMLInputElement | null>(null), dragging = ref(false), adding = ref(false), showPreview = ref(false);
 const materialName = computed(() => data.value.materials.find((source) => source.material === material.value)?.title ?? "this material");
 // Topics are the course's units. Archived skills stay off the list.
 const unitGroups = computed(() => data.value.units.map((item) => ({ ...item, skills: data.value.skills.filter((skill) => skill.unit === item.unit && (skill.status === "DRAFT" || skill.status === "CONFIRMED")) })).filter((group) => group.skills.length));
+function selectMaterial(source: MaterialId) { material.value = source; sessionStorage.setItem(sourceSelectionKey, source); }
+// The material viewer reads the material and loads each file's bytes only when the learner opens that file.
 function openMaterial(source: MaterialId) {
   if (material.value === source && showPreview.value) { showPreview.value = false; return; }
-  material.value = source; showPreview.value = true; task(readMaterial);
+  selectMaterial(source); previewFiles.value = null; showPreview.value = true;
 }
 function suggestFrom(source: MaterialId) { material.value = source; suggest(); }
 function removeFile(index: number) {
@@ -107,31 +115,134 @@ function removeFile(index: number) {
   requestId.value = crypto.randomUUID();
   if (!chosenFiles.value.length && fileInput.value) fileInput.value.value = "";
 }
-function fileSize(bytes: number) { return bytes < 1_000_000 ? `${Math.max(1, Math.round(bytes / 1000))} KB` : `${(bytes / 1_000_000).toFixed(1)} MB`; }
+// Sizes use the upload limit's unit: 1 MB is 1,048,576 bytes.
+function fileSize(bytes: number) { return bytes < 1_048_576 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1_048_576).toFixed(1)} MB`; }
 function fileKind(name: string) { const dot = name.lastIndexOf("."); return dot > 0 ? name.slice(dot + 1).toUpperCase().slice(0, 4) : "FILE"; }
+// The browser checks only the number of files and their combined size, with the server's sentences. The route checks the rest.
+const MAX_FILES = 12, MAX_UPLOAD_BYTES = 95 * 1_048_576;
+const NO_UPLOAD_ANSWER = "The upload didn't get an answer in time. It may still be saving. Wait a minute, then choose Import material again. The app continues from what it already saved.";
+/**
+ * "Accepting an upload" in design/compositions/Materials.md. The form starts a new request ID after an answer with a
+ * material or a state, and after IMPORT_REMOVED or IMPORT_REQUEST_CONFLICT. It keeps the request ID after any other
+ * refusal and when no answer arrives, so a retry continues from what the server already saved.
+ */
 async function upload() {
   await task(async () => {
+    const files = chosenFiles.value;
+    if (!files.length) throw new Error("Choose at least one file to import.");
+    if (files.length > MAX_FILES) throw new Error("Choose up to 12 files for one import.");
+    if (files.reduce((total, file) => total + file.size, 0) > MAX_UPLOAD_BYTES) throw new Error("Choose files with a combined size of 95 MB or less.");
     const form = new FormData();
     form.set("course", props.course.course); form.set("title", materialTitle.value.trim()); form.set("requestId", requestId.value);
-    for (const file of chosenFiles.value) form.append("files", file);
-    const saved = await uploadMaterial(form);
-    material.value = saved.material; await refresh(); await readMaterial();
-    adding.value = false; showPreview.value = true;
-    message.value = "Material saved. Check the readable text, then find skills in it.";
+    for (const file of files) form.append("files", file);
+    let answer: UploadAnswer;
+    try { answer = await importMaterial(form); }
+    catch (problem) {
+      if (refusalStartsNewImport(problem)) resetImport();
+      // No answer, or a page that is not the app's: the import may have reached the library. The listing runs in the
+      // background, because a server that did not answer may also be slow to list.
+      if (problem instanceof HostError && !problem.answered) { void loadImports(); throw new Error(NO_UPLOAD_ANSWER); }
+      throw problem;
+    }
+    resetImport(); clearForm(); adding.value = false;
+    if ("material" in answer) {
+      selectMaterial(answer.material); await refresh(); previewFiles.value = null; showPreview.value = true;
+      message.value = "Material saved. Check the readable text, then find skills in it.";
+      return;
+    }
+    await loadImports();
+    message.value = answer.state === "TRANSCRIBING"
+      ? "Upload saved. Your recording is being transcribed. This usually takes a few minutes, and longer for long recordings. You can keep studying."
+      : "Upload saved. Your material will appear in a moment.";
   });
 }
-async function readMaterial() {
-  if (!material.value) return;
-  sessionStorage.setItem(sourceSelectionKey, material.value);
-  preview.value = unwrap(await api.courses.materials.read({ material: material.value }));
+
+const POLL_MS = 15_000;
+const importsInProgress = computed(() => imports.value.some((entry) => entry.state === "TRANSCRIBING" || entry.state === "SAVING"));
+const importCards = new Map<string, HTMLElement>(), libraryHeading = ref<HTMLElement | null>(null);
+// Only the newest listing replaces the shown imports. An import action makes listings already on their way stale.
+let listingsStarted = 0, pollTimer: ReturnType<typeof setTimeout> | undefined, closed = false;
+const fileStateLabels: Record<ImportEntry["files"][number]["state"], string> = { DONE: "Done", WAITING: "Waiting", TRANSCRIBING: "Transcribing", FAILED: "Couldn't transcribe" };
+function importStatus(entry: ImportEntry) {
+  return entry.state === "TRANSCRIBING" ? "Transcribing. This usually takes a few minutes, and longer for long recordings. You can keep studying."
+    : entry.state === "FAILED" ? "Couldn't finish this import." : "Saving…";
 }
-async function download(file: string, name: string) {
-  await task(async () => {
-    const response = await fetch("/api/courses/materials/file", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ material: material.value, file }) });
-    if (!response.ok) throw new Error((await response.json().catch(() => null))?.detail || "That file could not be opened. Try again.");
-    const url = URL.createObjectURL(await response.blob()), link = document.createElement("a");
-    link.href = url; link.download = name; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+/** The import's failure sentence. A transcription failure follows "Couldn't transcribe NAME." */
+function importFailure(entry: ImportEntry) {
+  if (!entry.detail) return "";
+  const failed = entry.state === "SAVING" ? undefined : entry.files.find((file) => file.state === "FAILED");
+  return failed ? `Couldn't transcribe ${failed.name}. ${entry.detail}` : entry.detail;
+}
+function setImportCard(requestId: string, element: unknown) {
+  if (element instanceof HTMLElement) importCards.set(requestId, element);
+  else importCards.delete(requestId);
+}
+
+/**
+ * Lists the course's unfinished imports ("Unfinished imports in the library"). The route first saves each import whose
+ * transcripts are finished. The course reloads when the listing saved a material, or when an import the library was
+ * showing is no longer listed, so a material saved by another tab or by a listing whose reply was lost still appears.
+ */
+async function loadImports() {
+  const listing = ++listingsStarted;
+  clearTimeout(pollTimer); pollTimer = undefined;
+  let result: ImportListing;
+  try { result = await listImports(props.course.course); }
+  catch (problem) {
+    if (listing === listingsStarted && !closed) { importsError.value = problem instanceof Error ? problem.message : "Unfinished imports could not be listed."; schedulePoll(); }
+    return;
+  }
+  if (closed) return;
+  const latest = listing === listingsStarted, listed = new Set(result.imports.map((entry) => entry.requestId));
+  const left = latest && imports.value.some((entry) => !listed.has(entry.requestId));
+  if (latest) {
+    imports.value = result.imports; importsError.value = "";
+    for (const id of Object.keys(importErrors)) if (!listed.has(id)) delete importErrors[id];
+  }
+  if (result.saved.length || left) {
+    try { await refresh(); }
+    catch (problem) { error.value = problem instanceof Error ? problem.message : "The course could not be reloaded. Reload the page to see your materials."; }
+    if (result.saved.length) {
+      announcement.value = result.saved.map((saved) => `“${data.value.materials.find((item) => item.material === saved)?.title ?? "Your material"}” is ready. Check the transcript, then find skills in it.`).join(" ");
+    }
+  }
+  if (latest) schedulePoll();
+}
+/** Lists again in 15 seconds while Course materials shows an import that is transcribing or saving. */
+function schedulePoll() {
+  clearTimeout(pollTimer); pollTimer = undefined;
+  if (!closed && view.value === "setup" && importsInProgress.value) pollTimer = setTimeout(() => void loadImports(), POLL_MS);
+}
+watch(view, (next) => {
+  if (next !== "setup") { clearTimeout(pollTimer); pollTimer = undefined; announcement.value = ""; }
+  // Coming back to Course materials: catch up at once rather than waiting for the next turn.
+  else if (importsInProgress.value || importsError.value) void loadImports();
+});
+onBeforeUnmount(() => { closed = true; clearTimeout(pollTimer); });
+
+/** Try again and Remove. Their refusal sentences appear in the import's own card. */
+async function importAction(entry: ImportEntry, work: () => Promise<void>) {
+  const previous = focusedControl();
+  importBusy.value = entry.requestId; delete importErrors[entry.requestId];
+  try { await work(); listingsStarted++; }
+  catch (problem) { importErrors[entry.requestId] = problem instanceof Error ? problem.message : "This import could not be changed. Try again."; }
+  finally {
+    importBusy.value = null; schedulePoll(); await nextTick();
+    restoreFocus(previous, () => importCards.get(entry.requestId) ?? libraryHeading.value ?? document.getElementById("setup-title"));
+  }
+}
+function retryEntry(entry: ImportEntry) {
+  return importAction(entry, async () => {
+    const updated = await retryImport(entry.requestId);
+    imports.value = imports.value.map((item) => item.requestId === updated.requestId ? updated : item);
+  });
+}
+function removeEntry(entry: ImportEntry) {
+  return importAction(entry, async () => {
+    await removeImport(entry.requestId);
+    imports.value = imports.value.filter((item) => item.requestId !== entry.requestId);
+    // The form may still hold this import's request ID after an upload that got no answer.
+    if (requestId.value === entry.requestId) resetImport();
   });
 }
 async function suggest() {
@@ -174,7 +285,10 @@ async function confirm(skill: string) {
 onMounted(() => task(async () => {
   try { const saved = JSON.parse(sessionStorage.getItem(viewKey) ?? "null"); if (saved && ["home", "setup", "chat"].includes(saved.view)) { view.value = saved.view; selectedSkill.value = typeof saved.skill === "string" ? saved.skill : null; } } catch { /* Open Home if there is no saved view. */ }
   await nextTick(); viewRestored = true;
-  pendingDraftCount.value = draftSaves.read().length; await refresh(); await refreshAI();
+  pendingDraftCount.value = draftSaves.read().length; await refresh();
+  // Listing can wait on other work, such as a tutor request, so it runs beside the page's own loading.
+  void loadImports();
+  await refreshAI();
 }));
 </script>
 
@@ -201,9 +315,9 @@ onMounted(() => task(async () => {
     <section v-show="view === 'setup'" class="setup-view">
       <header class="setup-heading"><button class="back-home" @click="view = 'home'">← Back to your tree</button>
         <div class="setup-top"><div><h1 id="setup-title" tabindex="-1">Course materials</h1><p>The files your tutor teaches from, and the skills found in them.</p></div><button v-if="data.materials.length" class="add-material" :class="adding ? 'small-button' : 'primary'" :aria-expanded="adding" aria-controls="add-panel" @click="adding = !adding">{{ adding ? 'Close' : '+ Add material' }}</button></div>
-        <p class="hint ai-notice">Your files and answers are stored on the class server and sent to Google Gemini to create lessons and feedback. Don't upload anything private.</p></header>
+        <p class="hint ai-notice">Your files and answers are stored on the class server and sent to Google Gemini to create lessons and feedback. Google keeps copies of large files and recordings for up to 48 hours. Don't upload anything private.</p></header>
       <div role="alert"><p v-if="error && view === 'setup'" ref="setupError" class="error" tabindex="-1">{{ error }}</p></div>
-      <div role="status"><p v-if="message" ref="notice" class="notice" tabindex="-1">{{ message }} <button v-if="justConfirmed" class="quiet" @click="showOnTree(justConfirmed)">See it on your tree</button></p></div>
+      <div role="status"><p v-if="message" ref="notice" class="notice" tabindex="-1">{{ message }} <button v-if="justConfirmed" class="quiet" @click="showOnTree(justConfirmed)">See it on your tree</button></p><p v-if="announcement" class="notice">{{ announcement }}</p></div>
       <div class="course-tools">
         <section v-if="adding || !data.materials.length" id="add-panel" class="add-panel">
           <h2>{{ data.materials.length ? 'Add material' : 'Add your first material' }}</h2>
@@ -214,27 +328,36 @@ onMounted(() => task(async () => {
                 <li v-for="(file, index) in chosenFiles" :key="file.name + index" class="file-card"><span class="file-kind" aria-hidden="true">{{ fileKind(file.name) }}</span><span class="file-name">{{ file.name }}<small>{{ fileSize(file.size) }}</small></span><button type="button" class="file-remove" :disabled="busy" :aria-label="`Remove ${file.name}`" @click="removeFile(index)">×</button></li>
               </ul>
               <p v-else class="drop-title"><span aria-hidden="true">＋</span> Drop course files here, or <label for="lesson-files" class="drop-choose">choose files</label></p>
-              <p id="file-types" class="hint">PDF, Word, PowerPoint, Excel, text, notebook, or image (PNG, JPEG, WebP) files. Up to 25 MB total.</p>
+              <p id="file-types" class="hint">PDF (including scans), Word, PowerPoint, Excel, text, notebook, image (PNG, JPEG, WebP, HEIC, HEIF), audio, or video files. Up to 12 files and 95 MB in total. Recordings and videos can be up to 2 hours long.</p>
             </div>
             <label for="lesson-title">Material title</label><input id="lesson-title" v-model="materialTitle" maxlength="160" required placeholder="For example, Lecture 4 notes" :disabled="busy" @input="resetImport" />
             <div class="import-actions"><p v-if="!chosenFiles.length" id="import-reason" class="hint reason">Choose at least one file to import.</p><button class="primary" :disabled="busy || !chosenFiles.length" :aria-describedby="chosenFiles.length ? undefined : 'import-reason'">{{ busy ? 'Working…' : 'Import material' }}</button></div>
           </form>
         </section>
-        <section v-if="data.materials.length" class="library">
-          <h2>Files <span class="count">{{ data.materials.length }}</span></h2>
-          <ul class="material-list">
-            <li v-for="source in data.materials" :key="source.material" class="material-row">
-              <div class="material-main"><span class="doc-icon" aria-hidden="true"><svg width="16" height="18" viewBox="0 0 16 18" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 1.8h7.5L14 6.3v9.9H2z"/><path d="M9.5 1.8v4.5H14M5 10h6M5 13h4"/></svg></span>
-                <div class="material-text"><strong>{{ source.title }}</strong><small>{{ material === source.material && showPreview && preview ? `${preview.originals.length} ${preview.originals.length === 1 ? 'file' : 'files'}` : 'Course material' }}</small></div>
-                <div class="row-actions"><button class="quiet" :disabled="busy" :aria-expanded="material === source.material && showPreview" @click="openMaterial(source.material)">{{ material === source.material && showPreview ? 'Hide' : 'View' }}</button><button class="small-button" :disabled="busy || !!suggestReason" :aria-describedby="suggestReason ? 'suggest-reason' : undefined" @click="suggestFrom(source.material)">Find skills</button></div></div>
-              <div v-if="material === source.material && showPreview && preview" class="material-preview">
-                <div class="file-chips"><button v-for="file in preview.originals" :key="file.file" class="file-chip" :disabled="busy" @click="download(file.file, file.name)">↓ {{ file.name }}</button></div>
-                <p v-for="limit in preview.originals.flatMap((file) => file.limitations)" :key="limit" class="hint">{{ limit }}</p>
-                <pre>{{ preview.content || 'This source is available as readable images.' }}</pre>
+        <section v-if="data.materials.length || imports.length || importsError" class="library">
+          <h2 ref="libraryHeading" tabindex="-1">Files <span class="count">{{ data.materials.length }}</span></h2>
+          <p v-if="importsError" class="hint imports-error">{{ importsError }}</p>
+          <ul v-if="imports.length" class="material-list import-list" aria-label="Unfinished imports">
+            <li v-for="entry in imports" :key="entry.requestId" :ref="(element) => setImportCard(entry.requestId, element)" class="material-row import-row" :class="entry.state.toLowerCase()" tabindex="-1">
+              <div class="material-main"><span class="doc-icon" aria-hidden="true"><svg v-if="entry.state === 'FAILED'" width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="9" cy="9" r="7"/><path d="M9 5v5M9 12.4v.6"/></svg><svg v-else width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="9" cy="9" r="7"/><path d="M9 5v4l2.6 2"/></svg></span>
+                <div class="material-text"><strong>{{ entry.title }}</strong><p class="import-status">{{ importStatus(entry) }}</p></div>
+                <div v-if="(entry.state === 'FAILED' && entry.canRetry) || entry.canRemove" class="row-actions"><button v-if="entry.state === 'FAILED' && entry.canRetry" class="small-button" :disabled="busy || !!importBusy" @click="retryEntry(entry)">Try again</button><button v-if="entry.canRemove" class="quiet" :disabled="busy || !!importBusy" @click="removeEntry(entry)">Remove</button></div></div>
+              <div class="import-detail">
+                <ul v-if="entry.state === 'TRANSCRIBING'" class="import-files"><li v-for="(file, index) in entry.files" :key="index"><span class="import-file-name">{{ file.name }}</span><span class="file-state" :class="file.state.toLowerCase()">{{ fileStateLabels[file.state] }}</span></li></ul>
+                <p v-if="importFailure(entry)" class="import-failure">{{ importFailure(entry) }}</p>
+                <div role="alert"><p v-if="importErrors[entry.requestId]" class="error import-error">{{ importErrors[entry.requestId] }}</p></div>
               </div>
             </li>
           </ul>
-          <p v-if="suggestReason" id="suggest-reason" class="hint reason">{{ suggestReason }}</p>
+          <ul v-if="data.materials.length" class="material-list">
+            <li v-for="source in data.materials" :key="source.material" class="material-row">
+              <div class="material-main"><span class="doc-icon" aria-hidden="true"><svg width="16" height="18" viewBox="0 0 16 18" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 1.8h7.5L14 6.3v9.9H2z"/><path d="M9.5 1.8v4.5H14M5 10h6M5 13h4"/></svg></span>
+                <div class="material-text"><strong>{{ source.title }}</strong><small>{{ material === source.material && showPreview && previewFiles !== null ? `${previewFiles} ${previewFiles === 1 ? 'file' : 'files'}` : 'Course material' }}</small></div>
+                <div class="row-actions"><button class="quiet" :disabled="busy" :aria-expanded="material === source.material && showPreview" @click="openMaterial(source.material)">{{ material === source.material && showPreview ? 'Hide' : 'View' }}</button><button class="small-button" :disabled="busy || !!suggestReason" :aria-describedby="suggestReason ? 'suggest-reason' : undefined" @click="suggestFrom(source.material)">Find skills</button></div></div>
+              <div v-if="material === source.material && showPreview" class="material-preview"><MaterialViewer :material="source.material" @loaded="previewFiles = $event.originals.length" /></div>
+            </li>
+          </ul>
+          <p v-if="suggestReason && data.materials.length" id="suggest-reason" class="hint reason">{{ suggestReason }}</p>
         </section>
         <section v-if="suggestions.length" class="suggest-panel">
           <h2>Suggested skills from {{ materialName }}</h2><p class="hint">Edit these to match what your course expects, then save them as drafts.</p>
@@ -268,7 +391,7 @@ onMounted(() => task(async () => {
       </div>
     </section>
     <div v-show="view === 'chat'" class="lesson-view">
-      <KeepAlive :max="12"><SkillStudy v-if="current?.status === 'CONFIRMED'" :key="current.skill" :skill="current.skill" :course="course.course" :materials="data.materials" :ai-available="ai.available" :ai-reason="ai.reason" :active="view === 'chat'" @changed="progressChanged" /></KeepAlive>
+      <KeepAlive :max="12"><SkillStudy v-if="current?.status === 'CONFIRMED'" :key="current.skill" :skill="current.skill" :course="course.course" :materials="data.materials" :ai-available="ai.available" :ai-reason="ai.reason" :active="view === 'chat'" @changed="progressChanged" @imports="loadImports" /></KeepAlive>
       <div v-if="current?.status !== 'CONFIRMED'" class="no-lesson"><h2 tabindex="-1">Choose a leaf to begin.</h2><button class="primary" @click="view = 'home'">Go to your tree</button></div>
     </div>
   </section>
@@ -279,12 +402,14 @@ onMounted(() => task(async () => {
 .section-block{padding:25px 0;border-bottom:1px solid var(--line)}.section-block>summary{font-size:18px;font-weight:600;cursor:pointer;margin-bottom:16px}.section-block form{max-width:none}.section-block h2{font:25px Georgia,serif;margin:0 0 10px}.section-block h3{font-size:16px}.course-tools label{margin:14px 0 7px;font-size:12px}.course-tools input[type=file]{padding:12px 0;border:0;font-size:13px}select,textarea{width:100%;font:inherit;padding:10px 12px;border:1px solid var(--field);border-radius:7px;background:var(--surface);color:var(--ink)}textarea{resize:vertical}.inline-actions{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-top:15px}.skill-draft{padding:22px 0;border-top:1px solid var(--line);margin-top:18px}.skill-draft p{font-size:13px;color:var(--muted)}.gate{white-space:pre-wrap}.source-preview{margin-top:20px}.source-preview summary{font-size:12px;cursor:pointer}.source-preview pre{max-height:240px;overflow:auto;white-space:pre-wrap;font-size:12px;background:var(--wash);padding:15px}.source-file{margin:12px 0}
 .setup-top{display:flex;justify-content:space-between;align-items:flex-end;gap:20px}.course-tools .add-material,.setup-top .add-material{min-height:40px;padding:8px 16px;font-size:14px;white-space:nowrap;margin-bottom:14px}.library,.topics,.add-panel,.suggest-panel{margin-top:26px}.library h2,.topics h2,.add-panel h2,.suggest-panel h2{font:22px Georgia,serif;margin:0 0 10px;display:flex;align-items:center;gap:10px}.count{font:600 12px/1 "Avenir Next","Nunito Sans",sans-serif;background:var(--light);color:var(--primary);border-radius:10px;padding:4px 8px}
 .material-list,.skill-rows{list-style:none;margin:0;padding:0;background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}.material-row+.material-row,.skill-row+.skill-row{border-top:1px solid var(--line)}.material-main,.skill-row{display:flex;align-items:center;gap:12px;padding:12px 14px;flex-wrap:wrap}.material-main:hover,.skill-row:hover{background:var(--wash)}.doc-icon{display:grid;place-items:center;width:36px;height:36px;border-radius:9px;background:var(--light);color:var(--primary);flex:none}.material-text,.skill-text{flex:1;min-width:140px}.material-text strong,.skill-text strong{display:block;font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.material-text small,.skill-text small{display:block;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.row-actions{display:flex;align-items:center;gap:12px;flex:none}.course-tools .small-button{padding:6px 12px;font-size:13px}
-.material-preview{padding:2px 14px 14px 62px}.file-chips{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 10px}.file-chip{border:1px solid var(--line);border-radius:999px;background:var(--surface);padding:5px 12px;font-size:12px;color:var(--primary)}.file-chip:hover:not(:disabled){background:var(--light)}.material-preview pre{max-height:220px;overflow:auto;white-space:pre-wrap;font-size:12px;background:var(--wash);padding:12px;border-radius:10px;margin:0}.unit-label{font-size:12px;font-weight:600;color:var(--muted);margin:14px 0 6px}.status-dot{width:10px;height:10px;border-radius:50%;flex:none;background:var(--success)}.status-dot.draft{background:transparent;border:2px solid var(--accent)}.status-tag{font-size:12px;color:var(--muted);white-space:nowrap}.suggest-panel{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px}
+.material-preview{padding:2px 14px 14px 62px}.unit-label{font-size:12px;font-weight:600;color:var(--muted);margin:14px 0 6px}.status-dot{width:10px;height:10px;border-radius:50%;flex:none;background:var(--success)}.status-dot.draft{background:transparent;border:2px solid var(--accent)}.status-tag{font-size:12px;color:var(--muted);white-space:nowrap}.suggest-panel{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px}
 .course-tools{position:relative;counter-reset:step}.course-tools form.import-card{max-width:none}.step{position:relative;padding-left:58px;border-bottom:0}.step::before{counter-increment:step;content:counter(step);position:absolute;left:0;top:22px;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--primary);color:#fff;font:17px Georgia,serif;box-shadow:0 3px 0 var(--edge);z-index:1}.step.done::before{content:"✓";font-family:inherit;background:var(--success);box-shadow:0 3px 0 #145235}.step:not(:last-child)::after{content:"";position:absolute;left:17px;top:60px;bottom:-24px;width:2px;background:var(--light)}
 .step>summary,.step>h2{font:25px/1.3 Georgia,serif;font-weight:400;margin:0 0 6px;min-height:36px;display:flex;align-items:center;gap:10px}.step>summary{list-style:none}.step>summary::-webkit-details-marker{display:none}.step>summary::after{content:"›";color:var(--primary);font-size:28px;line-height:1;transition:transform 120ms}.step[open]>summary::after{transform:rotate(90deg)}.step>.hint{margin:0 0 14px}
 .import-card{margin-top:4px;background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:16px;box-shadow:0 1px 2px rgba(23,35,64,.05),0 10px 30px rgba(23,35,64,.07)}.dropzone{position:relative;border:2px dashed var(--accent);border-radius:16px;background:var(--wash);padding:28px 18px;text-align:center;transition:background-color 120ms}.dropzone input{position:absolute;inset:0;width:100%;height:100%;min-height:0;opacity:0;cursor:pointer;padding:0;border:0}.dropzone:hover,.dropzone.dragging{background:var(--light)}.dropzone:focus-within{outline:3px solid var(--primary);outline-offset:3px}.dropzone.chosen{border:1px solid var(--line);background:var(--surface);text-align:left;padding:12px}
 .drop-title{margin:0 0 6px;font-size:16px;font-weight:600;color:var(--ink)}.dropzone .drop-choose{display:inline;margin:0;font:inherit;color:var(--primary);text-decoration:underline;text-underline-offset:3px}.dropzone .hint{margin:0}.file-cards{list-style:none;margin:0 0 10px;padding:0;display:flex;flex-wrap:wrap;gap:10px;position:relative;z-index:2;pointer-events:none}.file-card{display:flex;align-items:center;gap:10px;padding:8px;border:1px solid var(--line);border-radius:12px;background:var(--surface);max-width:100%;pointer-events:auto}.file-kind{display:grid;place-items:center;width:38px;height:38px;border-radius:9px;background:var(--primary);color:#fff;font-size:10px;font-weight:700;flex:none}.file-name{display:flex;flex-direction:column;min-width:0;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.file-name small{font-weight:400;color:var(--muted)}.file-remove{border:0;background:var(--wash);border-radius:50%;width:28px;height:28px;padding:0;font-size:17px;line-height:1;color:var(--ink);flex:none}.file-remove:hover:not(:disabled){background:var(--light)}
+.library>h2{scroll-margin-top:16px}.imports-error{margin:0 0 10px}.import-list+.material-list{margin-top:12px}.import-row .material-main:hover{background:none}.import-status{margin:2px 0 0;font-size:12px;line-height:1.45;color:var(--muted)}.import-row.failed .doc-icon{color:var(--error);background:var(--surface);box-shadow:inset 0 0 0 1px var(--error)}
+.import-detail{padding:0 14px 0 62px}.import-files{list-style:none;margin:0 0 12px;padding:0;display:grid;gap:4px}.import-files li{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:12px}.import-file-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.file-state{flex:none;font-weight:600;color:var(--muted)}.file-state.done{color:var(--success)}.file-state.transcribing{color:var(--primary)}.file-state.failed{color:var(--error)}.import-failure{margin:0 0 12px;font-size:13px}.course-tools .import-error{margin:0 0 12px;padding:8px 12px;font-size:13px}
 .course-tools .import-card label{margin:16px 0 7px;font-size:13px}.import-actions{display:flex;align-items:center;justify-content:flex-end;gap:16px;margin-top:14px}.import-actions .hint{margin:0;flex:1}.course-tools form.import-card .primary{margin:0}
 @media(max-width:900px){.home-canvas{grid-template-columns:minmax(0,1fr) 245px;gap:20px}.home-sidebar{padding-left:20px}.home-heading h1{font-size:38px}}
-@media(max-width:650px){.setup-top{flex-direction:column;align-items:stretch}.material-preview{padding-left:14px}.step{padding-left:48px}.step::before{width:32px;height:32px;top:24px}.step:not(:last-child)::after{left:15px}.step>summary,.step>h2{font-size:22px}.import-card{padding:12px;border-radius:18px}.workspace-actions{gap:12px}.workspace-actions>button{font-size:11px}.view-tabs{gap:20px}.home-heading{padding-top:28px}.home-heading h1{font-size:34px}.home-count{display:none}.home-canvas{grid-template-columns:1fr;gap:0;min-height:0}.home-sidebar{border-left:0;border-top:1px solid var(--light);padding:25px 0}.tree-stage{padding:0}.home-heading .home-subtitle{font-size:12px}.setup-heading h1{font-size:31px}.no-lesson{padding:50px 10px}.workspace-nav{height:48px}.nav-reason{max-width:80px;line-height:1.25}.view-tabs button{font-size:13px}}
+@media(max-width:650px){.setup-top{flex-direction:column;align-items:stretch}.material-preview,.import-detail{padding-left:14px}.step{padding-left:48px}.step::before{width:32px;height:32px;top:24px}.step:not(:last-child)::after{left:15px}.step>summary,.step>h2{font-size:22px}.import-card{padding:12px;border-radius:18px}.workspace-actions{gap:12px}.workspace-actions>button{font-size:11px}.view-tabs{gap:20px}.home-heading{padding-top:28px}.home-heading h1{font-size:34px}.home-count{display:none}.home-canvas{grid-template-columns:1fr;gap:0;min-height:0}.home-sidebar{border-left:0;border-top:1px solid var(--light);padding:25px 0}.tree-stage{padding:0}.home-heading .home-subtitle{font-size:12px}.setup-heading h1{font-size:31px}.no-lesson{padding:50px 10px}.workspace-nav{height:48px}.nav-reason{max-width:80px;line-height:1.25}.view-tabs button{font-size:13px}}
 </style>

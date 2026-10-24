@@ -1,4 +1,5 @@
 /** Display labels for stored values. They change only what people read; saved values stay as they are. */
+import { placeLabel } from "./locations.ts";
 
 const STUDY_TIME_ZONE = "America/New_York";
 const dayFormat = new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: STUDY_TIME_ZONE });
@@ -18,27 +19,11 @@ export function planDayLabel(day: string, today: string): string {
 }
 
 /**
- * A cited source location as readable text, such as "Lecture 4, page 1".
- * Locations look like `key/page/N`, `key/image`, `key/lines/A-B`, `key/cell/N`, `key/document`,
- * `key/slide/N`, or `key/sheet/NAME/rows/A-B` (see design/material-data.md). `content` means the material's full text.
+ * A citation as readable text: the material title and the place label of its location, such as
+ * "Lecture 4 · Page 3" or "Lecture recording · 12:30–12:45". locations.ts reads the place from the location.
  */
 export function sourceLabel(location: string, materialTitle?: string): string {
-  const title = materialTitle?.trim() || "Course material";
-  const slash = location.indexOf("/");
-  if (location === "content" || slash < 0) return title;
-  const part = location.slice(slash + 1);
-  let match: RegExpExecArray | null;
-  if ((match = /^page\/(\d+)$/.exec(part))) return `${title}, page ${match[1]}`;
-  if ((match = /^slide\/(\d+)$/.exec(part))) return `${title}, slide ${match[1]}`;
-  if ((match = /^cell\/(\d+)$/.exec(part))) return `${title}, cell ${match[1]}`;
-  if ((match = /^lines\/(\d+)-(\d+)$/.exec(part))) return `${title}, lines ${match[1]}–${match[2]}`;
-  if ((match = /^sheet\/(.+)\/rows\/(\d+)-(\d+)$/.exec(part))) {
-    return match[2] === "1" ? `${title}, sheet ${match[1]}` : `${title}, sheet ${match[1]}, rows ${match[2]}–${match[3]}`;
-  }
-  if ((match = /^time\/([\d:]+)-([\d:]+)$/.exec(part))) return `${title}, ${match[1]}–${match[2]}`;
-  if (part === "image") return `${title}, image`;
-  if (part === "document") return title;
-  return `${title}, ${part.replaceAll("/", " ")}`;
+  return `${materialTitle?.trim() || "Course material"} · ${placeLabel(location)}`;
 }
 
 /**

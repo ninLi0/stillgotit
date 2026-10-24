@@ -22,22 +22,23 @@ describe("Readable plan dates", () => {
 describe("Readable source locations", () => {
   test("each imported location kind names the material and the place in it", () => {
     const key = "638f03e786ee0ccc";
-    expect(sourceLabel(`${key}/page/1`, "Lecture 4")).toBe("Lecture 4, page 1");
-    expect(sourceLabel(`${key}/slide/3`, "Slides")).toBe("Slides, slide 3");
-    expect(sourceLabel(`${key}/lines/1-100`, "Notes")).toBe("Notes, lines 1–100");
-    expect(sourceLabel(`${key}/cell/4`, "Notebook")).toBe("Notebook, cell 4");
-    expect(sourceLabel(`${key}/sheet/Budget/rows/1-40`, "Workbook")).toBe("Workbook, sheet Budget");
-    expect(sourceLabel(`${key}/sheet/Q3 Totals/rows/41-80`, "Workbook")).toBe("Workbook, sheet Q3 Totals, rows 41–80");
-    expect(sourceLabel(`${key}/image`, "Whiteboard")).toBe("Whiteboard, image");
-    expect(sourceLabel(`${key}/document`, "Reading")).toBe("Reading");
-    expect(sourceLabel("lecture/time/00:30-00:45", "Lecture video")).toBe("Lecture video, 00:30–00:45");
+    expect(sourceLabel(`${key}/page/1`, "Lecture 4")).toBe("Lecture 4 · Page 1");
+    expect(sourceLabel(`${key}/slide/3`, "Slides")).toBe("Slides · Slide 3");
+    expect(sourceLabel(`${key}/lines/1-100`, "Notes")).toBe("Notes · Lines 1–100");
+    expect(sourceLabel(`${key}/cell/4`, "Notebook")).toBe("Notebook · Cell 4");
+    expect(sourceLabel(`${key}/sheet/Budget/rows/1-40`, "Workbook")).toBe("Workbook · Sheet Budget");
+    expect(sourceLabel(`${key}/sheet/Q3 Totals/rows/41-80`, "Workbook")).toBe("Workbook · Sheet Q3 Totals, rows 41–80");
+    expect(sourceLabel(`${key}/image`, "Whiteboard")).toBe("Whiteboard · Image");
+    expect(sourceLabel(`${key}/document`, "Reading")).toBe("Reading · Document");
+    expect(sourceLabel("lecture/time/00:30-00:45", "Lecture video")).toBe("Lecture video · 00:30–00:45");
+    expect(sourceLabel(`${key}/time/59:48-1:00:21`, "Lecture video")).toBe("Lecture video · 59:48–1:00:21");
   });
 
   test("the whole-material location, unknown kinds, and unknown titles still read plainly", () => {
-    expect(sourceLabel("content", "Lecture 4")).toBe("Lecture 4");
-    expect(sourceLabel(`abc/region/2/3`, "Map")).toBe("Map, region 2 3");
-    expect(sourceLabel("abc/page/2")).toBe("Course material, page 2");
-    expect(sourceLabel("abc/page/2", "  ")).toBe("Course material, page 2");
+    expect(sourceLabel("content", "Lecture 4")).toBe("Lecture 4 · Material text");
+    expect(sourceLabel(`abc/region/2/3`, "Map")).toBe("Map · Region 2 3");
+    expect(sourceLabel("abc/page/2")).toBe("Course material · Page 2");
+    expect(sourceLabel("abc/page/2", "  ")).toBe("Course material · Page 2");
   });
 });
 

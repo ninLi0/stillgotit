@@ -12,11 +12,17 @@ import type { Gemini } from "./gemini.ts";
 import type { TutorFailures } from "./tutor-generation.ts";
 import type { MaterialFiles } from "./material-files.ts";
 import type { MaterialImportStore } from "../storage/MaterialImportStore.ts";
-import type { Material } from "../concepts/GroundedTutoring/GroundedTutoring.ts";
+import { createMaterialRoutes, failure, readForm, refusal, type MaterialRouteOptions } from "./material-routes.ts";
+import { Refusal } from "./refusal.ts";
+import { AUDIO_LIMIT } from "./gemini.ts";
+
+/** The dictation route reads at most a 15 MB recording plus the rest of its form. */
+export const DICTATION_BODY_LIMIT = AUDIO_LIMIT + 1024 * 1024;
+const DICTATION_TOO_LARGE = "Use an audio recording under 15 MB.";
 
 type Application = ReturnType<typeof assembleApplication>;
 
-export function createApplicationHttp({ application, recovery, publicOrigin, clock = () => new Date(), gemini, failures, files, imports }: {
+export function createApplicationHttp({ application, recovery, publicOrigin, clock = () => new Date(), gemini, failures, files, imports, transcription, limits, log }: {
   application: Application;
   recovery: Pick<RegistrationRecoveryStore, "getOrCreate">;
   publicOrigin: string;
@@ -25,11 +31,14 @@ export function createApplicationHttp({ application, recovery, publicOrigin, clo
   failures?: TutorFailures;
   files?: MaterialFiles;
   imports?: MaterialImportStore;
+  /** The transcription worker, woken after an upload saves TRANSCRIBING and after a retry or removal. */
+  transcription?: { wake(): void };
+  limits?: MaterialRouteOptions["limits"];
+  log?: (message: string) => void;
 }) {
   const rawGateway = createGateway({ application, executionLimits });
   const policy = stillGotItPolicy(publicOrigin);
   const inner = createHttpHandler({ application, gateway: rawGateway, policy });
-  const preparedInner = createHttpHandler({ application, gateway: rawGateway, policy: stillGotItPolicy(publicOrigin, 4 * 1024 * 1024) });
   const locks = new KeyedLocks();
   const { CommonsFederating, Registering, Sessioning } = application.concepts;
 
@@ -85,50 +94,19 @@ export function createApplicationHttp({ application, recovery, publicOrigin, clo
     return "error" in identity ? null : identity.subject;
   }
 
-  function internal(request: Request, body: unknown) {
-    return new Request(new URL("/api/internal/materials/add", request.url), { method: "POST", headers: {
-      "Content-Type": "application/json", Origin: publicOrigin, Cookie: request.headers.get("Cookie") ?? "",
-    }, body: JSON.stringify(body) });
-  }
-
-  async function importMaterial(request: Request): Promise<Response> {
-    const owner = await learner(request);
-    if (!owner) return failure("UNAUTHORIZED", 401);
-    if (!files || !imports) return failure("UNAVAILABLE", 503);
-    if (!request.headers.get("Content-Type")?.startsWith("multipart/form-data")) return failure("INVALID_REQUEST", 400);
-    const form = await request.formData();
-    const course = form.get("course"), title = form.get("title"), requestId = form.get("requestId");
-    const uploaded = form.getAll("files");
-    if (typeof course !== "string" || typeof title !== "string" || !title.trim() || title.length > 160 ||
-      typeof requestId !== "string" || !requestId.trim() || requestId.length > 100 || !uploaded.every((file) => file instanceof File)) {
-      return failure("INVALID_REQUEST", 400);
-    }
-    if (!await application.form(Access.CourseReady({ owner, course }))) return failure("FORBIDDEN", 403);
-    const sources = await files.describe(uploaded);
-    return locks.run(`import:${owner}:${requestId}`, async () => {
-      const identity = { owner, requestId };
-      let operation = await imports.getOrCreate({ ...identity, request: { scope: course, title, origin: "COURSE", sources } });
-      if (operation.stage === "CREATED") operation = await imports.saveSources({ ...identity, revision: operation.revision, sources: await files.retain(operation, uploaded) });
-      if (operation.stage === "SOURCES_SAVED") operation = await imports.savePrepared({ ...identity, revision: operation.revision, prepared: {
-        owner, scope: course, importKey: operation.importKey, title, locator: `upload:${operation.importKey}`, origin: "COURSE",
-        ...await files.prepare(operation),
-      } });
-      return locks.run(`user:${owner}`, async () => {
-        if (await learner(request) !== owner) return failure("UNAUTHORIZED", 401);
-        if (!await application.form(Access.CourseReady({ owner, course }))) return failure("FORBIDDEN", 403);
-        if (operation.stage === "COMPLETE") return Response.json({ material: operation.material });
-        const prepared = operation.prepared!;
-        const response = await preparedInner(internal(request, { course, importKey: prepared.importKey, title: prepared.title,
-          locator: prepared.locator, content: prepared.content, originals: prepared.originals, origin: prepared.origin }));
-        await rawGateway.whenIdle();
-        if (!response.ok) return response;
-        const result = await response.clone().json() as { material?: string };
-        if (typeof result.material !== "string") throw new Error("The material save did not return an identity.");
-        await imports.complete({ ...identity, revision: operation.revision, material: result.material });
-        return response;
-      });
-    });
-  }
+  const session = (request: Request) => cookie(request.headers.get("Cookie"), SESSION_COOKIE);
+  const materials = files && imports ? createMaterialRoutes({
+    imports, files, locks, clock, limits, log, learner, session,
+    courseReady: async (owner, course) => typeof course === "string" && !!await application.form(Access.CourseReady({ owner, course })),
+    // The private material endpoint, called in process with the session's token. It answers the exact refusal code.
+    addMaterial: async (input) => {
+      try { return await rawGateway.invoke("/internal/materials/add", input as never); }
+      finally { await rawGateway.whenIdle(); }
+    },
+    readMaterial: (token, material) => rawGateway.invoke("/courses/materials/read", { session: token, material } as never),
+    recordingsAvailable: () => gemini?.status().available ?? false,
+    wake: () => transcription?.wake(),
+  }) : null;
 
   async function providerRequest(request: Request, path: string): Promise<Response> {
     const owner = await learner(request);
@@ -137,20 +115,12 @@ export function createApplicationHttp({ application, recovery, publicOrigin, clo
     if (!body) return failure("INVALID_REQUEST", 400);
     // Availability only: whether this server has a Gemini key. The key never leaves the server.
     if (path === "/api/ai/status") return Response.json(gemini?.status() ?? { available: false, reason: "The AI tutor is not set up on this server." });
-    if (path === "/api/courses/materials/file") {
-      if (typeof body.material !== "string") return failure("INVALID_REQUEST", 400);
-      const material = body.material as Material;
-      const session = cookie(request.headers.get("Cookie"), SESSION_COOKIE);
-      const permitted = await rawGateway.invoke("/courses/materials/read", { session, material });
-      if (!permitted.ok) return failure("FORBIDDEN", 403);
-      const data = permitted.value as { originals: import("../concepts/GroundedTutoring/media.ts").MediaList };
-      const allowed = data.originals.flatMap((file) => [file.file, ...file.renditions.flatMap((part) => part.kind === "IMAGE" ? [part.file] : [])]);
-      if (typeof body.file !== "string" || !allowed.includes(body.file) || !files) return failure("FORBIDDEN", 403);
-      return new Response(new Uint8Array(await files.read(owner, body.file)), { headers: {
-        "Content-Type": "application/octet-stream", "Content-Disposition": "attachment", "X-Content-Type-Options": "nosniff",
-      } });
-    }
-    return failure("INVALID_REQUEST", 404);
+    const route = materials && {
+      "/api/courses/materials/file": materials.file, "/api/courses/materials/imports": materials.list,
+      "/api/courses/materials/imports/retry": materials.retry, "/api/courses/materials/imports/remove": materials.remove,
+    }[path];
+    if (route) return route(request, owner, body);
+    return path.startsWith("/api/courses/materials/") ? failure("UNAVAILABLE", 503) : failure("INVALID_REQUEST", 404);
   }
 
   async function resume(request: Request): Promise<Response> {
@@ -217,12 +187,14 @@ export function createApplicationHttp({ application, recovery, publicOrigin, clo
       return failure("INVALID_REQUEST", 400);
     }
     try {
-      if (path === "/api/courses/materials/add") return await importMaterial(request);
+      if (path === "/api/courses/materials/add") return materials ? await materials.upload(request) : failure("UNAVAILABLE", 503);
       if (path === "/api/learning/transcribe") {
         const owner = await learner(request);
         if (!owner) return failure("UNAUTHORIZED", 401);
-        if (!gemini || !request.headers.get("Content-Type")?.startsWith("multipart/form-data")) return failure("INVALID_REQUEST", 400);
-        const recording = (await request.formData()).get("recording");
+        if (!gemini) return failure("INVALID_REQUEST", 400);
+        // The body limit is checked while reading, so a larger body is refused before it is held in memory.
+        const form = await readForm(request, DICTATION_BODY_LIMIT, DICTATION_TOO_LARGE);
+        const recording = form?.get("recording");
         if (!(recording instanceof File)) return failure("INVALID_REQUEST", 400);
         const transcript = await gemini.transcribe(recording);
         return await learner(request) === owner ? Response.json(transcript) : failure("UNAUTHORIZED", 401);
@@ -249,7 +221,7 @@ export function createApplicationHttp({ application, recovery, publicOrigin, clo
             ? Response.json({ error: "INVALID_REQUEST", detail: reason }, { status: 400, headers: { "Cache-Control": "no-store" } }) : response;
         });
       }
-      if (path.startsWith("/api/ai/") || path === "/api/courses/materials/file") {
+      if (path.startsWith("/api/ai/") || path === "/api/courses/materials/file" || path.startsWith("/api/courses/materials/imports")) {
         return await providerRequest(request, path);
       }
       if (path === "/api/auth/commons/resume" || path === "/api/auth/commons/choose") {
@@ -276,8 +248,9 @@ export function createApplicationHttp({ application, recovery, publicOrigin, clo
       }
       return await inner(request);
     } catch (error) {
-      if (multipart || path.startsWith("/api/ai/") || path.startsWith("/api/learning/") || path.startsWith("/api/planning/") || path === "/api/courses/skills/suggest") {
-        const detail = error instanceof Error && error.name !== "MongoServerError" ? error.message : "This operation could not finish. Your saved work is available to retry.";
+      if (error instanceof Refusal) return refusal(error);
+      if (multipart || path.startsWith("/api/ai/") || path.startsWith("/api/courses/materials/") || path.startsWith("/api/learning/") || path.startsWith("/api/planning/") || path === "/api/courses/skills/suggest") {
+        const detail = error instanceof Error && !error.name.startsWith("Mongo") ? error.message : "This operation could not finish. Your saved work is available to retry.";
         return Response.json({ error: "OPERATION_FAILED", detail }, { status: 400, headers: { "Cache-Control": "no-store" } });
       }
       // Never return database errors, codes, keys, or session values to the browser or logs.
@@ -314,6 +287,3 @@ async function readBody(request: Request): Promise<Record<string, unknown> | nul
   } catch { return null; }
 }
 
-function failure(error: string, status: number) {
-  return Response.json({ error }, { status, headers: { "Cache-Control": "no-store" } });
-}

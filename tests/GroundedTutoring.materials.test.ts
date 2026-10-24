@@ -142,6 +142,73 @@ describe("GroundedTutoring material storage", () => {
     expect(await records.countDocuments()).toBe(0);
   });
 
+  test("accepts page renditions for pages without text and HEIC and HEIF images as readable material", async () => {
+    const { tutoring } = setup();
+    const scan: MediaValue = {
+      file: "retained-scan-pdf", name: "scan.pdf", mediaType: "application/pdf",
+      renditions: [{ kind: "PAGE", location: "scan/page/1", page: 1 }, { kind: "TEXT", location: "scan/page/2", text: "Typed notes." },
+        { kind: "PAGE", location: "scan/page/3", page: 3 }],
+      limitations: ["Pages 1 and 3 have no selectable text. The tutor reads those pages as images."],
+    };
+    const onlyPages = request({ content: "", originals: [{ ...scan, renditions: [{ kind: "PAGE", location: "scan/page/1", page: 1 }] }] });
+    expect(await tutoring._material(await tutoring.addMaterial(onlyPages))).toEqual([materialData(onlyPages)]);
+    const photos = (["image/heic", "image/heif"] as const).map((mediaType, index): MediaValue => ({
+      file: `retained-photo-${index}`, name: `board-${index}.heic`, mediaType,
+      renditions: [{ kind: "IMAGE", location: `photo-${index}/image`, file: `retained-photo-${index}`, mediaType }], limitations: [],
+    }));
+    const mixed = request({ content: "", originals: [scan, ...photos] });
+    expect(await tutoring._material(await tutoring.addMaterial(mixed))).toEqual([materialData(mixed)]);
+  });
+
+  test("still rejects malformed page renditions and other image types", async () => {
+    const { tutoring, records } = setup();
+    const page = { kind: "PAGE", location: "scan/page/1", page: 1 };
+    const malformed = [
+      { ...page, page: 0 }, { ...page, page: -1 }, { ...page, page: 1.5 }, { ...page, page: "1" }, { ...page, page: Number.NaN },
+      { ...page, page: Number.POSITIVE_INFINITY }, { ...page, page: 2 ** 53 }, { ...page, location: " " }, { kind: "PAGE", location: "scan/page/1" },
+      { kind: "PAGE", page: 1 }, { ...page, text: "Extra text" }, { ...page, file: "retained-scan-pdf" }, { ...page, kind: "page" },
+      { kind: "IMAGE", location: "photo/image", file: "f", mediaType: "image/gif" },
+      { kind: "IMAGE", location: "photo/image", file: "f", mediaType: "image/avif" },
+      { kind: "IMAGE", location: "photo/image", file: "f", mediaType: "image/HEIC" },
+    ];
+    for (const rendition of malformed) {
+      const input = request({ content: "", originals: [{ ...source(), renditions: [rendition] } as unknown as MediaValue] });
+      await expect(tutoring.addMaterial(input), JSON.stringify(rendition)).rejects.toBeInstanceOf(InvalidTutoringMaterial);
+    }
+    expect(await records.countDocuments()).toBe(0);
+  });
+
+  test("rejects page renditions outside a PDF, a repeated page, and a page that also has text", async () => {
+    const { tutoring, records } = setup();
+    const page = (number: number, location = `scan/page/${number}`) => ({ kind: "PAGE" as const, location, page: number });
+    const text = (location: string) => ({ kind: "TEXT" as const, location, text: "Typed notes." });
+    const pdf = (renditions: MediaValue["renditions"], mediaType = "application/pdf"): MediaValue =>
+      ({ file: "retained-scan", name: "scan.pdf", mediaType, renditions, limitations: [] });
+    const refused: [string, MediaValue][] = [
+      ["an image original", pdf([page(1)], "image/png")],
+      ["a text original", pdf([page(1)], "text/plain")],
+      ["an unknown binary original", pdf([page(1)], "application/octet-stream")],
+      ["the same page twice", pdf([page(2), page(2)])],
+      ["the same page twice at different locations", pdf([page(2), page(3), page(2, "scan/page/2-again")])],
+      ["text at the page's location", pdf([text("scan/page/2"), page(2)])],
+      ["text at the page's location, after it", pdf([page(1), page(2), text("scan/page/2")])],
+      ["text at the page's own location in another format", pdf([page(2, "scan/p2"), text("scan/p2")])],
+      ["text for the same page number", pdf([page(2, "scan/p2"), text("scan/page/2")])],
+    ];
+    for (const [label, original] of refused) {
+      await expect(tutoring.addMaterial(request({ content: "", originals: [original] })), label).rejects.toBeInstanceOf(InvalidTutoringMaterial);
+      // Readable content elsewhere does not excuse an original that breaks the rule.
+      await expect(tutoring.addMaterial(request({ originals: [source(), original] })), label).rejects.toBeInstanceOf(InvalidTutoringMaterial);
+    }
+    expect(await records.countDocuments()).toBe(0);
+
+    // The rule holds within one original: two PDFs may each have a page 1, and text for other pages is fine.
+    const accepted = request({ content: "", originals: [
+      pdf([page(1), text("scan/page/2"), page(3)]), { ...pdf([page(1, "other/page/1")]), file: "retained-other", name: "other.pdf" },
+    ] });
+    expect(await tutoring._material(await tutoring.addMaterial(accepted))).toEqual([materialData(accepted)]);
+  });
+
   test("snapshots validated input before database waits and leaves saved data unchanged after caller edits", async () => {
     const { tutoring } = setup();
     const original = {

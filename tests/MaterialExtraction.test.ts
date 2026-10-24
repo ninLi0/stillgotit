@@ -3,8 +3,13 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { strToU8, zipSync } from "fflate";
-import { classify, extract, OFFICE_LIMITATION, UNSUPPORTED } from "../src/host/extract.ts";
+import {
+  ARCHIVE, classify, extract, IMAGE_UNREADABLE, joinContent, MAX_TEXT, OFFICE_LIMITATION, OLD_OFFICE, OTHER_AUDIO, OTHER_IMAGE, OTHER_VIDEO,
+  RECORDING_TOO_LONG, RECORDING_UNREADABLE, TOO_MUCH_TEXT, UNSUPPORTED,
+} from "../src/host/extract.ts";
+import { wholeSeconds } from "../src/host/media-detect.ts";
 import { docx, pdf, png, pptx, xlsx } from "./fixtures/office.ts";
+import { adts, aiff, avi, flac, flv, heif, jpeg, mp3, mp4, mpegPs, ogg, scannedPdf, wav, webm, wmv } from "./fixtures/media.ts";
 
 const reference = `${crypto.randomUUID()}/${"a".repeat(64)}.bin`;
 const key = createHash("sha256").update(reference).digest("hex").slice(0, 16);
@@ -37,19 +42,36 @@ describe("PDF extraction", () => {
       `[${key}/page/2]\nInner dimensions\nA (m x n) times B (n x p) gives an m x p matrix.`);
   });
 
-  test("reports pages without selectable text", async () => {
+  test("a page without selectable text becomes a page location that the tutor reads from the original", async () => {
     const result = await read("scan.pdf", pdf(["First page", "", "Third page", ""]));
-    expect(result.renditions.map((part) => part.location)).toEqual([`${key}/page/1`, `${key}/page/3`]);
-    expect(result.limitations).toEqual(["Pages 2 and 4 have no selectable text."]);
-    expect((await read("one.pdf", pdf(["Text", ""]))).limitations).toEqual(["Page 2 has no selectable text."]);
-    const scan = await read("scan.pdf", pdf(["", ""]));
-    expect(scan.renditions).toEqual([]);
-    expect(scan.limitations).toEqual(["This PDF has no selectable text. It may be a scanned document."]);
+    expect(texts(result.renditions)).toEqual([[`${key}/page/1`, "First page"], [`${key}/page/2`, "PAGE"], [`${key}/page/3`, "Third page"], [`${key}/page/4`, "PAGE"]]);
+    expect(result.renditions[1]).toEqual({ kind: "PAGE", location: `${key}/page/2`, page: 2 });
+    expect(result.limitations).toEqual(["Pages 2 and 4 have no selectable text. The tutor reads those pages as images."]);
+    expect(result.content).toBe(`[${key}/page/1]\nFirst page\n\n[${key}/page/3]\nThird page`);
+    expect((await read("one.pdf", pdf(["Text", ""]))).limitations).toEqual(["Page 2 has no selectable text. The tutor reads that page as an image."]);
+    const three = await read("three.pdf", pdf(["", "Text", "", "", "Text"]));
+    expect(three.limitations).toEqual(["Pages 1, 3, and 4 have no selectable text. The tutor reads those pages as images."]);
+  });
+
+  test("a scanned PDF is accepted with a page location for every page and empty content", async () => {
+    const scan = await read("scan.pdf", scannedPdf([null, null, null]));
+    expect(scan.renditions).toEqual([1, 2, 3].map((page) => ({ kind: "PAGE", location: `${key}/page/${page}`, page })));
+    expect(scan.limitations).toEqual(["This PDF has no selectable text. The tutor reads its pages as images."]);
+    expect(scan.content).toBe("");
+  });
+
+  test("a partly scanned PDF keeps its text and marks the scanned page", async () => {
+    const partly = await read("partly.pdf", scannedPdf(["Eigenvalues solve det(A - tI) = 0.", null]));
+    expect(texts(partly.renditions)).toEqual([[`${key}/page/1`, "Eigenvalues solve det(A - tI) = 0."], [`${key}/page/2`, "PAGE"]]);
+    expect(partly.limitations).toEqual(["Page 2 has no selectable text. The tutor reads that page as an image."]);
   });
 
   test("refuses locked, damaged, and overly long PDFs", async () => {
     await expect(read("locked.pdf", await fixture("locked.pdf"))).rejects.toThrow("This PDF needs a password. Upload an unlocked copy.");
     await expect(read("broken.pdf", strToU8("%PDF-1.4 this is not a PDF"))).rejects.toThrow("This PDF can't be read. Check that it opens, or export it to PDF.");
+    // A file named .pdf without a PDF header is refused before anything is saved.
+    expect(() => classify("fake.pdf", strToU8("Hello"))).toThrow("This PDF can't be read. Check that it opens, or export it to PDF.");
+    expect(classify("late.pdf", strToU8(`${" ".repeat(100)}%PDF-1.7`))).toEqual({ kind: "pdf", mediaType: "application/pdf" });
     await expect(read("long.pdf", pdf(Array.from({ length: 51 }, (_, i) => `Page ${i + 1}`)))).rejects.toThrow("A source can contain at most 50 pages. Import a smaller unit.");
     expect((await read("fifty.pdf", pdf(Array.from({ length: 50 }, (_, i) => `Page ${i + 1}`)))).renditions).toHaveLength(50);
   });
@@ -163,33 +185,170 @@ describe("Text, notebooks, and images", () => {
     const jpeg = Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 0, 16]), webp = strToU8("RIFF\0\0\0\0WEBPVP8 ");
     expect((await read("photo.jpg", jpeg)).renditions[0]).toMatchObject({ mediaType: "image/jpeg" });
     expect((await read("photo.webp", webp)).renditions[0]).toMatchObject({ mediaType: "image/webp" });
-    await expect(read("photo.png", strToU8("not an image"))).rejects.toThrow("This image can't be read. Upload a PNG, JPEG, or WebP image.");
+    await expect(read("photo.png", strToU8("not an image"))).rejects.toThrow(IMAGE_UNREADABLE);
+  });
+
+  test("HEIC and HEIF photos are images, and the type comes from the bytes", async () => {
+    const heic = await read("IMG_0001.HEIC", heif());
+    expect(heic.renditions).toEqual([{ kind: "IMAGE", location: `${key}/image`, file: reference, mediaType: "image/heic" }]);
+    expect(heic.limitations).toEqual([]);
+    for (const brand of ["heic", "heix", "hevc", "hevx", "heim", "heis"]) expect(classify("a.heif", heif(brand, [brand]))).toEqual({ kind: "image", mediaType: "image/heic" });
+    for (const brand of ["mif1", "msf1"]) expect(classify("a.heic", heif(brand, [brand]))).toEqual({ kind: "image", mediaType: "image/heif" });
+    // A photo named .heic whose bytes are JPEG is saved as JPEG.
+    expect(classify("photo.heic", jpeg)).toEqual({ kind: "image", mediaType: "image/jpeg" });
+    expect(classify("photo.png", jpeg)).toEqual({ kind: "image", mediaType: "image/jpeg" });
+    expect(() => classify("photo.heic", heif("avif", ["mif1", "avif"]))).toThrow(IMAGE_UNREADABLE);
+    expect(() => classify("photo.heic", heif("isom", ["mp41"]))).toThrow(IMAGE_UNREADABLE);
+    expect(IMAGE_UNREADABLE).toBe("This image can't be read. Upload a PNG, JPEG, WebP, HEIC, or HEIF image.");
   });
 
   test("too much text is refused", async () => {
     await expect(read("long.txt", strToU8("word ".repeat(120_000)))).rejects.toThrow("This material contains too much text. Import a smaller unit.");
   });
+
+  test("the text limit counts the joined content exactly, including locations and separators", async () => {
+    const location = `${key}/lines/1-1`, overhead = location.length + 3;
+    const exact = await read("exact.txt", strToU8("x".repeat(MAX_TEXT - overhead)));
+    expect(exact.content).toHaveLength(MAX_TEXT);
+    expect(exact.content).toBe(joinContent([exact]));
+    await expect(read("over.txt", strToU8("x".repeat(MAX_TEXT - overhead + 1)))).rejects.toThrow(TOO_MUCH_TEXT);
+  });
+
+  test("an unknown extension is read as text when it is UTF-8", async () => {
+    expect(texts((await read("Makefile", strToU8("all:\n\techo hi\n"))).renditions)).toEqual([[`${key}/lines/1-2`, "all:\n\techo hi"]]);
+    expect(classify("notes.tex", strToU8("\\section{A}"))).toEqual({ kind: "text" });
+  });
+});
+
+describe("Recordings and videos", () => {
+  const seconds = (name: string, bytes: Uint8Array) => {
+    const detected = classify(name, bytes);
+    if (detected.kind !== "recording") throw new Error(`${name} is not a recording`);
+    return { mediaType: detected.mediaType, video: detected.recording.video, seconds: detected.recording.seconds, whole: wholeSeconds(detected.recording) };
+  };
+
+  test.each([
+    ["lecture.wav", () => wav(3), "audio/wav", 3],
+    ["alaw.wav", () => wav(2, { format: 6, bits: 8 }), "audio/wav", 2],
+    ["mulaw.wav", () => wav(2, { format: 7, bits: 8 }), "audio/wav", 2],
+    ["stereo.wav", () => wav(1.5, { rate: 44100, channels: 2 }), "audio/wav", 1.5],
+    ["voice.aiff", () => aiff(2.5), "audio/aiff", 2.5],
+    ["voice.aif", () => aiff(1, 44100), "audio/aiff", 1],
+    ["music.flac", () => flac(6), "audio/flac", 6],
+    ["voice.opus", () => ogg(7), "audio/ogg", 7],
+    ["voice.ogg", () => ogg(3, "vorbis"), "audio/ogg", 3],
+    ["voice.oga", () => ogg(2), "audio/ogg", 2],
+    ["memo.m4a", () => mp4({ seconds: 9, video: false, brand: "M4A " }), "audio/mp4", 9],
+    ["audio-only.mp4", () => mp4({ seconds: 4, video: false }), "audio/mp4", 4],
+    ["audio-only.mov", () => mp4({ seconds: 4, video: false, quicktime: true }), "audio/mp4", 4],
+    ["clip.mp4", () => mp4({ seconds: 9 }), "video/mp4", 9],
+    ["clip.m4v", () => mp4({ seconds: 3 }), "video/mp4", 3],
+    ["clip.mov", () => mp4({ seconds: 4, quicktime: true }), "video/mov", 4],
+    ["clip.3gp", () => mp4({ seconds: 4, brand: "3gp4" }), "video/3gpp", 4],
+    ["clip.3gpp", () => mp4({ seconds: 5, brand: "3gp6" }), "video/3gpp", 5],
+    ["recorded.webm", () => webm({ seconds: 3.5 }), "audio/webm", 3.5],
+    ["camera.webm", () => webm({ seconds: 2.5, video: true }), "video/webm", 2.5],
+    ["declared.webm", () => webm({ seconds: 2, duration: true }), "audio/webm", 2],
+    ["clip.mpg", () => mpegPs(6), "video/mpeg", 6],
+    ["clip.mpeg", () => mpegPs(2), "video/mpeg", 2],
+    ["clip.avi", () => avi(5), "video/avi", 5],
+    ["clip.flv", () => flv(4), "video/x-flv", 4],
+    ["clip.wmv", () => wmv(8), "video/wmv", 8],
+  ] as const)("%s has its type and length read from its container", (name, make, mediaType, length) => {
+    const found = seconds(name, make());
+    expect(found.mediaType).toBe(mediaType);
+    expect(found.video).toBe(mediaType.startsWith("video/"));
+    expect(found.seconds).toBeCloseTo(length, 5);
+  });
+
+  test("streams without a length header are measured by their frames or last timestamp", () => {
+    // 128 kbit/s MPEG-1 Layer III frames last 1,152 / 44,100 seconds each.
+    const mp3Length = seconds("lecture.mp3", mp3(5));
+    expect(mp3Length).toMatchObject({ mediaType: "audio/mp3", video: false, whole: 6 });
+    expect(mp3Length.seconds).toBeCloseTo(Math.ceil(5 * 44100 / 1152) * 1152 / 44100, 6);
+    expect(seconds("lecture.mpga", mp3(2, { id3: false })).seconds).toBeCloseTo(Math.ceil(2 * 44100 / 1152) * 1152 / 44100, 6);
+    // A Xing header gives the frame count directly.
+    expect(seconds("vbr.mp3", mp3(1, { xing: 1000 })).seconds).toBeCloseTo(1000 * 1152 / 44100, 6);
+    expect(seconds("voice.aac", adts(4)).seconds).toBeCloseTo(Math.ceil(4 * 44100 / 1024) * 1024 / 44100, 6);
+    // A browser-made WebM has no duration and clusters of unknown size; the last block gives the length.
+    expect(seconds("browser.webm", webm({ seconds: 61.24 })).seconds).toBeCloseTo(61.24, 6);
+    // A fragmented MP4 from a browser declares no length; its fragments do.
+    const fragmented = seconds("browser.mp4", mp4({ seconds: 10, video: false, fragmented: true }));
+    expect(fragmented.mediaType).toBe("audio/mp4");
+    expect(Math.abs(fragmented.seconds - 10)).toBeLessThan(1024 / 48000);
+  });
+
+  test("a recording longer than two hours is refused before saving", () => {
+    // One byte per second: 7,201 bytes of 1 Hz audio last 7,201 seconds.
+    expect(() => classify("long.wav", wav(7201, { rate: 1, bits: 8 }))).toThrow(RECORDING_TOO_LONG);
+    expect(seconds("limit.wav", wav(7200, { rate: 1, bits: 8 })).seconds).toBe(7200);
+    expect(() => classify("long.mp3", mp3(1, { xing: Math.ceil(7201 * 44100 / 1152) }))).toThrow(RECORDING_TOO_LONG);
+    expect(RECORDING_TOO_LONG).toBe("Recordings and videos can be at most 2 hours long. Split the recording and import each part.");
+  });
+
+  test.each([
+    ["empty.wav", new Uint8Array()],
+    ["text.mp3", strToU8("not audio at all")],
+    ["plain.m4a", strToU8("plain")],
+    ["id3-only.mp3", strToU8("ID3\u0003\0\0\0")],
+    ["silent.wav", wav(0)],
+    ["nolength.flac", flac(6, { samples: 0 })],
+    ["cut.mp4", mp4({ seconds: 3 }).slice(0, 40)],
+    ["zero.webm", webm({ seconds: 0 })],
+    ["wrong.webm", wav(3)],
+    ["wrong.ogg", mp3(1)],
+  ])("%s is refused as unreadable", (name, bytes) => {
+    expect(() => classify(name, bytes)).toThrow(RECORDING_UNREADABLE);
+  });
+
+  test("Ogg video and Windows Media audio are refused like their own formats", () => {
+    expect(() => classify("video.ogg", ogg(3, "theora"))).toThrow(OTHER_VIDEO);
+    expect(() => classify("audio.wmv", wmv(3, { video: false }))).toThrow(OTHER_AUDIO);
+  });
+
+  test("a recording gets no renditions at upload and is listed for transcription", async () => {
+    const recording = `${crypto.randomUUID()}/${"b".repeat(64)}.wav`;
+    const result = await extract([
+      { file: reference, name: "notes.md", mediaType: "text/markdown", bytes: strToU8("Eigenvalues") },
+      { file: recording, name: "lecture.wav", mediaType: "audio/wav", bytes: wav(2) },
+    ]);
+    expect(result.recordings).toEqual([recording]);
+    expect(result.originals[1]).toEqual({ file: recording, name: "lecture.wav", mediaType: "audio/wav", renditions: [], limitations: [] });
+    expect(result.content).toBe(`[${key}/lines/1-1]\nEigenvalues`);
+  });
 });
 
 describe("Refusals", () => {
   test.each([
-    ["lesson.zip", zipSync({ "a.md": strToU8("# A") }), UNSUPPORTED],
-    ["lecture.mp3", strToU8("ID3\u0003\0\0\0"), UNSUPPORTED],
-    ["lecture.m4a", strToU8("plain"), UNSUPPORTED],
+    ...[".zip", ".7z", ".rar", ".tar", ".gz", ".tgz", ".bz2", ".xz"].map((extension) => [`lesson${extension}`, zipSync({ "a.md": strToU8("# A") }), ARCHIVE] as const),
+    ...[".doc", ".dot", ".ppt", ".pps", ".pot", ".xls", ".xlt"].map((extension) => [`old${extension}`, strToU8("old"), OLD_OFFICE] as const),
+    ...[".gif", ".bmp", ".tif", ".tiff", ".avif"].map((extension) => [`picture${extension}`, strToU8("GIF89a"), OTHER_IMAGE] as const),
+    ...[".wma", ".amr", ".caf", ".pcm", ".raw"].map((extension) => [`voice${extension}`, wav(1), OTHER_AUDIO] as const),
+    ...[".mkv", ".ogv"].map((extension) => [`clip${extension}`, mp4({ seconds: 1 }), OTHER_VIDEO] as const),
+    ["stream.ts", Uint8Array.from([0x47, 0x40, 0x00, 0x10, 0x00, 0xff, 0xfe]), OTHER_VIDEO],
     ["notes.rtf", strToU8("{\\rtf1 Hello}"), UNSUPPORTED],
     ["data.bin", strToU8("text"), UNSUPPORTED],
     ["program", Uint8Array.from([0x7f, 0x45, 0x4c, 0x46, 0, 1]), UNSUPPORTED],
     ["latin.txt", Uint8Array.from([0x63, 0x61, 0x66, 0xe9]), UNSUPPORTED],
-    ["slides.ppt", strToU8("old"), "This older Office format can't be imported. Save the file as .docx, .pptx, or .xlsx, or export it to PDF."],
-    ["report.doc", strToU8("old"), "This older Office format can't be imported."],
-    ["anim.gif", strToU8("GIF89a"), "This image format can't be imported. Upload a PNG, JPEG, or WebP image."],
-  ])("%s is refused", (name, bytes, message) => {
+  ] as const)("%s is refused before saving", (name, bytes, message) => {
     expect(() => classify(name, bytes)).toThrow(message);
   });
 
-  test("the unsupported-type message lists what can be imported", () => {
-    expect(UNSUPPORTED).toBe("This file type can't be imported. Upload a PDF, image, text, notebook, Word, PowerPoint, or Excel file.");
-    expect(classify("LESSON.PDF", new Uint8Array())).toBe("pdf");
-    expect(classify("Makefile", strToU8("all:\n"))).toBe("text");
+  test("each refusal sentence tells the learner what to do instead", () => {
+    expect(UNSUPPORTED).toBe("This file type can't be imported. Upload a PDF, image, audio recording, video, text, notebook, Word, PowerPoint, or Excel file.");
+    expect(ARCHIVE).toBe("ZIP and other archive files can't be imported. Unzip them and choose the files inside.");
+    expect(OLD_OFFICE).toBe("This older Office format can't be imported. Save the file as .docx, .pptx, or .xlsx, or export it to PDF.");
+    expect(OTHER_IMAGE).toBe("This image format can't be imported. Upload a PNG, JPEG, WebP, HEIC, or HEIF image.");
+    expect(OTHER_AUDIO).toBe("This audio format can't be imported. Save the recording as MP3 or M4A and import it again.");
+    expect(OTHER_VIDEO).toBe("This video format can't be imported. Save the video as MP4 and import it again.");
+    expect(RECORDING_UNREADABLE).toBe("This recording can't be read. Check that it plays, then save it as MP3, M4A, or MP4 and import it again.");
+  });
+
+  test("how each file is read comes from its name and bytes", () => {
+    expect(classify("LESSON.PDF", strToU8("%PDF-1.4"))).toEqual({ kind: "pdf", mediaType: "application/pdf" });
+    expect(classify("Makefile", strToU8("all:\n"))).toEqual({ kind: "text" });
+    expect(classify("lesson.docx", new Uint8Array())).toEqual({ kind: "docx" });
+    // `.ts` is TypeScript source when it is UTF-8 text.
+    expect(classify("solver.ts", strToU8("export const x = 1;\n"))).toEqual({ kind: "text" });
   });
 });
