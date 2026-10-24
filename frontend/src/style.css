@@ -27,6 +27,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: .55; }
 button:focus-visible, a:focus-visible, input:focus-visible, summary:focus-visible, select:focus-visible, textarea:focus-visible, [role="tab"]:focus-visible, [role="radio"]:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+/* Text fields show focus in their own border and a soft ring, so the field is not drawn twice. */
+input:focus-visible, textarea:focus-visible, select:focus-visible { outline: none; border-color: var(--ink); box-shadow: 0 0 0 3px var(--ring); }
 /* Headings and messages that receive focus after an action are not controls, so they get no focus ring. */
 [tabindex="-1"]:focus { outline: none; }
 code, pre, kbd, samp { font-family: var(--font-mono); }

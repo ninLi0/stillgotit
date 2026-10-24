@@ -214,8 +214,10 @@ onMounted(async () => {
             <p id="course-hint" class="hint">For example, MIT 18.06SC Linear Algebra.</p>
             <span class="create-wrap"><button class="primary meadow" :disabled="busy || !title.trim()" :aria-describedby="title.trim() ? undefined : 'course-reason'">{{ busy ? 'Saving…' : 'Create course' }}</button><p v-if="!title.trim()" id="course-reason" class="hint reason">Enter a course name to continue.</p></span>
           </form>
-          <button v-if="courses.length" class="quiet retry" :disabled="busy" @click="selectCourse(selected!.course)">Back to {{ selected!.title }}</button>
-          <button class="quiet retry" type="button" :disabled="busy" @click="openSettings()">Settings</button>
+          <div class="welcome-links">
+            <button v-if="courses.length" class="quiet retry" :disabled="busy" @click="selectCourse(selected!.course)">Back to {{ selected!.title }}</button>
+            <button class="quiet retry" type="button" :disabled="busy" @click="openSettings()">Settings</button>
+          </div>
         </template>
         <div v-if="error" class="error" role="alert"><p>{{ error }}</p><button v-if="username" class="quiet" :disabled="busy" @click="reload">Reload saved work</button></div>
         <p v-if="notice" class="notice" role="status">{{ notice }}</p>
@@ -275,6 +277,9 @@ onMounted(async () => {
 .hero-title.small { font-size: 40px; }
 .intro { margin: 0 0 8px; max-width: 440px; color: var(--soft); font-size: 17px; line-height: 1.6; }
 .welcome-text .hint { margin: 0; }
+.welcome-text form .hint { margin: 8px 0 0; }
+.welcome-links { display: flex; flex-wrap: wrap; gap: 6px 22px; margin-top: 10px; }
+.welcome-links .retry { margin: 0; }
 .welcome-text form { width: 100%; }
 .create-wrap { display: inline-block; margin-top: 18px; }
 .create-wrap .primary { margin-top: 0; }
