@@ -39,3 +39,16 @@ The onboarding implementation also adapts the same pinned ConceptBox version:
 | `src/compositions/reusable/commons.ts` | Reuse start, confirmation, and named sign-in branches. Separate confirmation from continuation. Add recovery lookup and result validation. |
 | `src/compositions/reusable/inputs.ts` | Adapt the text input validator. Bound text fields and validate course input and endpoint results. |
 | `src/host/http-policy.ts`, `src/host/site.ts`, `src/main.ts` | Follow the HTTP policy, cookie bindings, Bun listener, and no-referrer page serving. Add course routes, strict origin checks, safe asset paths, and shutdown handling. |
+
+## Fonts
+
+The interface bundles four fonts in `frontend/public/fonts`, and the design handoff keeps the same files in `design/revamp/fonts`. Each is used unchanged under the SIL Open Font License 1.1. The license text and these copyright notices are in [licenses/OFL-1.1.txt](licenses/OFL-1.1.txt).
+
+| Font | File | Copyright notice in the font file | Used for |
+| --- | --- | --- | --- |
+| Pixelify Sans | `PixelifySans.ttf` | Copyright 2021 The Pixelify Sans Project Authors (https://github.com/eifetx/Pixelify-Sans). Designed by Stefie Justprince. | Headings. |
+| Instrument Sans | `InstrumentSans.ttf` | Copyright 2022 The Instrument Sans Project Authors (https://github.com/Instrument/instrument-sans). Designed by Rodrigo Fuenzalida. | Body text, buttons, and numbers. |
+| Spline Sans Mono | `SplineSansMono.ttf` | Copyright 2022 The Spline Sans Mono Project Authors (https://github.com/SorkinType/SplineSansMono). Designed by Eben Sorkin and Mirko Velimirovic. | Code and maths. |
+| Newsreader | `Newsreader.ttf` | Copyright 2020 The Newsreader Project Authors (http://github.com/productiontype/Newsreader). Designed by Hugues Gentile for Production Type. | The readable text of a PDF page that the Materials viewer cannot draw. |
+
+The font files also state two trademarks: Pixelify Sans is a trademark of Stefie Justprince, and Newsreader is a registered trademark of Production Systems SAS.
