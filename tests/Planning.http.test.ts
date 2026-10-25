@@ -298,6 +298,35 @@ test("another learner's course is refused at admission with the sentence and by 
   expect(after.exams).toEqual([{ exam, date: day(1), covered: skills }]);
 }, 60_000);
 
+test("in an owned course, each endpoint refuses an unknown or another learner's item, and a refresh it cannot make, with the concept's code", async () => {
+  const app = await setup(), owner = await app.learner("item-owner"), outsider = await app.learner("item-outsider");
+  const { course } = await owner.course("Linear algebra", ["Vectors"]);
+  await owner.ok("/planning/configure", { course, dailyMinutes: 30 });
+  const before = await owner.read(course), foreignItem = before.data.next!.item;
+  const own = await outsider.course("Physics", ["Forces"]);
+
+  // Without a budget, a refresh of the outsider's own course is refused with the planning concept's code.
+  expect(await outsider.direct("/planning/propose", { course: own.course })).toEqual(refusedBy("PLAN_PREFERENCES_UNAVAILABLE"));
+  await outsider.ok("/planning/configure", { course: own.course, dailyMinutes: 30 });
+  const ownPlan = await outsider.read(own.course);
+  const ITEM_ADMISSION = "Choose an activity from your own course.";
+  for (const item of [foreignItem, "missing-item"]) {
+    expect(await outsider.direct("/planning/begin", { course: own.course, item })).toEqual(refusedBy("ACTIVITY_BEGIN_UNAVAILABLE"));
+    expect(await outsider.direct("/planning/finish", { course: own.course, item, actualMinutes: 5 })).toEqual(refusedBy("ACTIVITY_FINISH_UNAVAILABLE"));
+    expect(await outsider.direct("/planning/stop", { course: own.course, item, actualMinutes: 5 })).toEqual(refusedBy("ACTIVITY_STOP_UNAVAILABLE"));
+    expect(await outsider.direct("/planning/miss", { course: own.course, item })).toEqual(refusedBy("ACTIVITY_MISS_UNAVAILABLE"));
+    // Over HTTP, admission declines the same requests first.
+    expect(await outsider.post("/planning/begin", { course: own.course, item })).toEqual(refused(BEGIN_ADMISSION));
+    for (const path of ["/planning/finish", "/planning/stop"]) expect(await outsider.post(path, { course: own.course, item, actualMinutes: 5 }), path).toEqual(refused(ITEM_ADMISSION));
+    expect(await outsider.post("/planning/miss", { course: own.course, item })).toEqual(refused(ITEM_ADMISSION));
+  }
+  // During an activity in the same course, a refresh is refused with the concept's code instead of going unanswered.
+  await outsider.ok("/planning/begin", { course: own.course, item: ownPlan.data.next!.item });
+  expect(await outsider.direct("/planning/propose", { course: own.course })).toEqual(refusedBy("PLAN_SESSION_IN_PROGRESS"));
+  expect((await outsider.read(own.course)).data.plan!.plan).toBe(ownPlan.data.plan!.plan);
+  expect(await owner.read(course)).toEqual(before);
+}, 60_000);
+
 test("an activity elsewhere keeps the plan until it ends; finishing or stopping refreshes every course with a budget", async () => {
   const app = await setup(), kai = await app.learner("exam-kai");
   const physics = await kai.course("Physics", ["Forces"]);
@@ -331,6 +360,40 @@ test("an activity elsewhere keeps the plan until it ends; finishing or stopping 
   read = await kai.read(algebra.course);
   expect([read.exams, read.proposal, read.cuts]).toEqual([[], [], []]);
   expect(read.data.plan!.items.every(({ candidate }) => candidate.deadlineRefs.length === 0)).toBe(true);
+}, 60_000);
+
+test("an activity in one course does not refuse a budget, a missed activity, or an adjustment in another; finishing refreshes both", async () => {
+  const app = await setup(), noa = await app.learner("replan-noa");
+  const physics = await noa.course("Physics", ["Forces"]);
+  const algebra = await noa.course("Linear algebra", ["Vectors", "Matrices"]);
+  await noa.ok("/learning/confidence", { skill: algebra.skills[0], confidence: 60 });
+  await noa.ok("/planning/configure", { course: physics.course, dailyMinutes: 30 });
+  await noa.ok("/planning/configure", { course: algebra.course, dailyMinutes: 10 });
+  const physicsPlan = await noa.read(physics.course), algebraPlan = await noa.read(algebra.course);
+  await noa.ok("/planning/begin", { course: physics.course, item: physicsPlan.data.next!.item });
+
+  // A new budget in the other course is saved and answered; its plan waits for the activity to end.
+  expect(await noa.post("/planning/configure", { course: algebra.course, dailyMinutes: 40 })).toMatchObject({ status: 200 });
+  let read = await noa.read(algebra.course);
+  expect(read.data).toMatchObject({ preferences: { dailyMinutes: 40 } });
+  expect(read.data.plan!.plan).toBe(algebraPlan.data.plan!.plan);
+  // Marking an activity of the other course missed is answered and saved, and the plan waits too.
+  const missed = algebraPlan.data.next!.item;
+  expect(await noa.post("/planning/miss", { course: algebra.course, item: missed })).toEqual({ status: 200, body: { item: missed } });
+  // An estimate adjustment in the other course is answered as well.
+  expect(await noa.post("/learning/adjust", { skill: algebra.skills[0], adjustmentKey: crypto.randomUUID(), value: 30, reason: "I forgot most of it." }))
+    .toEqual({ status: 200, body: { adjustment: expect.any(String) } });
+  read = await noa.read(algebra.course);
+  expect(read.data.plan!.plan).toBe(algebraPlan.data.plan!.plan);
+  expect(read.data.plan!.items.find(({ item }) => item === missed)!.status).toBe("MISSED");
+  expect((await noa.read(physics.course)).data.next).toMatchObject({ item: physicsPlan.data.next!.item, status: "IN_PROGRESS" });
+
+  // Finishing the physics activity refreshes both courses.
+  await noa.ok("/planning/finish", { course: physics.course, item: physicsPlan.data.next!.item, actualMinutes: 12 });
+  expect((await noa.read(physics.course)).data.plan!.plan).not.toBe(physicsPlan.data.plan!.plan);
+  read = await noa.read(algebra.course);
+  expect(read.data.plan!.plan).not.toBe(algebraPlan.data.plan!.plan);
+  expect(read.data).toMatchObject({ preferences: { dailyMinutes: 40 }, plan: { status: "ACTIVE" } });
 }, 60_000);
 
 test("urgent mode skips the prerequisite check only for exam work of an urgent active plan whose exam is still active", async () => {

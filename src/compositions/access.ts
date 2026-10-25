@@ -1,10 +1,11 @@
-import { compute, former, no, where } from "@mit-sdg/sync-engine/language";
+import { compute, former, where } from "@mit-sdg/sync-engine/language";
 import { concepts, computations as C } from "../concepts.ts";
 import { composition as Courses } from "./courses.ts";
 import { composition as Settings } from "./settings.ts";
 import * as R from "./learning-reads.ts";
 import { composition as PlanningFlows } from "./planning.ts";
 import { composition as Importing } from "./importing.ts";
+import { learnerWork } from "./learning.ts";
 const { SkillMapping: Mapping, Library, GroundedTutoring: Tutoring, AssessmentReviewing: Assessment, MasteryEstimating: Mastery, StudyPlanning: Planning } = concepts;
 
 const LessonReady = former("admit a lesson for (owner) and (skill)", ({ owner, skill }, { context, sources, materials }) => where(
@@ -16,19 +17,17 @@ const TaskReady = former("admit practice for (owner) and (skill)", ({ owner, ski
   Mastery._track({ learner: owner, subject: skill, definition }), C.prerequisitesReady({ skills, tracks, skill }),
   compute(C.selectSkillMaterials, { context }, materials), compute(C.selectSources, { sources, materials }, { valid: true }),
 ).form({ allowed: true })).optional();
-// Every attachment must be listed once and be the learner's own material in the session's course.
-const ResponseReady = former("admit learner work in (studySession)", ({ owner, studySession, text, channel, attachments, dialogueLength }, { course, data, sources }) => where(
-  R.OpenSession({ owner, studySession }).is({ course }), Tutoring._sessionData({ session: studySession }).is({ data }),
-  Library._sourceSet({ owner, scope: course }).is({ sources }), C.dialogueIsCurrent({ data, dialogueLength }),
-  compute(C.responseInput, { data, text, channel, attachments, sources }, { valid: true }),
+// Respond, Question, Reply, and RetryAssessment are admitted by the same views and condition helpers their endpoints state
+// (learning.ts and learning-reads.ts), so admission and the endpoints cannot drift apart. Every attachment must be listed
+// once and be the learner's own material in the session's course.
+const ResponseReady = former("admit learner work in (studySession)", ({ owner, studySession, text, channel, attachments, dialogueLength }, { data, sources, currentDialogue }) => where(
+  ...learnerWork(owner, studySession, { text, channel, attachments, dialogueLength, data, sources, currentDialogue }),
 ).form({ allowed: true })).optional();
-const QuestionReady = former("admit a question in (studySession)", ({ owner, studySession, text, channel, attachments, dialogueLength }, { course, data, sources }) => where(
-  R.OpenSession({ owner, studySession }).is({ course }), Tutoring._lesson({ lesson: studySession }), Tutoring._sessionData({ session: studySession }).is({ data }),
-  Library._sourceSet({ owner, scope: course }).is({ sources }), C.dialogueIsCurrent({ data, dialogueLength }),
-  compute(C.responseInput, { data, text, channel, attachments, sources }, { valid: true }),
+const QuestionReady = former("admit a question in (studySession)", ({ owner, studySession, text, channel, attachments, dialogueLength }, { data, sources, currentDialogue }) => where(
+  ...learnerWork(owner, studySession, { text, channel, attachments, dialogueLength, data, sources, currentDialogue }), Tutoring._lesson({ lesson: studySession }),
 ).form({ allowed: true })).optional();
 const ReplyReady = former("admit a tutor reply in (studySession)", ({ owner, studySession }, { data }) => where(
-  R.OpenSession({ owner, studySession }), Tutoring._sessionData({ session: studySession }).is({ data }), C.hasLessonQuestion({ data }),
+  R.SessionSources({ owner, studySession }).is({ data }), C.hasLessonQuestion({ data }),
 ).form({ allowed: true })).optional();
 const HintReady = former("admit requested help in (studySession)", ({ owner, studySession }) => where(
   R.OpenSession({ owner, studySession }), Tutoring._task({ task: studySession }),
@@ -38,9 +37,7 @@ const AssessmentReady = former("admit review of (studySession)", ({ owner, study
   R.OpenSession({ owner, studySession }).is({ skill, definition }), Mastery._track({ learner: owner, subject: skill, definition }),
   Tutoring._sessionData({ session: studySession }).is({ data }), C.attemptIsReady({ data, dialogueLength, reviewed, unseen, outsideHelp }),
 ).form({ allowed: true })).optional();
-const RetryReady = former("admit retry of (studySession)", ({ owner, studySession }, { assessment }) => where(
-  R.OwnedSession({ owner, studySession }), Assessment._byTask({ author: owner, task: studySession }).is({ case: assessment }), no(Assessment._effectiveJudgment({ case: assessment })),
-).form({ allowed: true })).optional();
+const RetryReady = former("admit retry of (studySession)", ({ owner, studySession }) => where(R.PendingGrade({ owner, studySession })).form({ allowed: true })).optional();
 // Admits Correct and Regrade for a practice or imported case. Regrade refuses an imported case itself.
 const RegradeReady = former("admit revision of (assessment)", ({ owner, assessment, basedOn }) => where(
   R.OwnedAnyCase({ owner, assessment }), Assessment._effectiveJudgment({ case: assessment }).is({ judgment: basedOn }),
