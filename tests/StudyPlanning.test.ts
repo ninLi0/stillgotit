@@ -199,6 +199,55 @@ describe("StudyPlanning", () => {
     expect(rows(await planning._items(second))).toEqual([["2026-10-13", "vectors", "TODO"], ["2026-10-14", "determinants", "TODO"]]);
   });
 
+  test("after a decline, a new proposal with the same cuts is compared with the active plan's cuts, so its new cut still needs confirmation", async () => {
+    const { planning } = setup();
+    await planning.configure({ ...sam, dailyMinutes: 20, focusNote: "" });
+    const { exam } = await planning.setExam({ ...sam, date: "2026-10-14", covered: ["vectors", "matrices"] });
+    const work = [candidate("vectors", { priority: 2, examRefs: [exam] }), candidate("matrices", { examRefs: [exam] })];
+    const cut = (key: string) => ({ cut: {
+      exam, candidateKey: key, omittedScope: `Practice ${key}`, minutes: 20,
+      reason: "This activity does not fit before the exam within its dates and the available budget.",
+      consequence: `No scheduled preparation for: Practice ${key}`,
+    } });
+    const confirmation = async ({ plan }: { plan: string }) => [
+      (await planning._plan({ plan }))[0]!.needsConfirmation,
+      (await planning._proposalCheck({ learner: "sam", plan, currentBasis: "skills-v1" }))[0]?.needsConfirmation,
+    ];
+
+    // The learner confirms leaving out matrices, so the active plan's cuts approve that cut.
+    const active = await planning.replan({ ...sam, candidates: work, ...proposal });
+    expect(await planning._cuts(active)).toEqual([cut("matrices")]);
+    await planning.confirmTradeoffs({ learner: "sam", plan: active.plan, currentBasis: "skills-v1" });
+
+    // With no study time, vectors is cut too. The learner declines that proposal.
+    await planning.configure({ ...sam, dailyMinutes: 0, focusNote: "" });
+    const declined = await planning.replan({ ...sam, candidates: work, ...proposal });
+    expect(await confirmation(declined)).toEqual([true, true]);
+    await planning.declineTradeoffs({ learner: "sam", plan: declined.plan });
+
+    // The next proposal has the same cuts as the declined one. Declining approved nothing, and the active plan's cuts
+    // hold only matrices, so the vectors cut still needs confirmation.
+    const again = await planning.replan({ ...sam, candidates: work, ...proposal });
+    expect(await planning._cuts(again)).toEqual([cut("matrices"), cut("vectors")]);
+    expect(await planning._cuts(again)).toEqual(await planning._cuts(declined));
+    expect(await confirmation(again)).toEqual([true, true]);
+    await refuses(planning.activateRoutine({ learner: "sam", plan: again.plan, currentBasis: "skills-v1" }), "EXAM_TRADEOFF_CONFIRMATION_REQUIRED");
+    // Only a PROPOSED plan can need confirmation, so the active plan and the declined plan report false.
+    expect(Object.fromEntries((await planning._plans(sam)).map(({ plan, status, needsConfirmation }) => [plan, [status, needsConfirmation]]))).toEqual({
+      [active.plan]: ["ACTIVE", false], [declined.plan]: ["DECLINED", false], [again.plan]: ["PROPOSED", true],
+    });
+
+    // With the budget restored, only the matrices cut remains. The active plan's cuts approve it, so the proposal activates routinely.
+    await planning.configure({ ...sam, dailyMinutes: 20, focusNote: "" });
+    const routine = await planning.replan({ ...sam, candidates: work, ...proposal });
+    expect(await planning._cuts(routine)).toEqual([cut("matrices")]);
+    expect(await confirmation(routine)).toEqual([false, false]);
+    await planning.activateRoutine({ learner: "sam", plan: routine.plan, currentBasis: "skills-v1" });
+    expect(statuses(await planning._plans(sam))).toEqual({
+      [active.plan]: "SUPERSEDED", [declined.plan]: "DECLINED", [again.plan]: "SUPERSEDED", [routine.plan]: "ACTIVE",
+    });
+  });
+
   test("removing an exam keeps its record and outdates proposals that used it; setting the date again restores it", async () => {
     const { planning } = setup();
     await planning.configure({ ...sam, dailyMinutes: 30, focusNote: "" });
