@@ -33,7 +33,7 @@ Locations are stable source labels. Each starts with a key: the first 16 hexadec
 | PDF page, with or without text | `key/page/N` | `9c1f0e2ab34d5e6f/page/3` |
 | Image, including HEIC and HEIF | `key/image` | `d04e7a5c19b2f368/image` |
 | Recording or video segment | `key/time/START-END` | `4be0c1d29a7f3e65/time/00:30-00:45` |
-| Text, Markdown, or code lines | `key/lines/A-B` | `51e8a0d3c7f2b964/lines/101-200` |
+| Text, Markdown, code, or caption file lines | `key/lines/A-B` | `51e8a0d3c7f2b964/lines/101-200` |
 | Notebook cell | `key/cell/N` | `7a2c4e9f0b1d3865/cell/4` |
 | Word document | `key/document` | `e3b7c1a09d4f2658/document` |
 | PowerPoint slide | `key/slide/N` | `0f9d2b6e4a8c1735/slide/7` |
@@ -52,12 +52,13 @@ The upload route reads each document in memory with TypeScript (`src/host/extrac
 | Audio recording | Transcript segments as text, at `key/time/START-END`. | "This transcript was written by the AI tutor from the recording. Words and times may contain mistakes. Play the recording to check." |
 | Video | Transcript segments as text, with notes of on-screen text, at `key/time/START-END`. | "This transcript was written by the AI tutor from the video. It includes short notes about text and diagrams on screen, but not the pictures themselves. Words and times may contain mistakes. Play the video to check." |
 | Text, Markdown, code | Text in blocks of 100 lines, at `key/lines/A-B`. Files must be UTF-8. | None. |
+| WebVTT or SubRip captions | The transcript as paragraphs, in blocks of up to 100 lines, at `key/lines/A-B`, as described under [Caption files](#caption-files). | None. |
 | Notebook (`.ipynb`) | The source of each nonblank cell, at `key/cell/N`. | Code is not run, and saved outputs are not read. |
 | Word (`.docx`) | All document text, at `key/document`. | Images and charts are not included. |
 | PowerPoint (`.pptx`) | The text of each slide, at `key/slide/N`, in the presentation's slide order. | Images and charts are not included. |
 | Excel (`.xlsx`, `.xlsm`) | Each sheet's cell values as `A1: value`, at `key/sheet/NAME/rows/1-LAST`. Formulas appear as `=FORMULA = value`. | Images and charts are not included. |
 
-A file's type comes from its bytes, not only its name. The importer saves the media type it detects for PDFs, images, recordings, and videos, and sends that type to Gemini. Text and Office files keep the type the browser declared, as before. A photo named `.heic` whose bytes are JPEG is saved as JPEG. A file with an unknown extension is still read as text when it decodes as UTF-8.
+A file's type comes from its bytes, not only its name. The importer saves the media type it detects for PDFs, images, recordings, and videos, and sends that type to Gemini. Text and Office files keep the type the browser declared, as before. A photo named `.heic` whose bytes are JPEG is saved as JPEG. A file with an unknown extension is still read as text when it decodes as UTF-8. A text file that starts like a WebVTT or SubRip caption file is read as captions, whatever its name.
 
 | Accepted names | Detected from | Saved media type |
 | --- | --- | --- |
@@ -143,6 +144,23 @@ Gemini transcribes each recording and video once, after the upload is saved and 
 - The material's `content` joins these renditions like any other text. Citations, skill suggestions, lessons, practice, and graded-work extraction all read the transcript.
 
 The original recording stays retained, downloadable, and playable. The tutor does not receive the recording again after import.
+
+## Caption files
+
+A WebVTT or SubRip caption file is a transcript with times, saved as text. The importer recognizes one by how it starts, not by its name. A WebVTT file's first line is `WEBVTT`, alone or followed by a space or tab. A SubRip file starts with a cue: a cue number, then a timing line such as `00:00:01,000 --> 00:00:03,500`; a file that starts with the timing line itself counts too. So a `.txt` file that starts with `WEBVTT` is read as captions, and a `.vtt` or `.srt` file that starts any other way is read as plain text.
+
+The readable text keeps what was said and leaves out the rest:
+
+- The header, `NOTE`, `STYLE`, and `REGION` blocks, cue identifiers and numbers, timing lines, and cue settings are left out.
+- Tags inside a cue, such as `<c>`, `<i>`, `<b>`, `<u>`, and SubRip's `<font>`, and times inside a cue are removed. Character references such as `&amp;` become the characters they stand for.
+- A voice tag such as `<v Professor Jackson>` puts `Professor Jackson: ` at the start of each of that speaker's paragraphs. A cue without a voice tag continues the current speaker.
+- The lines of one cue are joined with spaces, and cues are joined into paragraphs in file order. A new paragraph starts when the speaker changes, or when a cue ends a sentence and the next cue starts more than 2 seconds after it ends. A cue ends a sentence when its text ends with `.`, `!`, `?`, or `…`, before any closing quote or bracket. Runs of spaces and line breaks become one space.
+- Text after a blank line inside a cue stays with that cue. A cue number right before a timing line is left out even when no blank line comes before it.
+- Paragraphs are separated by a blank line. The text is split into blocks of 100 lines like other text, except that a block ends with its last paragraph rather than the blank line after it, so its location may end one line early, as in `key/lines/1-99`.
+
+The original caption file stays retained and downloadable, with its times. A caption file with no cue text has no readable text. Caption files imported before this rule keep the text they were saved with.
+
+For example, a WebVTT file with a cue from `00:00:00.000` to `00:00:02.500` reading `<v Professor Jackson>Welcome back.`, and a cue from `00:00:05.000` reading `<v Student>Can a concept have two purposes?`, becomes two paragraphs: "Professor Jackson: Welcome back." and "Student: Can a concept have two purposes?".
 
 ## Examples
 

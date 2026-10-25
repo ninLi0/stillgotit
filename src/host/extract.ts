@@ -139,10 +139,15 @@ export async function extract(sources: readonly Source[]): Promise<{ originals: 
     else {
       const text = decodeText(bytes);
       if (text === null) throw new Refusal(UNSUPPORTED);
-      const lines = text.split(/\r\n|[\n\r\v\f\x1c-\x1e\x85]/);
+      // A WebVTT or SubRip caption file is read as paragraphs, without its cue numbers and times.
+      const transcript = transcriptText(text);
+      const lines = (transcript ?? text).split(/\r\n|[\n\r\v\f\x1c-\x1e\x85]/);
       if (lines.at(-1) === "") lines.pop();
       for (let start = 0; start < lines.length; start += 100) {
-        add(`${key}/lines/${start + 1}-${Math.min(start + 100, lines.length)}`, lines.slice(start, start + 100).join("\n"));
+        let end = Math.min(start + 100, lines.length);
+        // A transcript's block ends with its last paragraph, not with the blank line after it.
+        if (transcript !== null) while (end > start + 1 && !lines[end - 1]!.trim()) end--;
+        add(`${key}/lines/${start + 1}-${end}`, lines.slice(start, end).join("\n"));
       }
     }
     originals.push({ file, name, mediaType, renditions, limitations });
@@ -318,4 +323,77 @@ function notebook(bytes: Uint8Array): string[] {
     const source = (cell as { source?: unknown } | null)?.source;
     return Array.isArray(source) ? source.filter((line) => typeof line === "string").join("") : typeof source === "string" ? source : "";
   });
+}
+
+/** A WebVTT file's first line is "WEBVTT", alone or followed by a space or tab and more text. */
+const WEBVTT = /^WEBVTT(?:[ \t]|$)/;
+const CUE_TIME = String.raw`(?:(\d+):)?(\d{1,2}):(\d{2})[.,](\d{1,3})`;
+/** A cue's timing line, such as "00:01:02.500 --> 00:01:04.000 align:start" in WebVTT or "00:01:02,500 --> 00:01:04,000" in SubRip. */
+const TIMING = new RegExp(String.raw`^\s*${CUE_TIME}\s*-->\s*${CUE_TIME}(?:\s|$)`);
+/** A voice tag, such as "<v Professor Jackson>" or "<v.loud Sam>". Its group is the speaker's name. */
+const VOICE = /<v(?:\.[^\s<>]*)?[ \t]+([^<>]*)>/;
+/** Class, italic, bold, underline, ruby, and language tags, SubRip font tags, their end tags, and times inside a cue. */
+const CUE_TAG = /<\/(?:c|i|b|u|v|lang|ruby|rt|font|s)[ \t]*>|<(?:c|i|b|u|v|ruby|rt|s)(?:\.[^\s<>]*)?>|<(?:lang|font)(?:\.[^\s<>]*)?[ \t][^<>]*>|<(?:\d+:)?\d{1,2}:\d{2}[.,]\d{1,3}>/gi;
+const SENTENCE_END = /[.!?…。！？]["'”’)\]]*$/;
+/** A paragraph ends with a sentence when the next cue starts more than this many seconds later. */
+const PAUSE_SECONDS = 2;
+
+const cueSeconds = (match: RegExpExecArray, at: number) =>
+  Number(match[at] ?? 0) * 3600 + Number(match[at + 1]) * 60 + Number(match[at + 2]) + Number(match[at + 3]!.padEnd(3, "0")) / 1000;
+/** Cue text without its tags, with character references decoded and every run of whitespace made one space. */
+const cueText = (text: string) =>
+  decodeXml(text.replace(CUE_TAG, "").replace(/&nbsp;/gi, " ").replace(/&(?:lrm|rlm);/gi, "")).replace(/[\s\x1c-\x1e\x85]+/g, " ").trim();
+
+/**
+ * The readable text of a WebVTT or SubRip caption file, or null when the text is neither. It keeps what was said, in
+ * file order, as paragraphs separated by blank lines, and leaves out headers, comments, styles, cue numbers, and times
+ * (design/material-data.md, "Caption files"). Only the start of the text decides whether it is a caption file.
+ */
+export function transcriptText(text: string): string | null {
+  const head = text.slice(0, 4096).split(/\r\n|[\n\r]/), vtt = WEBVTT.test(head[0]!);
+  if (!vtt) {
+    // A SubRip file starts with a cue: its number and then its timing line. A timing line alone is accepted too.
+    const first = head.findIndex((line) => line.trim());
+    if (first < 0 || !(TIMING.test(head[first]!) || (/^\d+$/.test(head[first]!.trim()) && TIMING.test(head[first + 1] ?? "")))) return null;
+  }
+  const lines = text.split(/\r\n|[\n\r]/), cues: { start: number; end: number; lines: string[] }[] = [];
+  // `skip` holds through the WebVTT header and through NOTE, STYLE, and REGION blocks, each of which ends at a blank line.
+  let skip = vtt, blockStart = true;
+  lines.forEach((line, i) => {
+    const starts = blockStart;
+    blockStart = !line.trim();
+    if (blockStart) { skip = false; return; }
+    const timing = TIMING.exec(line);
+    if (timing) { skip = false; cues.push({ start: cueSeconds(timing, 1), end: cueSeconds(timing, 5), lines: [] }); return; }
+    if (skip) return;
+    if (vtt && starts && /^(?:NOTE|STYLE|REGION)(?:[ \t]|$)/.test(line)) { skip = true; return; }
+    // The line before a timing line names that cue: an identifier in WebVTT, a number in SubRip.
+    if (TIMING.test(lines[i + 1] ?? "") && (starts || /^\d+$/.test(line.trim()))) return;
+    // Text after a blank line inside a cue stays with that cue.
+    cues.at(-1)?.lines.push(line);
+  });
+  const paragraphs: { speaker: string; parts: string[] }[] = [];
+  let last: { end: number; text: string } | undefined;
+  for (const cue of cues) {
+    // A voice tag names the speaker for the rest of its cue. A cue without one continues the current speaker.
+    let speaker: string | undefined, said = "";
+    for (const line of cue.lines) {
+      const pieces = line.split(VOICE);
+      for (let p = 0; p < pieces.length; p += 2) {
+        if (p) speaker = cueText(pieces[p - 1]!) || speaker;
+        const piece = cueText(pieces[p]!);
+        if (!piece) continue;
+        let paragraph = paragraphs.at(-1);
+        const pause = !said && !!last && SENTENCE_END.test(last.text) && cue.start - last.end > PAUSE_SECONDS;
+        if (!paragraph || pause || (speaker !== undefined && speaker !== paragraph.speaker)) {
+          paragraph = { speaker: speaker ?? paragraph?.speaker ?? "", parts: [] };
+          paragraphs.push(paragraph);
+        }
+        paragraph.parts.push(piece);
+        said = piece;
+      }
+    }
+    if (said) last = { end: cue.end, text: said };
+  }
+  return paragraphs.map(({ speaker, parts }) => (speaker ? `${speaker}: ` : "") + parts.join(" ")).join("\n\n");
 }
