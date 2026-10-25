@@ -1,12 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
-import { isDeepStrictEqual } from "node:util";
 import {
   type Collection,
   type Db,
   type Filter,
   MongoServerError,
-  type OptionalUnlessRequiredId,
   type UpdateFilter,
 } from "mongodb";
 
@@ -46,6 +44,10 @@ interface SkillDocument {
   prerequisites: Skill[];
   current: Version;
   status: SkillStatus;
+  // The key the browser sent with the save that created this skill. A unique
+  // index on the unit and key pair lets a repeated save find this skill instead
+  // of creating a second one. Skills saved before this field existed have none.
+  proposalKey?: string;
 }
 
 interface VersionDocument {
@@ -58,16 +60,6 @@ interface VersionDocument {
   previous?: Version;
 }
 
-interface ProposalDocument {
-  _id: string;
-  original: { unit: Unit; title: string; outcome: string; gate: string; materials: Material[] };
-  skill: Skill;
-  // A PENDING receipt names the version and skill that its save still has to
-  // create. Receipts saved before this field existed were always complete.
-  version?: Version;
-  status?: "PENDING" | "SAVED";
-}
-
 // A prerequisite or status change holds its course claim for a few reads and
 // one write. The claim expires, so a stopped process cannot block the course.
 // A waiting request outlasts one whole claim before it gives up.
@@ -78,18 +70,11 @@ const COURSE_CLAIM_POLL_MS = 25;
 // skill after this request read it. The action then reads it again.
 const WRITE_ATTEMPTS = 5;
 
-function isDuplicateId(error: unknown, id: string) {
-  return error instanceof MongoServerError && error.code === 11000 && error.keyValue?._id === id;
-}
-
-// Inserts a record under an identity chosen earlier. A duplicate identity means
-// an earlier attempt already saved this record, so the insert is complete.
-async function insertOnce<T extends { _id: string }>(collection: Collection<T>, record: T) {
-  try {
-    await collection.insertOne(record as OptionalUnlessRequiredId<T>);
-  } catch (error) {
-    if (!isDuplicateId(error, record._id)) throw error;
-  }
+// Whether a skill insert was refused by the unique index on the unit and
+// proposal key. That happens only when another save with the same unit and key
+// created its skill first.
+function isDuplicateProposalKey(error: unknown) {
+  return error instanceof MongoServerError && error.code === 11000 && error.keyPattern?.proposalKey !== undefined;
 }
 
 // Runs checks and one conditional write. An attempt returns undefined when its
@@ -161,22 +146,6 @@ export class InvalidSkillProposalKeyError extends Error {
   constructor() {
     super("Provide a nonblank proposal key of at most 100 characters.");
     this.name = "InvalidSkillProposalKeyError";
-  }
-}
-
-export class SkillProposalConflictError extends Error {
-  readonly code = "SKILL_PROPOSAL_CONFLICT";
-  constructor() {
-    super("Use the original skill details when retrying this save.");
-    this.name = "SkillProposalConflictError";
-  }
-}
-
-export class SkillProposalDiscardedError extends Error {
-  readonly code = "SKILL_PROPOSAL_DISCARDED";
-  constructor() {
-    super("This draft was discarded. Create a new proposal to save it again.");
-    this.name = "SkillProposalDiscardedError";
   }
 }
 
@@ -371,7 +340,6 @@ export class SkillMapping {
   private readonly units: Collection<UnitDocument>;
   private readonly skills: Collection<SkillDocument>;
   private readonly versions: Collection<VersionDocument>;
-  private readonly proposals: Collection<ProposalDocument>;
 
   constructor(db: Db, instanceName = "SkillMapping") {
     // MongoDB may run as a standalone server, so no action uses transactions.
@@ -381,7 +349,6 @@ export class SkillMapping {
     this.units = db.collection(`${instanceName}.units`);
     this.skills = db.collection(`${instanceName}.skills`);
     this.versions = db.collection(`${instanceName}.versions`);
-    this.proposals = db.collection(`${instanceName}.proposals`);
   }
 
   // A skill's unit may change only within its course, and a course never
@@ -554,7 +521,6 @@ export class SkillMapping {
   }): Promise<{ skill: Skill }> {
     // Freeze the set before any database wait. Its order is not part of the request.
     const sourceReferences = [...new Set(materials)];
-    const original = { unit, title, outcome, gate, materials: [...sourceReferences].sort() };
     // A unit's course and a course's owner cannot change under this spec.
     if (!await this.#ownedCourse(unit, owner)) {
       throw new ProposalUnitUnavailableError();
@@ -566,50 +532,44 @@ export class SkillMapping {
       throw new InvalidSkillProposalKeyError();
     }
 
-    // Encoding a pair avoids ambiguous concatenation and gives MongoDB one unique key.
-    const receiptId = JSON.stringify([owner, proposalKey]);
-    // Claim the key before any other write. The receipt names the version and
-    // skill it will create, so a retry can finish a save that stopped partway.
-    try {
-      await this.proposals.insertOne({
-        _id: receiptId, original, skill: randomUUID(), version: randomUUID(), status: "PENDING",
-      });
-    } catch (error) {
-      // An earlier or concurrent request holds this key. Its receipt decides the result.
-      if (!isDuplicateId(error, receiptId)) throw error;
-    }
-    const receipt = await this.proposals.findOne({ _id: receiptId });
-    if (!receipt) {
-      throw new Error("The proposal receipt is missing.");
-    }
-    if (!isDeepStrictEqual(receipt.original, original)) {
-      throw new SkillProposalConflictError();
-    }
+    return untilWritten(async () => {
+      // A used unit and key pair names the skill that an earlier save created.
+      // That skill is returned as it is now, so a retry after a lost reply keeps
+      // any edits or confirmation that happened in between.
+      const existing = await this.skills.findOne({ unit, proposalKey }, { projection: { _id: 1 } });
+      if (existing) {
+        return { skill: existing._id };
+      }
 
-    if (receipt.status === "PENDING" && receipt.version) {
       // Create the version before the skill, so a visible skill always has its
-      // current version. This input matches the receipt, and both inserts use
-      // the receipt's identities, so a repeated insert finds the record an
-      // earlier attempt saved and keeps any later edits to it.
-      await insertOnce(this.versions, { _id: receipt.version, skill: receipt.skill, outcome, gate });
-      await insertOnce(this.skills, {
-        _id: receipt.skill,
-        unit,
-        title,
-        materials: sourceReferences,
-        prerequisites: [],
-        current: receipt.version,
-        status: "DRAFT",
-      });
-      await this.proposals.updateOne({ _id: receiptId, status: "PENDING" }, { $set: { status: "SAVED" } });
-      return { skill: receipt.skill };
-    }
-
-    // A saved receipt's skill was fully created. If it is gone, it was discarded.
-    if (!await this.skills.findOne({ _id: receipt.skill })) {
-      throw new SkillProposalDiscardedError();
-    }
-    return { skill: receipt.skill };
+      // current version. If this request stops after the version is saved, the
+      // version names a skill that does not exist, and the queries ignore it.
+      const version = randomUUID();
+      const skill = randomUUID();
+      await this.versions.insertOne({ _id: version, skill, outcome, gate });
+      try {
+        await this.skills.insertOne({
+          _id: skill,
+          unit,
+          title,
+          materials: sourceReferences,
+          prerequisites: [],
+          current: version,
+          status: "DRAFT",
+          proposalKey,
+        });
+      } catch (error) {
+        // The version stays only if a lost reply hid a skill insert that did
+        // apply. Otherwise no skill uses it, and it is removed when possible.
+        // The error that stopped the save is kept.
+        await this.#removeUnusedVersion(skill, version).catch(() => undefined);
+        if (!isDuplicateProposalKey(error)) throw error;
+        // Another save with the same unit and key created its skill first. The
+        // next attempt finds that skill and returns it.
+        return undefined;
+      }
+      return { skill };
+    });
   }
 
   async reviseDraft({ owner, skill, unit, title, outcome, gate, materials }: {
@@ -643,6 +603,13 @@ export class SkillMapping {
 
       const previous = await this.versions.findOne({ _id: draft.current, skill });
       if (!previous) {
+        // A concurrent discard removes the skill and then its versions, so the
+        // version can disappear after the draft was read. The next attempt then
+        // finds no draft and refuses. A draft that still exists without its
+        // current version is a storage fault.
+        if (!await this.skills.findOne({ _id: skill, current: draft.current }, { projection: { _id: 1 } })) {
+          return undefined;
+        }
         throw new Error("The draft's current requirements version is missing.");
       }
 
@@ -677,10 +644,8 @@ export class SkillMapping {
         throw new DraftDiscardUnavailableError();
       }
 
-      // A save that stopped partway leaves its receipt PENDING. Mark it SAVED
-      // before removing the draft, so a retry of that save is refused instead
-      // of creating the draft again. The draft exists, so the save was complete.
-      await this.proposals.updateMany({ skill, status: "PENDING" }, { $set: { status: "SAVED" } });
+      // Remove the skill first. Its proposal key goes with it, so replaying the
+      // original save after this point creates the draft again.
       const removed = await this.skills.deleteOne({ _id: skill, unit: draft.unit, status: "DRAFT" });
       if (removed.deletedCount !== 1) {
         return undefined;
@@ -1070,13 +1035,19 @@ export async function createSkillMapping(
   const units = db.collection<UnitDocument>(`${instanceName}.units`);
   const skills = db.collection<SkillDocument>(`${instanceName}.skills`);
   const versions = db.collection<VersionDocument>(`${instanceName}.versions`);
-  const proposals = db.collection<ProposalDocument>(`${instanceName}.proposals`);
   await courses.createIndex({ owner: 1, _id: 1 });
   await units.createIndex({ course: 1, _id: 1 });
   await skills.createIndex({ unit: 1, _id: 1 });
   await skills.createIndex({ prerequisites: 1, status: 1 });
+  // Each unit and proposal key pair identifies at most one skill, so a repeated
+  // save cannot create a second draft. The index is partial rather than sparse.
+  // Every skill has a unit, so a sparse compound index would still include the
+  // skills saved without a key, all under a null key, and two of them in one
+  // unit would break it.
+  await skills.createIndex(
+    { unit: 1, proposalKey: 1 },
+    { unique: true, partialFilterExpression: { proposalKey: { $type: "string" } } },
+  );
   await versions.createIndex({ skill: 1, _id: 1 });
-  // discardDraft finds a draft's receipt by skill.
-  await proposals.createIndex({ skill: 1 });
   return new SkillMapping(db, instanceName);
 }

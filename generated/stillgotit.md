@@ -277,8 +277,6 @@ Defined in [SkillMapping](../design/concepts/SkillMapping.md), line 1.
   - Refuses `PROPOSAL_UNIT_UNAVAILABLE`: Choose a unit in one of your courses.
   - Refuses `INVALID_SKILL_PROPOSAL`: Enter a skill title, outcome, and demonstration requirements.
   - Refuses `INVALID_SKILL_PROPOSAL_KEY`: Provide a nonblank proposal key of at most 100 characters.
-  - Refuses `SKILL_PROPOSAL_CONFLICT`: Use the original skill details when retrying this save.
-  - Refuses `SKILL_PROPOSAL_DISCARDED`: This draft was discarded. Create a new proposal to save it again.
 - `reviseDraft(owner: User, skill: Skill, unit: Unit, title: String, outcome: String, gate: String, materials: MaterialSet) : returns ()`
   - Refuses `DRAFT_REVISION_UNAVAILABLE`: Choose one of your draft skills.
   - Refuses `DRAFT_UNIT_MISMATCH`: Choose a unit in the skill's course.

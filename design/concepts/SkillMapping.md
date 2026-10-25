@@ -42,23 +42,13 @@ a set of Skills with
   a prerequisites set of Skills
   a current Version
   a status SkillStatus
+  an optional proposalKey String
 a set of Versions with
   a skill Skill
   an outcome String
   a gate String
 a set of Revised Versions with
   a previous Version
-a set of ProposalReceipts with
-  an owner User
-  a proposalKey String
-  a unit Unit
-  a title String
-  an outcome String
-  a gate String
-  a materials set of Materials
-  a skillIdentity String
-  a versionIdentity String
-  a saved Flag
 Rule: each unit belongs to an existing course. Each skill belongs to an existing unit.
 Rule: a unit or skill belongs to the owner of its course. An unknown record belongs to no owner.
 Rule: emphasized records that the learner marked a unit as one the professor stressed, so the course shows which units matter most; a new unit is not emphasized.
@@ -67,8 +57,8 @@ Rule: a revised version's previous version is the version of the same skill that
 Rule: an outcome describes the ability. A gate describes the complete demonstration required for that ability.
 Rule: a confirmed skill's prerequisites are confirmed skills in the same course. A skill cannot require itself, and prerequisite links cannot form a cycle. Archived skills may retain links to archived prerequisites.
 Rule: blank text is empty or contains only whitespace. Titles, outcomes, and gates are not blank.
-Rule: proposal keys are nonblank strings of at most 100 characters. Each owner and key pair has at most one receipt. A receipt stores the original input and the identities of the skill and first version it creates; this content never changes. A receipt is written before its version and skill, and it is marked saved after both exist. Discarding a draft marks its receipt saved and retains it, so replay cannot recreate the draft.
-Rule: each write changes one record, and writes happen in an order that never shows a partial result. A skill is created only after its first version exists. A new version becomes current only after it is saved. A version that never becomes current is removed when possible, and no action returns its identity. Discarding removes a skill before its versions, and a version whose skill no longer exists counts as discarded. If an action stops partway, repeating the same request finishes it or is refused, and no query returns a partial record.
+Rule: a proposal key is a nonblank string of at most 100 characters. Each unit and key pair identifies at most one skill. Proposing again with a used pair returns that skill, whatever its current content, and creates nothing.
+Rule: no query returns a partial skill or version. A version whose skill does not exist is not returned. If an action stops partway, repeating the same request finishes it or is refused.
 Rule: new identities are unique. A refused action changes no state. Unmentioned state stays unchanged.
 ```
 
@@ -115,29 +105,14 @@ propose(owner: User, unit: Unit, proposalKey: String, title: String, outcome: St
   where unit belongs to owner, title, outcome, and gate are not blank, and proposalKey is invalid
   then
     refuses INVALID_SKILL_PROPOSAL_KEY "Provide a nonblank proposal key of at most 100 characters."
-  where input is valid and owner's receipt for proposalKey has different original input
+  where input is valid and a skill in unit already has proposalKey
   then
-    refuses SKILL_PROPOSAL_CONFLICT "Use the original skill details when retrying this save."
-  where input matches owner's saved receipt for proposalKey and its skill no longer exists
-  then
-    refuses SKILL_PROPOSAL_DISCARDED "This draft was discarded. Create a new proposal to save it again."
-  where input matches owner's saved receipt for proposalKey and its skill still exists
-  then
-    use the receipt's skill and keep its current content, version, and status unchanged
+    use that skill and keep its current content, version, and status unchanged
     returns skill
-  where input matches owner's receipt for proposalKey and the receipt is not yet marked saved
+  where input is valid and no skill in unit has proposalKey
   then
-    create the receipt's version with skill, outcome, and gate, unless it already exists
-    create the receipt's skill with unit, title, materials, an empty prerequisites set, that version as current, and status DRAFT, unless it already exists
-    keep any existing skill's current content, version, and status unchanged
-    mark the receipt saved
-    returns skill
-  where input is valid and owner has no receipt for proposalKey
-  then
-    save a receipt with owner, proposalKey, the original input, and new skill and version identities, not yet marked saved
-    create the receipt's version with skill, outcome, and gate
-    create the receipt's skill with unit, title, materials, an empty prerequisites set, that version as current, and status DRAFT
-    mark the receipt saved
+    create a version with outcome and gate for a new skill
+    create that skill with unit, proposalKey, title, materials, an empty prerequisites set, that version as current, and status DRAFT
     returns skill
 
 reviseDraft(owner: User, skill: Skill, unit: Unit, title: String, outcome: String, gate: String, materials: MaterialSet) : returns ()
@@ -162,7 +137,6 @@ discardDraft(owner: User, skill: Skill) : returns ()
     refuses DRAFT_DISCARD_UNAVAILABLE "Only your draft skills can be discarded."
   where skill is owner's draft
   then
-    mark skill's receipt saved if it is not yet marked saved
     remove skill, then remove all its versions
     returns
 

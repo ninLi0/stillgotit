@@ -7,8 +7,6 @@ import {
   InvalidSkillProposalError,
   InvalidSkillProposalKeyError,
   ProposalUnitUnavailableError,
-  SkillProposalConflictError,
-  SkillProposalDiscardedError,
   SkillMapping,
 } from "../src/concepts/SkillMapping.ts";
 import { connectMongo, localMongoUri } from "../src/storage/mongo.ts";
@@ -37,7 +35,7 @@ beforeEach(async () => {
 });
 
 describe("SkillMapping proposal retries", () => {
-  test("concurrent clients share one skill, version, and receipt", async () => {
+  test("concurrent clients share one skill and one version", async () => {
     const { owner, unit } = await ownedUnit();
     const input = { owner, unit, proposalKey: randomUUID(), ...content };
     const second = await connectMongo({ uri, database });
@@ -46,30 +44,35 @@ describe("SkillMapping proposal retries", () => {
       const results = await Promise.all(Array.from({ length: 12 }, (_, i) => (i % 2 ? peer : mapping).propose(input)));
       expect(new Set(results.map((result) => result.skill)).size).toBe(1);
       expect(await mapping._skills({ unit })).toHaveLength(1);
-      expect(await connection!.db.collection("SkillMapping.versions").countDocuments({ skill: results[0]!.skill })).toBe(1);
+      // Every save that lost the race removed the version it had saved.
+      expect(await connection!.db.collection("SkillMapping.versions").countDocuments()).toBe(1);
       expect(await mapping.propose({ ...input, materials: ["source-a", "source-b"] })).toEqual(results[0]);
     } finally { await second.client.close(); }
   });
 
-  test("changed inputs conflict, including competing first saves", async () => {
-    const { owner, course, unit } = await ownedUnit(), otherUnit = await mapping.addUnit({ owner, course, title: "Other unit" });
-    const input = { owner, unit, proposalKey: randomUUID(), ...content };
-    const results = await Promise.allSettled([mapping.propose(input), mapping.propose({ ...input, title: "Different title" })]);
-    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
-    const rejected = results.find((result) => result.status === "rejected") as PromiseRejectedResult;
-    expect(rejected.reason).toBeInstanceOf(SkillProposalConflictError);
-    expect(await mapping._skills({ unit })).toHaveLength(1);
-
-    const stable = { ...input, proposalKey: randomUUID() };
-    await mapping.propose(stable);
-    const before = await savedState();
-    for (const changed of [{ unit: otherUnit.unit }, { title: "Changed" }, { outcome: "Changed" }, { gate: "Changed" }, { materials: [] }]) {
-      await expect(mapping.propose({ ...stable, ...changed })).rejects.toBeInstanceOf(SkillProposalConflictError);
-    }
-    expect(await savedState()).toEqual(before);
+  test("two concurrent proposals with the same unit and key yield exactly one skill and no orphan version", async () => {
+    const { owner, unit } = await ownedUnit();
+    const second = await connectMongo({ uri, database });
+    try {
+      const peer = new SkillMapping(second.db);
+      // The two requests in a pair usually both look up the key before either
+      // saves its skill, so one skill insert meets the unique index on the unit
+      // and key. However a pair interleaves, it must leave one skill and one
+      // version.
+      for (let round = 0; round < 10; round++) {
+        const input = { owner, unit, proposalKey: randomUUID(), ...content };
+        const [first, other] = await Promise.all([mapping.propose(input), peer.propose(input)]);
+        expect(other).toEqual(first);
+        const [record] = await mapping._skill(first);
+        expect(await mapping._version({ version: record!.current }))
+          .toEqual([{ skill: first.skill, outcome: content.outcome, gate: content.gate }]);
+      }
+      expect(await mapping._skills({ unit })).toHaveLength(10);
+      expect(await connection!.db.collection("SkillMapping.versions").countDocuments()).toBe(10);
+    } finally { await second.client.close(); }
   });
 
-  test("keys are required, scoped to the owner, and cannot reveal foreign skills", async () => {
+  test("keys are required, belong to one unit, and cannot reveal foreign skills", async () => {
     const first = await ownedUnit(), second = await ownedUnit(), proposalKey = randomUUID();
     for (const invalid of ["", " \n", "x".repeat(101)]) {
       await expect(mapping.propose({ ...first, ...content, proposalKey: invalid })).rejects.toBeInstanceOf(InvalidSkillProposalKeyError);
@@ -82,7 +85,7 @@ describe("SkillMapping proposal retries", () => {
     expect(await mapping._skills({ unit: second.unit })).toHaveLength(1);
   });
 
-  test("replay preserves later edits and confirmation, and cannot recreate a discarded draft", async () => {
+  test("replay preserves later edits and confirmation", async () => {
     const { owner, unit } = await ownedUnit(), input = { owner, unit, proposalKey: randomUUID(), ...content };
     const saved = await mapping.propose(input);
     await mapping.reviseDraft({ ...input, ...saved, title: "Revised title", gate: "Revised demonstration" });
@@ -90,12 +93,6 @@ describe("SkillMapping proposal retries", () => {
     const before = await savedState();
     expect(await mapping.propose(input)).toEqual(saved);
     expect(await savedState()).toEqual(before);
-    const removable = { ...input, proposalKey: randomUUID() }, draft = await mapping.propose(removable);
-    await mapping.discardDraft({ owner, ...draft });
-    await expect(mapping.propose(removable)).rejects.toBeInstanceOf(SkillProposalDiscardedError);
-    expect(await mapping._skill(draft)).toEqual([]);
-    expect(await mapping._skills({ unit })).toHaveLength(1);
-    expect((await mapping.propose({ ...removable, proposalKey: randomUUID() })).skill).not.toBe(draft.skill);
   });
 
   test("a lost reply from a stopped process is recovered by a new process", async () => {
@@ -115,49 +112,23 @@ describe("SkillMapping proposal retries", () => {
     expect(await mapping._skills({ unit })).toEqual(stored);
   });
 
-  test.each(["versions", "skills"])("a save stopped by a failed %s write shows no skill, and a retry finishes it once", async (collection) => {
-    const name = `UnfinishedSave_${collection}`, concept = await createSkillMapping(connection!.db, name);
+  test("a failed skill write leaves no visible draft, and the retry creates it once", async () => {
+    const name = "UnfinishedSave", concept = await createSkillMapping(connection!.db, name);
     const { owner, unit } = await ownedUnit(concept), input = { owner, unit, proposalKey: randomUUID(), ...content };
-    await connection!.db.command({ collMod: `${name}.${collection}`, validator: { $jsonSchema: { required: ["testFailure"] } }, validationLevel: "strict", validationAction: "error" });
+    // The version write succeeds, and MongoDB then rejects the skill write.
+    await connection!.db.command({ collMod: `${name}.skills`, validator: { $jsonSchema: { required: ["testFailure"] } }, validationLevel: "strict", validationAction: "error" });
     try {
       await expect(concept.propose(input)).rejects.toMatchObject({ code: 121 });
-      // The version may exist, but no skill is visible until the save finishes.
       expect(await concept._skills({ unit })).toEqual([]);
-      // The key keeps its original input while the save is unfinished.
-      await expect(concept.propose({ ...input, title: "Different title" })).rejects.toBeInstanceOf(SkillProposalConflictError);
-    } finally { await connection!.db.command({ collMod: `${name}.${collection}`, validator: {} }); }
+      // No skill uses the version saved before the failure, so it was removed.
+      expect(await connection!.db.collection(`${name}.versions`).countDocuments()).toBe(0);
+    } finally { await connection!.db.command({ collMod: `${name}.skills`, validator: {} }); }
     const result = await concept.propose(input);
     expect(await concept.propose(input)).toEqual(result);
     const [record] = await concept._skill(result);
     expect(record).toEqual({ unit, title: content.title, current: expect.any(String), status: "DRAFT" });
     expect(await concept._version({ version: record!.current })).toEqual([{ skill: result.skill, outcome: content.outcome, gate: content.gate }]);
     expect(await concept._skills({ unit })).toHaveLength(1);
-    expect(await connection!.db.collection(`${name}.versions`).countDocuments({ skill: result.skill })).toBe(1);
-  });
-
-  test("a draft whose save stopped before its receipt was marked saved can be replayed or discarded", async () => {
-    const name = "UnmarkedReceipt", concept = await createSkillMapping(connection!.db, name);
-    const { owner, unit } = await ownedUnit(concept);
-    const kept = { owner, unit, proposalKey: randomUUID(), ...content };
-    const removed = { owner, unit, proposalKey: randomUUID(), ...content, title: "Read matrix dimensions" };
-    // Accept new PENDING receipts, but reject the final write that marks one SAVED.
-    await connection!.db.command({ collMod: `${name}.proposals`, validator: { status: "PENDING" }, validationLevel: "strict", validationAction: "error" });
-    try {
-      for (const input of [kept, removed]) {
-        await expect(concept.propose(input)).rejects.toMatchObject({ code: 121 });
-      }
-    } finally { await connection!.db.command({ collMod: `${name}.proposals`, validator: {} }); }
-    // Each skill and its version were saved before the failed write.
-    const drafts = await concept._skills({ unit });
-    expect(drafts).toHaveLength(2);
-    for (const { current } of drafts) expect(await concept._version({ version: current })).toHaveLength(1);
-    const keptSkill = drafts.find((row) => row.title === kept.title)!.skill;
-    const removedSkill = drafts.find((row) => row.title === removed.title)!.skill;
-
-    expect(await concept.propose(kept)).toEqual({ skill: keptSkill });
-    await concept.discardDraft({ owner, skill: removedSkill });
-    await expect(concept.propose(removed)).rejects.toBeInstanceOf(SkillProposalDiscardedError);
-    expect((await concept._skills({ unit })).map((row) => row.skill)).toEqual([keptSkill]);
     expect(await connection!.db.collection(`${name}.versions`).countDocuments()).toBe(1);
   });
 });

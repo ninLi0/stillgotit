@@ -126,7 +126,7 @@ evidenceAttribution(origin: AssessmentReviewing.Origin, rationale: String) : Str
   Identifies an AI assessment or learner correction alongside its saved explanation.
 ```
 
-The [course composition](../compositions/Courses.md) declares these endpoints and the saved request keys used to recover draft saves.
+The [course composition](../compositions/Courses.md) declares these endpoints and the proposal keys that let the browser repeat a draft save without creating the draft twice.
 
 ## Provider and file transport
 
