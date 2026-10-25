@@ -6,7 +6,7 @@ StillGotIt helps college students learn the skills in a course and keep them aft
 
 - **The deployed app:** https://stillgotit.mit-sdg.dev. Sign in with a 6.1040 Commons account.
 - **Demo video:** [a narrated walk through the main journey](PASTE_VIDEO_URL)
-- **P4 status:** [docs/P4.md](docs/P4.md) covers what changed since P3, how the work was checked, how the deployed app was tested, how to prepare a user test, and the known limits.
+- **P4 status:** [docs/P4.md](docs/P4.md) covers what changed since P3, how the work was checked, the tests of the deployed app, how to prepare a user test, and the known limits.
 - **Design document:** [docs/design-document.md](docs/design-document.md) summarizes how the final design differs from the P1 concept design and the P3 visual design, with links to the commits.
 - **Earlier status pages:** [P3, the beta](docs/P3.md), and [P2, the alpha](docs/P2.md).
 - **Design:** the [design index](design/README.md) lists every design document and links each concept to its code. The main parts are:

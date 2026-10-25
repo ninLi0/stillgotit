@@ -36,4 +36,4 @@ A concept is named for a behavior that many apps share, and the application stag
 
 The Pixel Nature redesign from P3 stands, as the [visual design study](../design/visual-design.md) describes it. Headings are set in Pixelify Sans and everything else in Instrument Sans. Each screen has one color family, and there are no gradients. Mastery appears as filled cells beside a number. Home shows a grove with a tree for each topic and a leaf for each skill, the Forest view shows the whole course, and Plan draws the week as a sea. This replaced both the black, white, and gray line-art tree of the P1 sketches and the first P3 look, which used Georgia, Avenir Next, and one cyanotype blue.
 
-Planned for P4: the six text colors that fall below a 4.5:1 contrast ratio, listed in the study, will be darkened, and Home will gain a Continue card for lessons in progress.
+Planned for P4: the six text colors that fall below a 4.5:1 contrast ratio, listed in the study, will be adjusted to reach it, and Home will gain a Continue card for lessons in progress.
