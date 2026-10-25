@@ -298,6 +298,35 @@ test("another learner's course is refused at admission with the sentence and by 
   expect(after.exams).toEqual([{ exam, date: day(1), covered: skills }]);
 }, 60_000);
 
+test("in an owned course, each endpoint refuses an unknown or another learner's item, and a refresh it cannot make, with the concept's code", async () => {
+  const app = await setup(), owner = await app.learner("item-owner"), outsider = await app.learner("item-outsider");
+  const { course } = await owner.course("Linear algebra", ["Vectors"]);
+  await owner.ok("/planning/configure", { course, dailyMinutes: 30 });
+  const before = await owner.read(course), foreignItem = before.data.next!.item;
+  const own = await outsider.course("Physics", ["Forces"]);
+
+  // Without a budget, a refresh of the outsider's own course is refused with the planning concept's code.
+  expect(await outsider.direct("/planning/propose", { course: own.course })).toEqual(refusedBy("PLAN_PREFERENCES_UNAVAILABLE"));
+  await outsider.ok("/planning/configure", { course: own.course, dailyMinutes: 30 });
+  const ownPlan = await outsider.read(own.course);
+  const ITEM_ADMISSION = "Choose an activity from your own course.";
+  for (const item of [foreignItem, "missing-item"]) {
+    expect(await outsider.direct("/planning/begin", { course: own.course, item })).toEqual(refusedBy("ACTIVITY_BEGIN_UNAVAILABLE"));
+    expect(await outsider.direct("/planning/finish", { course: own.course, item, actualMinutes: 5 })).toEqual(refusedBy("ACTIVITY_FINISH_UNAVAILABLE"));
+    expect(await outsider.direct("/planning/stop", { course: own.course, item, actualMinutes: 5 })).toEqual(refusedBy("ACTIVITY_STOP_UNAVAILABLE"));
+    expect(await outsider.direct("/planning/miss", { course: own.course, item })).toEqual(refusedBy("ACTIVITY_MISS_UNAVAILABLE"));
+    // Over HTTP, admission declines the same requests first.
+    expect(await outsider.post("/planning/begin", { course: own.course, item })).toEqual(refused(BEGIN_ADMISSION));
+    for (const path of ["/planning/finish", "/planning/stop"]) expect(await outsider.post(path, { course: own.course, item, actualMinutes: 5 }), path).toEqual(refused(ITEM_ADMISSION));
+    expect(await outsider.post("/planning/miss", { course: own.course, item })).toEqual(refused(ITEM_ADMISSION));
+  }
+  // During an activity in the same course, a refresh is refused with the concept's code instead of going unanswered.
+  await outsider.ok("/planning/begin", { course: own.course, item: ownPlan.data.next!.item });
+  expect(await outsider.direct("/planning/propose", { course: own.course })).toEqual(refusedBy("PLAN_SESSION_IN_PROGRESS"));
+  expect((await outsider.read(own.course)).data.plan!.plan).toBe(ownPlan.data.plan!.plan);
+  expect(await owner.read(course)).toEqual(before);
+}, 60_000);
+
 test("an activity elsewhere keeps the plan until it ends; finishing or stopping refreshes every course with a budget", async () => {
   const app = await setup(), kai = await app.learner("exam-kai");
   const physics = await kai.course("Physics", ["Forces"]);

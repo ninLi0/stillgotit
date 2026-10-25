@@ -18,7 +18,7 @@ The cuts list has one row per cut of that pending proposal, as `StudyPlanning._c
 
 [Configure](reaction:Planning.Configure) saves the daily budget and focus note. Its successful action triggers a review proposal and routine activation.
 
-[Propose](reaction:Planning.Propose) requests a fresh plan from declared current-state reads. The calculation keeps the prototype's ten-minute activities and its one-, three-, and seven-day review intervals. The horizon is seven days, or longer when an exam needs it. Work that does not fit remains visible.
+[Propose](reaction:Planning.Propose) requests a fresh plan from declared current-state reads. For an owned course it first requires [CanReplan](view:Reads.CanReplan). When the course has no saved budget, it answers `PLAN_PREFERENCES_UNAVAILABLE`, and when an activity of this course is in progress it answers `PLAN_SESSION_IN_PROGRESS`, the planning concept's own codes and sentences, without asking the concept. An activity in another course still reaches the concept's own `PLAN_SESSION_IN_PROGRESS` refusal. The calculation keeps the prototype's ten-minute activities and its one-, three-, and seven-day review intervals. The horizon is seven days, or longer when an exam needs it. Work that does not fit remains visible.
 
 ## Exams
 
@@ -74,7 +74,7 @@ Repeating a confirmation or decline after it succeeded is refused by the concept
 
 [The urgency rule](computation:urgentExamItem) decides from the schedule whether the item prepares for the focus exam of an exam-urgent ACTIVE plan whose focus exam is still active. A course with no ACTIVE plan counts as not urgent, and so does a plan whose focus exam was removed. Then [the start rule](computation:beginAllowed) requires ready prerequisites unless the urgency rule holds. With no ACTIVE plan the view still answers, so Begin reaches the concept's `ACTIVITY_BEGIN_UNAVAILABLE` message as it does today. The admission check for Begin uses the same view, so both decide alike. StudyPlanning still refuses an item outside the active plan and enforces remaining time and the one-active-activity rule.
 
-[Finish](reaction:Planning.Finish), [Stop](reaction:Planning.Stop), and [Miss](reaction:Planning.Miss) check item ownership before recording progress. Each waits for the resulting plan refresh before responding. Finish and Stop refresh every course of the learner that has saved preferences; Miss refreshes its own course. Actual time stays in the planning concept. Completing a timer does not prove mastery.
+[Finish](reaction:Planning.Finish), [Stop](reaction:Planning.Stop), and [Miss](reaction:Planning.Miss) check item ownership before recording progress. In an owned course, an unknown item, another learner's item, and an item of another course answer the planning concept's own code for the action without calling it: `ACTIVITY_FINISH_UNAVAILABLE`, `ACTIVITY_STOP_UNAVAILABLE`, or `ACTIVITY_MISS_UNAVAILABLE`. Begin answers `ACTIVITY_BEGIN_UNAVAILABLE` for such an item in the same way. Each waits for the resulting plan refresh before responding. Finish and Stop refresh every course of the learner that has saved preferences; Miss refreshes its own course. Actual time stays in the planning concept. Completing a timer does not prove mastery.
 
 ## Planner screen
 

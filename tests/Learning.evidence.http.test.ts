@@ -1,4 +1,5 @@
 import { afterAll, expect, test } from "bun:test";
+import { admissions } from "../src/compositions/access.ts";
 import { createRuntime } from "../src/host/runtime.ts";
 import { MemoryProvider } from "../src/concepts/Federating/provider.ts";
 import { AssessmentReviewing } from "../src/concepts/AssessmentReviewing/AssessmentReviewing.ts";
@@ -366,4 +367,60 @@ test("cases reach Read exactly as assessment history reports them, including imp
   // The imported attempt is evidence like any other.
   expect(read.explanation.changes.filter((change: { kind: string }) => change.kind === "ATTEMPT").map((change: { source: string }) => change.source))
     .toEqual([graded.case, practice.case]);
+}, 60_000);
+
+test("another learner's real skill, draft, sessions, case, and material are refused on every path and change nothing", async () => {
+  const app = await setup(), { learner, user, course, unit, skill, material } = await learningFixture(app, "ids-owner");
+  const other = app.browser(), outsider = await other.signIn("ids-outsider");
+  await learner.ok("/learning/confidence", { skill, confidence: 50 });
+  const { lesson } = await learner.ok("/learning/lesson", { skill, request: "Explain why the dimensions matter." });
+  await learner.ok("/learning/question", { studySession: lesson, text: "Why does order matter?", dialogueLength: 0 });
+  const assessed = await practise(learner, skill);
+  const { task } = await learner.ok("/learning/task", { skill });
+  await learner.ok("/learning/respond", { studySession: task, text: "My spoken work", channel: "VOICE", dialogueLength: 0 });
+  const { skill: draft } = await learner.ok("/courses/skills/propose", { proposalKey: crypto.randomUUID(), unit, material, title: "Inverses", outcome: "Invert matrices", gate: "Two inverses" });
+  const { cases: [saved] } = await learner.ok("/learning/read", { skill }), assessment = saved.case, basedOn = saved.judgment.judgment;
+  // Everything the owner could lose: sessions with their dialogue, cases with their history, tracks, and the course.
+  const state = async () => {
+    const { sessions, cases } = await learner.ok("/learning/read", { skill });
+    return { sessions, cases, tracks: await app.concepts.MasteryEstimating._tracks({ learner: user, subject: skill } as never), course: await learner.ok("/courses/read", { course }) };
+  };
+  const before = await state();
+  expect(before.sessions).toHaveLength(3);
+
+  // Each request names one of the owner's real records. The last value is the code the endpoint itself answers.
+  const requests: [string, Record<string, unknown>, string][] = [
+    ["/courses/skills/confirm", { skill: draft }, "COURSE_UNAVAILABLE"],
+    ["/courses/skills/edit", { skill: draft, unit, material, title: "Renamed by someone else", outcome: "A forged outcome", gate: "A forged gate" }, "COURSE_UNAVAILABLE"],
+    ["/courses/skills/suggest", { material }, "MATERIAL_UNAVAILABLE"],
+    ["/learning/read", { skill }, "SKILL_UNAVAILABLE"],
+    ["/learning/confidence", { skill, confidence: 90 }, "SKILL_UNAVAILABLE"],
+    ["/learning/lesson", { skill, request: "Show the private lesson" }, "SKILL_UNAVAILABLE"],
+    ["/learning/task", { skill }, "SKILL_UNAVAILABLE"],
+    ["/learning/respond", { studySession: task, text: "Forged work", channel: "TEXT", attachments: [], dialogueLength: 1 }, "SESSION_UNAVAILABLE"],
+    ["/learning/question", { studySession: lesson, text: "Forged question", channel: "TEXT", attachments: [], dialogueLength: 2 }, "SESSION_UNAVAILABLE"],
+    ["/learning/reply", { studySession: lesson }, "SESSION_UNAVAILABLE"],
+    ["/learning/hint", { studySession: task }, "SESSION_UNAVAILABLE"],
+    ["/learning/transcript", { studySession: task, turnIndex: 0, text: "Forged words" }, "SESSION_UNAVAILABLE"],
+    ["/learning/assess", { studySession: task, dialogueLength: 1, reviewed: true, unseen: true, outsideHelp: false }, "SESSION_UNAVAILABLE"],
+    ["/learning/retry", { studySession: assessed }, "SESSION_UNAVAILABLE"],
+    ["/learning/regrade", { case: assessment, basedOn, reason: "Check the calculation again" }, "REVISION_CASE_UNAVAILABLE"],
+    ["/learning/correct", { case: assessment, basedOn, result: "SLIP", gateMet: false, reason: "A forged correction" }, "REVISION_CASE_UNAVAILABLE"],
+  ];
+  // Over HTTP, admission declines a guarded command with its detail. The course commands answer FORBIDDEN, and Read and
+  // Confidence, which have no admission entry, answer their own refusal.
+  const guarded = admissions as unknown as Record<string, readonly { detail: string }[]>;
+  const declined = (path: string) => guarded[path] ? { status: 400, body: { error: "INVALID_REQUEST", detail: guarded[path].at(-1)!.detail } }
+    : path.startsWith("/courses/") ? { status: 403, body: { error: "FORBIDDEN" } } : { status: 400, body: { error: "INVALID_REQUEST" } };
+  const foreign = await app.native(outsider.user);
+  for (const [path, input, code] of requests) {
+    expect(await other.post(path, input), path).toEqual(declined(path));
+    // Without admission, the endpoint answers a refusal of its own instead of leaving the request unanswered.
+    expect(await foreign.raw(path, input), path).toMatchObject({ ok: false, error: { kind: "domain", value: code } });
+  }
+  // The owner's own submitted attempt is no longer open, so assessing it again without admission is refused the same way.
+  const owner = await app.native(user);
+  expect(await owner.raw("/learning/assess", { studySession: assessed, dialogueLength: 1, reviewed: true, unseen: true, outsideHelp: false }))
+    .toMatchObject({ ok: false, error: { kind: "domain", value: "SESSION_UNAVAILABLE" } });
+  expect(await state()).toEqual(before);
 }, 60_000);

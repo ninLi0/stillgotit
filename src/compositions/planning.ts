@@ -6,7 +6,8 @@ import * as R from "./learning-reads.ts";
 import { learningInput, structuredOutput, validators } from "./reusable/inputs.ts";
 const { Sessioning, StudyPlanning: Planning, SkillMapping: Mapping, MasteryEstimating: Mastery } = concepts;
 const options = { validators: { ...validators, input: learningInput, output: structuredOutput } };
-// A missing course and another learner's course get the same answer, before any other refusal.
+// A missing course and another learner's course get the same answer, before any other refusal. In an owned course, an
+// unknown item and another learner's item get the planning concept's own refusal for the action, without calling it.
 // The host adds each refusal's sentence from the design (src/host/http-policy.ts); this one is spelled out here so a caller that skips the host still gets it.
 const courseUnavailable = () => respond({ error: "COURSE_UNAVAILABLE", detail: "Choose one of your own courses." });
 const WAITING = "Your plan will update when you finish or stop your current activity.";
@@ -56,13 +57,21 @@ const Configure = endpoint("/planning/configure", ({ session, course, dailyMinut
     where(no(Courses.OwnedCourse({ owner, course }))).then(courseUnavailable()).named("missing"),
   ).afterFlowSettles().then(where(Courses.OwnedCourse({ owner, course }), Planning._preferences({ owner, scope: course }).is({ preferences, dailyMinutes, focusNote }))
     .then(respond({ preferences }))), options);
+// When CanReplan fails for an owned course, the endpoint answers the planning concept's own refusal for that reason. The
+// ready branch only uses the session again; the replan stage repeats CanReplan because it follows every branch, so the
+// refusal branches end there and the settled answer below follows only the replan.
 const Propose = endpoint("/planning/propose", ({ session, course, owner, candidates, horizonEnd, basis, explanation, plan }) => receive({ session, course })
   .then(Sessioning.use({ session }).responds({ subject: owner })).then(
-    where(R.CanReplan({ owner, course }), R.PlanContext({ owner, course }).is({ candidates, horizonEnd, basis, explanation }))
-      .then(Planning.replan({ owner, scope: course, candidates, horizonEnd, basis, explanation, workloadComplete: false }).responds({})).named("owned"),
+    where(R.CanReplan({ owner, course })).then(Sessioning.use({ session }).responds({ subject: owner })).named("ready"),
+    where(Courses.OwnedCourse({ owner, course }), no(Planning._preferences({ owner, scope: course })))
+      .then(respond({ error: "PLAN_PREFERENCES_UNAVAILABLE" })).named("budget"),
+    where(Courses.OwnedCourse({ owner, course }), Planning._preferences({ owner, scope: course }), Planning._next({ owner, scope: course }).is({ status: "IN_PROGRESS" }))
+      .then(respond({ error: "PLAN_SESSION_IN_PROGRESS" })).named("busy"),
     where(no(Courses.OwnedCourse({ owner, course }))).then(courseUnavailable()).named("missing"),
+  ).then(where(R.CanReplan({ owner, course }), R.PlanContext({ owner, course }).is({ candidates, horizonEnd, basis, explanation }))
+    .then(Planning.replan({ owner, scope: course, candidates, horizonEnd, basis, explanation, workloadComplete: false }).responds({})))
   // The plan proposed in this flow is either still awaiting the learner or now active.
-  ).afterFlowSettles().then(
+  .afterFlowSettles().then(
     where(Courses.OwnedCourse({ owner, course }), Planning._plans({ owner, scope: course }).is({ plan, status: "PROPOSED" })).then(respond({ plan })).named("proposed"),
     where(Courses.OwnedCourse({ owner, course }), no(Planning._plans({ owner, scope: course }).is({ status: "PROPOSED" })),
       Planning._plans({ owner, scope: course }).is({ plan, status: "ACTIVE" })).then(respond({ plan })).named("active"),
@@ -71,24 +80,28 @@ const Begin = endpoint("/planning/begin", ({ session, course, item, owner }) => 
   .then(Sessioning.use({ session }).responds({ subject: owner })).then(
     where(Courses.OwnedCourse({ owner, course }), StartAllowed({ owner, course, item }))
       .then(Planning.begin({ owner, item }).responds({ item })).then(respond({ item })).named("owned"),
+    where(Courses.OwnedCourse({ owner, course }), no(Planning._item({ item }).is({ owner, scope: course }))).then(respond({ error: "ACTIVITY_BEGIN_UNAVAILABLE" })).named("item"),
     where(no(Courses.OwnedCourse({ owner, course }))).then(courseUnavailable()).named("missing"),
   ), options);
 const Finish = endpoint("/planning/finish", ({ session, course, item, actualMinutes, owner }) => receive({ session, course, item, actualMinutes })
   .then(Sessioning.use({ session }).responds({ subject: owner })).then(
     where(Courses.OwnedCourse({ owner, course }), Planning._item({ item }).is({ owner, scope: course }))
       .then(Planning.finish({ owner, item, actualMinutes }).responds({ item })).named("owned"),
+    where(Courses.OwnedCourse({ owner, course }), no(Planning._item({ item }).is({ owner, scope: course }))).then(respond({ error: "ACTIVITY_FINISH_UNAVAILABLE" })).named("item"),
     where(no(Courses.OwnedCourse({ owner, course }))).then(courseUnavailable()).named("missing"),
   ).afterFlowSettles().then(where(Courses.OwnedCourse({ owner, course }), Planning._item({ item }).is({ owner, scope: course, status: "DONE" })).then(respond({ item }))), options);
 const Stop = endpoint("/planning/stop", ({ session, course, item, actualMinutes, owner }) => receive({ session, course, item, actualMinutes })
   .then(Sessioning.use({ session }).responds({ subject: owner })).then(
     where(Courses.OwnedCourse({ owner, course }), Planning._item({ item }).is({ owner, scope: course }))
       .then(Planning.stop({ owner, item, actualMinutes }).responds({ item })).named("owned"),
+    where(Courses.OwnedCourse({ owner, course }), no(Planning._item({ item }).is({ owner, scope: course }))).then(respond({ error: "ACTIVITY_STOP_UNAVAILABLE" })).named("item"),
     where(no(Courses.OwnedCourse({ owner, course }))).then(courseUnavailable()).named("missing"),
   ).afterFlowSettles().then(where(Courses.OwnedCourse({ owner, course }), Planning._item({ item }).is({ owner, scope: course, status: "STOPPED" })).then(respond({ item }))), options);
 const Miss = endpoint("/planning/miss", ({ session, course, item, owner }) => receive({ session, course, item })
   .then(Sessioning.use({ session }).responds({ subject: owner })).then(
     where(Courses.OwnedCourse({ owner, course }), Planning._item({ item }).is({ owner, scope: course }))
       .then(Planning.miss({ owner, item }).responds({ item })).named("owned"),
+    where(Courses.OwnedCourse({ owner, course }), no(Planning._item({ item }).is({ owner, scope: course }))).then(respond({ error: "ACTIVITY_MISS_UNAVAILABLE" })).named("item"),
     where(no(Courses.OwnedCourse({ owner, course }))).then(courseUnavailable()).named("missing"),
   ).afterFlowSettles().then(where(Courses.OwnedCourse({ owner, course }), Planning._item({ item }).is({ owner, scope: course, status: "MISSED" })).then(respond({ item }))), options);
 

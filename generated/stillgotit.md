@@ -558,6 +558,7 @@ Authored path: `Reads.OpenSession`.
 Authored path: `Reads.CanReplan`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 49.
 - Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 23.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 31.
 - Covered by [Progress reactions](../design/compositions/Progress.md), line 35.
 
@@ -3451,7 +3452,7 @@ then
   Sessioning.use (session)
 ```
 
-### Learning.Assess#2
+### Learning.Assess:missing#2
 
 Authored path: `Learning.Assess`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 27.
@@ -3462,6 +3463,23 @@ Authored path: `Learning.Assess`.
 when Sessioning.use (session, subject: owner), asked by Learning.Assess
 where
   earlier, RequestBoundary.request (dialogueLength, outsideHelp, path: "/learning/assess", requestId, reviewed, session, studySession, unseen)
+  no view "(owner) can change session (studySession)" with (owner, studySession)
+then
+  RequestBoundary.respond (error: "SESSION_UNAVAILABLE", requestId)
+```
+
+### Learning.Assess:missing#3
+
+Authored path: `Learning.Assess`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 27.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 107.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when RequestBoundary.respond (error: "SESSION_UNAVAILABLE", requestId), asked by Learning.Assess:missing#2
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Learning.Assess
+  earlier, RequestBoundary.request (dialogueLength, outsideHelp, path: "/learning/assess", requestId, reviewed, session, studySession, unseen)
   view "(owner) can change session (studySession)" with (owner, studySession) has (definition, skill)
   approved is reviewApproved (outsideHelp, reviewed, unseen)
   approved is among [true]
@@ -3470,7 +3488,7 @@ then
   GroundedTutoring.confirmAttempt (dialogueLength, outsideHelp, owner, task: studySession, unseen)
 ```
 
-### Learning.Assess#3
+### Learning.Assess:missing#4
 
 Authored path: `Learning.Assess`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 27.
@@ -3478,7 +3496,7 @@ Authored path: `Learning.Assess`.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
-when GroundedTutoring.confirmAttempt (dialogueLength, outsideHelp, owner, task: studySession, unseen), asked by Learning.Assess#2
+when GroundedTutoring.confirmAttempt (dialogueLength, outsideHelp, owner, task: studySession, unseen), asked by Learning.Assess:missing#3
 at the flow's settlement frontier
 where
   view "(owner) owns study session (studySession)" with (owner, studySession) has (course)
@@ -3497,7 +3515,7 @@ then
   TutorGenerating.generate (owner, request: prepared)
 ```
 
-### Learning.Assess#4
+### Learning.Assess:missing#5
 
 Authored path: `Learning.Assess`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 27.
@@ -3505,14 +3523,14 @@ Authored path: `Learning.Assess`.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
-when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Assess#3
+when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Assess:missing#4
 where
   earlier, Sessioning.use (session, subject: owner), asked by Learning.Assess
 then
   Sessioning.use (session)
 ```
 
-### Learning.Assess#5
+### Learning.Assess:missing#6
 
 Authored path: `Learning.Assess`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 27.
@@ -3520,17 +3538,17 @@ Authored path: `Learning.Assess`.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
-when Sessioning.use (session, subject: owner), asked by Learning.Assess#4
+when Sessioning.use (session, subject: owner), asked by Learning.Assess:missing#5
 where
-  earlier, GroundedTutoring.confirmAttempt (dialogueLength, outsideHelp, owner, task: studySession, unseen), asked by Learning.Assess#2
+  earlier, GroundedTutoring.confirmAttempt (dialogueLength, outsideHelp, owner, task: studySession, unseen), asked by Learning.Assess:missing#3
   AssessmentReviewing._byTask (author: owner, task: studySession) has (case: assessment)
-  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Assess#3
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Assess:missing#4
   (gateMet, rationale, result) is generationFields (answer)
 then
   AssessmentReviewing.assess (case: assessment, gateMet, rationale, result)
 ```
 
-### Learning.Assess#6
+### Learning.Assess:missing#7
 
 Authored path: `Learning.Assess`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 27.
@@ -3538,11 +3556,124 @@ Authored path: `Learning.Assess`.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
-when AssessmentReviewing.assess (case: assessment, gateMet, rationale, result), asked by Learning.Assess#5
+when AssessmentReviewing.assess (case: assessment, gateMet, rationale, result), asked by Learning.Assess:missing#6
 at the flow's settlement frontier
 where
-  earlier, GroundedTutoring.confirmAttempt (dialogueLength, outsideHelp, owner, task: studySession, unseen), asked by Learning.Assess#2
-  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Assess#3
+  earlier, RequestBoundary.respond (error: "SESSION_UNAVAILABLE", requestId), asked by Learning.Assess:missing#2
+  earlier, GroundedTutoring.confirmAttempt (dialogueLength, outsideHelp, owner, task: studySession, unseen), asked by Learning.Assess:missing#3
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Assess:missing#4
+then
+  RequestBoundary.respond (requestId, studySession, tutor: former "the tutor choice that (request) carried" with (request: prepared))
+```
+
+### Learning.Assess:ready#2
+
+Authored path: `Learning.Assess`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 27.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 107.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Assess
+where
+  earlier, RequestBoundary.request (dialogueLength, outsideHelp, path: "/learning/assess", requestId, reviewed, session, studySession, unseen)
+  view "(owner) can change session (studySession)" with (owner, studySession)
+then
+  Sessioning.use (session)
+```
+
+### Learning.Assess:ready#3
+
+Authored path: `Learning.Assess`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 27.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 107.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Assess:ready#2
+where
+  earlier, RequestBoundary.request (dialogueLength, outsideHelp, path: "/learning/assess", requestId, reviewed, session, studySession, unseen)
+  view "(owner) can change session (studySession)" with (owner, studySession) has (definition, skill)
+  approved is reviewApproved (outsideHelp, reviewed, unseen)
+  approved is among [true]
+  MasteryEstimating._track (definition, learner: owner, subject: skill)
+then
+  GroundedTutoring.confirmAttempt (dialogueLength, outsideHelp, owner, task: studySession, unseen)
+```
+
+### Learning.Assess:ready#4
+
+Authored path: `Learning.Assess`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 27.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 107.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when GroundedTutoring.confirmAttempt (dialogueLength, outsideHelp, owner, task: studySession, unseen), asked by Learning.Assess:ready#3
+at the flow's settlement frontier
+where
+  view "(owner) owns study session (studySession)" with (owner, studySession) has (course)
+  AssessmentReviewing._byTask (author: owner, task: studySession) has (case: assessment)
+  no AssessmentReviewing._effectiveJudgment (case: assessment)
+  AssessmentReviewing._caseData (case: assessment) has (data)
+  GroundedTutoring._sessionData (session: studySession) has (data: sessionData)
+  Library._sourceSet (owner, scope: course) has (sources)
+  materials is sessionMaterials (data: sessionData)
+  (selected, valid: true) is selectSources (materials, sources)
+  draft is gradeRequest (data, selected)
+  view "the tutor choice that applies to (owner)" with (owner) has (choice, status)
+  status is among ["SAVED", "DEFAULT"]
+  prepared is withChoice (choice, request: draft)
+then
+  TutorGenerating.generate (owner, request: prepared)
+```
+
+### Learning.Assess:ready#5
+
+Authored path: `Learning.Assess`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 27.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 107.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Assess:ready#4
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Learning.Assess
+then
+  Sessioning.use (session)
+```
+
+### Learning.Assess:ready#6
+
+Authored path: `Learning.Assess`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 27.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 107.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Assess:ready#5
+where
+  earlier, GroundedTutoring.confirmAttempt (dialogueLength, outsideHelp, owner, task: studySession, unseen), asked by Learning.Assess:ready#3
+  AssessmentReviewing._byTask (author: owner, task: studySession) has (case: assessment)
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Assess:ready#4
+  (gateMet, rationale, result) is generationFields (answer)
+then
+  AssessmentReviewing.assess (case: assessment, gateMet, rationale, result)
+```
+
+### Learning.Assess:ready#7
+
+Authored path: `Learning.Assess`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 27.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 107.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when AssessmentReviewing.assess (case: assessment, gateMet, rationale, result), asked by Learning.Assess:ready#6
+at the flow's settlement frontier
+where
+  earlier, GroundedTutoring.confirmAttempt (dialogueLength, outsideHelp, owner, task: studySession, unseen), asked by Learning.Assess:ready#3
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Assess:ready#4
   earlier, RequestBoundary.request (dialogueLength, outsideHelp, path: "/learning/assess", requestId, reviewed, session, studySession, unseen)
 then
   RequestBoundary.respond (requestId, studySession, tutor: former "the tutor choice that (request) carried" with (request: prepared))
@@ -3682,7 +3813,7 @@ when AssessmentReviewing.revise (author: owner, basedOn, case, gateMet, origin: 
 at the flow's settlement frontier
 where
   AssessmentReviewing._effectiveJudgment (case) has (judgment)
-  no view "(owner) owns practice or imported assessment (assessment)" with (assessment: case, owner) has (imported: true)
+  view "(owner) owns practice or imported assessment (assessment)" with (assessment: case, owner) has (imported: false)
   earlier, RequestBoundary.request (basedOn, case, gateMet, path: "/learning/correct", reason, requestId, result, session)
 then
   RequestBoundary.respond (judgment, requestId)
@@ -3739,7 +3870,62 @@ where
   earlier, Sessioning.use (session, subject: owner), asked by Learning.Correct
   earlier, RequestBoundary.request (basedOn, case, gateMet, path: "/learning/correct", reason, requestId, result, session)
   AssessmentReviewing._effectiveJudgment (case) has (judgment)
-  no view "(owner) owns practice or imported assessment (assessment)" with (assessment: case, owner) has (imported: true)
+  view "(owner) owns practice or imported assessment (assessment)" with (assessment: case, owner) has (imported: false)
+then
+  RequestBoundary.respond (judgment, requestId)
+```
+
+### Learning.Correct:missing#2
+
+Authored path: `Learning.Correct`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 29.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 109.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Correct
+where
+  earlier, RequestBoundary.request (basedOn, case, gateMet, path: "/learning/correct", reason, requestId, result, session)
+  no view "(owner) owns practice or imported assessment (assessment)" with (assessment: case, owner)
+then
+  RequestBoundary.respond (error: "REVISION_CASE_UNAVAILABLE", requestId)
+```
+
+### Learning.Correct:missing:importedRevised#3
+
+Authored path: `Learning.Correct`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 29.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 109.
+
+```reaction
+when RequestBoundary.respond (error: "REVISION_CASE_UNAVAILABLE", requestId), asked by Learning.Correct:missing#2
+at the flow's settlement frontier
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Learning.Correct
+  earlier, RequestBoundary.request (basedOn, case, gateMet, path: "/learning/correct", reason, requestId, result, session)
+  AssessmentReviewing._effectiveJudgment (case) has (judgment)
+  view "(owner) owns practice or imported assessment (assessment)" with (assessment: case, owner) has (imported: true)
+  gateMet is among [false]
+then
+  RequestBoundary.respond (judgment, requestId)
+```
+
+### Learning.Correct:missing:practiceRevised#3
+
+Authored path: `Learning.Correct`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 29.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 109.
+
+```reaction
+when RequestBoundary.respond (error: "REVISION_CASE_UNAVAILABLE", requestId), asked by Learning.Correct:missing#2
+at the flow's settlement frontier
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Learning.Correct
+  earlier, RequestBoundary.request (basedOn, case, gateMet, path: "/learning/correct", reason, requestId, result, session)
+  AssessmentReviewing._effectiveJudgment (case) has (judgment)
+  view "(owner) owns practice or imported assessment (assessment)" with (assessment: case, owner) has (imported: false)
 then
   RequestBoundary.respond (judgment, requestId)
 ```
@@ -3755,7 +3941,7 @@ Authored path: `Learning.Correct`.
 when Sessioning.use (session, subject: owner), asked by Learning.Correct
 where
   earlier, RequestBoundary.request (basedOn, case, gateMet, path: "/learning/correct", reason, requestId, result, session)
-  no view "(owner) owns practice or imported assessment (assessment)" with (assessment: case, owner) has (imported: true)
+  view "(owner) owns practice or imported assessment (assessment)" with (assessment: case, owner) has (imported: false)
 then
   AssessmentReviewing.revise (author: owner, basedOn, case, gateMet, origin: "MANUAL", rationale: reason, result)
 ```
@@ -3791,7 +3977,7 @@ when AssessmentReviewing.revise (author: owner, basedOn, case, gateMet, origin: 
 at the flow's settlement frontier
 where
   AssessmentReviewing._effectiveJudgment (case) has (judgment)
-  no view "(owner) owns practice or imported assessment (assessment)" with (assessment: case, owner) has (imported: true)
+  view "(owner) owns practice or imported assessment (assessment)" with (assessment: case, owner) has (imported: false)
   earlier, RequestBoundary.request (basedOn, case, gateMet, path: "/learning/correct", reason, requestId, result, session)
 then
   RequestBoundary.respond (judgment, requestId)
@@ -3810,7 +3996,114 @@ then
   Sessioning.use (session)
 ```
 
-### Learning.Hint#2
+### Learning.Hint:missing#2
+
+Authored path: `Learning.Hint`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 11.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 105.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Hint
+where
+  earlier, RequestBoundary.request (path: "/learning/hint", requestId, session, studySession)
+  no view "(owner) can change session (studySession)" with (owner, studySession)
+then
+  RequestBoundary.respond (error: "SESSION_UNAVAILABLE", requestId)
+```
+
+### Learning.Hint:missing#3
+
+Authored path: `Learning.Hint`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 11.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 105.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when RequestBoundary.respond (error: "SESSION_UNAVAILABLE", requestId), asked by Learning.Hint:missing#2
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Learning.Hint
+  view "the tutor choice that applies to (owner)" with (owner) has (choice, status)
+  status is among ["SAVED", "DEFAULT"]
+  earlier, RequestBoundary.request (path: "/learning/hint", requestId, session, studySession)
+  view "(owner) can change session (studySession)" with (owner, studySession) has (course)
+  GroundedTutoring._sessionData (session: studySession) has (data)
+  Library._sourceSet (owner, scope: course) has (sources)
+  materials is sessionMaterials (data)
+  (selected, valid: true) is selectSources (materials, sources)
+  draft is sessionRequest (data, kind: "HINT", selected)
+  prepared is withChoice (choice, request: draft)
+then
+  TutorGenerating.generate (owner, request: prepared)
+```
+
+### Learning.Hint:missing#4
+
+Authored path: `Learning.Hint`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 11.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 105.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Hint:missing#3
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Learning.Hint
+then
+  Sessioning.use (session)
+```
+
+### Learning.Hint:missing:closed#5
+
+Authored path: `Learning.Hint`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 11.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 105.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Hint:missing#4
+where
+  earlier, RequestBoundary.respond (error: "SESSION_UNAVAILABLE", requestId), asked by Learning.Hint:missing#2
+  earlier, RequestBoundary.request (path: "/learning/hint", requestId, session, studySession)
+  no view "(owner) can change session (studySession)" with (owner, studySession)
+then
+  RequestBoundary.respond (error: "SESSION_CHANGED", requestId)
+```
+
+### Learning.Hint:missing:open#5
+
+Authored path: `Learning.Hint`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 11.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 105.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Hint:missing#4
+where
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Hint:missing#3
+  (text) is generationFields (answer)
+  earlier, RequestBoundary.request (path: "/learning/hint", requestId, session, studySession)
+  view "(owner) can change session (studySession)" with (owner, studySession)
+then
+  GroundedTutoring.giveHint (channel: "TEXT", owner, task: studySession, text)
+```
+
+### Learning.Hint:missing:open#6
+
+Authored path: `Learning.Hint`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 11.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 105.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when GroundedTutoring.giveHint (channel: "TEXT", owner, task: studySession, text), asked by Learning.Hint:missing:open#5
+where
+  earlier, RequestBoundary.respond (error: "SESSION_UNAVAILABLE", requestId), asked by Learning.Hint:missing#2
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Hint:missing#3
+then
+  RequestBoundary.respond (requestId, tutor: former "the tutor choice that (request) carried" with (request: prepared))
+```
+
+### Learning.Hint:ready#2
 
 Authored path: `Learning.Hint`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
@@ -3826,7 +4119,7 @@ then
   GroundedTutoring.requestHint (owner, task: studySession)
 ```
 
-### Learning.Hint#3
+### Learning.Hint:ready#3
 
 Authored path: `Learning.Hint`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
@@ -3834,7 +4127,7 @@ Authored path: `Learning.Hint`.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
-when GroundedTutoring.requestHint (owner, task: studySession), asked by Learning.Hint#2
+when GroundedTutoring.requestHint (owner, task: studySession), asked by Learning.Hint:ready#2
 where
   view "(owner) can change session (studySession)" with (owner, studySession) has (course)
   GroundedTutoring._sessionData (session: studySession) has (data)
@@ -3849,7 +4142,7 @@ then
   TutorGenerating.generate (owner, request: prepared)
 ```
 
-### Learning.Hint#4
+### Learning.Hint:ready#4
 
 Authored path: `Learning.Hint`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
@@ -3857,14 +4150,14 @@ Authored path: `Learning.Hint`.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
-when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Hint#3
+when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Hint:ready#3
 where
   earlier, Sessioning.use (session, subject: owner), asked by Learning.Hint
 then
   Sessioning.use (session)
 ```
 
-### Learning.Hint:closed#5
+### Learning.Hint:ready:closed#5
 
 Authored path: `Learning.Hint`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
@@ -3872,16 +4165,16 @@ Authored path: `Learning.Hint`.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
-when Sessioning.use (session, subject: owner), asked by Learning.Hint#4
+when Sessioning.use (session, subject: owner), asked by Learning.Hint:ready#4
 where
-  earlier, GroundedTutoring.requestHint (owner, task: studySession), asked by Learning.Hint#2
+  earlier, GroundedTutoring.requestHint (owner, task: studySession), asked by Learning.Hint:ready#2
   no view "(owner) can change session (studySession)" with (owner, studySession)
   earlier, RequestBoundary.request (path: "/learning/hint", requestId, session, studySession)
 then
   RequestBoundary.respond (error: "SESSION_CHANGED", requestId)
 ```
 
-### Learning.Hint:open#5
+### Learning.Hint:ready:open#5
 
 Authored path: `Learning.Hint`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
@@ -3889,17 +4182,17 @@ Authored path: `Learning.Hint`.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
-when Sessioning.use (session, subject: owner), asked by Learning.Hint#4
+when Sessioning.use (session, subject: owner), asked by Learning.Hint:ready#4
 where
-  earlier, GroundedTutoring.requestHint (owner, task: studySession), asked by Learning.Hint#2
+  earlier, GroundedTutoring.requestHint (owner, task: studySession), asked by Learning.Hint:ready#2
   view "(owner) can change session (studySession)" with (owner, studySession)
-  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Hint#3
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Hint:ready#3
   (text) is generationFields (answer)
 then
   GroundedTutoring.giveHint (channel: "TEXT", owner, task: studySession, text)
 ```
 
-### Learning.Hint:open#6
+### Learning.Hint:ready:open#6
 
 Authored path: `Learning.Hint`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
@@ -3907,9 +4200,9 @@ Authored path: `Learning.Hint`.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
-when GroundedTutoring.giveHint (channel: "TEXT", owner, task: studySession, text), asked by Learning.Hint:open#5
+when GroundedTutoring.giveHint (channel: "TEXT", owner, task: studySession, text), asked by Learning.Hint:ready:open#5
 where
-  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Hint#3
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Hint:ready#3
   earlier, RequestBoundary.request (path: "/learning/hint", requestId, session, studySession)
 then
   RequestBoundary.respond (requestId, tutor: former "the tutor choice that (request) carried" with (request: prepared))
@@ -3928,7 +4221,7 @@ then
   Sessioning.use (session)
 ```
 
-### Learning.Lesson#2
+### Learning.Lesson:missing#2
 
 Authored path: `Learning.Lesson`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 7.
@@ -3937,6 +4230,131 @@ Authored path: `Learning.Lesson`.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Lesson
+where
+  earlier, RequestBoundary.request (path: "/learning/lesson", request, requestId, session, skill)
+  no view "(owner) can study confirmed (skill)" with (owner, skill)
+then
+  RequestBoundary.respond (error: "SKILL_UNAVAILABLE", requestId)
+```
+
+### Learning.Lesson:missing#3
+
+Authored path: `Learning.Lesson`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 7.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 100.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when RequestBoundary.respond (error: "SKILL_UNAVAILABLE", requestId), asked by Learning.Lesson:missing#2
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Learning.Lesson
+  view "the tutor choice that applies to (owner)" with (owner) has (choice, status)
+  status is among ["SAVED", "DEFAULT"]
+  earlier, RequestBoundary.request (path: "/learning/lesson", request, requestId, session, skill)
+  view "(owner) can study confirmed (skill)" with (owner, skill)
+  view "the current context of (skill) for (owner)" with (owner, skill) has (context, sources)
+  materials is selectSkillMaterials (context)
+  (selected, valid: true) is selectSources (materials, sources)
+  draft is lessonRequest (context, request, selected)
+  prepared is withChoice (choice, request: draft)
+then
+  TutorGenerating.generate (owner, request: prepared)
+```
+
+### Learning.Lesson:missing#4
+
+Authored path: `Learning.Lesson`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 7.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 100.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Lesson:missing#3
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Learning.Lesson
+then
+  Sessioning.use (session)
+```
+
+### Learning.Lesson:missing:changed#5
+
+Authored path: `Learning.Lesson`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 7.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 100.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Lesson:missing#4
+where
+  earlier, RequestBoundary.respond (error: "SKILL_UNAVAILABLE", requestId), asked by Learning.Lesson:missing#2
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Lesson:missing#3
+  (definition) is generationDefinition (request: prepared)
+  earlier, RequestBoundary.request (path: "/learning/lesson", request, requestId, session, skill)
+  no view "(owner) can study confirmed (skill)" with (owner, skill) has (definition)
+then
+  RequestBoundary.respond (error: "SKILL_CHANGED", requestId)
+```
+
+### Learning.Lesson:missing:current#5
+
+Authored path: `Learning.Lesson`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 7.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 100.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Lesson:missing#4
+where
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Lesson:missing#3
+  (definition) is generationDefinition (request: prepared)
+  (citations, materials, text: explanation) is generationFields (answer)
+  earlier, RequestBoundary.request (path: "/learning/lesson", request, requestId, session, skill)
+  view "(owner) can study confirmed (skill)" with (owner, skill) has (definition)
+then
+  GroundedTutoring.explain (citations, definition, explanation, materials, owner, request, topic: skill)
+```
+
+### Learning.Lesson:missing:current#6
+
+Authored path: `Learning.Lesson`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 7.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 100.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when GroundedTutoring.explain (citations, definition, explanation, materials, owner, request, topic: skill, lesson), asked by Learning.Lesson:missing:current#5
+where
+  earlier, RequestBoundary.respond (error: "SKILL_UNAVAILABLE", requestId), asked by Learning.Lesson:missing#2
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Lesson:missing#3
+then
+  RequestBoundary.respond (lesson, requestId, tutor: former "the tutor choice that (request) carried" with (request: prepared))
+```
+
+### Learning.Lesson:ready#2
+
+Authored path: `Learning.Lesson`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 7.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 100.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Lesson
+where
+  earlier, RequestBoundary.request (path: "/learning/lesson", request, requestId, session, skill)
+  view "(owner) can study confirmed (skill)" with (owner, skill)
+then
+  Sessioning.use (session)
+```
+
+### Learning.Lesson:ready#3
+
+Authored path: `Learning.Lesson`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 7.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 100.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Lesson:ready#2
 where
   view "the tutor choice that applies to (owner)" with (owner) has (choice, status)
   status is among ["SAVED", "DEFAULT"]
@@ -3951,7 +4369,7 @@ then
   TutorGenerating.generate (owner, request: prepared)
 ```
 
-### Learning.Lesson#3
+### Learning.Lesson:ready#4
 
 Authored path: `Learning.Lesson`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 7.
@@ -3959,14 +4377,14 @@ Authored path: `Learning.Lesson`.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
-when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Lesson#2
+when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Lesson:ready#3
 where
   earlier, Sessioning.use (session, subject: owner), asked by Learning.Lesson
 then
   Sessioning.use (session)
 ```
 
-### Learning.Lesson:changed#4
+### Learning.Lesson:ready:changed#5
 
 Authored path: `Learning.Lesson`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 7.
@@ -3974,9 +4392,9 @@ Authored path: `Learning.Lesson`.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
-when Sessioning.use (session, subject: owner), asked by Learning.Lesson#3
+when Sessioning.use (session, subject: owner), asked by Learning.Lesson:ready#4
 where
-  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Lesson#2
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Lesson:ready#3
   (definition) is generationDefinition (request: prepared)
   earlier, RequestBoundary.request (path: "/learning/lesson", request, requestId, session, skill)
   no view "(owner) can study confirmed (skill)" with (owner, skill) has (definition)
@@ -3984,7 +4402,7 @@ then
   RequestBoundary.respond (error: "SKILL_CHANGED", requestId)
 ```
 
-### Learning.Lesson:current#4
+### Learning.Lesson:ready:current#5
 
 Authored path: `Learning.Lesson`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 7.
@@ -3992,9 +4410,9 @@ Authored path: `Learning.Lesson`.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
-when Sessioning.use (session, subject: owner), asked by Learning.Lesson#3
+when Sessioning.use (session, subject: owner), asked by Learning.Lesson:ready#4
 where
-  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Lesson#2
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Lesson:ready#3
   (definition) is generationDefinition (request: prepared)
   (citations, materials, text: explanation) is generationFields (answer)
   earlier, RequestBoundary.request (path: "/learning/lesson", request, requestId, session, skill)
@@ -4003,7 +4421,7 @@ then
   GroundedTutoring.explain (citations, definition, explanation, materials, owner, request, topic: skill)
 ```
 
-### Learning.Lesson:current#5
+### Learning.Lesson:ready:current#6
 
 Authored path: `Learning.Lesson`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 7.
@@ -4011,9 +4429,9 @@ Authored path: `Learning.Lesson`.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
-when GroundedTutoring.explain (citations, definition, explanation, materials, owner, request, topic: skill, lesson), asked by Learning.Lesson:current#4
+when GroundedTutoring.explain (citations, definition, explanation, materials, owner, request, topic: skill, lesson), asked by Learning.Lesson:ready:current#5
 where
-  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Lesson#2
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Lesson:ready#3
   earlier, RequestBoundary.request (path: "/learning/lesson", request, requestId, session, skill)
 then
   RequestBoundary.respond (lesson, requestId, tutor: former "the tutor choice that (request) carried" with (request: prepared))
@@ -4074,7 +4492,114 @@ then
   Sessioning.use (session)
 ```
 
-### Learning.Question#2
+### Learning.Question:missing#2
+
+Authored path: `Learning.Question`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 11.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 103.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Question
+where
+  earlier, RequestBoundary.request (attachments, channel, dialogueLength, path: "/learning/question", requestId, session, studySession, text)
+  no view "(owner) can change session (studySession)" with (owner, studySession)
+then
+  RequestBoundary.respond (error: "SESSION_UNAVAILABLE", requestId)
+```
+
+### Learning.Question:missing#3
+
+Authored path: `Learning.Question`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 11.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 103.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when RequestBoundary.respond (error: "SESSION_UNAVAILABLE", requestId), asked by Learning.Question:missing#2
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Learning.Question
+  view "the tutor choice that applies to (owner)" with (owner) has (choice, status)
+  status is among ["SAVED", "DEFAULT"]
+  earlier, RequestBoundary.request (attachments, channel, dialogueLength, path: "/learning/question", requestId, session, studySession, text)
+  view "(owner) can change session (studySession)" with (owner, studySession) has (course)
+  GroundedTutoring._sessionData (session: studySession) has (data)
+  Library._sourceSet (owner, scope: course) has (sources)
+  materials is sessionMaterials (data)
+  (selected, valid: true) is selectSources (materials, sources)
+  draft is sessionRequest (data, kind: "REPLY", selected)
+  prepared is withChoice (choice, request: draft)
+then
+  TutorGenerating.generate (owner, request: prepared)
+```
+
+### Learning.Question:missing#4
+
+Authored path: `Learning.Question`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 11.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 103.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Question:missing#3
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Learning.Question
+then
+  Sessioning.use (session)
+```
+
+### Learning.Question:missing:closed#5
+
+Authored path: `Learning.Question`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 11.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 103.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Question:missing#4
+where
+  earlier, RequestBoundary.respond (error: "SESSION_UNAVAILABLE", requestId), asked by Learning.Question:missing#2
+  earlier, RequestBoundary.request (attachments, channel, dialogueLength, path: "/learning/question", requestId, session, studySession, text)
+  no view "(owner) can change session (studySession)" with (owner, studySession)
+then
+  RequestBoundary.respond (error: "SESSION_CHANGED", requestId)
+```
+
+### Learning.Question:missing:open#5
+
+Authored path: `Learning.Question`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 11.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 103.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Question:missing#4
+where
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Question:missing#3
+  (citations, text: reply) is generationFields (answer)
+  earlier, RequestBoundary.request (attachments, channel, dialogueLength, path: "/learning/question", requestId, session, studySession, text)
+  view "(owner) can change session (studySession)" with (owner, studySession)
+then
+  GroundedTutoring.answerLesson (channel: "TEXT", citations, lesson: studySession, owner, text: reply)
+```
+
+### Learning.Question:missing:open#6
+
+Authored path: `Learning.Question`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 11.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 103.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when GroundedTutoring.answerLesson (channel: "TEXT", citations, lesson: studySession, owner, text: reply), asked by Learning.Question:missing:open#5
+where
+  earlier, RequestBoundary.respond (error: "SESSION_UNAVAILABLE", requestId), asked by Learning.Question:missing#2
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Question:missing#3
+then
+  RequestBoundary.respond (requestId, tutor: former "the tutor choice that (request) carried" with (request: prepared))
+```
+
+### Learning.Question:ready#2
 
 Authored path: `Learning.Question`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
@@ -4096,7 +4621,7 @@ then
   GroundedTutoring.respond (channel, media, owner, session: studySession, text)
 ```
 
-### Learning.Question#3
+### Learning.Question:ready#3
 
 Authored path: `Learning.Question`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
@@ -4104,7 +4629,7 @@ Authored path: `Learning.Question`.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
-when GroundedTutoring.respond (channel, media, owner, session: studySession, text), asked by Learning.Question#2
+when GroundedTutoring.respond (channel, media, owner, session: studySession, text), asked by Learning.Question:ready#2
 where
   view "(owner) can change session (studySession)" with (owner, studySession) has (course)
   GroundedTutoring._sessionData (session: studySession) has (data)
@@ -4119,7 +4644,7 @@ then
   TutorGenerating.generate (owner, request: prepared)
 ```
 
-### Learning.Question#4
+### Learning.Question:ready#4
 
 Authored path: `Learning.Question`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
@@ -4127,14 +4652,14 @@ Authored path: `Learning.Question`.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
-when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Question#3
+when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Question:ready#3
 where
   earlier, Sessioning.use (session, subject: owner), asked by Learning.Question
 then
   Sessioning.use (session)
 ```
 
-### Learning.Question:closed#5
+### Learning.Question:ready:closed#5
 
 Authored path: `Learning.Question`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
@@ -4142,16 +4667,16 @@ Authored path: `Learning.Question`.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
-when Sessioning.use (session, subject: owner), asked by Learning.Question#4
+when Sessioning.use (session, subject: owner), asked by Learning.Question:ready#4
 where
-  earlier, GroundedTutoring.respond (channel, media, owner, session: studySession, text), asked by Learning.Question#2
+  earlier, GroundedTutoring.respond (channel, media, owner, session: studySession, text), asked by Learning.Question:ready#2
   no view "(owner) can change session (studySession)" with (owner, studySession)
   earlier, RequestBoundary.request (attachments, channel, dialogueLength, path: "/learning/question", requestId, session, studySession, text)
 then
   RequestBoundary.respond (error: "SESSION_CHANGED", requestId)
 ```
 
-### Learning.Question:open#5
+### Learning.Question:ready:open#5
 
 Authored path: `Learning.Question`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
@@ -4159,17 +4684,17 @@ Authored path: `Learning.Question`.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
-when Sessioning.use (session, subject: owner), asked by Learning.Question#4
+when Sessioning.use (session, subject: owner), asked by Learning.Question:ready#4
 where
-  earlier, GroundedTutoring.respond (channel, media, owner, session: studySession, text), asked by Learning.Question#2
+  earlier, GroundedTutoring.respond (channel, media, owner, session: studySession, text), asked by Learning.Question:ready#2
   view "(owner) can change session (studySession)" with (owner, studySession)
-  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Question#3
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Question:ready#3
   (citations, text: reply) is generationFields (answer)
 then
   GroundedTutoring.answerLesson (channel: "TEXT", citations, lesson: studySession, owner, text: reply)
 ```
 
-### Learning.Question:open#6
+### Learning.Question:ready:open#6
 
 Authored path: `Learning.Question`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
@@ -4177,9 +4702,9 @@ Authored path: `Learning.Question`.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
-when GroundedTutoring.answerLesson (channel: "TEXT", citations, lesson: studySession, owner, text: reply), asked by Learning.Question:open#5
+when GroundedTutoring.answerLesson (channel: "TEXT", citations, lesson: studySession, owner, text: reply), asked by Learning.Question:ready:open#5
 where
-  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Question#3
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Question:ready#3
   earlier, RequestBoundary.request (attachments, channel, dialogueLength, path: "/learning/question", requestId, session, studySession, text)
 then
   RequestBoundary.respond (requestId, tutor: former "the tutor choice that (request) carried" with (request: prepared))
@@ -4343,6 +4868,102 @@ then
   RequestBoundary.respond (judgment, requestId, tutor: former "the tutor choice that (request) carried" with (request: prepared))
 ```
 
+### Learning.Regrade:missing#2
+
+Authored path: `Learning.Regrade`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 84.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 110.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Regrade
+where
+  earlier, RequestBoundary.request (basedOn, case, path: "/learning/regrade", reason, requestId, session)
+  no view "(owner) owns practice or imported assessment (assessment)" with (assessment: case, owner)
+then
+  RequestBoundary.respond (error: "REVISION_CASE_UNAVAILABLE", requestId)
+```
+
+### Learning.Regrade:missing#3
+
+Authored path: `Learning.Regrade`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 84.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 110.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when RequestBoundary.respond (error: "REVISION_CASE_UNAVAILABLE", requestId), asked by Learning.Regrade:missing#2
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Learning.Regrade
+  view "the tutor choice that applies to (owner)" with (owner) has (choice, status)
+  status is among ["SAVED", "DEFAULT"]
+  earlier, RequestBoundary.request (basedOn, case, path: "/learning/regrade", reason, requestId, session)
+  view "(owner) owns assessment (assessment)" with (assessment: case, owner) has (course, task)
+  AssessmentReviewing._caseData (case) has (data)
+  GroundedTutoring._sessionData (session: task) has (data: sessionData)
+  Library._sourceSet (owner, scope: course) has (sources)
+  materials is sessionMaterials (data: sessionData)
+  (selected, valid: true) is selectSources (materials, sources)
+  draft is gradeRequest (data, selected)
+  prepared is withChoice (choice, request: draft)
+then
+  TutorGenerating.generate (owner, request: prepared)
+```
+
+### Learning.Regrade:missing#4
+
+Authored path: `Learning.Regrade`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 84.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 110.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Regrade:missing#3
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Learning.Regrade
+then
+  Sessioning.use (session)
+```
+
+### Learning.Regrade:missing#5
+
+Authored path: `Learning.Regrade`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 84.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 110.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Regrade:missing#4
+where
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Regrade:missing#3
+  (gateMet, rationale, result) is generationFields (answer)
+  earlier, RequestBoundary.request (basedOn, case, path: "/learning/regrade", reason, requestId, session)
+then
+  AssessmentReviewing.revise (author: owner, basedOn, case, gateMet, origin: "AI", rationale, result)
+```
+
+### Learning.Regrade:missing#6
+
+Authored path: `Learning.Regrade`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 84.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 110.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when AssessmentReviewing.revise (author: owner, basedOn, case, gateMet, origin: "AI", rationale, result, judgment), asked by Learning.Regrade:missing#5
+at the flow's settlement frontier
+where
+  earlier, RequestBoundary.respond (error: "REVISION_CASE_UNAVAILABLE", requestId), asked by Learning.Regrade:missing#2
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Regrade:missing#3
+then
+  RequestBoundary.respond (judgment, requestId, tutor: former "the tutor choice that (request) carried" with (request: prepared))
+```
+
 ### Learning.Regrade:practice#2
 
 Authored path: `Learning.Regrade`.
@@ -4471,7 +5092,7 @@ then
   Sessioning.use (session)
 ```
 
-### Learning.Reply#2
+### Learning.Reply:missing#2
 
 Authored path: `Learning.Reply`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
@@ -4481,6 +5102,137 @@ Authored path: `Learning.Reply`.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Reply
+where
+  earlier, RequestBoundary.request (path: "/learning/reply", requestId, session, studySession)
+  no view "(owner) can change session (studySession)" with (owner, studySession)
+then
+  RequestBoundary.respond (error: "SESSION_UNAVAILABLE", requestId)
+```
+
+### Learning.Reply:missing#3
+
+Authored path: `Learning.Reply`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 11.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 104.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 135.
+
+```reaction
+when RequestBoundary.respond (error: "SESSION_UNAVAILABLE", requestId), asked by Learning.Reply:missing#2
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Learning.Reply
+  view "the tutor choice that applies to (owner)" with (owner) has (choice, status)
+  status is among ["SAVED", "DEFAULT"]
+  earlier, RequestBoundary.request (path: "/learning/reply", requestId, session, studySession)
+  view "(owner) can change session (studySession)" with (owner, studySession) has (course)
+  GroundedTutoring._sessionData (session: studySession) has (data)
+  hasLessonQuestion (data)
+  Library._sourceSet (owner, scope: course) has (sources)
+  materials is sessionMaterials (data)
+  (selected, valid: true) is selectSources (materials, sources)
+  draft is sessionRequest (data, kind: "REPLY", selected)
+  prepared is withChoice (choice, request: draft)
+then
+  TutorGenerating.generate (owner, request: prepared)
+```
+
+### Learning.Reply:missing#4
+
+Authored path: `Learning.Reply`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 11.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 104.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 135.
+
+```reaction
+when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Reply:missing#3
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Learning.Reply
+then
+  Sessioning.use (session)
+```
+
+### Learning.Reply:missing:closed#5
+
+Authored path: `Learning.Reply`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 11.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 104.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 135.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Reply:missing#4
+where
+  earlier, RequestBoundary.respond (error: "SESSION_UNAVAILABLE", requestId), asked by Learning.Reply:missing#2
+  earlier, RequestBoundary.request (path: "/learning/reply", requestId, session, studySession)
+  no view "(owner) can change session (studySession)" with (owner, studySession)
+then
+  RequestBoundary.respond (error: "SESSION_CHANGED", requestId)
+```
+
+### Learning.Reply:missing:open#5
+
+Authored path: `Learning.Reply`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 11.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 104.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 135.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Reply:missing#4
+where
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Reply:missing#3
+  (citations, text) is generationFields (answer)
+  earlier, RequestBoundary.request (path: "/learning/reply", requestId, session, studySession)
+  view "(owner) can change session (studySession)" with (owner, studySession)
+then
+  GroundedTutoring.answerLesson (channel: "TEXT", citations, lesson: studySession, owner, text)
+```
+
+### Learning.Reply:missing:open#6
+
+Authored path: `Learning.Reply`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 11.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 104.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 135.
+
+```reaction
+when GroundedTutoring.answerLesson (channel: "TEXT", citations, lesson: studySession, owner, text), asked by Learning.Reply:missing:open#5
+where
+  earlier, RequestBoundary.respond (error: "SESSION_UNAVAILABLE", requestId), asked by Learning.Reply:missing#2
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Reply:missing#3
+then
+  RequestBoundary.respond (requestId, tutor: former "the tutor choice that (request) carried" with (request: prepared))
+```
+
+### Learning.Reply:ready#2
+
+Authored path: `Learning.Reply`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 11.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 104.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 135.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Reply
+where
+  earlier, RequestBoundary.request (path: "/learning/reply", requestId, session, studySession)
+  view "(owner) can change session (studySession)" with (owner, studySession)
+then
+  Sessioning.use (session)
+```
+
+### Learning.Reply:ready#3
+
+Authored path: `Learning.Reply`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 11.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 104.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 135.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Reply:ready#2
 where
   view "the tutor choice that applies to (owner)" with (owner) has (choice, status)
   status is among ["SAVED", "DEFAULT"]
@@ -4497,7 +5249,7 @@ then
   TutorGenerating.generate (owner, request: prepared)
 ```
 
-### Learning.Reply#3
+### Learning.Reply:ready#4
 
 Authored path: `Learning.Reply`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
@@ -4506,14 +5258,14 @@ Authored path: `Learning.Reply`.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 135.
 
 ```reaction
-when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Reply#2
+when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Reply:ready#3
 where
   earlier, Sessioning.use (session, subject: owner), asked by Learning.Reply
 then
   Sessioning.use (session)
 ```
 
-### Learning.Reply:closed#4
+### Learning.Reply:ready:closed#5
 
 Authored path: `Learning.Reply`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
@@ -4522,7 +5274,7 @@ Authored path: `Learning.Reply`.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 135.
 
 ```reaction
-when Sessioning.use (session, subject: owner), asked by Learning.Reply#3
+when Sessioning.use (session, subject: owner), asked by Learning.Reply:ready#4
 where
   earlier, RequestBoundary.request (path: "/learning/reply", requestId, session, studySession)
   no view "(owner) can change session (studySession)" with (owner, studySession)
@@ -4530,7 +5282,7 @@ then
   RequestBoundary.respond (error: "SESSION_CHANGED", requestId)
 ```
 
-### Learning.Reply:open#4
+### Learning.Reply:ready:open#5
 
 Authored path: `Learning.Reply`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
@@ -4539,9 +5291,9 @@ Authored path: `Learning.Reply`.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 135.
 
 ```reaction
-when Sessioning.use (session, subject: owner), asked by Learning.Reply#3
+when Sessioning.use (session, subject: owner), asked by Learning.Reply:ready#4
 where
-  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Reply#2
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Reply:ready#3
   (citations, text) is generationFields (answer)
   earlier, RequestBoundary.request (path: "/learning/reply", requestId, session, studySession)
   view "(owner) can change session (studySession)" with (owner, studySession)
@@ -4549,7 +5301,7 @@ then
   GroundedTutoring.answerLesson (channel: "TEXT", citations, lesson: studySession, owner, text)
 ```
 
-### Learning.Reply:open#5
+### Learning.Reply:ready:open#6
 
 Authored path: `Learning.Reply`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
@@ -4558,9 +5310,9 @@ Authored path: `Learning.Reply`.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 135.
 
 ```reaction
-when GroundedTutoring.answerLesson (channel: "TEXT", citations, lesson: studySession, owner, text), asked by Learning.Reply:open#4
+when GroundedTutoring.answerLesson (channel: "TEXT", citations, lesson: studySession, owner, text), asked by Learning.Reply:ready:open#5
 where
-  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Reply#2
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Reply:ready#3
   earlier, RequestBoundary.request (path: "/learning/reply", requestId, session, studySession)
 then
   RequestBoundary.respond (requestId, tutor: former "the tutor choice that (request) carried" with (request: prepared))
@@ -4578,7 +5330,22 @@ then
   Sessioning.use (session)
 ```
 
-### Learning.Respond#2
+### Learning.Respond:missing#2
+
+Authored path: `Learning.Respond`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 11.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 102.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Respond
+where
+  earlier, RequestBoundary.request (attachments, channel, dialogueLength, path: "/learning/respond", requestId, session, studySession, text)
+  no view "(owner) can change session (studySession)" with (owner, studySession)
+then
+  RequestBoundary.respond (error: "SESSION_UNAVAILABLE", requestId)
+```
+
+### Learning.Respond:ready#2
 
 Authored path: `Learning.Respond`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
@@ -4598,14 +5365,14 @@ then
   GroundedTutoring.respond (channel, media, owner, session: studySession, text)
 ```
 
-### Learning.Respond#3
+### Learning.Respond:ready#3
 
 Authored path: `Learning.Respond`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 102.
 
 ```reaction
-when GroundedTutoring.respond (channel, media, owner, session: studySession, text), asked by Learning.Respond#2
+when GroundedTutoring.respond (channel, media, owner, session: studySession, text), asked by Learning.Respond:ready#2
 where
   earlier, RequestBoundary.request (attachments, channel, dialogueLength, path: "/learning/respond", requestId, session, studySession, text)
 then
@@ -4625,7 +5392,7 @@ then
   Sessioning.use (session)
 ```
 
-### Learning.RetryAssessment#2
+### Learning.RetryAssessment:missing#2
 
 Authored path: `Learning.RetryAssessment`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 27.
@@ -4634,6 +5401,116 @@ Authored path: `Learning.RetryAssessment`.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.RetryAssessment
+where
+  earlier, RequestBoundary.request (path: "/learning/retry", requestId, session, studySession)
+  no view "(owner) owns study session (studySession)" with (owner, studySession)
+then
+  RequestBoundary.respond (error: "SESSION_UNAVAILABLE", requestId)
+```
+
+### Learning.RetryAssessment:missing#3
+
+Authored path: `Learning.RetryAssessment`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 27.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 108.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when RequestBoundary.respond (error: "SESSION_UNAVAILABLE", requestId), asked by Learning.RetryAssessment:missing#2
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Learning.RetryAssessment
+  view "the tutor choice that applies to (owner)" with (owner) has (choice, status)
+  status is among ["SAVED", "DEFAULT"]
+  earlier, RequestBoundary.request (path: "/learning/retry", requestId, session, studySession)
+  view "(owner) owns study session (studySession)" with (owner, studySession) has (course)
+  AssessmentReviewing._byTask (author: owner, task: studySession) has (case: assessment)
+  no AssessmentReviewing._effectiveJudgment (case: assessment)
+  AssessmentReviewing._caseData (case: assessment) has (data)
+  GroundedTutoring._sessionData (session: studySession) has (data: sessionData)
+  Library._sourceSet (owner, scope: course) has (sources)
+  materials is sessionMaterials (data: sessionData)
+  (selected, valid: true) is selectSources (materials, sources)
+  draft is gradeRequest (data, selected)
+  prepared is withChoice (choice, request: draft)
+then
+  TutorGenerating.generate (owner, request: prepared)
+```
+
+### Learning.RetryAssessment:missing#4
+
+Authored path: `Learning.RetryAssessment`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 27.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 108.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.RetryAssessment:missing#3
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Learning.RetryAssessment
+then
+  Sessioning.use (session)
+```
+
+### Learning.RetryAssessment:missing#5
+
+Authored path: `Learning.RetryAssessment`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 27.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 108.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.RetryAssessment:missing#4
+where
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.RetryAssessment:missing#3
+  (gateMet, rationale, result) is generationFields (answer)
+  earlier, RequestBoundary.request (path: "/learning/retry", requestId, session, studySession)
+  AssessmentReviewing._byTask (author: owner, task: studySession) has (case: assessment)
+then
+  AssessmentReviewing.assess (case: assessment, gateMet, rationale, result)
+```
+
+### Learning.RetryAssessment:missing#6
+
+Authored path: `Learning.RetryAssessment`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 27.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 108.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when AssessmentReviewing.assess (case: assessment, gateMet, rationale, result), asked by Learning.RetryAssessment:missing#5
+at the flow's settlement frontier
+where
+  earlier, RequestBoundary.respond (error: "SESSION_UNAVAILABLE", requestId), asked by Learning.RetryAssessment:missing#2
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.RetryAssessment:missing#3
+then
+  RequestBoundary.respond (requestId, tutor: former "the tutor choice that (request) carried" with (request: prepared))
+```
+
+### Learning.RetryAssessment:ready#2
+
+Authored path: `Learning.RetryAssessment`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 27.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 108.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.RetryAssessment
+where
+  earlier, RequestBoundary.request (path: "/learning/retry", requestId, session, studySession)
+  view "(owner) owns study session (studySession)" with (owner, studySession)
+then
+  Sessioning.use (session)
+```
+
+### Learning.RetryAssessment:ready#3
+
+Authored path: `Learning.RetryAssessment`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 27.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 108.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.RetryAssessment:ready#2
 where
   view "the tutor choice that applies to (owner)" with (owner) has (choice, status)
   status is among ["SAVED", "DEFAULT"]
@@ -4652,7 +5529,7 @@ then
   TutorGenerating.generate (owner, request: prepared)
 ```
 
-### Learning.RetryAssessment#3
+### Learning.RetryAssessment:ready#4
 
 Authored path: `Learning.RetryAssessment`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 27.
@@ -4660,14 +5537,14 @@ Authored path: `Learning.RetryAssessment`.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
-when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.RetryAssessment#2
+when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.RetryAssessment:ready#3
 where
   earlier, Sessioning.use (session, subject: owner), asked by Learning.RetryAssessment
 then
   Sessioning.use (session)
 ```
 
-### Learning.RetryAssessment#4
+### Learning.RetryAssessment:ready#5
 
 Authored path: `Learning.RetryAssessment`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 27.
@@ -4675,9 +5552,9 @@ Authored path: `Learning.RetryAssessment`.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
-when Sessioning.use (session, subject: owner), asked by Learning.RetryAssessment#3
+when Sessioning.use (session, subject: owner), asked by Learning.RetryAssessment:ready#4
 where
-  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.RetryAssessment#2
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.RetryAssessment:ready#3
   (gateMet, rationale, result) is generationFields (answer)
   earlier, RequestBoundary.request (path: "/learning/retry", requestId, session, studySession)
   AssessmentReviewing._byTask (author: owner, task: studySession) has (case: assessment)
@@ -4685,7 +5562,7 @@ then
   AssessmentReviewing.assess (case: assessment, gateMet, rationale, result)
 ```
 
-### Learning.RetryAssessment#5
+### Learning.RetryAssessment:ready#6
 
 Authored path: `Learning.RetryAssessment`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 27.
@@ -4693,10 +5570,10 @@ Authored path: `Learning.RetryAssessment`.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
-when AssessmentReviewing.assess (case: assessment, gateMet, rationale, result), asked by Learning.RetryAssessment#4
+when AssessmentReviewing.assess (case: assessment, gateMet, rationale, result), asked by Learning.RetryAssessment:ready#5
 at the flow's settlement frontier
 where
-  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.RetryAssessment#2
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.RetryAssessment:ready#3
   earlier, RequestBoundary.request (path: "/learning/retry", requestId, session, studySession)
 then
   RequestBoundary.respond (requestId, tutor: former "the tutor choice that (request) carried" with (request: prepared))
@@ -4716,6 +5593,94 @@ Authored path: `Learning.Suggest`.
 when RequestBoundary.request (material, path: "/courses/skills/suggest", requestId, session)
 then
   Sessioning.use (session)
+```
+
+### Learning.Suggest:course#2
+
+Authored path: `Learning.Suggest`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 19.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 88.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 112.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+- Covered by [P2 learning journey](../design/stages/materials.md), line 123.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Suggest
+where
+  earlier, RequestBoundary.request (material, path: "/courses/skills/suggest", requestId, session)
+  Library._material (material) has (owner, scope: course)
+  no view "(owner) owns (course) with (title)" with (course, owner)
+then
+  RequestBoundary.respond (error: "COURSE_UNAVAILABLE", requestId)
+```
+
+### Learning.Suggest:course#3
+
+Authored path: `Learning.Suggest`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 19.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 88.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 112.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+- Covered by [P2 learning journey](../design/stages/materials.md), line 123.
+
+```reaction
+when RequestBoundary.respond (error: "COURSE_UNAVAILABLE", requestId), asked by Learning.Suggest:course#2
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Learning.Suggest
+  view "the tutor choice that applies to (owner)" with (owner) has (choice, status)
+  status is among ["SAVED", "DEFAULT"]
+  earlier, RequestBoundary.request (material, path: "/courses/skills/suggest", requestId, session)
+  Library._material (material) has (owner, scope: course, title)
+  view "(owner) owns (course) with (title)" with (course, owner)
+  graded is gradedTitle (title)
+  graded is among [false]
+  Library._sourceSet (owner, scope: course) has (sources)
+  materials is singleMaterial (material)
+  (selected, valid: true) is selectSources (materials, sources)
+  draft is suggestRequest (selected)
+  prepared is withChoice (choice, request: draft)
+then
+  TutorGenerating.generate (owner, request: prepared)
+```
+
+### Learning.Suggest:course#4
+
+Authored path: `Learning.Suggest`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 19.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 88.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 112.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+- Covered by [P2 learning journey](../design/stages/materials.md), line 123.
+
+```reaction
+when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Suggest:course#3
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Learning.Suggest
+then
+  Sessioning.use (session)
+```
+
+### Learning.Suggest:course#5
+
+Authored path: `Learning.Suggest`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 19.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 88.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 112.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+- Covered by [P2 learning journey](../design/stages/materials.md), line 123.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Suggest:course#4
+where
+  earlier, RequestBoundary.respond (error: "COURSE_UNAVAILABLE", requestId), asked by Learning.Suggest:course#2
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Suggest:course#3
+  (suggestions) is generationFields (answer)
+then
+  RequestBoundary.respond (requestId, suggestions, tutor: former "the tutor choice that (request) carried" with (request: prepared))
 ```
 
 ### Learning.Suggest:graded#2
@@ -4803,6 +5768,93 @@ when Sessioning.use (session, subject: owner), asked by Learning.Suggest:graded#
 where
   earlier, RequestBoundary.respond (error: "GRADED_MATERIAL_NOT_SOURCE", requestId), asked by Learning.Suggest:graded#2
   earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Suggest:graded#3
+  (suggestions) is generationFields (answer)
+then
+  RequestBoundary.respond (requestId, suggestions, tutor: former "the tutor choice that (request) carried" with (request: prepared))
+```
+
+### Learning.Suggest:missing#2
+
+Authored path: `Learning.Suggest`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 19.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 88.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 112.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+- Covered by [P2 learning journey](../design/stages/materials.md), line 123.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Suggest
+where
+  earlier, RequestBoundary.request (material, path: "/courses/skills/suggest", requestId, session)
+  no Library._material (material) has (owner)
+then
+  RequestBoundary.respond (error: "MATERIAL_UNAVAILABLE", requestId)
+```
+
+### Learning.Suggest:missing#3
+
+Authored path: `Learning.Suggest`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 19.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 88.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 112.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+- Covered by [P2 learning journey](../design/stages/materials.md), line 123.
+
+```reaction
+when RequestBoundary.respond (error: "MATERIAL_UNAVAILABLE", requestId), asked by Learning.Suggest:missing#2
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Learning.Suggest
+  view "the tutor choice that applies to (owner)" with (owner) has (choice, status)
+  status is among ["SAVED", "DEFAULT"]
+  earlier, RequestBoundary.request (material, path: "/courses/skills/suggest", requestId, session)
+  Library._material (material) has (owner, scope: course, title)
+  view "(owner) owns (course) with (title)" with (course, owner)
+  graded is gradedTitle (title)
+  graded is among [false]
+  Library._sourceSet (owner, scope: course) has (sources)
+  materials is singleMaterial (material)
+  (selected, valid: true) is selectSources (materials, sources)
+  draft is suggestRequest (selected)
+  prepared is withChoice (choice, request: draft)
+then
+  TutorGenerating.generate (owner, request: prepared)
+```
+
+### Learning.Suggest:missing#4
+
+Authored path: `Learning.Suggest`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 19.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 88.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 112.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+- Covered by [P2 learning journey](../design/stages/materials.md), line 123.
+
+```reaction
+when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Suggest:missing#3
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Learning.Suggest
+then
+  Sessioning.use (session)
+```
+
+### Learning.Suggest:missing#5
+
+Authored path: `Learning.Suggest`.
+- Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 19.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 88.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 112.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+- Covered by [P2 learning journey](../design/stages/materials.md), line 123.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Suggest:missing#4
+where
+  earlier, RequestBoundary.respond (error: "MATERIAL_UNAVAILABLE", requestId), asked by Learning.Suggest:missing#2
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Suggest:missing#3
   (suggestions) is generationFields (answer)
 then
   RequestBoundary.respond (requestId, suggestions, tutor: former "the tutor choice that (request) carried" with (request: prepared))
@@ -4910,7 +5962,7 @@ then
   Sessioning.use (session)
 ```
 
-### Learning.Task#2
+### Learning.Task:missing#2
 
 Authored path: `Learning.Task`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 7.
@@ -4919,6 +5971,134 @@ Authored path: `Learning.Task`.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Task
+where
+  earlier, RequestBoundary.request (path: "/learning/task", requestId, session, skill)
+  no view "(owner) can study confirmed (skill)" with (owner, skill)
+then
+  RequestBoundary.respond (error: "SKILL_UNAVAILABLE", requestId)
+```
+
+### Learning.Task:missing#3
+
+Authored path: `Learning.Task`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 7.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 101.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when RequestBoundary.respond (error: "SKILL_UNAVAILABLE", requestId), asked by Learning.Task:missing#2
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Learning.Task
+  view "the tutor choice that applies to (owner)" with (owner) has (choice, status)
+  status is among ["SAVED", "DEFAULT"]
+  earlier, RequestBoundary.request (path: "/learning/task", requestId, session, skill)
+  view "(owner) can study confirmed (skill)" with (owner, skill) has (definition)
+  view "the current context of (skill) for (owner)" with (owner, skill) has (context, skills, sources, tracks)
+  MasteryEstimating._track (definition, learner: owner, subject: skill)
+  prerequisitesReady (skill, skills, tracks)
+  GroundedTutoring._study (owner, topic: skill) has (sessions)
+  materials is selectSkillMaterials (context)
+  (selected, valid: true) is selectSources (materials, sources)
+  draft is taskRequest (context, selected, sessions)
+  prepared is withChoice (choice, request: draft)
+then
+  TutorGenerating.generate (owner, request: prepared)
+```
+
+### Learning.Task:missing#4
+
+Authored path: `Learning.Task`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 7.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 101.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Task:missing#3
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Learning.Task
+then
+  Sessioning.use (session)
+```
+
+### Learning.Task:missing:changed#5
+
+Authored path: `Learning.Task`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 7.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 101.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Task:missing#4
+where
+  earlier, RequestBoundary.respond (error: "SKILL_UNAVAILABLE", requestId), asked by Learning.Task:missing#2
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Task:missing#3
+  (definition) is generationDefinition (request: prepared)
+  earlier, RequestBoundary.request (path: "/learning/task", requestId, session, skill)
+  no view "(owner) can study confirmed (skill)" with (owner, skill) has (definition)
+then
+  RequestBoundary.respond (error: "SKILL_CHANGED", requestId)
+```
+
+### Learning.Task:missing:current#5
+
+Authored path: `Learning.Task`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 7.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 101.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Task:missing#4
+where
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Task:missing#3
+  (criteria, definition) is generationDefinition (request: prepared)
+  (citations, materials, text: question) is generationFields (answer)
+  earlier, RequestBoundary.request (path: "/learning/task", requestId, session, skill)
+  view "(owner) can study confirmed (skill)" with (owner, skill) has (definition)
+then
+  GroundedTutoring.prepareTask (citations, criteria, definition, fresh: true, materials, mode: "CHECK", owner, question, topic: skill)
+```
+
+### Learning.Task:missing:current#6
+
+Authored path: `Learning.Task`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 7.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 101.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when GroundedTutoring.prepareTask (citations, criteria, definition, fresh: true, materials, mode: "CHECK", owner, question, topic: skill, task), asked by Learning.Task:missing:current#5
+where
+  earlier, RequestBoundary.respond (error: "SKILL_UNAVAILABLE", requestId), asked by Learning.Task:missing#2
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Task:missing#3
+then
+  RequestBoundary.respond (requestId, task, tutor: former "the tutor choice that (request) carried" with (request: prepared))
+```
+
+### Learning.Task:ready#2
+
+Authored path: `Learning.Task`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 7.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 101.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Task
+where
+  earlier, RequestBoundary.request (path: "/learning/task", requestId, session, skill)
+  view "(owner) can study confirmed (skill)" with (owner, skill)
+then
+  Sessioning.use (session)
+```
+
+### Learning.Task:ready#3
+
+Authored path: `Learning.Task`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 7.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 101.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Task:ready#2
 where
   view "the tutor choice that applies to (owner)" with (owner) has (choice, status)
   status is among ["SAVED", "DEFAULT"]
@@ -4936,7 +6116,7 @@ then
   TutorGenerating.generate (owner, request: prepared)
 ```
 
-### Learning.Task#3
+### Learning.Task:ready#4
 
 Authored path: `Learning.Task`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 7.
@@ -4944,14 +6124,14 @@ Authored path: `Learning.Task`.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
-when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Task#2
+when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Task:ready#3
 where
   earlier, Sessioning.use (session, subject: owner), asked by Learning.Task
 then
   Sessioning.use (session)
 ```
 
-### Learning.Task:changed#4
+### Learning.Task:ready:changed#5
 
 Authored path: `Learning.Task`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 7.
@@ -4959,9 +6139,9 @@ Authored path: `Learning.Task`.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
-when Sessioning.use (session, subject: owner), asked by Learning.Task#3
+when Sessioning.use (session, subject: owner), asked by Learning.Task:ready#4
 where
-  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Task#2
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Task:ready#3
   (definition) is generationDefinition (request: prepared)
   earlier, RequestBoundary.request (path: "/learning/task", requestId, session, skill)
   no view "(owner) can study confirmed (skill)" with (owner, skill) has (definition)
@@ -4969,7 +6149,7 @@ then
   RequestBoundary.respond (error: "SKILL_CHANGED", requestId)
 ```
 
-### Learning.Task:current#4
+### Learning.Task:ready:current#5
 
 Authored path: `Learning.Task`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 7.
@@ -4977,9 +6157,9 @@ Authored path: `Learning.Task`.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
-when Sessioning.use (session, subject: owner), asked by Learning.Task#3
+when Sessioning.use (session, subject: owner), asked by Learning.Task:ready#4
 where
-  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Task#2
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Task:ready#3
   (criteria, definition) is generationDefinition (request: prepared)
   (citations, materials, text: question) is generationFields (answer)
   earlier, RequestBoundary.request (path: "/learning/task", requestId, session, skill)
@@ -4988,7 +6168,7 @@ then
   GroundedTutoring.prepareTask (citations, criteria, definition, fresh: true, materials, mode: "CHECK", owner, question, topic: skill)
 ```
 
-### Learning.Task:current#5
+### Learning.Task:ready:current#6
 
 Authored path: `Learning.Task`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 7.
@@ -4996,9 +6176,9 @@ Authored path: `Learning.Task`.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
-when GroundedTutoring.prepareTask (citations, criteria, definition, fresh: true, materials, mode: "CHECK", owner, question, topic: skill, task), asked by Learning.Task:current#4
+when GroundedTutoring.prepareTask (citations, criteria, definition, fresh: true, materials, mode: "CHECK", owner, question, topic: skill, task), asked by Learning.Task:ready:current#5
 where
-  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Task#2
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Task:ready#3
   earlier, RequestBoundary.request (path: "/learning/task", requestId, session, skill)
 then
   RequestBoundary.respond (requestId, task, tutor: former "the tutor choice that (request) carried" with (request: prepared))
@@ -5070,6 +6250,22 @@ Authored path: `Planning.Begin`.
 when RequestBoundary.request (course, item, path: "/planning/begin", requestId, session)
 then
   Sessioning.use (session)
+```
+
+### Planning.Begin:item#2
+
+Authored path: `Planning.Begin`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 73.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 89.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Planning.Begin
+where
+  earlier, RequestBoundary.request (course, item, path: "/planning/begin", requestId, session)
+  view "(owner) owns (course) with (title)" with (course, owner)
+  no StudyPlanning._item (item) has (owner, scope: course)
+then
+  RequestBoundary.respond (error: "ACTIVITY_BEGIN_UNAVAILABLE", requestId)
 ```
 
 ### Planning.Begin:missing#2
@@ -5353,6 +6549,40 @@ then
   Sessioning.use (session)
 ```
 
+### Planning.Finish:item#2
+
+Authored path: `Planning.Finish`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 77.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 90.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Planning.Finish
+where
+  earlier, RequestBoundary.request (actualMinutes, course, item, path: "/planning/finish", requestId, session)
+  view "(owner) owns (course) with (title)" with (course, owner)
+  no StudyPlanning._item (item) has (owner, scope: course)
+then
+  RequestBoundary.respond (error: "ACTIVITY_FINISH_UNAVAILABLE", requestId)
+```
+
+### Planning.Finish:item#3
+
+Authored path: `Planning.Finish`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 77.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 90.
+
+```reaction
+when RequestBoundary.respond (error: "ACTIVITY_FINISH_UNAVAILABLE", requestId), asked by Planning.Finish:item#2
+at the flow's settlement frontier
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Planning.Finish
+  earlier, RequestBoundary.request (actualMinutes, course, item, path: "/planning/finish", requestId, session)
+  view "(owner) owns (course) with (title)" with (course, owner)
+  StudyPlanning._item (item) has (owner, scope: course, status: "DONE")
+then
+  RequestBoundary.respond (item, requestId)
+```
+
 ### Planning.Finish:missing#2
 
 Authored path: `Planning.Finish`.
@@ -5429,6 +6659,40 @@ Authored path: `Planning.Miss`.
 when RequestBoundary.request (course, item, path: "/planning/miss", requestId, session)
 then
   Sessioning.use (session)
+```
+
+### Planning.Miss:item#2
+
+Authored path: `Planning.Miss`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 77.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 92.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Planning.Miss
+where
+  earlier, RequestBoundary.request (course, item, path: "/planning/miss", requestId, session)
+  view "(owner) owns (course) with (title)" with (course, owner)
+  no StudyPlanning._item (item) has (owner, scope: course)
+then
+  RequestBoundary.respond (error: "ACTIVITY_MISS_UNAVAILABLE", requestId)
+```
+
+### Planning.Miss:item#3
+
+Authored path: `Planning.Miss`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 77.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 92.
+
+```reaction
+when RequestBoundary.respond (error: "ACTIVITY_MISS_UNAVAILABLE", requestId), asked by Planning.Miss:item#2
+at the flow's settlement frontier
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Planning.Miss
+  earlier, RequestBoundary.request (course, item, path: "/planning/miss", requestId, session)
+  view "(owner) owns (course) with (title)" with (course, owner)
+  StudyPlanning._item (item) has (owner, scope: course, status: "MISSED")
+then
+  RequestBoundary.respond (item, requestId)
 ```
 
 ### Planning.Miss:missing#2
@@ -5509,6 +6773,143 @@ then
   Sessioning.use (session)
 ```
 
+### Planning.Propose:budget#2
+
+Authored path: `Planning.Propose`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 88.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Planning.Propose
+where
+  earlier, RequestBoundary.request (course, path: "/planning/propose", requestId, session)
+  view "(owner) owns (course) with (title)" with (course, owner)
+  no StudyPlanning._preferences (owner, scope: course)
+then
+  RequestBoundary.respond (error: "PLAN_PREFERENCES_UNAVAILABLE", requestId)
+```
+
+### Planning.Propose:budget#3
+
+Authored path: `Planning.Propose`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 88.
+
+```reaction
+when RequestBoundary.respond (error: "PLAN_PREFERENCES_UNAVAILABLE", requestId), asked by Planning.Propose:budget#2
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Planning.Propose
+  earlier, RequestBoundary.request (course, path: "/planning/propose", requestId, session)
+  view "(owner) can refresh routine reviews in (course)" with (course, owner)
+  view "review inputs for (owner) in (course)" with (course, owner) has (basis, candidates, explanation, horizonEnd)
+then
+  StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false)
+```
+
+### Planning.Propose:budget:active#4
+
+Authored path: `Planning.Propose`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 88.
+
+```reaction
+when StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false), asked by Planning.Propose:budget#3
+at the flow's settlement frontier
+where
+  view "(owner) owns (course) with (title)" with (course, owner)
+  no StudyPlanning._plans (owner, scope: course) has (status: "PROPOSED")
+  StudyPlanning._plans (owner, scope: course) has (plan, status: "ACTIVE")
+  earlier, RequestBoundary.respond (error: "PLAN_PREFERENCES_UNAVAILABLE", requestId), asked by Planning.Propose:budget#2
+then
+  RequestBoundary.respond (plan, requestId)
+```
+
+### Planning.Propose:budget:proposed#4
+
+Authored path: `Planning.Propose`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 88.
+
+```reaction
+when StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false), asked by Planning.Propose:budget#3
+at the flow's settlement frontier
+where
+  view "(owner) owns (course) with (title)" with (course, owner)
+  StudyPlanning._plans (owner, scope: course) has (plan, status: "PROPOSED")
+  earlier, RequestBoundary.respond (error: "PLAN_PREFERENCES_UNAVAILABLE", requestId), asked by Planning.Propose:budget#2
+then
+  RequestBoundary.respond (plan, requestId)
+```
+
+### Planning.Propose:busy#2
+
+Authored path: `Planning.Propose`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 88.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Planning.Propose
+where
+  earlier, RequestBoundary.request (course, path: "/planning/propose", requestId, session)
+  view "(owner) owns (course) with (title)" with (course, owner)
+  StudyPlanning._preferences (owner, scope: course)
+  StudyPlanning._next (owner, scope: course) has (status: "IN_PROGRESS")
+then
+  RequestBoundary.respond (error: "PLAN_SESSION_IN_PROGRESS", requestId)
+```
+
+### Planning.Propose:busy#3
+
+Authored path: `Planning.Propose`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 88.
+
+```reaction
+when RequestBoundary.respond (error: "PLAN_SESSION_IN_PROGRESS", requestId), asked by Planning.Propose:busy#2
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Planning.Propose
+  earlier, RequestBoundary.request (course, path: "/planning/propose", requestId, session)
+  view "(owner) can refresh routine reviews in (course)" with (course, owner)
+  view "review inputs for (owner) in (course)" with (course, owner) has (basis, candidates, explanation, horizonEnd)
+then
+  StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false)
+```
+
+### Planning.Propose:busy:active#4
+
+Authored path: `Planning.Propose`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 88.
+
+```reaction
+when StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false), asked by Planning.Propose:busy#3
+at the flow's settlement frontier
+where
+  view "(owner) owns (course) with (title)" with (course, owner)
+  no StudyPlanning._plans (owner, scope: course) has (status: "PROPOSED")
+  StudyPlanning._plans (owner, scope: course) has (plan, status: "ACTIVE")
+  earlier, RequestBoundary.respond (error: "PLAN_SESSION_IN_PROGRESS", requestId), asked by Planning.Propose:busy#2
+then
+  RequestBoundary.respond (plan, requestId)
+```
+
+### Planning.Propose:busy:proposed#4
+
+Authored path: `Planning.Propose`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 88.
+
+```reaction
+when StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false), asked by Planning.Propose:busy#3
+at the flow's settlement frontier
+where
+  view "(owner) owns (course) with (title)" with (course, owner)
+  StudyPlanning._plans (owner, scope: course) has (plan, status: "PROPOSED")
+  earlier, RequestBoundary.respond (error: "PLAN_SESSION_IN_PROGRESS", requestId), asked by Planning.Propose:busy#2
+then
+  RequestBoundary.respond (plan, requestId)
+```
+
 ### Planning.Propose:missing#2
 
 Authored path: `Planning.Propose`.
@@ -5524,7 +6925,7 @@ then
   RequestBoundary.respond (detail: "Choose one of your own courses.", error: "COURSE_UNAVAILABLE", requestId)
 ```
 
-### Planning.Propose:missing:active#3
+### Planning.Propose:missing#3
 
 Authored path: `Planning.Propose`.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
@@ -5532,36 +6933,51 @@ Authored path: `Planning.Propose`.
 
 ```reaction
 when RequestBoundary.respond (detail: "Choose one of your own courses.", error: "COURSE_UNAVAILABLE", requestId), asked by Planning.Propose:missing#2
-at the flow's settlement frontier
 where
   earlier, Sessioning.use (session, subject: owner), asked by Planning.Propose
   earlier, RequestBoundary.request (course, path: "/planning/propose", requestId, session)
+  view "(owner) can refresh routine reviews in (course)" with (course, owner)
+  view "review inputs for (owner) in (course)" with (course, owner) has (basis, candidates, explanation, horizonEnd)
+then
+  StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false)
+```
+
+### Planning.Propose:missing:active#4
+
+Authored path: `Planning.Propose`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 88.
+
+```reaction
+when StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false), asked by Planning.Propose:missing#3
+at the flow's settlement frontier
+where
   view "(owner) owns (course) with (title)" with (course, owner)
   no StudyPlanning._plans (owner, scope: course) has (status: "PROPOSED")
   StudyPlanning._plans (owner, scope: course) has (plan, status: "ACTIVE")
+  earlier, RequestBoundary.respond (detail: "Choose one of your own courses.", error: "COURSE_UNAVAILABLE", requestId), asked by Planning.Propose:missing#2
 then
   RequestBoundary.respond (plan, requestId)
 ```
 
-### Planning.Propose:missing:proposed#3
+### Planning.Propose:missing:proposed#4
 
 Authored path: `Planning.Propose`.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 88.
 
 ```reaction
-when RequestBoundary.respond (detail: "Choose one of your own courses.", error: "COURSE_UNAVAILABLE", requestId), asked by Planning.Propose:missing#2
+when StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false), asked by Planning.Propose:missing#3
 at the flow's settlement frontier
 where
-  earlier, Sessioning.use (session, subject: owner), asked by Planning.Propose
-  earlier, RequestBoundary.request (course, path: "/planning/propose", requestId, session)
   view "(owner) owns (course) with (title)" with (course, owner)
   StudyPlanning._plans (owner, scope: course) has (plan, status: "PROPOSED")
+  earlier, RequestBoundary.respond (detail: "Choose one of your own courses.", error: "COURSE_UNAVAILABLE", requestId), asked by Planning.Propose:missing#2
 then
   RequestBoundary.respond (plan, requestId)
 ```
 
-### Planning.Propose:owned#2
+### Planning.Propose:ready#2
 
 Authored path: `Planning.Propose`.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
@@ -5572,19 +6988,34 @@ when Sessioning.use (session, subject: owner), asked by Planning.Propose
 where
   earlier, RequestBoundary.request (course, path: "/planning/propose", requestId, session)
   view "(owner) can refresh routine reviews in (course)" with (course, owner)
-  view "review inputs for (owner) in (course)" with (course, owner) has (basis, candidates, explanation, horizonEnd)
 then
-  StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false)
+  Sessioning.use (session)
 ```
 
-### Planning.Propose:owned:active#3
+### Planning.Propose:ready#3
 
 Authored path: `Planning.Propose`.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 88.
 
 ```reaction
-when StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false), asked by Planning.Propose:owned#2
+when Sessioning.use (session, subject: owner), asked by Planning.Propose:ready#2
+where
+  earlier, RequestBoundary.request (course, path: "/planning/propose", requestId, session)
+  view "(owner) can refresh routine reviews in (course)" with (course, owner)
+  view "review inputs for (owner) in (course)" with (course, owner) has (basis, candidates, explanation, horizonEnd)
+then
+  StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false)
+```
+
+### Planning.Propose:ready:active#4
+
+Authored path: `Planning.Propose`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 88.
+
+```reaction
+when StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false), asked by Planning.Propose:ready#3
 at the flow's settlement frontier
 where
   view "(owner) owns (course) with (title)" with (course, owner)
@@ -5595,14 +7026,14 @@ then
   RequestBoundary.respond (plan, requestId)
 ```
 
-### Planning.Propose:owned:proposed#3
+### Planning.Propose:ready:proposed#4
 
 Authored path: `Planning.Propose`.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 88.
 
 ```reaction
-when StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false), asked by Planning.Propose:owned#2
+when StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false), asked by Planning.Propose:ready#3
 at the flow's settlement frontier
 where
   view "(owner) owns (course) with (title)" with (course, owner)
@@ -6003,6 +7434,40 @@ Authored path: `Planning.Stop`.
 when RequestBoundary.request (actualMinutes, course, item, path: "/planning/stop", requestId, session)
 then
   Sessioning.use (session)
+```
+
+### Planning.Stop:item#2
+
+Authored path: `Planning.Stop`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 77.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 91.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Planning.Stop
+where
+  earlier, RequestBoundary.request (actualMinutes, course, item, path: "/planning/stop", requestId, session)
+  view "(owner) owns (course) with (title)" with (course, owner)
+  no StudyPlanning._item (item) has (owner, scope: course)
+then
+  RequestBoundary.respond (error: "ACTIVITY_STOP_UNAVAILABLE", requestId)
+```
+
+### Planning.Stop:item#3
+
+Authored path: `Planning.Stop`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 77.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 91.
+
+```reaction
+when RequestBoundary.respond (error: "ACTIVITY_STOP_UNAVAILABLE", requestId), asked by Planning.Stop:item#2
+at the flow's settlement frontier
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Planning.Stop
+  earlier, RequestBoundary.request (actualMinutes, course, item, path: "/planning/stop", requestId, session)
+  view "(owner) owns (course) with (title)" with (course, owner)
+  StudyPlanning._item (item) has (owner, scope: course, status: "STOPPED")
+then
+  RequestBoundary.respond (item, requestId)
 ```
 
 ### Planning.Stop:missing#2
