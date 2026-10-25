@@ -31,7 +31,7 @@ The selected composition documents match the current implementation. Unselected 
 - [Material data](material-data.md): retained originals and readable renditions.
 - [Import store](material-import-store.md): one key and frozen preparation per import.
 - [Shared identities](types.md): bindings across concepts.
-- [P3 status](../P3.md): the beta's journey, checks, known limits, and plan. [P2](../P2.md) records the earlier alpha.
+- [P3 status](../docs/P3.md): the beta's journey, checks, known limits, and plan. [P2](../docs/P2.md) records the earlier alpha.
 - [Diagnostic review](advisory-review.md): the P2 review of the checker's advisories, with its tested fixes and decisions.
 
 ## Checks

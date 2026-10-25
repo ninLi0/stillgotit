@@ -1,5 +1,7 @@
 # StillGotIt: concept design
 
+> This is the P1 concept design, last revised on October 7, 2026 (commit `b5c3426`). Apart from this note, it is identical to [design/p1-concepts.md](../../design/p1-concepts.md), and the specifications in [design/concepts](../../design/concepts/) replaced it in P2. It was moved here from the repository root on October 25, 2026.
+
 ## Scope and notation
 
 The first version supports one course per learner. It accepts source documents, voice, text, and photos.

@@ -6,14 +6,14 @@ StillGotIt helps college students learn the skills in a course and keep them aft
 
 - **The deployed app:** https://stillgotit.mit-sdg.dev. Sign in with a 6.1040 Commons account.
 - **Demo video:** [a narrated walk through the main journey](PASTE_VIDEO_URL)
-- **Status pages:** [P3, the beta](P3.md), and [P2, the alpha](P2.md).
+- **Status pages:** [P3, the beta](docs/P3.md), and [P2, the alpha](docs/P2.md).
 - **Design:** the [design index](design/README.md) lists every design document and links each concept to its code. The main parts are:
   - the [concept specifications](design/concepts/), one file per concept;
   - the [compositions](design/compositions/), which describe the endpoints, reactions, views, and formers that connect the concepts;
   - the [host](design/host.md), which names each part of the server that works outside the concepts;
   - the [runtime responsibilities](design/runtime.md): where the app runs, accounts and requests, writes without transactions, the AI tutor, and file import;
   - the [visual design study](design/visual-design.md), which covers the Pixel Nature look.
-- **The P1 design:** the [design submission](design.md) and its [concept design](concepts.md).
+- **The P1 design:** the [design submission](docs/history/p1-design.md) and its [concept design](docs/history/p1-concepts.md).
 
 ## Run locally
 
@@ -104,7 +104,8 @@ Then open **http://127.0.0.1:5174**. The fixture serves the built app with canne
 | `generated.config.ts` | The application that the checks and `bun run generate` assemble. |
 | `tests/` | Concept, HTTP, and scenario tests. `tests/fixtures/` holds the browser fixture and test files, and `tests/output/` holds the saved P3 test run. |
 | `scripts/` | The MongoDB start-up check and the SkillMapping demonstrations from P2, listed as `demo:*` in `package.json`. |
-| `docs/history/` | Earlier records kept for reference, such as the [implementation steps](docs/history/implementation-steps.md) that the README listed until P4. |
+| `docs/` | The milestone status pages, the tree-drawing research from P1, and the P1 sketches in `docs/images/`. |
+| `docs/history/` | Earlier records kept for reference: the P1 design submission, the P1 concept design, and the [implementation steps](docs/history/implementation-steps.md) that the README listed until P4. |
 | `reference_docs/` | Copies of the course pages: [background readings, rubrics, and project directions](reference_docs/README.md). |
 | `compose.yaml` | The MongoDB server that `bun run db:up` starts. |
 | `THIRD_PARTY_NOTICES.md`, `licenses/` | Attribution and licenses for reused code. |
