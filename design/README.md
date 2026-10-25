@@ -26,6 +26,7 @@ The eight domain concepts, TutorPreferring, and ViewPreferring own their MongoDB
 The selected composition documents match the current implementation. Unselected access and identity sketches describe broader work that the selected stage does not bind. The selected stage and its linked flow documents identify the implemented paths. [The onboarding stage](stages/onboarding.md) preserves an earlier increment.
 
 - [Runtime contract](runtime.md): host boundaries, provider access, and recovery.
+- [Host actors](host.md): each part of the host, what it owns, what it calls or serves, and the page that describes it.
 - [Material data](material-data.md): retained originals and readable renditions.
 - [Import store](material-import-store.md): one key and frozen preparation per import.
 - [Shared identities](types.md): bindings across concepts.
