@@ -3,8 +3,8 @@ import { TutorFailures, tutorGenerator } from "../src/host/tutor-generation.ts";
 import { CourseTutor, OriginalTooLarge } from "../src/host/tutor.ts";
 import { TutorGenerating } from "../src/concepts/Generating/registry.ts";
 import { GenerationFailed } from "../src/concepts/Generating/Generating.ts";
-import type { Material, MaterialData } from "../src/concepts/GroundedTutoring/GroundedTutoring.ts";
-import type { MediaValue } from "../src/concepts/GroundedTutoring/media.ts";
+import type { Material, MaterialData } from "../src/concepts/MaterialKeeping/MaterialKeeping.ts";
+import type { MediaValue } from "../src/media.ts";
 import type { TutorRequest } from "../src/learning-data.ts";
 import type { User } from "../src/concepts/Registering/Registering.ts";
 

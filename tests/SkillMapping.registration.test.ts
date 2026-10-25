@@ -2,6 +2,7 @@ import { StudyPlanning } from "../src/concepts/StudyPlanning/StudyPlanning.ts";
 import { MasteryEstimating } from "../src/concepts/MasteryEstimating/MasteryEstimating.ts";
 import { AssessmentReviewing } from "../src/concepts/AssessmentReviewing/AssessmentReviewing.ts";
 import { GroundedTutoring } from "../src/concepts/GroundedTutoring/GroundedTutoring.ts";
+import { MaterialKeeping } from "../src/concepts/MaterialKeeping/MaterialKeeping.ts";
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import type { ActionRefusal } from "@mit-sdg/sync-engine/assembly";
@@ -34,6 +35,7 @@ beforeAll(async () => {
     AssessmentReviewing: new AssessmentReviewing(connection.db),
     MasteryEstimating: new MasteryEstimating(connection.db),
     StudyPlanning: new StudyPlanning(connection.db),
+    Library: new MaterialKeeping(connection.db, "Library"),
     GroundedTutoring: new GroundedTutoring(connection.db),
   });
 });
@@ -133,6 +135,7 @@ describe("SkillMapping framework registration", () => {
         AssessmentReviewing: new AssessmentReviewing(secondConnection.db),
         MasteryEstimating: new MasteryEstimating(secondConnection.db),
         StudyPlanning: new StudyPlanning(secondConnection.db),
+        Library: new MaterialKeeping(secondConnection.db, "Library"),
         GroundedTutoring: new GroundedTutoring(secondConnection.db),
       });
       expect(await second.concepts.SkillMapping._skill({ skill }))

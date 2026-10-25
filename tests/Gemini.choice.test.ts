@@ -5,7 +5,7 @@ import { CourseTutor } from "../src/host/tutor.ts";
 import { tutorGenerator, TutorFailures } from "../src/host/tutor-generation.ts";
 import { checkConfiguredModel, checkModelList } from "../src/host/tutor-catalog.ts";
 import { TUTOR_MODELS } from "../src/computations/tutor.ts";
-import type { Material, MaterialData } from "../src/concepts/GroundedTutoring/GroundedTutoring.ts";
+import type { Material, MaterialData } from "../src/concepts/MaterialKeeping/MaterialKeeping.ts";
 import type { TutorChoice } from "../src/tutor-types.ts";
 
 const KEY = "test-key-not-real";

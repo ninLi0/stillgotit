@@ -15,6 +15,7 @@ import type { RegisteringConcept, User } from "./concepts/Registering/Registerin
 import type { SessioningConcept } from "./concepts/Sessioning/Sessioning.ts";
 import type { SkillMapping } from "./concepts/SkillMapping.ts";
 import type { GroundedTutoring } from "./concepts/GroundedTutoring/GroundedTutoring.ts";
+import type { Material, MaterialKeeping } from "./concepts/MaterialKeeping/MaterialKeeping.ts";
 import { composition as accounts } from "./compositions/reusable/accounts.ts";
 import { composition as commons } from "./compositions/reusable/commons.ts";
 import { composition as Courses } from "./compositions/courses.ts";
@@ -37,7 +38,8 @@ export function assembleApplication(instances: {
   CommonsFederating: ConceptImplementation<typeof FederatingConcept<User>>;
   Sessioning: ConceptImplementation<typeof SessioningConcept<User>>;
   SkillMapping: ConceptImplementation<typeof SkillMapping>;
-  GroundedTutoring: ConceptImplementation<typeof GroundedTutoring<User, string>>;
+  Library: ConceptImplementation<typeof MaterialKeeping<User, string>>;
+  GroundedTutoring: ConceptImplementation<typeof GroundedTutoring<User, Material>>;
   TutorGenerating?: ConceptImplementation<typeof TutorGenerating>;
   TutorPreferring?: ConceptImplementation<typeof TutorPreferring>;
   ViewPreferring?: ConceptImplementation<typeof ViewPreferring>;

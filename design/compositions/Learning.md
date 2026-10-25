@@ -6,6 +6,8 @@ The frontend sends learner choices through the generated client. The session coo
 
 [Lesson](reaction:Learning.Lesson) joins the skill to its owned sources, requests an explanation, rechecks the session and the original requirements, and saves the lesson. [Task](reaction:Learning.Task) also requires a mastery track and ready prerequisites. It requests the complete demonstration gate and rejects a repeated question. The provider does not assign a mastery score.
 
+GroundedTutoring checks only the shape of a session's sources, so these flows guarantee the rest. Lesson and Task read the learner's materials in the skill's course with `Library._sourceSet`, and [selectSources](computation:selectSources) requires every source of the skill to be among them. Question, Reply, Hint, and the assessment flows apply the same check to the session's saved materials. The host accepts a tutor answer only when each citation names one of those materials and a location in it, so a saved lesson, task, or answer never names another learner's material or a material from another course.
+
 [Respond](reaction:Learning.Respond) checks the current dialogue length, open session, and the ownership of every attachment before saving learner work. [Question](reaction:Learning.Question) saves a lesson question and requests its answer in one flow. [Reply](reaction:Learning.Reply) retries an unanswered saved lesson question. [Hint](reaction:Learning.Hint) records requested help before contacting the provider, so a failed hint request cannot later be treated as independent work. [Transcript](reaction:Learning.Transcript) records corrections to an existing voice response.
 
 ## Several attachments in one response

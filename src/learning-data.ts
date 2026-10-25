@@ -4,7 +4,7 @@ import type { AssessmentReviewing, Result } from "./concepts/AssessmentReviewing
 import type { MasteryEstimating } from "./concepts/MasteryEstimating/MasteryEstimating.ts";
 import type { StudyPlanning } from "./concepts/StudyPlanning/StudyPlanning.ts";
 import type { PassageSet, MaterialSet } from "./concepts/GroundedTutoring/dialogue.ts";
-import type { MediaList } from "./concepts/GroundedTutoring/media.ts";
+import type { MediaList } from "./media.ts";
 import type { ExtractedRow, SourceContext, Suggestions } from "./tutor-types.ts";
 export type SkillRows = Awaited<ReturnType<SkillMapping["_map"]>>["skills"];
 export type SkillInfo = SkillRows[number];

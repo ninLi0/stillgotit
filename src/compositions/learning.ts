@@ -5,7 +5,7 @@ import { composition as Courses } from "./courses.ts";
 import { composition as Settings } from "./settings.ts";
 import * as R from "./learning-reads.ts";
 import { learningInput, structuredOutput, validators } from "./reusable/inputs.ts";
-const { Sessioning, GroundedTutoring: Tutoring, AssessmentReviewing: Assessment, MasteryEstimating: Mastery, StudyPlanning: Planning, TutorGenerating: AI } = concepts;
+const { Sessioning, Library, GroundedTutoring: Tutoring, AssessmentReviewing: Assessment, MasteryEstimating: Mastery, StudyPlanning: Planning, TutorGenerating: AI } = concepts;
 const options = { validators: { ...validators, input: learningInput, output: structuredOutput } };
 
 /**
@@ -69,18 +69,18 @@ const Task = endpoint("/learning/task", ({ session, skill, owner, definition, co
 const Respond = endpoint("/learning/respond", ({ session, studySession, text, channel, attachments, dialogueLength, owner, course, data, sources, media, currentDialogue }) => receive({ session, studySession, text, channel, attachments, dialogueLength })
   .then(Sessioning.use({ session }).responds({ subject: owner }))
   .then(where(R.OpenSession({ owner, studySession }).is({ course }), Tutoring._sessionData({ session: studySession }).is({ data }),
-    Tutoring._sourceSet({ owner, scope: course }).is({ sources }), compute(C.dialogueIsCurrent, { data, dialogueLength }, currentDialogue), is.among(currentDialogue, [true]),
+    Library._sourceSet({ owner, scope: course }).is({ sources }), compute(C.dialogueIsCurrent, { data, dialogueLength }, currentDialogue), is.among(currentDialogue, [true]),
     compute(C.responseInput, { data, text, channel, attachments, sources }, { valid: true, media }))
     .then(Tutoring.respond({ owner, session: studySession, text, channel, media }).responds({})))
   .then(respond({})), options);
 const Question = endpoint("/learning/question", ({ session, studySession, text, channel, attachments, dialogueLength, owner, course, data, sources, media, currentDialogue, materials, selected, draft, choice, status, prepared, answer, reply, citations }) => receive({ session, studySession, text, channel, attachments, dialogueLength })
   .then(Sessioning.use({ session }).responds({ subject: owner }))
   .then(where(R.OpenSession({ owner, studySession }).is({ course }), Tutoring._lesson({ lesson: studySession }), Tutoring._sessionData({ session: studySession }).is({ data }),
-    Tutoring._sourceSet({ owner, scope: course }).is({ sources }), compute(C.dialogueIsCurrent, { data, dialogueLength }, currentDialogue), is.among(currentDialogue, [true]),
+    Library._sourceSet({ owner, scope: course }).is({ sources }), compute(C.dialogueIsCurrent, { data, dialogueLength }, currentDialogue), is.among(currentDialogue, [true]),
     compute(C.responseInput, { data, text, channel, attachments, sources }, { valid: true, media }))
     .then(Tutoring.respond({ owner, session: studySession, text, channel, media }).responds({})))
   .then(where(R.OpenSession({ owner, studySession }).is({ course }), Tutoring._sessionData({ session: studySession }).is({ data }),
-    Tutoring._sourceSet({ owner, scope: course }).is({ sources }), compute(C.sessionMaterials, { data }, materials),
+    Library._sourceSet({ owner, scope: course }).is({ sources }), compute(C.sessionMaterials, { data }, materials),
     compute(C.selectSources, { sources, materials }, { selected, valid: true }), compute(C.sessionRequest, { selected, data, kind: "REPLY" }, draft),
     ...usingTutorChoice(owner, draft, choice, status, prepared))
     .then(AI.generate({ owner, request: prepared }).responds({ answer })))
@@ -94,7 +94,7 @@ const Question = endpoint("/learning/question", ({ session, studySession, text, 
 const Reply = endpoint("/learning/reply", ({ session, studySession, owner, course, data, materials, sources, selected, draft, choice, status, prepared, answer, text, citations }) => receive({ session, studySession })
   .then(Sessioning.use({ session }).responds({ subject: owner }))
   .then(where(R.OpenSession({ owner, studySession }).is({ course }), Tutoring._sessionData({ session: studySession }).is({ data }), C.hasLessonQuestion({ data }),
-    Tutoring._sourceSet({ owner, scope: course }).is({ sources }), compute(C.sessionMaterials, { data }, materials),
+    Library._sourceSet({ owner, scope: course }).is({ sources }), compute(C.sessionMaterials, { data }, materials),
     compute(C.selectSources, { sources, materials }, { selected, valid: true }), compute(C.sessionRequest, { selected, data, kind: "REPLY" }, draft),
     ...usingTutorChoice(owner, draft, choice, status, prepared))
     .then(AI.generate({ owner, request: prepared }).responds({ answer })))
@@ -109,7 +109,7 @@ const Hint = endpoint("/learning/hint", ({ session, studySession, owner, course,
   .then(Sessioning.use({ session }).responds({ subject: owner }))
   .then(where(R.OpenSession({ owner, studySession }))
     .then(Tutoring.requestHint({ owner, task: studySession }).responds({})))
-  .then(where(R.OpenSession({ owner, studySession }).is({ course }), Tutoring._sessionData({ session: studySession }).is({ data }), Tutoring._sourceSet({ owner, scope: course }).is({ sources }),
+  .then(where(R.OpenSession({ owner, studySession }).is({ course }), Tutoring._sessionData({ session: studySession }).is({ data }), Library._sourceSet({ owner, scope: course }).is({ sources }),
     compute(C.sessionMaterials, { data }, materials), compute(C.selectSources, { sources, materials }, { selected, valid: true }),
     compute(C.sessionRequest, { selected, data, kind: "HINT" }, draft), ...usingTutorChoice(owner, draft, choice, status, prepared))
     .then(AI.generate({ owner, request: prepared }).responds({ answer })))
@@ -133,7 +133,7 @@ const Assess = endpoint("/learning/assess", ({ session, studySession, dialogueLe
     .then(Tutoring.confirmAttempt({ owner, task: studySession, dialogueLength, unseen, outsideHelp }).responds({})))
   .afterFlowSettles().where(R.OwnedSession({ owner, studySession }).is({ course }), Assessment._byTask({ author: owner, task: studySession }).is({ case: assessment }),
     no(Assessment._effectiveJudgment({ case: assessment })), Assessment._caseData({ case: assessment }).is({ data }), Tutoring._sessionData({ session: studySession }).is({ data: sessionData }),
-    Tutoring._sourceSet({ owner, scope: course }).is({ sources }), compute(C.sessionMaterials, { data: sessionData }, materials),
+    Library._sourceSet({ owner, scope: course }).is({ sources }), compute(C.sessionMaterials, { data: sessionData }, materials),
     compute(C.selectSources, { sources, materials }, { selected, valid: true }), compute(C.gradeRequest, { selected, data }, draft),
     ...usingTutorChoice(owner, draft, choice, status, prepared))
   .then(AI.generate({ owner, request: prepared }).responds({ answer }))
@@ -145,7 +145,7 @@ const RetryAssessment = endpoint("/learning/retry", ({ session, studySession, ow
   .then(Sessioning.use({ session }).responds({ subject: owner }))
   .then(where(R.OwnedSession({ owner, studySession }).is({ course }), Assessment._byTask({ author: owner, task: studySession }).is({ case: assessment }),
     no(Assessment._effectiveJudgment({ case: assessment })), Assessment._caseData({ case: assessment }).is({ data }), Tutoring._sessionData({ session: studySession }).is({ data: sessionData }),
-    Tutoring._sourceSet({ owner, scope: course }).is({ sources }), compute(C.sessionMaterials, { data: sessionData }, materials),
+    Library._sourceSet({ owner, scope: course }).is({ sources }), compute(C.sessionMaterials, { data: sessionData }, materials),
     compute(C.selectSources, { sources, materials }, { selected, valid: true }), compute(C.gradeRequest, { selected, data }, draft),
     ...usingTutorChoice(owner, draft, choice, status, prepared))
     .then(AI.generate({ owner, request: prepared }).responds({ answer })))
@@ -179,7 +179,7 @@ const Regrade = endpoint("/learning/regrade", ({ session, case: assessment, base
       compute(C.correctionNote, { reason }, clarification)).then(Assessment.clarify({ author: owner, case: assessment, clarification }).responds({})).named("practice"),
   )
   .then(where(R.OwnedCase({ owner, assessment }).is({ course, task }), Assessment._caseData({ case: assessment }).is({ data }), Tutoring._sessionData({ session: task }).is({ data: sessionData }),
-    Tutoring._sourceSet({ owner, scope: course }).is({ sources }), compute(C.sessionMaterials, { data: sessionData }, materials),
+    Library._sourceSet({ owner, scope: course }).is({ sources }), compute(C.sessionMaterials, { data: sessionData }, materials),
     compute(C.selectSources, { sources, materials }, { selected, valid: true }), compute(C.gradeRequest, { selected, data }, draft),
     ...usingTutorChoice(owner, draft, choice, status, prepared))
     .then(AI.generate({ owner, request: prepared }).responds({ answer })))
@@ -213,13 +213,13 @@ const ReplanAfterAdjustment = reaction(({ owner, skill, course, candidates, hori
 // and repeats the source condition: the graded branch has already answered, and the source branch only rechecks the session.
 const Suggest = endpoint("/courses/skills/suggest", ({ session, material, owner, course, sources, selected, materials, draft, choice, status, prepared, answer, suggestions, title, graded }) => receive({ session, material })
   .then(Sessioning.use({ session }).responds({ subject: owner })).then(
-    where(Tutoring._material({ material }).is({ owner, scope: course, title }), Courses.OwnedCourse({ owner, course }), compute(C.gradedTitle, { title }, graded), is.among(graded, [true]))
+    where(Library._material({ material }).is({ owner, scope: course, title }), Courses.OwnedCourse({ owner, course }), compute(C.gradedTitle, { title }, graded), is.among(graded, [true]))
       .then(respond({ error: "GRADED_MATERIAL_NOT_SOURCE" })).named("graded"),
-    where(Tutoring._material({ material }).is({ owner, scope: course, title }), Courses.OwnedCourse({ owner, course }), compute(C.gradedTitle, { title }, graded), is.among(graded, [false]))
+    where(Library._material({ material }).is({ owner, scope: course, title }), Courses.OwnedCourse({ owner, course }), compute(C.gradedTitle, { title }, graded), is.among(graded, [false]))
       .then(Sessioning.use({ session }).responds({ subject: owner })).named("source"),
   )
-  .then(where(Tutoring._material({ material }).is({ owner, scope: course, title }), Courses.OwnedCourse({ owner, course }), compute(C.gradedTitle, { title }, graded), is.among(graded, [false]),
-    Tutoring._sourceSet({ owner, scope: course }).is({ sources }), compute(C.singleMaterial, { material }, materials),
+  .then(where(Library._material({ material }).is({ owner, scope: course, title }), Courses.OwnedCourse({ owner, course }), compute(C.gradedTitle, { title }, graded), is.among(graded, [false]),
+    Library._sourceSet({ owner, scope: course }).is({ sources }), compute(C.singleMaterial, { material }, materials),
     compute(C.selectSources, { sources, materials }, { selected, valid: true }), compute(C.suggestRequest, { selected }, draft),
     ...usingTutorChoice(owner, draft, choice, status, prepared))
     .then(AI.generate({ owner, request: prepared }).responds({ answer })))

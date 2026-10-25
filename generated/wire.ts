@@ -116,7 +116,7 @@ export type StillGotItWire = {
   };
   "/courses/graded/confirm": {
     input: {
-      "material": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_material"]>[0], ["material"]>>;
+      "material": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>[0], ["material"]>>;
       "outsideHelp": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["gradedReview"]["fn"]>[0], ["outsideHelp"]>>;
       "performedOn": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["gradedReview"]["fn"]>[0], ["performedOn"]>>;
       "row": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["gradedReview"]["fn"]>[0], ["row"]>>;
@@ -129,7 +129,7 @@ export type StillGotItWire = {
   };
   "/courses/graded/extract": {
     input: {
-      "material": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_material"]>[0], ["material"]>>;
+      "material": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>[0], ["material"]>>;
       "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
     };
     output: {
@@ -139,7 +139,7 @@ export type StillGotItWire = {
   };
   "/courses/graded/read": {
     input: {
-      "material": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["gradedSource"]["fn"]>[0], ["material"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_material"]>[0], ["material"]>]>>;
+      "material": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["gradedSource"]["fn"]>[0], ["material"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>[0], ["material"]>]>>;
       "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
     };
     output: {
@@ -158,29 +158,29 @@ export type StillGotItWire = {
   };
   "/courses/materials/read": {
     input: {
-      "material": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_material"]>[0], ["material"]>>;
+      "material": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>[0], ["material"]>>;
       "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
     };
     output: {
-      "content": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_material"]>>>, ["content"]>>;
-      "locator": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_material"]>>>, ["locator"]>>;
-      "origin": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_material"]>>>, ["origin"]>>;
-      "originals": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_material"]>>>, ["originals"]>>;
-      "title": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_material"]>>>, ["title"]>>;
+      "content": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>>>, ["content"]>>;
+      "locator": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>>>, ["locator"]>>;
+      "origin": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>>>, ["origin"]>>;
+      "originals": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>>>, ["originals"]>>;
+      "title": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>>>, ["title"]>>;
     };
     error: { error: AppWideError | "COURSE_UNAVAILABLE" | "INVALID_INPUT" | "MATERIAL_UNAVAILABLE" | "NOT_SIGNED_IN" };
   };
   "/courses/read": {
     input: {
-      "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_materials"]>[0], ["scope"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_units"]>[0], ["course"]>]>>;
+      "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["_materials"]>[0], ["scope"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_units"]>[0], ["course"]>]>>;
       "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
     };
     output: {
       "materials": {
-        "locator": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_materials"]>>>, ["locator"]>>;
-        "material": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_materials"]>>>, ["material"]>>;
-        "origin": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_materials"]>>>, ["origin"]>>;
-        "title": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_materials"]>>>, ["title"]>>;
+        "locator": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Library"]["_materials"]>>>, ["locator"]>>;
+        "material": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Library"]["_materials"]>>>, ["material"]>>;
+        "origin": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Library"]["_materials"]>>>, ["origin"]>>;
+        "title": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Library"]["_materials"]>>>, ["title"]>>;
       }[];
       "prerequisites": {
         "prerequisite": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_prerequisites"]>>>, ["prerequisite"]>>;
@@ -242,7 +242,7 @@ export type StillGotItWire = {
   "/courses/skills/edit": {
     input: {
       "gate": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["reviseDraft"]>[0], ["gate"]>>;
-      "material": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_material"]>[0], ["material"]>>;
+      "material": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>[0], ["material"]>>;
       "outcome": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["reviseDraft"]>[0], ["outcome"]>>;
       "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
       "skill": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["reviseDraft"]>[0], ["skill"]>>;
@@ -264,7 +264,7 @@ export type StillGotItWire = {
   "/courses/skills/propose": {
     input: {
       "gate": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["propose"]>[0], ["gate"]>>;
-      "material": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_material"]>[0], ["material"]>>;
+      "material": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>[0], ["material"]>>;
       "outcome": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["propose"]>[0], ["outcome"]>>;
       "proposalKey": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["propose"]>[0], ["proposalKey"]>>;
       "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
@@ -299,7 +299,7 @@ export type StillGotItWire = {
   };
   "/courses/skills/sources/add": {
     input: {
-      "material": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["attachMaterial"]>[0], ["material"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_material"]>[0], ["material"]>]>>;
+      "material": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["attachMaterial"]>[0], ["material"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>[0], ["material"]>]>>;
       "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
       "skill": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["attachMaterial"]>[0], ["skill"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_skill"]>[0], ["skill"]>]>>;
     };
@@ -308,7 +308,7 @@ export type StillGotItWire = {
   };
   "/courses/skills/suggest": {
     input: {
-      "material": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_material"]>[0], ["material"]>>;
+      "material": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>[0], ["material"]>>;
       "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
     };
     output: {
@@ -342,17 +342,17 @@ export type StillGotItWire = {
   };
   "/internal/materials/add": {
     input: {
-      "content": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["addMaterial"]>[0], ["content"]>>;
-      "course": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["addMaterial"]>[0], ["scope"]>>;
-      "importKey": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["addMaterial"]>[0], ["importKey"]>>;
-      "locator": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["addMaterial"]>[0], ["locator"]>>;
-      "origin": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["addMaterial"]>[0], ["origin"]>>;
-      "originals": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["addMaterial"]>[0], ["originals"]>>;
+      "content": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["add"]>[0], ["content"]>>;
+      "course": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["add"]>[0], ["scope"]>>;
+      "importKey": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["add"]>[0], ["importKey"]>>;
+      "locator": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["add"]>[0], ["locator"]>>;
+      "origin": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["add"]>[0], ["origin"]>>;
+      "originals": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["add"]>[0], ["originals"]>>;
       "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
-      "title": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["addMaterial"]>[0], ["title"]>>;
+      "title": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["add"]>[0], ["title"]>>;
     };
     output: {
-      "material": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["addMaterial"]>>, ["material"]>>;
+      "material": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Library"]["add"]>>, ["material"]>>;
     };
     error: { error: AppWideError | "COURSE_UNAVAILABLE" | "INVALID_INPUT" | "INVALID_MATERIAL_IMPORT_KEY" | "INVALID_TUTORING_MATERIAL" | "MATERIAL_IMPORT_CONFLICT" | "NOT_SIGNED_IN" };
   };
@@ -927,7 +927,7 @@ export type StillGotItHttp = {
   };
   "/courses/graded/confirm": {
     input: {
-      "material": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_material"]>[0], ["material"]>>;
+      "material": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>[0], ["material"]>>;
       "outsideHelp": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["gradedReview"]["fn"]>[0], ["outsideHelp"]>>;
       "performedOn": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["gradedReview"]["fn"]>[0], ["performedOn"]>>;
       "row": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["gradedReview"]["fn"]>[0], ["row"]>>;
@@ -939,7 +939,7 @@ export type StillGotItHttp = {
   };
   "/courses/graded/extract": {
     input: {
-      "material": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_material"]>[0], ["material"]>>;
+      "material": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>[0], ["material"]>>;
     };
     output: {
       "rows": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["generationFields"]["fn"]>>, ["rows"]>>;
@@ -948,7 +948,7 @@ export type StillGotItHttp = {
   };
   "/courses/graded/read": {
     input: {
-      "material": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["gradedSource"]["fn"]>[0], ["material"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_material"]>[0], ["material"]>]>>;
+      "material": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["gradedSource"]["fn"]>[0], ["material"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>[0], ["material"]>]>>;
     };
     output: {
       "imported": {
@@ -966,27 +966,27 @@ export type StillGotItHttp = {
   };
   "/courses/materials/read": {
     input: {
-      "material": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_material"]>[0], ["material"]>>;
+      "material": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>[0], ["material"]>>;
     };
     output: {
-      "content": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_material"]>>>, ["content"]>>;
-      "locator": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_material"]>>>, ["locator"]>>;
-      "origin": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_material"]>>>, ["origin"]>>;
-      "originals": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_material"]>>>, ["originals"]>>;
-      "title": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_material"]>>>, ["title"]>>;
+      "content": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>>>, ["content"]>>;
+      "locator": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>>>, ["locator"]>>;
+      "origin": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>>>, ["origin"]>>;
+      "originals": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>>>, ["originals"]>>;
+      "title": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>>>, ["title"]>>;
     };
     error: { error: HttpAppWideError | "FORBIDDEN" | "INVALID_REQUEST" | "UNAUTHORIZED" };
   };
   "/courses/read": {
     input: {
-      "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_materials"]>[0], ["scope"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_units"]>[0], ["course"]>]>>;
+      "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["_materials"]>[0], ["scope"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_units"]>[0], ["course"]>]>>;
     };
     output: {
       "materials": {
-        "locator": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_materials"]>>>, ["locator"]>>;
-        "material": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_materials"]>>>, ["material"]>>;
-        "origin": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_materials"]>>>, ["origin"]>>;
-        "title": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_materials"]>>>, ["title"]>>;
+        "locator": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Library"]["_materials"]>>>, ["locator"]>>;
+        "material": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Library"]["_materials"]>>>, ["material"]>>;
+        "origin": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Library"]["_materials"]>>>, ["origin"]>>;
+        "title": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Library"]["_materials"]>>>, ["title"]>>;
       }[];
       "prerequisites": {
         "prerequisite": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_prerequisites"]>>>, ["prerequisite"]>>;
@@ -1045,7 +1045,7 @@ export type StillGotItHttp = {
   "/courses/skills/edit": {
     input: {
       "gate": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["reviseDraft"]>[0], ["gate"]>>;
-      "material": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_material"]>[0], ["material"]>>;
+      "material": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>[0], ["material"]>>;
       "outcome": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["reviseDraft"]>[0], ["outcome"]>>;
       "skill": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["reviseDraft"]>[0], ["skill"]>>;
       "title": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["reviseDraft"]>[0], ["title"]>>;
@@ -1065,7 +1065,7 @@ export type StillGotItHttp = {
   "/courses/skills/propose": {
     input: {
       "gate": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["propose"]>[0], ["gate"]>>;
-      "material": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_material"]>[0], ["material"]>>;
+      "material": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>[0], ["material"]>>;
       "outcome": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["propose"]>[0], ["outcome"]>>;
       "proposalKey": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["propose"]>[0], ["proposalKey"]>>;
       "title": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["propose"]>[0], ["title"]>>;
@@ -1097,7 +1097,7 @@ export type StillGotItHttp = {
   };
   "/courses/skills/sources/add": {
     input: {
-      "material": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["attachMaterial"]>[0], ["material"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_material"]>[0], ["material"]>]>>;
+      "material": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["attachMaterial"]>[0], ["material"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>[0], ["material"]>]>>;
       "skill": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["attachMaterial"]>[0], ["skill"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_skill"]>[0], ["skill"]>]>>;
     };
     output: Record<string, never>;
@@ -1105,7 +1105,7 @@ export type StillGotItHttp = {
   };
   "/courses/skills/suggest": {
     input: {
-      "material": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_material"]>[0], ["material"]>>;
+      "material": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>[0], ["material"]>>;
     };
     output: {
       "suggestions": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["generationFields"]["fn"]>>, ["suggestions"]>>;
@@ -1136,16 +1136,16 @@ export type StillGotItHttp = {
   };
   "/internal/materials/add": {
     input: {
-      "content": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["addMaterial"]>[0], ["content"]>>;
-      "course": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["addMaterial"]>[0], ["scope"]>>;
-      "importKey": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["addMaterial"]>[0], ["importKey"]>>;
-      "locator": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["addMaterial"]>[0], ["locator"]>>;
-      "origin": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["addMaterial"]>[0], ["origin"]>>;
-      "originals": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["addMaterial"]>[0], ["originals"]>>;
-      "title": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["addMaterial"]>[0], ["title"]>>;
+      "content": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["add"]>[0], ["content"]>>;
+      "course": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["add"]>[0], ["scope"]>>;
+      "importKey": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["add"]>[0], ["importKey"]>>;
+      "locator": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["add"]>[0], ["locator"]>>;
+      "origin": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["add"]>[0], ["origin"]>>;
+      "originals": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["add"]>[0], ["originals"]>>;
+      "title": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["add"]>[0], ["title"]>>;
     };
     output: {
-      "material": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["addMaterial"]>>, ["material"]>>;
+      "material": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Library"]["add"]>>, ["material"]>>;
     };
     error: { error: HttpAppWideError | "CONFLICT" | "FORBIDDEN" | "INVALID_REQUEST" | "UNAUTHORIZED" };
   };

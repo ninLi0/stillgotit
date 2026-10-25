@@ -2,16 +2,18 @@ import { InvalidLessonContent, InvalidLessonSources, InvalidTaskContent, Invalid
 import { registerConcept } from "@mit-sdg/sync-engine/assembly";
 import spec from "@design/concepts/GroundedTutoring.md" with { type: "text" };
 import type { User } from "../Registering/Registering.ts";
-import type { Course } from "../SkillMapping.ts";
-import { GroundedTutoring, InvalidTutoringMaterial, InvalidMaterialImportKey, MaterialImportConflict } from "./GroundedTutoring.ts";
+import type { Material } from "../MaterialKeeping/MaterialKeeping.ts";
+import type { Skill, Version } from "../SkillMapping.ts";
+import { GroundedTutoring } from "./GroundedTutoring.ts";
 
-class MaterialStorage extends GroundedTutoring<User, Course> {}
+/**
+ * GroundedTutoring bound as the stage's instance: Learner is Registering.User, Material is Library.Material,
+ * Topic is SkillMapping.Skill, and Definition is SkillMapping.Version.
+ */
+class LearnerTutoring extends GroundedTutoring<User, Material, Skill, Version> {}
 export const groundedTutoring = registerConcept({
-  class: MaterialStorage, spec,
+  class: LearnerTutoring, spec,
   refusals: {
-    INVALID_TUTORING_MATERIAL: InvalidTutoringMaterial,
-    INVALID_MATERIAL_IMPORT_KEY: InvalidMaterialImportKey,
-    MATERIAL_IMPORT_CONFLICT: MaterialImportConflict,
     INVALID_LESSON_CONTENT: InvalidLessonContent,
     INVALID_LESSON_SOURCES: InvalidLessonSources,
     INVALID_TASK_CONTENT: InvalidTaskContent,
@@ -30,6 +32,5 @@ export const groundedTutoring = registerConcept({
     ATTEMPT_REVIEW_UNAVAILABLE: AttemptReviewUnavailable,
     ATTEMPT_REVIEW_CHANGED: AttemptReviewChanged,
     SESSION_CLOSE_UNAVAILABLE: SessionCloseUnavailable,
-
   },
 });

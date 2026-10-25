@@ -12,11 +12,11 @@ A graded upload is an ordinary course material. Graded work may be a PDF, with o
 
 Graded work goes through the same import path as any other upload, so the importer reads every kind of returned paper ([materials](Materials.md), "Graded work"): a scanned or partly scanned PDF, whose pages without text become page locations that the tutor reads from the original, a photographed page, or a HEIC or HEIF photo. The import screen accepts a PDF or photos of the pages (PNG, JPEG, WebP, HEIC, or HEIF). When the importer still finds nothing to read, the learner sees its own sentence, "No readable content was found in these files. Check that they aren't empty, or export documents that contain pictures to PDF and import the PDF.", and the import screen adds "Upload photos of the pages instead." beneath it. Before uploading anything, the import screen also checks each file against the tutor's inline limit (15 MB today), because extraction sends every original PDF and photo inline in full. A larger PDF or photo is refused on the screen with the matching sentence from the [learning flows](Learning.md), so it never becomes a graded material that the tutor cannot read. The screen also keeps a graded upload to 12 files and 25 MB in total, below the 95 MB that other uploads allow; if the provider still refuses a whole request as too large, the learner sees that recorded provider reason.
 
-The import screen requires a name for the work that is not blank after trimming. It sets the title to `Graded work: ` followed by the trimmed name, such as `Graded work: Midterm 1`. [gradedTitle](computation:gradedTitle) recognizes that exact prefix. The title carries the graded mark so that GroundedTutoring's material record needs no new field for it. Material records never change, so a graded upload stays graded. The library lists the title, so the learner can see which materials are graded work. For a graded material, the library offers "Review graded work" instead of skill suggestions. It reopens the import screen for that material, so the learner never needs to upload the same file again.
+The import screen requires a name for the work that is not blank after trimming. It sets the title to `Graded work: ` followed by the trimmed name, such as `Graded work: Midterm 1`. [gradedTitle](computation:gradedTitle) recognizes that exact prefix. The title carries the graded mark so that MaterialKeeping's material record needs no new field for it. Material records never change, so a graded upload stays graded. The library lists the title, so the learner can see which materials are graded work. For a graded material, the library offers "Review graded work" instead of skill suggestions. It reopens the import screen for that material, so the learner never needs to upload the same file again.
 
 Each upload is a separate material. If the learner uploads the same paper twice, its questions can be imported once from each upload, and the skill counts that evidence twice. The import screen says so plainly: "Each upload is separate. Uploading the same paper again lets its questions be imported again."
 
-[GradedMaterial](view:Importing.GradedMaterial) reads `GroundedTutoring._material`. It holds when the material exists, belongs to the owner, lies in a course the owner owns ([OwnedCourse](view:Courses.OwnedCourse)), and has a graded title. It answers that course and the material's retained originals. Every endpoint here requires it before any other read. An unknown material, another learner's material, a material outside the owner's courses, and the owner's own ungraded material all answer `GRADED_MATERIAL_UNAVAILABLE` with one sentence: "Choose graded work that you imported into one of your courses." A caller therefore cannot tell whether another learner's material exists.
+[GradedMaterial](view:Importing.GradedMaterial) reads `Library._material`. It holds when the material exists, belongs to the owner, lies in a course the owner owns ([OwnedCourse](view:Courses.OwnedCourse)), and has a graded title. It answers that course and the material's retained originals. Every endpoint here requires it before any other read. An unknown material, another learner's material, a material outside the owner's courses, and the owner's own ungraded material all answer `GRADED_MATERIAL_UNAVAILABLE` with one sentence: "Choose graded work that you imported into one of your courses." A caller therefore cannot tell whether another learner's material exists.
 
 Graded work is evidence, not teaching material. It never becomes a skill source, so lessons, practice tasks, hints, and assessments never send it to the tutor as a source. The course setup view does not offer it for skill suggestions or as a draft's source. [Suggest](reaction:Learning.Suggest), [ProposeSkill](reaction:Courses.ProposeSkill), and [EditDraft](reaction:Courses.EditDraft) first confirm that the material is the learner's own in the chosen course. Any other material keeps its existing ownership refusal, whatever its title. Only then do they answer `GRADED_MATERIAL_NOT_SOURCE` for a graded title, before any provider call or skill change: graded work is evidence, not a teaching source.
 
@@ -109,7 +109,7 @@ gradedTitle(title: String) : Flag
 hasConfirmedSkill(skills: SkillMapping.SkillMapRows) : Flag
   True when the course map has at least one confirmed skill.
 
-extractRequest(selected: GroundedTutoring.SourceRecords, skills: SkillMapping.SkillMapRows) : TutorRequest
+extractRequest(selected: Library.SourceRecords, skills: SkillMapping.SkillMapRows) : TutorRequest
   Prepares an EXTRACT request. Its only source is the selected graded material, it carries no separate learner work, and its context lists each confirmed skill's identity, title, current outcome, and gate in skill identity order. It does not call a provider.
 
 hasGradedRows(answer: TutorAnswer) : Flag
@@ -121,12 +121,12 @@ gradedToday(at: DateTime) : String
 gradedReview(row: GradedRow, outsideHelp: Flag, performedOn: String, at: DateTime, skills: SkillMapping.SkillMapRows) : GradedReview
   Applies the confirm checks for the date and the row in their stated order and answers the first failure: DATE_INVALID, DATE_FUTURE, ROW_INVALID, UNMAPPED, HELP_CONFLICT, or SKILL_UNAVAILABLE. Otherwise it answers READY with the start of the performance date in America/New_York. Today follows the gradedToday rule for the supplied instant.
 
-gradedKey(material: GroundedTutoring.Material, row: GradedRow) : GradedKey
+gradedKey(material: Library.Material, row: GradedRow) : GradedKey
   Produces the skill and source key of the row. The key is the word graded followed by the JSON array of the material identity, the trimmed label, and the skill identity.
 
-gradedImport(material: GroundedTutoring.Material, originals: GroundedTutoring.MediaList, row: GradedRow, outsideHelp: Flag, performedAt: DateTime, skills: SkillMapping.SkillMapRows) : GradedImport
+gradedImport(material: Library.Material, originals: Library.MediaList, row: GradedRow, outsideHelp: Flag, performedAt: DateTime, skills: SkillMapping.SkillMapRows) : GradedImport
   Produces the importGraded input for the row, with the values listed under Confirming the import, including the rationale wording. It uses the gradedKey source key and the current version, outcome, and gate from the course map.
 
-gradedSource(sourceKey: String, material: GroundedTutoring.Material) : Flag
+gradedSource(sourceKey: String, material: Library.Material) : Flag
   True when gradedKey made the source key for this material.
 ```

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { SkillRows, SkillInfo, Sessions, StudySession, Cases, CaseInfo, Tracks, Schedule, TutorRequest } from "../learning-data.ts";
-import { isMediaList } from "../concepts/GroundedTutoring/media.ts";
+import { isMediaList } from "../media.ts";
 import type { SourceContext } from "../tutor-types.ts";
 import type { Candidate, CutValue } from "../concepts/StudyPlanning/StudyPlanning.ts";
 import type { ResponseValue, Help } from "../concepts/AssessmentReviewing/AssessmentReviewing.ts";

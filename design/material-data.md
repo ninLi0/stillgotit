@@ -1,6 +1,6 @@
 # Material data
 
-This document defines the concrete values used by GroundedTutoring's material methods. The importer prepares these values before calling `addMaterial`.
+This document defines the concrete values that the [MaterialKeeping](concepts/MaterialKeeping.md) concept saves. The application's instance of it is called Library. The importer prepares these values before calling `Library.add`, and GroundedTutoring uses the same `MediaValue` representation for files that a learner attaches to a response.
 
 ## Retained files
 
@@ -26,7 +26,7 @@ The importer produces this representation; extraction tests verify representativ
 
 ## Locations
 
-Locations are stable source labels. Each starts with a key: the first 16 hexadecimal characters of the SHA-256 digest of the file reference. The importer assigns them consistently within a material. GroundedTutoring's methods preserve the supplied locations, and tutoring citation checks use them. A citation may name any rendition's location, or `content` when the material's content is not blank. Multiple renditions can show the same source location.
+Locations are stable source labels. Each starts with a key: the first 16 hexadecimal characters of the SHA-256 digest of the file reference. The importer assigns them consistently within a material. MaterialKeeping preserves the supplied locations, and the host's citation checks use them. A citation may name any rendition's location, or `content` when the material's content is not blank. Multiple renditions can show the same source location.
 
 | Source | Location | Example |
 | --- | --- | --- |
@@ -162,13 +162,13 @@ A download or view first checks the learner's access to the material and the exa
 
 A material needs nonblank `content` or at least one valid readable rendition. Text, image, and page renditions are readable; a page rendition is readable because the tutor reads that page from the retained PDF. A filename, file reference, MIME type, or `readable: true` flag by itself is insufficient. Valid metadata with no renditions can accompany readable content or another readable original; its reported limitations remain available.
 
-GroundedTutoring validates this representation and saves it. The host must first verify that referenced files exist, are retained, belong to the learner, and can be used as stated. The concept does not open files or run extraction, rendering, transcription, or AI calls. Structural validation is not proof that a scan was read correctly or that a transcript is accurate.
+MaterialKeeping validates this representation and saves it. The host must first verify that referenced files exist, are retained, belong to the learner, and can be used as stated. The concept does not open files or run extraction, rendering, transcription, or AI calls. Structural validation is not proof that a scan was read correctly or that a transcript is accurate.
 
 Learner, scope, material, and file references are nonblank strings. Values are preserved exactly, without trimming or case folding. `origin` is `COURSE` or `REFERENCE`. Invalid material fields cause `INVALID_TUTORING_MATERIAL` before any storage work. Malformed query identifiers cause a `TypeError`; a well-formed but unknown identifier returns no rows.
 
 ## Import keys and retries
 
-`addMaterial` also requires a nonblank `importKey`. The host supplies it for one saved import. A missing, malformed, or blank key causes `INVALID_MATERIAL_IMPORT_KEY` before storage work. Material-field validation comes first. The key grants no access; the host must still verify the session, course, and files.
+`add` also requires a nonblank `importKey`. The host supplies it for one saved import. A missing, malformed, or blank key causes `INVALID_MATERIAL_IMPORT_KEY` before storage work. Material-field validation comes first. The key grants no access; the host must still verify the session, course, and files.
 
 The pair `(owner, importKey)` identifies one material. A matching retry returns that material's ID without changing it. A retry with different scope, title, locator, content, originals, or origin causes `MATERIAL_IMPORT_CONFLICT`. Strings compare exactly. List order matters, including original files, renditions, and limitations. Record field order does not matter. Comparison uses the complete saved values, not a content hash.
 
@@ -178,10 +178,10 @@ The host must save the key and prepared input before calling the action. Retryin
 
 ## Storage behavior
 
-`addMaterial` snapshots validated input before its first database wait. It looks for the learner's import key, then creates a material only if the key is unused. One document write saves the material, key, and ID together. A unique index on `(owner, importKey)` settles concurrent creates. A client that loses the insert race reads the winning record and applies the same match or conflict rule. Other database failures remain errors. If a reply is lost after a save, a later call can recover the material with the same key and input.
+`add` snapshots validated input before its first database wait. It looks for the learner's import key, then creates a material only if the key is unused. One document write saves the material, key, and ID together. A unique index on `(owner, importKey)` settles concurrent creates. A client that loses the insert race reads the winning record and applies the same match or conflict rule. Other database failures remain errors. If a reply is lost after a save, a later call can recover the material with the same key and input.
 
 Reads use the primary with majority read concern. Writes use majority, journaled acknowledgement. The key index covers only records with string keys. Older materials without keys remain readable and are not claimed by matching content. There is no material-update action.
 
-`_materials` filters by both owner and scope, orders by material ID, and returns only ID, title, locator, and origin. `_material` returns the full material for one ID, or no row. Both queries are read-only. `_material` is an internal lookup; an application ownership check is required before its result reaches a browser.
+`_materials` filters by both owner and scope, orders by material ID, and returns only ID, title, locator, and origin. `_material` returns the full material for one ID, or no row. `_sourceSet` returns the owner's materials in one scope with their content and originals, which the application uses to build tutor requests. All three queries are read-only. `_material` is an internal lookup; an application ownership check is required before its result reaches a browser.
 
-GroundedTutoring is registered with its full specification, including lessons and practice. The [checked P2 stage](stages/materials.md) connects material import, ownership checks, AI proposals, and skill confirmation. File and provider operations remain host responsibilities.
+MaterialKeeping and GroundedTutoring are each registered with their full specifications. The [checked P2 stage](stages/materials.md) connects material import, ownership checks, AI proposals, and skill confirmation. File and provider operations remain host responsibilities.

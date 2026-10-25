@@ -4,6 +4,7 @@ import { assessmentReviewing } from "../concepts/AssessmentReviewing/registry.ts
 import { commonsFederating } from "../concepts/Federating/registry.ts";
 import { generating } from "../concepts/Generating/registry.ts";
 import { groundedTutoring } from "../concepts/GroundedTutoring/registry.ts";
+import { materialKeeping } from "../concepts/MaterialKeeping/registry.ts";
 import { masteryEstimating } from "../concepts/MasteryEstimating/registry.ts";
 import { registering } from "../concepts/Registering/registry.ts";
 import { sessioning } from "../concepts/Sessioning/registry.ts";
@@ -176,7 +177,7 @@ export function stillGotItPolicy(publicOrigin: string, requestBodyBytes = BODY_L
 // The adapter sends a refusal only as its public category above, so http.ts adds the refusal's sentence as `detail`.
 // A concept's sentences come from its specification, which states the same sentence its refusal class carries.
 const conceptSentences: Readonly<Record<string, string>> = Object.fromEntries(
-  [registering, commonsFederating, sessioning, skillMapping, groundedTutoring, assessmentReviewing, masteryEstimating, studyPlanning, generating]
+  [registering, commonsFederating, sessioning, skillMapping, materialKeeping, groundedTutoring, assessmentReviewing, masteryEstimating, studyPlanning, generating]
     .flatMap(({ specification }) => specification.actions.flatMap(({ refusals }) => refusals.map(({ code, message }) => [code, message]))));
 
 /**

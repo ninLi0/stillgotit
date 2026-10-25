@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { extname } from "node:path";
 import type { ImportOperation } from "../storage/MaterialImportStore.ts";
-import type { MediaValue } from "../concepts/GroundedTutoring/media.ts";
+import type { MediaValue } from "../media.ts";
 import { bytesNeeded, classify, extract, START_BYTES, type Detected } from "./extract.ts";
 import { fileStore, type FileStore, type StoreCall } from "./file-store.ts";
 import { Refusal } from "./refusal.ts";

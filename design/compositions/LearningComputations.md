@@ -33,7 +33,7 @@ generationDefinition(request: TutorRequest) : GenerationDefinition
 generationFields(answer: TutorAnswer) : TutorAnswer
   Exposes fields from a validated provider answer for later actions.
 
-gradeRequest(selected: GroundedTutoring.SourceRecords, data: AssessmentReviewing.CaseRecord) : TutorRequest
+gradeRequest(selected: Library.SourceRecords, data: AssessmentReviewing.CaseRecord) : TutorRequest
   Prepares the immutable assessment work and clarifications for grading. It does not call a provider.
 
 hasLessonQuestion(data: GroundedTutoring.StudyRecord) : Flag
@@ -42,7 +42,7 @@ hasLessonQuestion(data: GroundedTutoring.StudyRecord) : Flag
 itemSubject(candidate: StudyPlanning.Candidate) : ItemSubject
   Extracts the activity's saved skill and requirement version for validation.
 
-lessonRequest(selected: GroundedTutoring.SourceRecords, context: SkillContext, request: String) : TutorRequest
+lessonRequest(selected: Library.SourceRecords, context: SkillContext, request: String) : TutorRequest
   Prepares the selected outcome and learner question for a cited lesson.
 
 planDetail(schedule: StudyPlanning.ScheduleValue) : PlanDetail
@@ -59,7 +59,7 @@ prerequisitesReady(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.
 progressRows(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows) : SkillProgress
   Pairs each course skill with its estimate for the current definition.
 
-responseInput(data: GroundedTutoring.StudyRecord, text: String, channel: GroundedTutoring.Channel, attachments: AttachmentList, sources: GroundedTutoring.SourceRecords) : ResponseInput
+responseInput(data: GroundedTutoring.StudyRecord, text: String, channel: GroundedTutoring.Channel, attachments: AttachmentList, sources: Library.SourceRecords) : ResponseInput
   Checks each listed material against the supplied sources, which are the learner's own materials in the session's course, and treats a list that names one material twice as invalid. One failing entry makes the whole response invalid. Rejects a response with neither text nor an attachment. The media are the retained files of each listed material in list order, keeping each material's own file order.
 
 reviewApproved(reviewed: Flag, unseen: Flag, outsideHelp: Flag) : Flag
@@ -71,13 +71,13 @@ selectSkill(skills: SkillMapping.SkillMapRows, skill: SkillMapping.Skill) : Skil
 selectSkillMaterials(context: SkillContext) : GroundedTutoring.MaterialSet
   Returns the current skill's material identities.
 
-selectSources(sources: GroundedTutoring.SourceRecords, materials: GroundedTutoring.MaterialSet) : SourceSelection
-  Selects the requested material identities and checks that none are missing.
+selectSources(sources: Library.SourceRecords, materials: GroundedTutoring.MaterialSet) : SourceSelection
+  Selects the requested material identities and checks that none are missing. The flows pass the learner's own materials in one course as the sources, so a valid selection also means that every requested material belongs to the learner and to that course, which GroundedTutoring no longer checks itself.
 
 sessionMaterials(data: GroundedTutoring.StudyRecord) : GroundedTutoring.MaterialSet
   Returns the source identities fixed when the session was created.
 
-sessionRequest(selected: GroundedTutoring.SourceRecords, data: GroundedTutoring.StudyRecord, kind: String) : TutorRequest
+sessionRequest(selected: Library.SourceRecords, data: GroundedTutoring.StudyRecord, kind: String) : TutorRequest
   Prepares saved dialogue and sources for a lesson reply or requested hint.
 
 studyDetail(context: SkillContext, tracks: MasteryEstimating.ProgressRows, sessions: GroundedTutoring.StudyRecords, cases: AssessmentReviewing.CaseRecords) : StudyDetail
@@ -96,10 +96,10 @@ estimateTimeline(explanation?: MasteryEstimating.EstimateExplanation, tracks: Ma
 submissionInput(data: GroundedTutoring.StudyRecord, unseen: Flag, outsideHelp: Flag) : SubmissionInput
   Uses corrected transcripts, saved attachments, and recorded hints. Converts dates to JSON values. Outside help prevents independent classification; the learner's freshness claim can only reduce the task's freshness.
 
-suggestRequest(selected: GroundedTutoring.SourceRecords) : TutorRequest
+suggestRequest(selected: Library.SourceRecords) : TutorRequest
   Prepares one owned source for editable skill suggestions.
 
-taskRequest(selected: GroundedTutoring.SourceRecords, context: SkillContext, sessions: GroundedTutoring.StudyRecords) : TutorRequest
+taskRequest(selected: Library.SourceRecords, context: SkillContext, sessions: GroundedTutoring.StudyRecords) : TutorRequest
   Includes the complete gate and earlier task questions so the provider can propose fresh work.
 
 attemptIsReady(data: GroundedTutoring.StudyRecord, dialogueLength: Number, reviewed: Flag, unseen: Flag, outsideHelp: Flag) : Flag

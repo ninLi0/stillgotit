@@ -1,7 +1,7 @@
 import { isDeepStrictEqual } from "node:util";
 import { type Collection, type Db, type Filter, MongoServerError, type UpdateFilter } from "mongodb";
-import type { MaterialImport } from "../concepts/GroundedTutoring/GroundedTutoring.ts";
-import { isMediaList, type MediaList } from "../concepts/GroundedTutoring/media.ts";
+import type { MaterialImport } from "../concepts/MaterialKeeping/MaterialKeeping.ts";
+import { isMediaList, type MediaList } from "../media.ts";
 
 /** Declared sources only. The importer must verify uploaded bytes before retaining them. */
 export type ImportSource = {

@@ -1,4 +1,4 @@
-import { GroundedTutoring, type Material } from "../../src/concepts/GroundedTutoring/GroundedTutoring.ts";
+import { MaterialKeeping, type Material } from "../../src/concepts/MaterialKeeping/MaterialKeeping.ts";
 import { connectMongo } from "../../src/storage/mongo.ts";
 
 const [database, name, material] = process.argv.slice(2);
@@ -8,12 +8,12 @@ if (!database?.startsWith("stillgotit_test_") || !name || !material) {
 
 const { client, db } = await connectMongo({ uri: process.env.MONGODB_TEST_URI, database });
 try {
-  const tutoring = new GroundedTutoring(db, name);
-  const [saved] = await tutoring._material({ material: material as Material });
+  const library = new MaterialKeeping(db, name);
+  const [saved] = await library._material({ material: material as Material });
   if (!saved) throw new Error("The saved material was not found.");
   console.log(JSON.stringify({
     saved,
-    materials: await tutoring._materials({ owner: saved.owner, scope: saved.scope }),
+    materials: await library._materials({ owner: saved.owner, scope: saved.scope }),
   }));
 } finally {
   await client.close();

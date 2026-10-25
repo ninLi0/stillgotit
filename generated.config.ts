@@ -2,6 +2,7 @@ import { StudyPlanning } from "./src/concepts/StudyPlanning/StudyPlanning.ts";
 import { MasteryEstimating } from "./src/concepts/MasteryEstimating/MasteryEstimating.ts";
 import { AssessmentReviewing } from "./src/concepts/AssessmentReviewing/AssessmentReviewing.ts";
 import { GroundedTutoring } from "./src/concepts/GroundedTutoring/GroundedTutoring.ts";
+import { MaterialKeeping } from "./src/concepts/MaterialKeeping/MaterialKeeping.ts";
 import { MongoClient } from "mongodb";
 import { httpWire } from "@mit-sdg/sync-engine-http/tooling";
 import { assembleApplication } from "./src/assembly.ts";
@@ -28,6 +29,7 @@ function assembleForChecks() {
     AssessmentReviewing: new AssessmentReviewing(client.db("stillgotit_spec_check")),
     MasteryEstimating: new MasteryEstimating(client.db("stillgotit_spec_check")),
     StudyPlanning: new StudyPlanning(client.db("stillgotit_spec_check")),
+    Library: new MaterialKeeping(client.db("stillgotit_spec_check"), "Library"),
     GroundedTutoring: new GroundedTutoring(client.db("stillgotit_spec_check")),
     TutorPreferring: new TutorPreferring(client.db("stillgotit_spec_check"), "TutorPreferring"),
     ViewPreferring: new ViewPreferring(client.db("stillgotit_spec_check"), "ViewPreferring"),

@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { extractRequest, gradedImport, gradedKey, gradedReview, gradedSource, gradedTitle, gradedToday, hasConfirmedSkill, hasGradedRows, type GradedRow } from "../src/computations/importing.ts";
 import type { SkillRows, TutorAnswer } from "../src/learning-data.ts";
-import type { Material } from "../src/concepts/GroundedTutoring/GroundedTutoring.ts";
-import type { MediaList } from "../src/concepts/GroundedTutoring/media.ts";
+import type { Material } from "../src/concepts/MaterialKeeping/MaterialKeeping.ts";
+import type { MediaList } from "../src/media.ts";
 
 const material = "material-1" as Material;
 const skill = (id: string, status: "DRAFT" | "CONFIRMED" | "ARCHIVED" = "CONFIRMED") => ({ skill: id, title: `Skill ${id}`, current: `${id}-v2`, status, unit: "unit-1", course: "course-1",

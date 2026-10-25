@@ -1,7 +1,7 @@
 import { compute, each, former, no, view, where, whether } from "@mit-sdg/sync-engine/language";
 import { concepts, computations } from "../concepts.ts";
 import { composition as Courses } from "./courses.ts";
-const { SkillMapping: Mapping, GroundedTutoring: Tutoring, AssessmentReviewing: Assessment, MasteryEstimating: Mastery, StudyPlanning: Planning } = concepts;
+const { SkillMapping: Mapping, Library, GroundedTutoring: Tutoring, AssessmentReviewing: Assessment, MasteryEstimating: Mastery, StudyPlanning: Planning } = concepts;
 export const OwnedSkill = view("(owner) owns study skill (skill)", ({ owner, skill }, { course, definition, status }, { unit }) => where(
   Mapping._skill({ skill }).is({ unit, current: definition, status }), Mapping._unit({ unit }).is({ course }), Courses.OwnedCourse({ owner, course }),
 )).optional();
@@ -22,7 +22,7 @@ export const OwnedAnyCase = view("(owner) owns practice or imported assessment (
 )).optional();
 export const SkillContext = view("the current context of (skill) for (owner)", ({ owner, skill }, { context, definition, skills, tracks, sources }, { course }) => where(
   OwnedSkill({ owner, skill }).is({ course, definition }), Mapping._map({ course }).is({ skills }), Mastery._progress({ learner: owner }).is({ tracks }),
-  Tutoring._sourceSet({ owner, scope: course }).is({ sources }), compute(computations.selectSkill, { skills, skill }, context),
+  Library._sourceSet({ owner, scope: course }).is({ sources }), compute(computations.selectSkill, { skills, skill }, context),
 )).optional();
 // `at` is the Read flow's instant. The explanation is an optional row: without one, `explanation` is null and the record is unchanged.
 export const SkillData = former("study data for (owner) and (skill) at (at)", ({ owner, skill, at }, { context, definition, tracks, sessions, cases, track, estimate, explanation, timeline }) => where(

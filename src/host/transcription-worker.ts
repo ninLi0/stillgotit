@@ -1,4 +1,4 @@
-import type { MediaRendition, MediaValue } from "../concepts/GroundedTutoring/media.ts";
+import type { MediaRendition, MediaValue } from "../media.ts";
 import {
   ImportProgressConflict, type ClaimedRecording, type ImportFailure, type ImportOperation, type MaterialImportStore, type TranscriptSegment,
 } from "../storage/MaterialImportStore.ts";

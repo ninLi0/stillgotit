@@ -3,7 +3,7 @@ import { extname } from "node:path";
 import { unzipSync, zipSync } from "fflate";
 import mammoth from "mammoth";
 import { extractText, getDocumentProxy } from "unpdf";
-import type { ImageMediaType, MediaRendition, MediaValue } from "../concepts/GroundedTutoring/media.ts";
+import type { ImageMediaType, MediaRendition, MediaValue } from "../media.ts";
 import { imageType, isPdf, OggVideo, readRecording, WindowsAudio, recordingFamilies, type RecordingInfo } from "./media-detect.ts";
 import { Refusal } from "./refusal.ts";
 

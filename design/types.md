@@ -1,6 +1,6 @@
 # Application identities
 
-All five learning concepts use `Registering.User` as their learner identity. The server gets that identity from `Sessioning.use`. A browser request cannot choose its acting learner. A course, skill, requirements version, practice task, or assessment case keeps its owning concept's identity when another concept refers to it. Titles, email addresses, and tree positions are not identity keys.
+All six learning concepts use `Registering.User` as their learner identity; for the Library, the MaterialKeeping instance, that identity is the owner of each material. The server gets that identity from `Sessioning.use`. A browser request cannot choose its acting learner. A course, material, skill, requirements version, practice task, or assessment case keeps its owning concept's identity when another concept refers to it. Titles, email addresses, and tree positions are not identity keys.
 
 ```instances
 instantiate Registering
@@ -13,11 +13,15 @@ instantiate Sessioning with
 
 instantiate SkillMapping with
   User is Registering.User
-  Material is GroundedTutoring.Material
+  Material is Library.Material
+
+instantiate MaterialKeeping as Library with
+  Owner is Registering.User
+  Scope is SkillMapping.Course
 
 instantiate GroundedTutoring with
   Learner is Registering.User
-  Scope is SkillMapping.Course
+  Material is Library.Material
   Topic is SkillMapping.Skill
   Definition is SkillMapping.Version
 
@@ -40,7 +44,7 @@ instantiate StudyPlanning with
   Definition is SkillMapping.Version
 ```
 
-This original domain inventory has eight application instances: five learning concepts and three account concepts. Learners and courses are records in their state; creating a course does not create another engine instance. The current inventory is in stages/materials.md. It binds eleven instances: these eight, the stateless TutorGenerating provider adapter, TutorPreferring, which keeps each learner's tutor choice, and ViewPreferring, which keeps each learner's home view.
+This domain inventory has nine application instances: six learning concepts and three account concepts. Learners and courses are records in their state; creating a course does not create another engine instance. The current inventory is in stages/materials.md. It binds twelve instances: these nine, the stateless TutorGenerating provider adapter, TutorPreferring, which keeps each learner's tutor choice, and ViewPreferring, which keeps each learner's home view.
 
 The practice-task binding requires membership in `GroundedTutoring.PracticeSessions`. Its actions take the parent `Session` type, so the application must check task membership before submitting an assessment. A lesson cannot serve as an assessed task.
 

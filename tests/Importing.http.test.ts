@@ -11,7 +11,7 @@ import { executionLimits } from "../src/assembly.ts";
 import { pdf, png } from "./fixtures/office.ts";
 import type { ExtractContext } from "../src/tutor-types.ts";
 import { refusalDetail } from "../src/host/http-policy.ts";
-import type { Material } from "../src/concepts/GroundedTutoring/GroundedTutoring.ts";
+import type { Material } from "../src/concepts/MaterialKeeping/MaterialKeeping.ts";
 import type { Result } from "../src/concepts/AssessmentReviewing/AssessmentReviewing.ts";
 import type { User } from "../src/concepts/Registering/Registering.ts";
 import { admissions, composition as Access } from "../src/compositions/access.ts";

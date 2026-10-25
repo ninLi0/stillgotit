@@ -1,7 +1,7 @@
-import type { Material } from "../concepts/GroundedTutoring/GroundedTutoring.ts";
+import type { Material } from "../concepts/MaterialKeeping/MaterialKeeping.ts";
 import { FilesApiError, GEMINI_TIMEOUT_MS, GeminiError, type Gemini, type GeminiPart } from "./gemini.ts";
 import type { MaterialFiles } from "./material-files.ts";
-import type { MediaList, MediaValue } from "../concepts/GroundedTutoring/media.ts";
+import type { MediaList, MediaValue } from "../media.ts";
 import type { ProviderFiles } from "./provider-files.ts";
 import { assertTutorChoice, objectSchema } from "./gemini.ts";
 import type { TutorChoice } from "../tutor-types.ts";

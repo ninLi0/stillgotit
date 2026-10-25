@@ -9,7 +9,7 @@ import {
 } from "../src/host/material-files.ts";
 import { DiskStore, S3Store, type FileStore } from "../src/host/file-store.ts";
 import type { ImportOperation } from "../src/storage/MaterialImportStore.ts";
-import { isMediaList } from "../src/concepts/GroundedTutoring/media.ts";
+import { isMediaList } from "../src/media.ts";
 import { ARCHIVE, RECORDING_UNREADABLE } from "../src/host/extract.ts";
 import { pdf, png } from "./fixtures/office.ts";
 import { heif, jpeg, mp4, scannedPdf, wav, webm } from "./fixtures/media.ts";
