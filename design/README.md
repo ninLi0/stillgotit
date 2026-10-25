@@ -10,7 +10,7 @@
 | [GroundedTutoring](concepts/GroundedTutoring.md) | Materials, grounded lessons, practice, dialogue, hints, and transcript review. |
 | [AssessmentReviewing](concepts/AssessmentReviewing.md) | Original work, judgments, clarifications, and revisions. |
 | [MasteryEstimating](concepts/MasteryEstimating.md) | Provisional confidence and replay of effective assessment evidence. |
-| [StudyPlanning](concepts/StudyPlanning.md) | Budgets, proposals, time records, and explicit exam-cut approval. |
+| [Budgeting](concepts/Budgeting.md) | A daily time budget, proposals, time records, and explicit approval of cuts; used as StudyPlanning. |
 | [Registering](concepts/Registering.md) | Local accounts with unique names and recovery keys. |
 | [Sessioning](concepts/Sessioning.md) | Local sessions and expiry. |
 | [Federating](concepts/Federating.md) | Verified Commons identities and local account links. |

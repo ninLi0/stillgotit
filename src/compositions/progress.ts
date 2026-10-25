@@ -26,27 +26,27 @@ const InitializedEvidence = reaction(({ owner, skill, definition, assessment, re
   .then(Mastery.acceptEvidence({ learner: owner, subject: skill, definition, evidence: assessment, revision, performedAt, signal: result, fresh, gateMet, attribution })));
 const ReplanAfterEvidence = reaction(({ owner, skill, course, candidates, horizonEnd, basis, explanation }) => when(Mastery.acceptEvidence({ learner: owner, subject: skill }).responds({}))
   .afterFlowSettles().where(R.OwnedSkill({ owner, skill }).is({ course }), R.CanReplan({ owner, course }), R.PlanContext({ owner, course }).is({ candidates, horizonEnd, basis, explanation }))
-  .then(Planning.replan({ learner: owner, scope: course, candidates, horizonEnd, basis, explanation, workloadComplete: false })));
+  .then(Planning.replan({ owner, scope: course, candidates, horizonEnd, basis, explanation, workloadComplete: false })));
 const ReplanAfterConfidence = reaction(({ owner, skill, course, candidates, horizonEnd, basis, explanation }) => when(Mastery.initialize({ learner: owner, subject: skill }).responds({}))
   .afterFlowSettles().where(R.OwnedSkill({ owner, skill }).is({ course }), R.CanReplan({ owner, course }), R.PlanContext({ owner, course }).is({ candidates, horizonEnd, basis, explanation }))
-  .then(Planning.replan({ learner: owner, scope: course, candidates, horizonEnd, basis, explanation, workloadComplete: false })));
-const ReplanAfterBudget = reaction(({ owner, course, candidates, horizonEnd, basis, explanation }) => when(Planning.configure({ learner: owner, scope: course }).responds({}))
+  .then(Planning.replan({ owner, scope: course, candidates, horizonEnd, basis, explanation, workloadComplete: false })));
+const ReplanAfterBudget = reaction(({ owner, course, candidates, horizonEnd, basis, explanation }) => when(Planning.configure({ owner, scope: course }).responds({}))
   .where(R.CanReplan({ owner, course }), R.PlanContext({ owner, course }).is({ candidates, horizonEnd, basis, explanation }))
-  .then(Planning.replan({ learner: owner, scope: course, candidates, horizonEnd, basis, explanation, workloadComplete: false })));
-const ActivateRoutine = reaction(({ owner, course, plan, currentBasis }) => when(Planning.replan({ learner: owner, scope: course, workloadComplete: false }).responds({ plan }))
-  .where(R.PlanContext({ owner, course }).is({ basis: currentBasis }), Planning._proposalCheck({ learner: owner, plan, currentBasis }).is({ canActivate: true, needsConfirmation: false }))
-  .then(Planning.activateRoutine({ learner: owner, plan, currentBasis })));
+  .then(Planning.replan({ owner, scope: course, candidates, horizonEnd, basis, explanation, workloadComplete: false })));
+const ActivateRoutine = reaction(({ owner, course, plan, currentBasis }) => when(Planning.replan({ owner, scope: course, workloadComplete: false }).responds({ plan }))
+  .where(R.PlanContext({ owner, course }).is({ basis: currentBasis }), Planning._proposalCheck({ owner, plan, currentBasis }).is({ canActivate: true, needsConfirmation: false }))
+  .then(Planning.activateRoutine({ owner, plan, currentBasis })));
 // No course can be replanned during an activity, so finishing or stopping one refreshes every course of the learner
 // with saved preferences. An exam or budget change made in another course during the activity takes effect here.
-const ReplanAfterFinish = reaction(({ owner, course, candidates, horizonEnd, basis, explanation }) => when(Planning.finish({ learner: owner }).responds({}))
+const ReplanAfterFinish = reaction(({ owner, course, candidates, horizonEnd, basis, explanation }) => when(Planning.finish({ owner }).responds({}))
   .where(Mapping._courses({ owner }).is({ course }), R.CanReplan({ owner, course }), R.PlanContext({ owner, course }).is({ candidates, horizonEnd, basis, explanation }))
-  .then(Planning.replan({ learner: owner, scope: course, candidates, horizonEnd, basis, explanation, workloadComplete: false })));
-const ReplanAfterStop = reaction(({ owner, course, candidates, horizonEnd, basis, explanation }) => when(Planning.stop({ learner: owner }).responds({}))
+  .then(Planning.replan({ owner, scope: course, candidates, horizonEnd, basis, explanation, workloadComplete: false })));
+const ReplanAfterStop = reaction(({ owner, course, candidates, horizonEnd, basis, explanation }) => when(Planning.stop({ owner }).responds({}))
   .where(Mapping._courses({ owner }).is({ course }), R.CanReplan({ owner, course }), R.PlanContext({ owner, course }).is({ candidates, horizonEnd, basis, explanation }))
-  .then(Planning.replan({ learner: owner, scope: course, candidates, horizonEnd, basis, explanation, workloadComplete: false })));
-const ReplanAfterMiss = reaction(({ owner, item, course, candidates, horizonEnd, basis, explanation }) => when(Planning.miss({ learner: owner, item }).responds({}))
-  .where(Planning._item({ item }).is({ learner: owner, scope: course }), R.CanReplan({ owner, course }), R.PlanContext({ owner, course }).is({ candidates, horizonEnd, basis, explanation }))
-  .then(Planning.replan({ learner: owner, scope: course, candidates, horizonEnd, basis, explanation, workloadComplete: false })));
+  .then(Planning.replan({ owner, scope: course, candidates, horizonEnd, basis, explanation, workloadComplete: false })));
+const ReplanAfterMiss = reaction(({ owner, item, course, candidates, horizonEnd, basis, explanation }) => when(Planning.miss({ owner, item }).responds({}))
+  .where(Planning._item({ item }).is({ owner, scope: course }), R.CanReplan({ owner, course }), R.PlanContext({ owner, course }).is({ candidates, horizonEnd, basis, explanation }))
+  .then(Planning.replan({ owner, scope: course, candidates, horizonEnd, basis, explanation, workloadComplete: false })));
 // Recovery is scoped to the Read endpoint's successful authentication occurrence.
 const RepairReadEvidence = reaction(({ identity, owner, course, unit, skill, assessment, definition, revision, result, gateMet, rationale, origin, fresh, performedAt, attribution }) =>
   when(returned({ concept: "Sessioning", action: "use", result: identity }, { by: "Learning.Read" }))

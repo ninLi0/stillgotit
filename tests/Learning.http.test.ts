@@ -198,7 +198,7 @@ test("direct judgments trigger evidence and plans; a read repairs interrupted pr
   await app.runtime.gateway.whenIdle();
   let inputs = await app.runtime.application.concepts.MasteryEstimating._inputs({ track: original.track.track });
   expect(inputs).toHaveLength(1); expect(inputs[0]!.revision).toBe(2); expect(inputs[0]!.signal).toBe("SLIP");
-  const [next] = await app.runtime.application.concepts.StudyPlanning._next({ learner: user, scope: course });
+  const [next] = await app.runtime.application.concepts.StudyPlanning._next({ owner: user, scope: course });
   expect(next?.candidate.subject).toBe(skill);
   // Simulate process loss after a durable judgment but before its reactions ran.
   const { AssessmentReviewing } = await import("../src/concepts/AssessmentReviewing/AssessmentReviewing.ts");
@@ -212,10 +212,10 @@ test("direct judgments trigger evidence and plans; a read repairs interrupted pr
   inputs = await app.runtime.application.concepts.MasteryEstimating._inputs({ track: original.track.track });
   expect(inputs).toHaveLength(1); expect(inputs[0]!.revision).toBe(3);
   expect(inputs[0]!.performedAt.toISOString()).toBe(assessment.performedAt);
-  const plans = await app.runtime.application.concepts.StudyPlanning._plans({ learner: user, scope: course });
+  const plans = await app.runtime.application.concepts.StudyPlanning._plans({ owner: user, scope: course });
   await learner.ok("/learning/read", { skill });
   expect(await app.runtime.application.concepts.MasteryEstimating._inputs({ track: original.track.track })).toEqual(inputs);
-  expect(await app.runtime.application.concepts.StudyPlanning._plans({ learner: user, scope: course })).toEqual(plans);
+  expect(await app.runtime.application.concepts.StudyPlanning._plans({ owner: user, scope: course })).toEqual(plans);
 }, 30_000);
 
 test("readiness, ownership and stale dialogue are refused before generation or mutation", async () => {

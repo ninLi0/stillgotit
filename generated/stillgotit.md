@@ -55,6 +55,73 @@ Defined in [AssessmentReviewing](../design/concepts/AssessmentReviewing.md), lin
   - `Subject` is `SkillMapping.Skill` — [P2 learning journey](../design/stages/materials.md), line 37.
   - `Task` is `GroundedTutoring.Session` — [P2 learning journey](../design/stages/materials.md), line 39.
 
+### Budgeting
+
+Defined in [Budgeting](../design/concepts/Budgeting.md), line 1.
+
+#### Actions
+
+- `configure(owner: Owner, scope: Scope, dailyMinutes: Number, focusNote: String) : returns (preferences: Preferences)`
+  - Refuses `INVALID_DAILY_BUDGET`: Enter a whole number of minutes from 0 to 1440.
+- `setDeadline(owner: Owner, scope: Scope, date: Date, covered: SubjectSet) : returns (deadline: Deadline)`
+  - Refuses `DEADLINE_PREFERENCES_UNAVAILABLE`: Set a daily budget first.
+  - Refuses `INVALID_DEADLINE_DETAILS`: Choose today or a future date and at least one covered subject.
+- `removeDeadline(owner: Owner, scope: Scope, date: Date) : returns (deadline: Deadline)`
+  - Refuses `DEADLINE_REMOVE_UNAVAILABLE`: Choose a recorded deadline.
+- `replan(owner: Owner, scope: Scope, candidates: CandidateList, horizonEnd: Date, explanation: String, basis: String, workloadComplete: Flag) : returns (plan: Plan)`
+  - Refuses `PLAN_PREFERENCES_UNAVAILABLE`: Set a daily budget first.
+  - Refuses `PLAN_SESSION_IN_PROGRESS`: Finish or stop the current activity before replacing the schedule.
+  - Refuses `INVALID_PLAN_INPUT`: Provide valid activities, planning dates, and all known unfinished work for the nearest deadline.
+- `activateRoutine(owner: Owner, plan: Plan, currentBasis: String) : returns (plan: Plan)`
+  - Refuses `ROUTINE_PLAN_UNAVAILABLE`: Choose one of your proposed plans.
+  - Refuses `ROUTINE_SESSION_IN_PROGRESS`: Finish or stop the current activity before changing plans.
+  - Refuses `ROUTINE_PLAN_OUTDATED`: Create a new proposal from the current budget, dates, and progress.
+  - Refuses `DEADLINE_TRADEOFF_CONFIRMATION_REQUIRED`: Review and confirm the proposed cuts.
+- `confirmTradeoffs(owner: Owner, plan: Plan, currentBasis: String) : returns (plan: Plan)`
+  - Refuses `TRADEOFF_PLAN_UNAVAILABLE`: Choose one of your proposed plans.
+  - Refuses `TRADEOFF_SESSION_IN_PROGRESS`: Finish or stop the current activity before changing plans.
+  - Refuses `TRADEOFF_PLAN_OUTDATED`: Review a new proposal based on the current budget, dates, and progress.
+  - Refuses `TRADEOFF_CONFIRMATION_NOT_NEEDED`: This plan has no new cuts. Use routine activation.
+- `declineTradeoffs(owner: Owner, plan: Plan) : returns (plan: Plan)`
+  - Refuses `PLAN_DECLINE_UNAVAILABLE`: Choose one of your proposed plans.
+- `begin(owner: Owner, item: Item) : returns (item: Item)`
+  - Refuses `ACTIVITY_BEGIN_UNAVAILABLE`: Choose an unfinished activity from your active plan.
+  - Refuses `ANOTHER_ACTIVITY_IN_PROGRESS`: Finish or stop the current activity first.
+  - Refuses `ACTIVITY_NOT_SCHEDULED_TODAY`: Choose an activity scheduled for today or update the plan.
+  - Refuses `ACTIVITY_EXCEEDS_REMAINING_BUDGET`: Update the plan or time budget before starting this activity.
+- `finish(owner: Owner, item: Item, actualMinutes: Number) : returns (item: Item)`
+  - Refuses `ACTIVITY_FINISH_UNAVAILABLE`: Choose your current activity.
+  - Refuses `INVALID_FINISH_TIME`: Enter a nonnegative number of minutes spent.
+- `stop(owner: Owner, item: Item, actualMinutes: Number) : returns (item: Item)`
+  - Refuses `ACTIVITY_STOP_UNAVAILABLE`: Choose your current activity.
+  - Refuses `INVALID_STOP_TIME`: Enter a nonnegative number of minutes spent.
+- `miss(owner: Owner, item: Item) : returns (item: Item)`
+  - Refuses `ACTIVITY_MISS_UNAVAILABLE`: Choose an unfinished activity from your active plan.
+  - Refuses `ACTIVITY_MISS_TOO_EARLY`: Only today's or an overdue activity can be marked missed.
+
+#### Queries
+
+- `_preferences(owner: Owner, scope: Scope) : optional (preferences: Preferences, dailyMinutes: Number, focusNote: String)`
+- `_deadlines(owner: Owner, scope: Scope) : many (deadline: Deadline, date: Date, covered: SubjectSet, active: Flag)`
+- `_plans(owner: Owner, scope: Scope) : many (plan: Plan, status: PlanStatus, horizonEnd: Date, needsConfirmation: Flag)`
+- `_plan(plan: Plan) : optional (owner: Owner, scope: Scope, status: PlanStatus, basis: String, inputs: PlanInputs, horizonEnd: Date, explanation: String, focusDeadline?: Deadline, urgent: Flag, workloadComplete: Flag, requiredMinutes: Number, availableMinutes: Number, scheduledMinutes: Number, deferredMinutes: Number, needsConfirmation: Flag)`
+- `_items(plan: Plan) : many (item: Item, candidate: Candidate, day: Date, status: ItemStatus, actualMinutes: Number, spentOn?: Date)`
+- `_next(owner: Owner, scope: Scope) : optional (item: Item, candidate: Candidate, day: Date, status: ItemStatus)`
+- `_budget(owner: Owner, scope: Scope, day: Date) : optional (dailyMinutes: Number, spentMinutes: Number, remainingMinutes: Number)`
+- `_deferred(plan: Plan) : many (candidate: Candidate)`
+- `_cuts(plan: Plan) : many (cut: CutValue)`
+- `_proposalCheck(owner: Owner, plan: Plan, currentBasis: String) : optional (locallyCurrent: Flag, contextCurrent: Flag, sessionInProgress: Flag, needsConfirmation: Flag, canActivate: Flag)`
+- `_schedule(owner: Owner, scope: Scope) : one (schedule: ScheduleValue)`
+- `_item(item: Item) : optional (owner: Owner, scope: Scope, item: Item, candidate: Candidate, day: String, status: ItemStatus, actualMinutes: Number, spentOn?: String)`
+
+#### Instances
+
+- `StudyPlanning` — instance of `Budgeting` — [P2 learning journey](../design/stages/materials.md), line 47.
+  - `Definition` is `SkillMapping.Version` — [P2 learning journey](../design/stages/materials.md), line 51.
+  - `Owner` is `Registering.User` — [P2 learning journey](../design/stages/materials.md), line 48.
+  - `Scope` is `SkillMapping.Course` — [P2 learning journey](../design/stages/materials.md), line 49.
+  - `Subject` is `SkillMapping.Skill` — [P2 learning journey](../design/stages/materials.md), line 50.
+
 ### Federating
 
 Defined in [Federating](../design/concepts/Federating.md), line 1.
@@ -328,73 +395,6 @@ Defined in [SkillMapping](../design/concepts/SkillMapping.md), line 1.
   - `Material` is `GroundedTutoring.Material` — [P2 learning journey](../design/stages/materials.md), line 27.
   - `User` is `Registering.User` — [P2 learning journey](../design/stages/materials.md), line 26.
 
-### StudyPlanning
-
-Defined in [StudyPlanning](../design/concepts/StudyPlanning.md), line 1.
-
-#### Actions
-
-- `configure(learner: Learner, scope: Scope, dailyMinutes: Number, focusNote: String) : returns (preferences: Preferences)`
-  - Refuses `INVALID_DAILY_BUDGET`: Enter a whole number of minutes from 0 to 1440.
-- `setExam(learner: Learner, scope: Scope, date: Date, covered: SubjectSet) : returns (exam: Exam)`
-  - Refuses `EXAM_PREFERENCES_UNAVAILABLE`: Set a study budget for this course first.
-  - Refuses `INVALID_EXAM_DETAILS`: Choose today or a future date and at least one covered skill.
-- `removeExam(learner: Learner, scope: Scope, date: Date) : returns (exam: Exam)`
-  - Refuses `EXAM_REMOVE_UNAVAILABLE`: Choose an exam recorded for this course.
-- `replan(learner: Learner, scope: Scope, candidates: CandidateList, horizonEnd: Date, explanation: String, basis: String, workloadComplete: Flag) : returns (plan: Plan)`
-  - Refuses `PLAN_PREFERENCES_UNAVAILABLE`: Set a study budget for this course first.
-  - Refuses `PLAN_SESSION_IN_PROGRESS`: Finish or stop the current activity before replacing the schedule.
-  - Refuses `INVALID_PLAN_INPUT`: Provide valid activities, planning dates, and all known unfinished exam preparation.
-- `activateRoutine(learner: Learner, plan: Plan, currentBasis: String) : returns (plan: Plan)`
-  - Refuses `ROUTINE_PLAN_UNAVAILABLE`: Choose one of your proposed plans.
-  - Refuses `ROUTINE_SESSION_IN_PROGRESS`: Finish or stop the current activity before changing plans.
-  - Refuses `ROUTINE_PLAN_OUTDATED`: Create a new proposal from the current budget, dates, and progress.
-  - Refuses `EXAM_TRADEOFF_CONFIRMATION_REQUIRED`: Review and confirm the proposed cuts to exam preparation.
-- `confirmTradeoffs(learner: Learner, plan: Plan, currentBasis: String) : returns (plan: Plan)`
-  - Refuses `TRADEOFF_PLAN_UNAVAILABLE`: Choose one of your proposed plans.
-  - Refuses `TRADEOFF_SESSION_IN_PROGRESS`: Finish or stop the current activity before changing plans.
-  - Refuses `TRADEOFF_PLAN_OUTDATED`: Review a new proposal based on the current budget, dates, and progress.
-  - Refuses `TRADEOFF_CONFIRMATION_NOT_NEEDED`: This plan has no new exam cuts. Use routine activation.
-- `declineTradeoffs(learner: Learner, plan: Plan) : returns (plan: Plan)`
-  - Refuses `PLAN_DECLINE_UNAVAILABLE`: Choose one of your proposed plans.
-- `begin(learner: Learner, item: Item) : returns (item: Item)`
-  - Refuses `ACTIVITY_BEGIN_UNAVAILABLE`: Choose an unfinished activity from your active plan.
-  - Refuses `ANOTHER_ACTIVITY_IN_PROGRESS`: Finish or stop the current activity first.
-  - Refuses `ACTIVITY_NOT_SCHEDULED_TODAY`: Choose an activity scheduled for today or update the plan.
-  - Refuses `ACTIVITY_EXCEEDS_REMAINING_BUDGET`: Update the plan or time budget before starting this activity.
-- `finish(learner: Learner, item: Item, actualMinutes: Number) : returns (item: Item)`
-  - Refuses `ACTIVITY_FINISH_UNAVAILABLE`: Choose your current activity.
-  - Refuses `INVALID_FINISH_TIME`: Enter a nonnegative number of minutes spent.
-- `stop(learner: Learner, item: Item, actualMinutes: Number) : returns (item: Item)`
-  - Refuses `ACTIVITY_STOP_UNAVAILABLE`: Choose your current activity.
-  - Refuses `INVALID_STOP_TIME`: Enter a nonnegative number of minutes spent.
-- `miss(learner: Learner, item: Item) : returns (item: Item)`
-  - Refuses `ACTIVITY_MISS_UNAVAILABLE`: Choose an unfinished activity from your active plan.
-  - Refuses `ACTIVITY_MISS_TOO_EARLY`: Only today's or an overdue activity can be marked missed.
-
-#### Queries
-
-- `_preferences(learner: Learner, scope: Scope) : optional (preferences: Preferences, dailyMinutes: Number, focusNote: String)`
-- `_exams(learner: Learner, scope: Scope) : many (exam: Exam, date: Date, covered: SubjectSet, active: Flag)`
-- `_plans(learner: Learner, scope: Scope) : many (plan: Plan, status: PlanStatus, horizonEnd: Date, needsConfirmation: Flag)`
-- `_plan(plan: Plan) : optional (learner: Learner, scope: Scope, status: PlanStatus, basis: String, inputs: PlanInputs, horizonEnd: Date, explanation: String, focusExam?: Exam, examUrgent: Flag, workloadComplete: Flag, estimatedExamMinutes: Number, availableExamMinutes: Number, scheduledMinutes: Number, deferredMinutes: Number, needsConfirmation: Flag)`
-- `_items(plan: Plan) : many (item: Item, candidate: Candidate, day: Date, status: ItemStatus, actualMinutes: Number, spentOn?: Date)`
-- `_next(learner: Learner, scope: Scope) : optional (item: Item, candidate: Candidate, day: Date, status: ItemStatus)`
-- `_budget(learner: Learner, scope: Scope, day: Date) : optional (dailyMinutes: Number, spentMinutes: Number, remainingMinutes: Number)`
-- `_deferred(plan: Plan) : many (candidate: Candidate)`
-- `_cuts(plan: Plan) : many (cut: CutValue)`
-- `_proposalCheck(learner: Learner, plan: Plan, currentBasis: String) : optional (locallyCurrent: Flag, contextCurrent: Flag, sessionInProgress: Flag, needsConfirmation: Flag, canActivate: Flag)`
-- `_schedule(learner: Learner, scope: Scope) : one (schedule: ScheduleValue)`
-- `_item(item: Item) : optional (learner: Learner, scope: Scope, item: Item, candidate: Candidate, day: String, status: ItemStatus, actualMinutes: Number, spentOn?: String)`
-
-#### Instances
-
-- `StudyPlanning` — instance of `StudyPlanning` — [P2 learning journey](../design/stages/materials.md), line 47.
-  - `Definition` is `SkillMapping.Version` — [P2 learning journey](../design/stages/materials.md), line 51.
-  - `Learner` is `Registering.User` — [P2 learning journey](../design/stages/materials.md), line 48.
-  - `Scope` is `SkillMapping.Course` — [P2 learning journey](../design/stages/materials.md), line 49.
-  - `Subject` is `SkillMapping.Skill` — [P2 learning journey](../design/stages/materials.md), line 50.
-
 ## Application types
 
 Concrete types:
@@ -546,8 +546,8 @@ Authored path: `Reads.CanReplan`.
 (owner) can refresh routine reviews in (course) — inputs (owner, course); outputs (); bindings ()
   where
     view "(owner) owns (course) with (title)" with (course, owner)
-    StudyPlanning._preferences (learner: owner, scope: course)
-    no StudyPlanning._next (learner: owner, scope: course) has (status: "IN_PROGRESS")
+    StudyPlanning._preferences (owner, scope: course)
+    no StudyPlanning._next (owner, scope: course) has (status: "IN_PROGRESS")
 ```
 
 ### (owner) can study confirmed (skill)
@@ -571,7 +571,7 @@ Authored path: `Planning.ActivityInProgress`.
 (owner) has an activity in progress — inputs (owner); outputs (); bindings (course)
   where
     SkillMapping._courses (owner) has (course)
-    StudyPlanning._next (learner: owner, scope: course) has (status: "IN_PROGRESS")
+    StudyPlanning._next (owner, scope: course) has (status: "IN_PROGRESS")
 ```
 
 ### (owner) imported graded work (material)
@@ -597,12 +597,12 @@ Authored path: `Planning.StartAllowed`.
 ```view
 (owner) may start (item) in (course) — inputs (owner, course, item); outputs (); bindings (candidate, skill, definition, skills, tracks, schedule, urgent)
   where
-    StudyPlanning._item (item) has (candidate, learner: owner, scope: course)
+    StudyPlanning._item (item) has (candidate, owner, scope: course)
     (definition, skill) is itemSubject (candidate)
     view "(owner) can study confirmed (skill)" with (owner, skill) has (course, definition)
     SkillMapping._map (course) has (skills)
     MasteryEstimating._progress (learner: owner) has (tracks)
-    StudyPlanning._schedule (learner: owner, scope: course) has (schedule)
+    StudyPlanning._schedule (owner, scope: course) has (schedule)
     urgent is urgentExamItem (candidate, schedule)
     beginAllowed (skill, skills, tracks, urgent)
 ```
@@ -701,7 +701,7 @@ review inputs for (owner) in (course) — inputs (owner, course); outputs (candi
   where
     SkillMapping._map (course) has (skills)
     MasteryEstimating._progress (learner: owner) has (tracks)
-    StudyPlanning._schedule (learner: owner, scope: course) has (schedule)
+    StudyPlanning._schedule (owner, scope: course) has (schedule)
     (basis, candidates, explanation, horizonEnd) is planRequest (schedule, skills, tracks)
 ```
 
@@ -930,7 +930,7 @@ Authored path: `Access.ItemReady`.
 Former "admit progress on (item) in (course)" — inputs (owner, course, item); bindings (); promises at most one record — forms:
   a record of
     where view "(owner) owns (course) with (title)" with (course, owner)
-    where StudyPlanning._item (item) has (learner: owner, scope: course)
+    where StudyPlanning._item (item) has (owner, scope: course)
     allowed: true
 ```
 
@@ -1073,7 +1073,7 @@ Authored path: `Reads.PlanData`.
 ```former
 Former "study plan for (owner) in (course)" — inputs (owner, course); bindings (schedule, preferences, budget, next, today, plan); promises exactly one record — forms:
   a record of
-    where StudyPlanning._schedule (learner: owner, scope: course) has (schedule)
+    where StudyPlanning._schedule (owner, scope: course) has (schedule)
     where (budget, next, plan, preferences, today) is planDetail (schedule)
     budget
     next
@@ -1089,7 +1089,7 @@ Authored path: `Planning.Exams`.
 
 ```former
 Former "the active exams for (owner) in (course)" — inputs (owner, course); bindings (exam, date, covered); promises exactly one record — forms:
-  each StudyPlanning._exams (learner: owner, scope: course) has (active: true, covered, date, exam)
+  each StudyPlanning._deadlines (owner, scope: course) has (active: true, covered, date, deadline: exam)
     arranged by date
     form a record of
       covered
@@ -1104,7 +1104,7 @@ Authored path: `Planning.PendingItems`.
 
 ```former
 Former "the activities of the proposal awaiting confirmation for (owner) in (course)" — inputs (owner, course); bindings (plan, item, candidate, day, order); promises exactly one record — forms:
-  each StudyPlanning._plans (learner: owner, scope: course) has (needsConfirmation: true, plan, status: "PROPOSED")
+  each StudyPlanning._plans (owner, scope: course) has (needsConfirmation: true, plan, status: "PROPOSED")
     where StudyPlanning._items (plan) has (candidate, day, item)
     where order is itemOrder (candidate, day)
     arranged by order
@@ -1137,7 +1137,7 @@ Authored path: `Planning.PendingCuts`.
 
 ```former
 Former "the cuts of the proposal awaiting confirmation for (owner) in (course)" — inputs (owner, course); bindings (plan, cut, order); promises exactly one record — forms:
-  each StudyPlanning._plans (learner: owner, scope: course) has (needsConfirmation: true, plan, status: "PROPOSED")
+  each StudyPlanning._plans (owner, scope: course) has (needsConfirmation: true, plan, status: "PROPOSED")
     where StudyPlanning._cuts (plan) has (cut)
     where order is cutKey (cut)
     arranged by order
@@ -1209,11 +1209,11 @@ Authored path: `Planning.PendingProposal`.
 
 ```former
 Former "the proposal awaiting confirmation for (owner) in (course)" — inputs (owner, course); bindings (plan, explanation, examUrgent, estimatedExamMinutes, availableExamMinutes, focusExam, focusExamDate, currentBasis, locallyCurrent, contextCurrent, sessionInProgress); promises exactly one record — forms:
-  each StudyPlanning._plans (learner: owner, scope: course) has (needsConfirmation: true, plan, status: "PROPOSED")
-    where StudyPlanning._plan (plan) has (availableExamMinutes, estimatedExamMinutes, examUrgent, explanation, focusExam)
-    where StudyPlanning._exams (learner: owner, scope: course) has (date: focusExamDate, exam: focusExam)
+  each StudyPlanning._plans (owner, scope: course) has (needsConfirmation: true, plan, status: "PROPOSED")
+    where StudyPlanning._plan (plan) has (availableMinutes: availableExamMinutes, explanation, focusDeadline: focusExam, requiredMinutes: estimatedExamMinutes, urgent: examUrgent)
+    where StudyPlanning._deadlines (owner, scope: course) has (date: focusExamDate, deadline: focusExam)
     where view "review inputs for (owner) in (course)" with (course, owner) has (basis: currentBasis)
-    where StudyPlanning._proposalCheck (currentBasis, learner: owner, plan) has (contextCurrent, locallyCurrent, sessionInProgress)
+    where StudyPlanning._proposalCheck (currentBasis, owner, plan) has (contextCurrent, locallyCurrent, sessionInProgress)
     arranged by plan
     form a record of
       availableExamMinutes
@@ -3286,7 +3286,7 @@ where
   MasteryEstimating._adjustments (track) has (adjustment)
   view "(owner) can refresh routine reviews in (course)" with (course, owner)
   view "review inputs for (owner) in (course)" with (course, owner) has (basis)
-  StudyPlanning._plans (learner: owner, scope: course) has (plan, status)
+  StudyPlanning._plans (owner, scope: course) has (plan, status)
   status is among ["PROPOSED", "ACTIVE"]
   StudyPlanning._plan (plan) has (basis)
   earlier, RequestBoundary.request (adjustmentKey, path: "/learning/adjust", reason, requestId, session, skill, value)
@@ -3345,7 +3345,7 @@ where
   MasteryEstimating._adjustments (track) has (adjustment)
   view "(owner) can refresh routine reviews in (course)" with (course, owner)
   view "review inputs for (owner) in (course)" with (course, owner) has (basis)
-  StudyPlanning._plans (learner: owner, scope: course) has (plan, status)
+  StudyPlanning._plans (owner, scope: course) has (plan, status)
   status is among ["PROPOSED", "ACTIVE"]
   StudyPlanning._plan (plan) has (basis)
 then
@@ -4387,7 +4387,7 @@ where
   view "(owner) can refresh routine reviews in (course)" with (course, owner)
   view "review inputs for (owner) in (course)" with (course, owner) has (basis, candidates, explanation, horizonEnd)
 then
-  StudyPlanning.replan (basis, candidates, explanation, horizonEnd, learner: owner, scope: course, workloadComplete: false)
+  StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false)
 ```
 
 ### Learning.Reply
@@ -5033,7 +5033,7 @@ where
   view "(owner) owns (course) with (title)" with (course, owner)
   view "(owner) may start (item) in (course)" with (course, item, owner)
 then
-  StudyPlanning.begin (item, learner: owner)
+  StudyPlanning.begin (item, owner)
 ```
 
 ### Planning.Begin:owned#3
@@ -5043,7 +5043,7 @@ Authored path: `Planning.Begin`.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 89.
 
 ```reaction
-when StudyPlanning.begin (item, learner: owner), asked by Planning.Begin:owned#2
+when StudyPlanning.begin (item, owner), asked by Planning.Begin:owned#2
 where
   earlier, RequestBoundary.request (course, item, path: "/planning/begin", requestId, session)
 then
@@ -5090,7 +5090,7 @@ where
   earlier, Sessioning.use (session, subject: owner), asked by Planning.Configure
   earlier, RequestBoundary.request (course, dailyMinutes, focusNote, path: "/planning/configure", requestId, session)
   view "(owner) owns (course) with (title)" with (course, owner)
-  StudyPlanning._preferences (learner: owner, scope: course) has (dailyMinutes, focusNote, preferences)
+  StudyPlanning._preferences (owner, scope: course) has (dailyMinutes, focusNote, preferences)
 then
   RequestBoundary.respond (preferences, requestId)
 ```
@@ -5107,7 +5107,7 @@ where
   earlier, RequestBoundary.request (course, dailyMinutes, focusNote, path: "/planning/configure", requestId, session)
   view "(owner) owns (course) with (title)" with (course, owner)
 then
-  StudyPlanning.configure (dailyMinutes, focusNote, learner: owner, scope: course)
+  StudyPlanning.configure (dailyMinutes, focusNote, owner, scope: course)
 ```
 
 ### Planning.Configure:owned#3
@@ -5117,11 +5117,11 @@ Authored path: `Planning.Configure`.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 87.
 
 ```reaction
-when StudyPlanning.configure (dailyMinutes, focusNote, learner: owner, scope: course), asked by Planning.Configure:owned#2
+when StudyPlanning.configure (dailyMinutes, focusNote, owner, scope: course), asked by Planning.Configure:owned#2
 at the flow's settlement frontier
 where
   view "(owner) owns (course) with (title)" with (course, owner)
-  StudyPlanning._preferences (learner: owner, scope: course) has (dailyMinutes, focusNote, preferences)
+  StudyPlanning._preferences (owner, scope: course) has (dailyMinutes, focusNote, preferences)
   earlier, RequestBoundary.request (course, dailyMinutes, focusNote, path: "/planning/configure", requestId, session)
 then
   RequestBoundary.respond (preferences, requestId)
@@ -5165,10 +5165,10 @@ when Sessioning.use (session, subject: owner), asked by Planning.ConfirmTradeoff
 where
   earlier, RequestBoundary.request (course, path: "/planning/tradeoffs/confirm", plan, requestId, session)
   view "(owner) owns (course) with (title)" with (course, owner)
-  StudyPlanning._plan (plan) has (learner: owner, scope: course)
+  StudyPlanning._plan (plan) has (owner, scope: course)
   view "review inputs for (owner) in (course)" with (course, owner) has (basis: currentBasis)
 then
-  StudyPlanning.confirmTradeoffs (currentBasis, learner: owner, plan)
+  StudyPlanning.confirmTradeoffs (currentBasis, owner, plan)
 ```
 
 ### Planning.ConfirmTradeoffs:owned#3
@@ -5178,7 +5178,7 @@ Authored path: `Planning.ConfirmTradeoffs`.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 95.
 
 ```reaction
-when StudyPlanning.confirmTradeoffs (currentBasis, learner: owner, plan), asked by Planning.ConfirmTradeoffs:owned#2
+when StudyPlanning.confirmTradeoffs (currentBasis, owner, plan), asked by Planning.ConfirmTradeoffs:owned#2
 where
   earlier, RequestBoundary.request (course, path: "/planning/tradeoffs/confirm", plan, requestId, session)
 then
@@ -5196,7 +5196,7 @@ when Sessioning.use (session, subject: owner), asked by Planning.ConfirmTradeoff
 where
   earlier, RequestBoundary.request (course, path: "/planning/tradeoffs/confirm", plan, requestId, session)
   view "(owner) owns (course) with (title)" with (course, owner)
-  no StudyPlanning._plan (plan) has (learner: owner, scope: course)
+  no StudyPlanning._plan (plan) has (owner, scope: course)
 then
   RequestBoundary.respond (detail: "Choose one of your proposed plans.", error: "PROPOSAL_UNAVAILABLE", requestId)
 ```
@@ -5239,9 +5239,9 @@ when Sessioning.use (session, subject: owner), asked by Planning.DeclineTradeoff
 where
   earlier, RequestBoundary.request (course, path: "/planning/tradeoffs/decline", plan, requestId, session)
   view "(owner) owns (course) with (title)" with (course, owner)
-  StudyPlanning._plan (plan) has (learner: owner, scope: course)
+  StudyPlanning._plan (plan) has (owner, scope: course)
 then
-  StudyPlanning.declineTradeoffs (learner: owner, plan)
+  StudyPlanning.declineTradeoffs (owner, plan)
 ```
 
 ### Planning.DeclineTradeoffs:owned#3
@@ -5251,7 +5251,7 @@ Authored path: `Planning.DeclineTradeoffs`.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 96.
 
 ```reaction
-when StudyPlanning.declineTradeoffs (learner: owner, plan), asked by Planning.DeclineTradeoffs:owned#2
+when StudyPlanning.declineTradeoffs (owner, plan), asked by Planning.DeclineTradeoffs:owned#2
 where
   earlier, RequestBoundary.request (course, path: "/planning/tradeoffs/decline", plan, requestId, session)
 then
@@ -5269,7 +5269,7 @@ when Sessioning.use (session, subject: owner), asked by Planning.DeclineTradeoff
 where
   earlier, RequestBoundary.request (course, path: "/planning/tradeoffs/decline", plan, requestId, session)
   view "(owner) owns (course) with (title)" with (course, owner)
-  no StudyPlanning._plan (plan) has (learner: owner, scope: course)
+  no StudyPlanning._plan (plan) has (owner, scope: course)
 then
   RequestBoundary.respond (detail: "Choose one of your proposed plans.", error: "PROPOSAL_UNAVAILABLE", requestId)
 ```
@@ -5314,7 +5314,7 @@ where
   earlier, Sessioning.use (session, subject: owner), asked by Planning.Finish
   earlier, RequestBoundary.request (actualMinutes, course, item, path: "/planning/finish", requestId, session)
   view "(owner) owns (course) with (title)" with (course, owner)
-  StudyPlanning._item (item) has (learner: owner, scope: course, status: "DONE")
+  StudyPlanning._item (item) has (owner, scope: course, status: "DONE")
 then
   RequestBoundary.respond (item, requestId)
 ```
@@ -5330,9 +5330,9 @@ when Sessioning.use (session, subject: owner), asked by Planning.Finish
 where
   earlier, RequestBoundary.request (actualMinutes, course, item, path: "/planning/finish", requestId, session)
   view "(owner) owns (course) with (title)" with (course, owner)
-  StudyPlanning._item (item) has (learner: owner, scope: course)
+  StudyPlanning._item (item) has (owner, scope: course)
 then
-  StudyPlanning.finish (actualMinutes, item, learner: owner)
+  StudyPlanning.finish (actualMinutes, item, owner)
 ```
 
 ### Planning.Finish:owned#3
@@ -5342,10 +5342,10 @@ Authored path: `Planning.Finish`.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 90.
 
 ```reaction
-when StudyPlanning.finish (actualMinutes, item, learner: owner), asked by Planning.Finish:owned#2
+when StudyPlanning.finish (actualMinutes, item, owner), asked by Planning.Finish:owned#2
 at the flow's settlement frontier
 where
-  StudyPlanning._item (item) has (learner: owner, scope: course, status: "DONE")
+  StudyPlanning._item (item) has (owner, scope: course, status: "DONE")
   view "(owner) owns (course) with (title)" with (course, owner)
   earlier, RequestBoundary.request (actualMinutes, course, item, path: "/planning/finish", requestId, session)
 then
@@ -5392,7 +5392,7 @@ where
   earlier, Sessioning.use (session, subject: owner), asked by Planning.Miss
   earlier, RequestBoundary.request (course, item, path: "/planning/miss", requestId, session)
   view "(owner) owns (course) with (title)" with (course, owner)
-  StudyPlanning._item (item) has (learner: owner, scope: course, status: "MISSED")
+  StudyPlanning._item (item) has (owner, scope: course, status: "MISSED")
 then
   RequestBoundary.respond (item, requestId)
 ```
@@ -5408,9 +5408,9 @@ when Sessioning.use (session, subject: owner), asked by Planning.Miss
 where
   earlier, RequestBoundary.request (course, item, path: "/planning/miss", requestId, session)
   view "(owner) owns (course) with (title)" with (course, owner)
-  StudyPlanning._item (item) has (learner: owner, scope: course)
+  StudyPlanning._item (item) has (owner, scope: course)
 then
-  StudyPlanning.miss (item, learner: owner)
+  StudyPlanning.miss (item, owner)
 ```
 
 ### Planning.Miss:owned#3
@@ -5420,10 +5420,10 @@ Authored path: `Planning.Miss`.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 92.
 
 ```reaction
-when StudyPlanning.miss (item, learner: owner), asked by Planning.Miss:owned#2
+when StudyPlanning.miss (item, owner), asked by Planning.Miss:owned#2
 at the flow's settlement frontier
 where
-  StudyPlanning._item (item) has (learner: owner, scope: course, status: "MISSED")
+  StudyPlanning._item (item) has (owner, scope: course, status: "MISSED")
   view "(owner) owns (course) with (title)" with (course, owner)
   earlier, RequestBoundary.request (course, item, path: "/planning/miss", requestId, session)
 then
@@ -5470,8 +5470,8 @@ where
   earlier, Sessioning.use (session, subject: owner), asked by Planning.Propose
   earlier, RequestBoundary.request (course, path: "/planning/propose", requestId, session)
   view "(owner) owns (course) with (title)" with (course, owner)
-  no StudyPlanning._plans (learner: owner, scope: course) has (status: "PROPOSED")
-  StudyPlanning._plans (learner: owner, scope: course) has (plan, status: "ACTIVE")
+  no StudyPlanning._plans (owner, scope: course) has (status: "PROPOSED")
+  StudyPlanning._plans (owner, scope: course) has (plan, status: "ACTIVE")
 then
   RequestBoundary.respond (plan, requestId)
 ```
@@ -5489,7 +5489,7 @@ where
   earlier, Sessioning.use (session, subject: owner), asked by Planning.Propose
   earlier, RequestBoundary.request (course, path: "/planning/propose", requestId, session)
   view "(owner) owns (course) with (title)" with (course, owner)
-  StudyPlanning._plans (learner: owner, scope: course) has (plan, status: "PROPOSED")
+  StudyPlanning._plans (owner, scope: course) has (plan, status: "PROPOSED")
 then
   RequestBoundary.respond (plan, requestId)
 ```
@@ -5507,7 +5507,7 @@ where
   view "(owner) can refresh routine reviews in (course)" with (course, owner)
   view "review inputs for (owner) in (course)" with (course, owner) has (basis, candidates, explanation, horizonEnd)
 then
-  StudyPlanning.replan (basis, candidates, explanation, horizonEnd, learner: owner, scope: course, workloadComplete: false)
+  StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false)
 ```
 
 ### Planning.Propose:owned:active#3
@@ -5517,12 +5517,12 @@ Authored path: `Planning.Propose`.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 88.
 
 ```reaction
-when StudyPlanning.replan (basis, candidates, explanation, horizonEnd, learner: owner, scope: course, workloadComplete: false), asked by Planning.Propose:owned#2
+when StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false), asked by Planning.Propose:owned#2
 at the flow's settlement frontier
 where
   view "(owner) owns (course) with (title)" with (course, owner)
-  no StudyPlanning._plans (learner: owner, scope: course) has (status: "PROPOSED")
-  StudyPlanning._plans (learner: owner, scope: course) has (plan, status: "ACTIVE")
+  no StudyPlanning._plans (owner, scope: course) has (status: "PROPOSED")
+  StudyPlanning._plans (owner, scope: course) has (plan, status: "ACTIVE")
   earlier, RequestBoundary.request (course, path: "/planning/propose", requestId, session)
 then
   RequestBoundary.respond (plan, requestId)
@@ -5535,11 +5535,11 @@ Authored path: `Planning.Propose`.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 88.
 
 ```reaction
-when StudyPlanning.replan (basis, candidates, explanation, horizonEnd, learner: owner, scope: course, workloadComplete: false), asked by Planning.Propose:owned#2
+when StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false), asked by Planning.Propose:owned#2
 at the flow's settlement frontier
 where
   view "(owner) owns (course) with (title)" with (course, owner)
-  StudyPlanning._plans (learner: owner, scope: course) has (plan, status: "PROPOSED")
+  StudyPlanning._plans (owner, scope: course) has (plan, status: "PROPOSED")
   earlier, RequestBoundary.request (course, path: "/planning/propose", requestId, session)
 then
   RequestBoundary.respond (plan, requestId)
@@ -5628,7 +5628,7 @@ where
   no view "(owner) has an activity in progress" with (owner)
   earlier, RequestBoundary.request (course, date, path: "/planning/exams/remove", requestId, session)
   view "(owner) owns (course) with (title)" with (course, owner)
-  StudyPlanning._exams (learner: owner, scope: course) has (active: false, date, exam)
+  StudyPlanning._deadlines (owner, scope: course) has (active: false, date, deadline: exam)
 then
   RequestBoundary.respond (exam, refreshed: true, requestId)
 ```
@@ -5647,7 +5647,7 @@ where
   view "(owner) has an activity in progress" with (owner)
   earlier, RequestBoundary.request (course, date, path: "/planning/exams/remove", requestId, session)
   view "(owner) owns (course) with (title)" with (course, owner)
-  StudyPlanning._exams (learner: owner, scope: course) has (active: false, date, exam)
+  StudyPlanning._deadlines (owner, scope: course) has (active: false, date, deadline: exam)
 then
   RequestBoundary.respond (exam, notice: "Your plan will update when you finish or stop your current activity.", refreshed: false, requestId)
 ```
@@ -5664,7 +5664,7 @@ where
   earlier, RequestBoundary.request (course, date, path: "/planning/exams/remove", requestId, session)
   view "(owner) owns (course) with (title)" with (course, owner)
 then
-  StudyPlanning.removeExam (date, learner: owner, scope: course)
+  StudyPlanning.removeDeadline (date, owner, scope: course)
 ```
 
 ### Planning.RemoveExam:owned:refreshed#3
@@ -5674,11 +5674,11 @@ Authored path: `Planning.RemoveExam`.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 94.
 
 ```reaction
-when StudyPlanning.removeExam (date, learner: owner, scope: course), asked by Planning.RemoveExam:owned#2
+when StudyPlanning.removeDeadline (date, owner, scope: course), asked by Planning.RemoveExam:owned#2
 at the flow's settlement frontier
 where
   view "(owner) owns (course) with (title)" with (course, owner)
-  StudyPlanning._exams (learner: owner, scope: course) has (active: false, date, exam)
+  StudyPlanning._deadlines (owner, scope: course) has (active: false, date, deadline: exam)
   no view "(owner) has an activity in progress" with (owner)
   earlier, RequestBoundary.request (course, date, path: "/planning/exams/remove", requestId, session)
 then
@@ -5692,11 +5692,11 @@ Authored path: `Planning.RemoveExam`.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 94.
 
 ```reaction
-when StudyPlanning.removeExam (date, learner: owner, scope: course), asked by Planning.RemoveExam:owned#2
+when StudyPlanning.removeDeadline (date, owner, scope: course), asked by Planning.RemoveExam:owned#2
 at the flow's settlement frontier
 where
   view "(owner) owns (course) with (title)" with (course, owner)
-  StudyPlanning._exams (learner: owner, scope: course) has (active: false, date, exam)
+  StudyPlanning._deadlines (owner, scope: course) has (active: false, date, deadline: exam)
   view "(owner) has an activity in progress" with (owner)
   earlier, RequestBoundary.request (course, date, path: "/planning/exams/remove", requestId, session)
 then
@@ -5709,13 +5709,13 @@ Authored path: `Planning.ReplanAfterExam`.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 31.
 
 ```reaction
-when StudyPlanning.setExam (learner: owner, scope: course)
+when StudyPlanning.setDeadline (owner, scope: course)
 where
   view "(owner) can refresh routine reviews in (course)" with (course, owner)
   no view "(owner) has an activity in progress" with (owner)
   view "review inputs for (owner) in (course)" with (course, owner) has (basis, candidates, explanation, horizonEnd)
 then
-  StudyPlanning.replan (basis, candidates, explanation, horizonEnd, learner: owner, scope: course, workloadComplete: false)
+  StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false)
 ```
 
 ### Planning.ReplanAfterExamRemoval
@@ -5724,13 +5724,13 @@ Authored path: `Planning.ReplanAfterExamRemoval`.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 33.
 
 ```reaction
-when StudyPlanning.removeExam (learner: owner, scope: course)
+when StudyPlanning.removeDeadline (owner, scope: course)
 where
   view "(owner) can refresh routine reviews in (course)" with (course, owner)
   no view "(owner) has an activity in progress" with (owner)
   view "review inputs for (owner) in (course)" with (course, owner) has (basis, candidates, explanation, horizonEnd)
 then
-  StudyPlanning.replan (basis, candidates, explanation, horizonEnd, learner: owner, scope: course, workloadComplete: false)
+  StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false)
 ```
 
 ### Planning.SetExam
@@ -5777,7 +5777,7 @@ where
   SkillMapping._map (course) has (skills)
   confirmed is coveredSkillsConfirmed (covered, skills)
   confirmed is among [true]
-  StudyPlanning._exams (learner: owner, scope: course) has (active: true, covered, date, exam)
+  StudyPlanning._deadlines (owner, scope: course) has (active: true, covered, date, deadline: exam)
 then
   RequestBoundary.respond (exam, refreshed: true, requestId)
 ```
@@ -5799,7 +5799,7 @@ where
   SkillMapping._map (course) has (skills)
   confirmed is coveredSkillsConfirmed (covered, skills)
   confirmed is among [true]
-  StudyPlanning._exams (learner: owner, scope: course) has (active: true, covered, date, exam)
+  StudyPlanning._deadlines (owner, scope: course) has (active: true, covered, date, deadline: exam)
 then
   RequestBoundary.respond (exam, notice: "Your plan will update when you finish or stop your current activity.", refreshed: false, requestId)
 ```
@@ -5819,7 +5819,7 @@ where
   confirmed is coveredSkillsConfirmed (covered, skills)
   confirmed is among [true]
 then
-  StudyPlanning.setExam (covered, date, learner: owner, scope: course)
+  StudyPlanning.setDeadline (covered, date, owner, scope: course)
 ```
 
 ### Planning.SetExam:owned:refreshed#3
@@ -5829,14 +5829,14 @@ Authored path: `Planning.SetExam`.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 93.
 
 ```reaction
-when StudyPlanning.setExam (covered, date, learner: owner, scope: course), asked by Planning.SetExam:owned#2
+when StudyPlanning.setDeadline (covered, date, owner, scope: course), asked by Planning.SetExam:owned#2
 at the flow's settlement frontier
 where
   view "(owner) owns (course) with (title)" with (course, owner)
   SkillMapping._map (course) has (skills)
   confirmed is coveredSkillsConfirmed (covered, skills)
   confirmed is among [true]
-  StudyPlanning._exams (learner: owner, scope: course) has (active: true, covered, date, exam)
+  StudyPlanning._deadlines (owner, scope: course) has (active: true, covered, date, deadline: exam)
   no view "(owner) has an activity in progress" with (owner)
   earlier, RequestBoundary.request (course, covered, date, path: "/planning/exams/set", requestId, session)
 then
@@ -5850,14 +5850,14 @@ Authored path: `Planning.SetExam`.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 93.
 
 ```reaction
-when StudyPlanning.setExam (covered, date, learner: owner, scope: course), asked by Planning.SetExam:owned#2
+when StudyPlanning.setDeadline (covered, date, owner, scope: course), asked by Planning.SetExam:owned#2
 at the flow's settlement frontier
 where
   view "(owner) owns (course) with (title)" with (course, owner)
   SkillMapping._map (course) has (skills)
   confirmed is coveredSkillsConfirmed (covered, skills)
   confirmed is among [true]
-  StudyPlanning._exams (learner: owner, scope: course) has (active: true, covered, date, exam)
+  StudyPlanning._deadlines (owner, scope: course) has (active: true, covered, date, deadline: exam)
   view "(owner) has an activity in progress" with (owner)
   earlier, RequestBoundary.request (course, covered, date, path: "/planning/exams/set", requestId, session)
 then
@@ -5899,7 +5899,7 @@ where
   SkillMapping._map (course) has (skills)
   confirmed is coveredSkillsConfirmed (covered, skills)
   confirmed is among [true]
-  StudyPlanning._exams (learner: owner, scope: course) has (active: true, covered, date, exam)
+  StudyPlanning._deadlines (owner, scope: course) has (active: true, covered, date, deadline: exam)
 then
   RequestBoundary.respond (exam, refreshed: true, requestId)
 ```
@@ -5921,7 +5921,7 @@ where
   SkillMapping._map (course) has (skills)
   confirmed is coveredSkillsConfirmed (covered, skills)
   confirmed is among [true]
-  StudyPlanning._exams (learner: owner, scope: course) has (active: true, covered, date, exam)
+  StudyPlanning._deadlines (owner, scope: course) has (active: true, covered, date, deadline: exam)
 then
   RequestBoundary.respond (exam, notice: "Your plan will update when you finish or stop your current activity.", refreshed: false, requestId)
 ```
@@ -5966,7 +5966,7 @@ where
   earlier, Sessioning.use (session, subject: owner), asked by Planning.Stop
   earlier, RequestBoundary.request (actualMinutes, course, item, path: "/planning/stop", requestId, session)
   view "(owner) owns (course) with (title)" with (course, owner)
-  StudyPlanning._item (item) has (learner: owner, scope: course, status: "STOPPED")
+  StudyPlanning._item (item) has (owner, scope: course, status: "STOPPED")
 then
   RequestBoundary.respond (item, requestId)
 ```
@@ -5982,9 +5982,9 @@ when Sessioning.use (session, subject: owner), asked by Planning.Stop
 where
   earlier, RequestBoundary.request (actualMinutes, course, item, path: "/planning/stop", requestId, session)
   view "(owner) owns (course) with (title)" with (course, owner)
-  StudyPlanning._item (item) has (learner: owner, scope: course)
+  StudyPlanning._item (item) has (owner, scope: course)
 then
-  StudyPlanning.stop (actualMinutes, item, learner: owner)
+  StudyPlanning.stop (actualMinutes, item, owner)
 ```
 
 ### Planning.Stop:owned#3
@@ -5994,10 +5994,10 @@ Authored path: `Planning.Stop`.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 91.
 
 ```reaction
-when StudyPlanning.stop (actualMinutes, item, learner: owner), asked by Planning.Stop:owned#2
+when StudyPlanning.stop (actualMinutes, item, owner), asked by Planning.Stop:owned#2
 at the flow's settlement frontier
 where
-  StudyPlanning._item (item) has (learner: owner, scope: course, status: "STOPPED")
+  StudyPlanning._item (item) has (owner, scope: course, status: "STOPPED")
   view "(owner) owns (course) with (title)" with (course, owner)
   earlier, RequestBoundary.request (actualMinutes, course, item, path: "/planning/stop", requestId, session)
 then
@@ -6011,12 +6011,12 @@ Authored path: `Progress.ActivateRoutine`.
 - Covered by [Progress reactions](../design/compositions/Progress.md), line 15.
 
 ```reaction
-when StudyPlanning.replan (learner: owner, scope: course, workloadComplete: false, plan)
+when StudyPlanning.replan (owner, scope: course, workloadComplete: false, plan)
 where
   view "review inputs for (owner) in (course)" with (course, owner) has (basis: currentBasis)
-  StudyPlanning._proposalCheck (currentBasis, learner: owner, plan) has (canActivate: true, needsConfirmation: false)
+  StudyPlanning._proposalCheck (currentBasis, owner, plan) has (canActivate: true, needsConfirmation: false)
 then
-  StudyPlanning.activateRoutine (currentBasis, learner: owner, plan)
+  StudyPlanning.activateRoutine (currentBasis, owner, plan)
 ```
 
 ### Progress.AssessedEvidence
@@ -6123,12 +6123,12 @@ Authored path: `Progress.ReplanAfterBudget`.
 - Covered by [Progress reactions](../design/compositions/Progress.md), line 13.
 
 ```reaction
-when StudyPlanning.configure (learner: owner, scope: course)
+when StudyPlanning.configure (owner, scope: course)
 where
   view "(owner) can refresh routine reviews in (course)" with (course, owner)
   view "review inputs for (owner) in (course)" with (course, owner) has (basis, candidates, explanation, horizonEnd)
 then
-  StudyPlanning.replan (basis, candidates, explanation, horizonEnd, learner: owner, scope: course, workloadComplete: false)
+  StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false)
 ```
 
 ### Progress.ReplanAfterConfidence
@@ -6144,7 +6144,7 @@ where
   view "(owner) can refresh routine reviews in (course)" with (course, owner)
   view "review inputs for (owner) in (course)" with (course, owner) has (basis, candidates, explanation, horizonEnd)
 then
-  StudyPlanning.replan (basis, candidates, explanation, horizonEnd, learner: owner, scope: course, workloadComplete: false)
+  StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false)
 ```
 
 ### Progress.ReplanAfterEvidence
@@ -6160,7 +6160,7 @@ where
   view "(owner) can refresh routine reviews in (course)" with (course, owner)
   view "review inputs for (owner) in (course)" with (course, owner) has (basis, candidates, explanation, horizonEnd)
 then
-  StudyPlanning.replan (basis, candidates, explanation, horizonEnd, learner: owner, scope: course, workloadComplete: false)
+  StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false)
 ```
 
 ### Progress.ReplanAfterFinish
@@ -6170,13 +6170,13 @@ Authored path: `Progress.ReplanAfterFinish`.
 - Covered by [Progress reactions](../design/compositions/Progress.md), line 17.
 
 ```reaction
-when StudyPlanning.finish (learner: owner)
+when StudyPlanning.finish (owner)
 where
   SkillMapping._courses (owner) has (course)
   view "(owner) can refresh routine reviews in (course)" with (course, owner)
   view "review inputs for (owner) in (course)" with (course, owner) has (basis, candidates, explanation, horizonEnd)
 then
-  StudyPlanning.replan (basis, candidates, explanation, horizonEnd, learner: owner, scope: course, workloadComplete: false)
+  StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false)
 ```
 
 ### Progress.ReplanAfterMiss
@@ -6185,13 +6185,13 @@ Authored path: `Progress.ReplanAfterMiss`.
 - Covered by [Progress reactions](../design/compositions/Progress.md), line 17.
 
 ```reaction
-when StudyPlanning.miss (item, learner: owner)
+when StudyPlanning.miss (item, owner)
 where
-  StudyPlanning._item (item) has (learner: owner, scope: course)
+  StudyPlanning._item (item) has (owner, scope: course)
   view "(owner) can refresh routine reviews in (course)" with (course, owner)
   view "review inputs for (owner) in (course)" with (course, owner) has (basis, candidates, explanation, horizonEnd)
 then
-  StudyPlanning.replan (basis, candidates, explanation, horizonEnd, learner: owner, scope: course, workloadComplete: false)
+  StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false)
 ```
 
 ### Progress.ReplanAfterStop
@@ -6201,13 +6201,13 @@ Authored path: `Progress.ReplanAfterStop`.
 - Covered by [Progress reactions](../design/compositions/Progress.md), line 17.
 
 ```reaction
-when StudyPlanning.stop (learner: owner)
+when StudyPlanning.stop (owner)
 where
   SkillMapping._courses (owner) has (course)
   view "(owner) can refresh routine reviews in (course)" with (course, owner)
   view "review inputs for (owner) in (course)" with (course, owner) has (basis, candidates, explanation, horizonEnd)
 then
-  StudyPlanning.replan (basis, candidates, explanation, horizonEnd, learner: owner, scope: course, workloadComplete: false)
+  StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false)
 ```
 
 ### Progress.RevisedEvidence

@@ -1,21 +1,21 @@
 import { registerConcept } from "@mit-sdg/sync-engine/assembly";
-import spec from "@design/concepts/StudyPlanning.md" with { type: "text" };
-import { StudyPlanning } from "./StudyPlanning.ts";
+import spec from "@design/concepts/Budgeting.md" with { type: "text" };
+import { Budgeting } from "./Budgeting.ts";
 import * as refusal from "./refusals.ts";
 
-export const studyPlanning = registerConcept({
-  class: StudyPlanning, spec, refusals: {
+export const budgeting = registerConcept({
+  class: Budgeting, spec, refusals: {
     INVALID_DAILY_BUDGET: refusal.InvalidDailyBudget,
-    EXAM_PREFERENCES_UNAVAILABLE: refusal.ExamPreferencesUnavailable,
-    INVALID_EXAM_DETAILS: refusal.InvalidExamDetails,
-    EXAM_REMOVE_UNAVAILABLE: refusal.ExamRemoveUnavailable,
+    DEADLINE_PREFERENCES_UNAVAILABLE: refusal.DeadlinePreferencesUnavailable,
+    INVALID_DEADLINE_DETAILS: refusal.InvalidDeadlineDetails,
+    DEADLINE_REMOVE_UNAVAILABLE: refusal.DeadlineRemoveUnavailable,
     PLAN_PREFERENCES_UNAVAILABLE: refusal.PlanPreferencesUnavailable,
     PLAN_SESSION_IN_PROGRESS: refusal.PlanSessionInProgress,
     INVALID_PLAN_INPUT: refusal.InvalidPlanInput,
     ROUTINE_PLAN_UNAVAILABLE: refusal.RoutinePlanUnavailable,
     ROUTINE_SESSION_IN_PROGRESS: refusal.RoutineSessionInProgress,
     ROUTINE_PLAN_OUTDATED: refusal.RoutinePlanOutdated,
-    EXAM_TRADEOFF_CONFIRMATION_REQUIRED: refusal.ExamTradeoffConfirmationRequired,
+    DEADLINE_TRADEOFF_CONFIRMATION_REQUIRED: refusal.DeadlineTradeoffConfirmationRequired,
     TRADEOFF_PLAN_UNAVAILABLE: refusal.TradeoffPlanUnavailable,
     TRADEOFF_SESSION_IN_PROGRESS: refusal.TradeoffSessionInProgress,
     TRADEOFF_PLAN_OUTDATED: refusal.TradeoffPlanOutdated,

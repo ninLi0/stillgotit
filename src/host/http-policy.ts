@@ -8,7 +8,7 @@ import { masteryEstimating } from "../concepts/MasteryEstimating/registry.ts";
 import { registering } from "../concepts/Registering/registry.ts";
 import { sessioning } from "../concepts/Sessioning/registry.ts";
 import { skillMapping } from "../concepts/SkillMapping.registry.ts";
-import { studyPlanning } from "../concepts/StudyPlanning/registry.ts";
+import { budgeting } from "../concepts/Budgeting/registry.ts";
 
 export const SESSION_COOKIE = "__Host-stillgotit-session";
 export const ATTEMPT_COOKIE = "__Host-stillgotit-sign-in";
@@ -40,14 +40,14 @@ export function stillGotItPolicy(publicOrigin: string, requestBodyBytes = BODY_L
       ATTEMPT_REVIEW_CHANGED: "INVALID_REQUEST",
       ATTEMPT_REVIEW_UNAVAILABLE: "INVALID_REQUEST",
       CLARIFICATION_CASE_UNAVAILABLE: "INVALID_REQUEST",
+      DEADLINE_PREFERENCES_UNAVAILABLE: "INVALID_REQUEST",
+      DEADLINE_REMOVE_UNAVAILABLE: "INVALID_REQUEST",
+      DEADLINE_TRADEOFF_CONFIRMATION_REQUIRED: "INVALID_REQUEST",
       EVIDENCE_DATE_MISMATCH: "INVALID_REQUEST",
       EVIDENCE_REVISION_NOT_NEW: "INVALID_REQUEST",
       EVIDENCE_TRACK_MISMATCH: "INVALID_REQUEST",
       EVIDENCE_TRACK_UNAVAILABLE: "INVALID_REQUEST",
-      EXAM_PREFERENCES_UNAVAILABLE: "INVALID_REQUEST",
-      EXAM_REMOVE_UNAVAILABLE: "INVALID_REQUEST",
       EXAM_SKILLS_UNAVAILABLE: "INVALID_REQUEST",
-      EXAM_TRADEOFF_CONFIRMATION_REQUIRED: "INVALID_REQUEST",
       // http.ts adds the tutor's reason as `detail`, so the learner sees why and can retry.
       GENERATION_FAILED: "INVALID_REQUEST",
       GRADED_DATE_FUTURE: "INVALID_REQUEST",
@@ -68,7 +68,7 @@ export function stillGotItPolicy(publicOrigin: string, requestBodyBytes = BODY_L
       INVALID_ASSESSMENT_WORK: "INVALID_REQUEST",
       INVALID_CONFIRMED_TRANSCRIPT: "INVALID_REQUEST",
       INVALID_DAILY_BUDGET: "INVALID_REQUEST",
-      INVALID_EXAM_DETAILS: "INVALID_REQUEST",
+      INVALID_DEADLINE_DETAILS: "INVALID_REQUEST",
       INVALID_FINISH_TIME: "INVALID_REQUEST",
       INVALID_GRADED_WORK: "INVALID_REQUEST",
       INVALID_HINT_TEXT: "INVALID_REQUEST",
@@ -176,7 +176,7 @@ export function stillGotItPolicy(publicOrigin: string, requestBodyBytes = BODY_L
 // The adapter sends a refusal only as its public category above, so http.ts adds the refusal's sentence as `detail`.
 // A concept's sentences come from its specification, which states the same sentence its refusal class carries.
 const conceptSentences: Readonly<Record<string, string>> = Object.fromEntries(
-  [registering, commonsFederating, sessioning, skillMapping, groundedTutoring, assessmentReviewing, masteryEstimating, studyPlanning, generating]
+  [registering, commonsFederating, sessioning, skillMapping, groundedTutoring, assessmentReviewing, masteryEstimating, budgeting, generating]
     .flatMap(({ specification }) => specification.actions.flatMap(({ refusals }) => refusals.map(({ code, message }) => [code, message]))));
 
 /**

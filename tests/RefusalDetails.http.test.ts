@@ -13,7 +13,7 @@ import { registering } from "../src/concepts/Registering/registry.ts";
 import { sessioning } from "../src/concepts/Sessioning/registry.ts";
 import { UnitCourseUnavailableError } from "../src/concepts/SkillMapping.ts";
 import { skillMapping } from "../src/concepts/SkillMapping.registry.ts";
-import { studyPlanning } from "../src/concepts/StudyPlanning/registry.ts";
+import { budgeting } from "../src/concepts/Budgeting/registry.ts";
 import { SESSION_COOKIE, refusalDetail, refusalDetails, scopedRefusalDetails, stillGotItPolicy } from "../src/host/http-policy.ts";
 import { createRuntime } from "../src/host/runtime.ts";
 import type { CourseTutor } from "../src/host/tutor.ts";
@@ -38,7 +38,7 @@ test("the host's sentences are the ones the concepts and compositions state, as 
   expect(stated.length).toBeGreaterThan(100);
   for (const [code, sentence] of stated) expect(refusalDetails[code], code).toBe(sentence);
   // Every refusal class that carries its own message carries that same sentence.
-  for (const { refusals } of [registering, commonsFederating, sessioning, skillMapping, groundedTutoring, assessmentReviewing, masteryEstimating, studyPlanning, generating]) {
+  for (const { refusals } of [registering, commonsFederating, sessioning, skillMapping, groundedTutoring, assessmentReviewing, masteryEstimating, budgeting, generating]) {
     for (const [code, signal] of Object.entries(refusals ?? {})) {
       const Refusal = signal as unknown as new () => Error;
       if (Refusal.length === 0 && message(Refusal)) expect(message(Refusal), code).toBe(refusalDetails[code]!);

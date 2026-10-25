@@ -28,7 +28,7 @@ const headline = computed(() => {
       <h3 :id="`${id}-title`">{{ headline }}</h3>
       <p class="sentence">{{ proposal.explanation }} Nothing changes until you confirm.</p>
       <ul v-if="cuts.length" class="defer-chips" aria-label="What would be left out">
-        <li v-for="row in cuts" :key="`${row.cut.exam}:${row.cut.candidateKey}`">Defer · {{ row.label }} · {{ minutes(row.cut.minutes) }}</li>
+        <li v-for="row in cuts" :key="`${row.cut.deadline}:${row.cut.candidateKey}`">Defer · {{ row.label }} · {{ minutes(row.cut.minutes) }}</li>
       </ul>
       <details class="schedule">
         <summary>What changes</summary>
@@ -42,12 +42,12 @@ const headline = computed(() => {
         <template v-if="cuts.length">
           <h4>What would be left out</h4>
           <ul class="cuts">
-            <li v-for="row in cuts" :key="`${row.cut.exam}:${row.cut.candidateKey}`"><p class="cut-title"><strong>{{ row.label }}</strong> · {{ minutes(row.cut.minutes) }}</p><p>{{ row.cut.reason }}</p><p class="hint">{{ row.cut.consequence }}</p></li>
+            <li v-for="row in cuts" :key="`${row.cut.deadline}:${row.cut.candidateKey}`"><p class="cut-title"><strong>{{ row.label }}</strong> · {{ minutes(row.cut.minutes) }}</p><p>{{ row.cut.reason }}</p><p class="hint">{{ row.cut.consequence }}</p></li>
           </ul>
         </template>
         <template v-if="items.length">
           <h4>What the plan would schedule ({{ items.length }})</h4>
-          <ol class="scheduled"><li v-for="row in items" :key="row.item">{{ planDayLabel(row.day, today) }} · {{ row.candidate.activity }} · {{ row.candidate.minutes }} min<template v-if="row.candidate.examRefs.length"> · exam preparation</template></li></ol>
+          <ol class="scheduled"><li v-for="row in items" :key="row.item">{{ planDayLabel(row.day, today) }} · {{ row.candidate.activity }} · {{ row.candidate.minutes }} min<template v-if="row.candidate.deadlineRefs.length"> · exam preparation</template></li></ol>
         </template>
         <p v-else class="hint">The proposed plan schedules no activities.</p>
         <p v-if="examDay" class="hint">This preparation was not finished before the exam. Routine updates for this course wait until you confirm.</p>

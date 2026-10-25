@@ -202,12 +202,12 @@ const Adjust = endpoint("/learning/adjust", ({ session, skill, adjustmentKey, va
       Mastery._adjustments({ track }).is({ adjustment }), no(R.CanReplan({ owner, course }))).then(respond({ adjustment })).named("unplanned"),
     where(R.ActiveSkill({ owner, skill }).is({ course, definition }), Mastery._track({ learner: owner, subject: skill, definition }).is({ track }),
       Mastery._adjustments({ track }).is({ adjustment }), R.CanReplan({ owner, course }), R.PlanContext({ owner, course }).is({ basis }),
-      Planning._plans({ learner: owner, scope: course }).is({ plan, status }), is.among(status, ["PROPOSED", "ACTIVE"]), Planning._plan({ plan }).is({ basis }))
+      Planning._plans({ owner, scope: course }).is({ plan, status }), is.among(status, ["PROPOSED", "ACTIVE"]), Planning._plan({ plan }).is({ basis }))
       .then(respond({ adjustment })).named("planned"),
   ), options);
 const ReplanAfterAdjustment = reaction(({ owner, skill, course, candidates, horizonEnd, basis, explanation }) => when(Mastery.adjust({ learner: owner, subject: skill }).responds({}))
   .afterFlowSettles().where(R.OwnedSkill({ owner, skill }).is({ course }), R.CanReplan({ owner, course }), R.PlanContext({ owner, course }).is({ candidates, horizonEnd, basis, explanation }))
-  .then(Planning.replan({ learner: owner, scope: course, candidates, horizonEnd, basis, explanation, workloadComplete: false })));
+  .then(Planning.replan({ owner, scope: course, candidates, horizonEnd, basis, explanation, workloadComplete: false })));
 // Graded work is evidence, not a teaching source. The check applies only to the learner's own material in a course they own;
 // any other material keeps the admission refusal. Every branch shares the stages that follow, so the tutor request lives there
 // and repeats the source condition: the graded branch has already answered, and the source branch only rechecks the session.

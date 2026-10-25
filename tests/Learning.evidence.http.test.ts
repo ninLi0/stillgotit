@@ -187,13 +187,13 @@ test("an adjustment replans: the candidate gets a new key, priority from the adj
   expect(adjusted.priority).toBeCloseTo(60, 3);
   expect(adjusted).toMatchObject({ earliestDay: evidenced.earliestDay, latestDay: evidenced.latestDay, reason: "This skill needs fresh independent evidence." });
   // The proposal made before the adjustment was replaced, not left active.
-  const plans = await app.concepts.StudyPlanning._plans({ learner: user, scope: course } as never);
+  const plans = await app.concepts.StudyPlanning._plans({ owner: user, scope: course } as never);
   expect(plans.find((plan) => plan.plan === before.plan.plan)?.status).toBe("SUPERSEDED");
   expect(plans.filter((plan) => plan.status === "ACTIVE").map((plan) => plan.plan)).toEqual([after.plan.plan]);
 
   // A same-key retry adds no adjustment but runs the replan again, which makes a new proposal from current state.
   expect(await learner.ok("/learning/adjust", input)).toEqual({ adjustment });
-  const retried = await app.concepts.StudyPlanning._plans({ learner: user, scope: course } as never);
+  const retried = await app.concepts.StudyPlanning._plans({ owner: user, scope: course } as never);
   expect(retried).toHaveLength(plans.length + 1);
   const proposal = retried.find((plan) => !plans.some((earlier) => earlier.plan === plan.plan))!;
   expect(proposal.status).toBe("ACTIVE");
@@ -211,7 +211,7 @@ test("an exam beyond the seven-day horizon extends the replan after an adjustmen
   // Before exams were planned for, an exam beyond the seven-day horizon made every replan refuse INVALID_PLAN_INPUT.
   // The plan now runs up to the day before the exam, and preparation for the exam stands for the skill's review.
   const date = addDays(studyDate(app.now()), 9);
-  expect(await app.concepts.StudyPlanning.setExam({ learner: user, scope: course, date, covered: [skill] } as never)).not.toHaveProperty("error");
+  expect(await app.concepts.StudyPlanning.setDeadline({ owner: user, scope: course, date, covered: [skill] } as never)).not.toHaveProperty("error");
 
   const input = { skill, adjustmentKey: crypto.randomUUID(), value: 40, reason: "I could not redo the second product today." };
   const { adjustment } = await learner.ok("/learning/adjust", input);
@@ -220,11 +220,11 @@ test("an exam beyond the seven-day horizon extends the replan after an adjustmen
   const after = await learner.ok("/planning/read", { course });
   expect(after.plan.plan).not.toBe(before.plan.plan);
   expect(after.plan.horizonEnd).toBe(addDays(studyDate(app.now()), 8));
-  const candidates = after.plan.items.map((item: { candidate: { subject: string; examRefs: string[]; key: string } }) => item.candidate);
+  const candidates = after.plan.items.map((item: { candidate: { subject: string; deadlineRefs: string[]; key: string } }) => item.candidate);
   const preparation = candidates.find((candidate: { subject: string }) => candidate.subject === skill);
   // The exam candidate was proposed when the exam was set and is carried unchanged, so its key predates the adjustment.
-  expect(preparation.examRefs).toHaveLength(1);
-  expect(preparation.key).toEndWith(`:exam:${preparation.examRefs[0]}`);
+  expect(preparation.deadlineRefs).toHaveLength(1);
+  expect(preparation.key).toEndWith(`:exam:${preparation.deadlineRefs[0]}`);
   // A same-key retry adds no adjustment and leaves the saved estimate alone.
   expect(await learner.ok("/learning/adjust", input)).toEqual({ adjustment });
   expect(await adjustments(app, track)).toHaveLength(1);
@@ -234,14 +234,14 @@ test("without a saved budget or while an activity is in progress, Adjust succeed
   const app = await setup(), { learner, user, course, skill } = await learningFixture(app, "adjust-no-budget");
   const { track } = await learner.ok("/learning/confidence", { skill, confidence: 50 });
   await learner.ok("/learning/adjust", { skill, adjustmentKey: crypto.randomUUID(), value: 65, reason: "Reviewed my notes." });
-  expect(await app.concepts.StudyPlanning._plans({ learner: user, scope: course } as never)).toEqual([]);
+  expect(await app.concepts.StudyPlanning._plans({ owner: user, scope: course } as never)).toEqual([]);
 
   await learner.ok("/planning/configure", { course, dailyMinutes: 30 });
   const { next } = await learner.ok("/planning/read", { course });
   await learner.ok("/planning/begin", { course, item: next.item });
-  const plans = await app.concepts.StudyPlanning._plans({ learner: user, scope: course } as never);
+  const plans = await app.concepts.StudyPlanning._plans({ owner: user, scope: course } as never);
   await learner.ok("/learning/adjust", { skill, adjustmentKey: crypto.randomUUID(), value: 75, reason: "Reviewed my notes again." });
-  expect(await app.concepts.StudyPlanning._plans({ learner: user, scope: course } as never)).toEqual(plans);
+  expect(await app.concepts.StudyPlanning._plans({ owner: user, scope: course } as never)).toEqual(plans);
   expect(await adjustments(app, track)).toHaveLength(2);
 }, 60_000);
 

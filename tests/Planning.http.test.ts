@@ -6,8 +6,8 @@ import { createGateway } from "@mit-sdg/sync-engine/boundary";
 import { executionLimits } from "../src/assembly.ts";
 import { MemoryProvider } from "../src/concepts/Federating/provider.ts";
 import type { User } from "../src/concepts/Registering/Registering.ts";
-import { StudyPlanning } from "../src/concepts/StudyPlanning/StudyPlanning.ts";
-import * as concept from "../src/concepts/StudyPlanning/refusals.ts";
+import { Budgeting } from "../src/concepts/Budgeting/Budgeting.ts";
+import * as concept from "../src/concepts/Budgeting/refusals.ts";
 import type { CourseTutor } from "../src/host/tutor.ts";
 import { createRuntime } from "../src/host/runtime.ts";
 import { connectMongo, localMongoUri } from "../src/storage/mongo.ts";
@@ -23,11 +23,11 @@ const WAITING = "Your plan will update when you finish or stop your current acti
 const OWN_COURSE = "Choose one of your own courses.";
 const BEGIN_ADMISSION = "Choose your own current activity and check its prerequisites. Update the plan if requirements changed.";
 
-interface Candidate { key: string; subject: string; definition: string; latestDay: string; earliestDay: string; priority: number; examRefs: string[] }
+interface Candidate { key: string; subject: string; definition: string; latestDay: string; earliestDay: string; priority: number; deadlineRefs: string[] }
 interface Item { item: string; candidate: Candidate; day: string; status: string }
-interface Cut { exam: string; candidateKey: string; omittedScope: string; minutes: number; reason: string; consequence: string }
+interface Cut { deadline: string; candidateKey: string; omittedScope: string; minutes: number; reason: string; consequence: string }
 interface PlanRead {
-  data: { today: string; next: Item | null; plan: { plan: string; status: string; examUrgent: boolean; horizonEnd: string; items: Item[] } | null };
+  data: { today: string; next: Item | null; plan: { plan: string; status: string; urgent: boolean; horizonEnd: string; items: Item[] } | null };
   exams: { exam: string; date: string; covered: string[] }[];
   proposal: { plan: string; explanation: string; examUrgent: boolean; estimatedExamMinutes: number; availableExamMinutes: number; focusExam: string; focusExamDate: string;
     locallyCurrent: boolean; contextCurrent: boolean; sessionInProgress: boolean }[];
@@ -46,7 +46,7 @@ async function setup() {
   // The assembled endpoints without the host's admission checks, to see each endpoint's own answer.
   const endpoints = createGateway({ application: runtime.application, executionLimits });
   // The planning concept without reactions, to change saved state behind the application's back.
-  const planning = new StudyPlanning(connection.db, "StudyPlanning", () => TODAY);
+  const planning = new Budgeting(connection.db, "StudyPlanning", () => TODAY);
   cleanups.push(async () => {
     await runtime.gateway.beginDrain(); await connection.db.dropDatabase(); await connection.client.close();
     for (const owner of owners) await rm(resolve(".data/files", createHash("sha256").update(owner).digest("hex")), { recursive: true, force: true });
@@ -105,7 +105,7 @@ const refusedBy = (value: string) => ({ ok: false, error: { kind: "domain", valu
 const refused = (detail: string) => ({ status: 400, body: { error: "INVALID_REQUEST", detail } });
 const message = (Refusal: new () => Error) => new Refusal().message;
 const SKILLS_REFUSAL = "Choose confirmed skills from this course, each once.", PROPOSAL_REFUSAL = "Choose one of your proposed plans.";
-const examWorkIn = (items: { candidate: Candidate }[], exam: string) => items.filter(({ candidate }) => candidate.examRefs.includes(exam));
+const examWorkIn = (items: { candidate: Candidate }[], exam: string) => items.filter(({ candidate }) => candidate.deadlineRefs.includes(exam));
 
 test("setting an exam needs a budget, today or later, and confirmed course skills; the same date replaces its skills; removal proposes again", async () => {
   const app = await setup(), maya = await app.learner("exam-maya");
@@ -114,15 +114,15 @@ test("setting an exam needs a budget, today or later, and confirmed course skill
   const { skill: draft } = await maya.ok("/courses/skills/propose", { proposalKey: crypto.randomUUID(), unit, material, title: "Draft", outcome: "o", gate: "g" });
 
   // Before a budget exists, the planning concept refuses the exam.
-  expect(await maya.post("/planning/exams/set", { course, date: day(10), covered: [a] })).toEqual(refused(message(concept.ExamPreferencesUnavailable)));
-  expect(await maya.direct("/planning/exams/set", { course, date: day(10), covered: [a] })).toEqual(refusedBy("EXAM_PREFERENCES_UNAVAILABLE"));
+  expect(await maya.post("/planning/exams/set", { course, date: day(10), covered: [a] })).toEqual(refused(message(concept.DeadlinePreferencesUnavailable)));
+  expect(await maya.direct("/planning/exams/set", { course, date: day(10), covered: [a] })).toEqual(refusedBy("DEADLINE_PREFERENCES_UNAVAILABLE"));
   await maya.ok("/planning/configure", { course, dailyMinutes: 60 });
   const routine = await maya.read(course);
 
   // A past date and an empty skill list reach the planning concept's own refusal.
   for (const input of [{ date: day(-1), covered: [a] }, { date: day(10), covered: [] }]) {
-    expect(await maya.post("/planning/exams/set", { course, ...input })).toEqual(refused(message(concept.InvalidExamDetails)));
-    expect(await maya.direct("/planning/exams/set", { course, ...input })).toEqual(refusedBy("INVALID_EXAM_DETAILS"));
+    expect(await maya.post("/planning/exams/set", { course, ...input })).toEqual(refused(message(concept.InvalidDeadlineDetails)));
+    expect(await maya.direct("/planning/exams/set", { course, ...input })).toEqual(refusedBy("INVALID_DEADLINE_DETAILS"));
   }
   // A repeated skill, a draft, or a skill from another course is refused before the concept is called.
   for (const covered of [[a, a], [a, draft], [other.skills[0]], ["missing"]]) {
@@ -147,20 +147,20 @@ test("setting an exam needs a budget, today or later, and confirmed course skill
   const examWork = examWorkIn(read.data.plan!.items, exam);
   expect(examWork.map(({ candidate }) => candidate.subject).sort()).toEqual([b, c].sort());
   for (const { candidate } of examWork) {
-    expect(candidate).toMatchObject({ latestDay: day(9), examRefs: [exam], priority: 1100 });
+    expect(candidate).toMatchObject({ latestDay: day(9), deadlineRefs: [exam], priority: 1100 });
     expect(candidate.key).toEndWith(`:exam:${exam}`);
   }
-  expect(read.data.plan!.items.find(({ candidate }) => candidate.subject === a)!.candidate.examRefs).toEqual([]);
+  expect(read.data.plan!.items.find(({ candidate }) => candidate.subject === a)!.candidate.deadlineRefs).toEqual([]);
 
   // Removing the exam deactivates it and proposes again without exam work. Removing it again succeeds.
   expect(await maya.ok("/planning/exams/remove", { course, date: day(10) })).toEqual({ exam, refreshed: true });
   read = await maya.read(course);
   expect(read.exams).toEqual([]);
   expect(read.data.plan!.horizonEnd).toBe(day(6));
-  expect(read.data.plan!.items.every(({ candidate }) => candidate.examRefs.length === 0)).toBe(true);
+  expect(read.data.plan!.items.every(({ candidate }) => candidate.deadlineRefs.length === 0)).toBe(true);
   expect(await maya.ok("/planning/exams/remove", { course, date: day(10) })).toEqual({ exam, refreshed: true });
-  expect(await maya.post("/planning/exams/remove", { course, date: day(11) })).toEqual(refused(message(concept.ExamRemoveUnavailable)));
-  expect(await maya.direct("/planning/exams/remove", { course, date: day(11) })).toEqual(refusedBy("EXAM_REMOVE_UNAVAILABLE"));
+  expect(await maya.post("/planning/exams/remove", { course, date: day(11) })).toEqual(refused(message(concept.DeadlineRemoveUnavailable)));
+  expect(await maya.direct("/planning/exams/remove", { course, date: day(11) })).toEqual(refusedBy("DEADLINE_REMOVE_UNAVAILABLE"));
   // Setting the date again restores the same exam.
   expect(await maya.ok("/planning/exams/set", { course, date: day(10), covered: [c] })).toEqual({ exam, refreshed: true });
   expect((await maya.read(course)).exams).toEqual([{ exam, date: day(10), covered: [c] }]);
@@ -188,11 +188,11 @@ test("new exam cuts wait for confirmation in order; approved cuts later refresh 
   const cuts = await app.runtime.application.concepts.StudyPlanning._cuts({ plan: pending });
   expect(read.proposalItems).toEqual(items.map(({ item, candidate, day: when }) => ({ item, candidate, day: when })));
   // Today holds the two exam activities that fit; the unrelated review moves to a later day.
-  expect(read.proposalItems.map(({ day: when, candidate }) => [when, candidate.examRefs])).toEqual([[TODAY, [exam]], [TODAY, [exam]], [day(1), []]]);
+  expect(read.proposalItems.map(({ day: when, candidate }) => [when, candidate.deadlineRefs])).toEqual([[TODAY, [exam]], [TODAY, [exam]], [day(1), []]]);
   expect(read.proposalItems.slice(0, 2).every(({ candidate }) => candidate.latestDay === TODAY)).toBe(true);
   expect(read.cuts).toEqual(cuts);
   expect(read.cuts).toHaveLength(2);
-  expect(read.cuts.every(({ cut }) => cut.exam === exam && cut.minutes === 10 && cut.consequence === `No scheduled preparation for: ${cut.omittedScope}`)).toBe(true);
+  expect(read.cuts.every(({ cut }) => cut.deadline === exam && cut.minutes === 10 && cut.consequence === `No scheduled preparation for: ${cut.omittedScope}`)).toBe(true);
 
   // A routine refresh makes a new proposal with the same unapproved cuts, so it waits too.
   await lee.ok("/planning/propose", { course });
@@ -209,7 +209,7 @@ test("new exam cuts wait for confirmation in order; approved cuts later refresh 
   }
   expect(await lee.ok("/planning/tradeoffs/confirm", { course, plan: pending })).toEqual({ plan: pending });
   read = await lee.read(course);
-  expect(read.data.plan).toMatchObject({ plan: pending, status: "ACTIVE", examUrgent: true });
+  expect(read.data.plan).toMatchObject({ plan: pending, status: "ACTIVE", urgent: true });
   expect([read.proposal, read.proposalItems, read.cuts]).toEqual([[], [], []]);
   expect(await lee.post("/planning/tradeoffs/confirm", { course, plan: pending })).toEqual(refused(message(concept.TradeoffPlanUnavailable)));
   expect(await lee.direct("/planning/tradeoffs/confirm", { course, plan: pending })).toEqual(refusedBy("TRADEOFF_PLAN_UNAVAILABLE"));
@@ -261,7 +261,7 @@ test("confirming waits for the current activity and current inputs; declining is
   expect(read.proposal).toHaveLength(1);
   const waiting = read.proposal[0]!.plan;
   // An exam saved without a refresh changes the local inputs, so the waiting proposal is out of date.
-  await app.planning.setExam({ learner: ana.user, scope: course, date: day(5), covered: [skills[0]!] });
+  await app.planning.setDeadline({ owner: ana.user, scope: course, date: day(5), covered: [skills[0]!] });
   expect((await ana.read(course)).proposal[0]).toMatchObject({ plan: waiting, locallyCurrent: false, sessionInProgress: false });
   expect(await ana.post("/planning/tradeoffs/confirm", { course, plan: waiting })).toEqual(refused(message(concept.TradeoffPlanOutdated)));
   expect(await ana.direct("/planning/tradeoffs/confirm", { course, plan: waiting })).toEqual(refusedBy("TRADEOFF_PLAN_OUTDATED"));
@@ -330,7 +330,7 @@ test("an activity elsewhere keeps the plan until it ends; finishing or stopping 
   await kai.ok("/planning/stop", { course: algebra.course, item: read.data.next!.item, actualMinutes: 3 });
   read = await kai.read(algebra.course);
   expect([read.exams, read.proposal, read.cuts]).toEqual([[], [], []]);
-  expect(read.data.plan!.items.every(({ candidate }) => candidate.examRefs.length === 0)).toBe(true);
+  expect(read.data.plan!.items.every(({ candidate }) => candidate.deadlineRefs.length === 0)).toBe(true);
 }, 60_000);
 
 test("urgent mode skips the prerequisite check only for exam work of an urgent active plan whose exam is still active", async () => {
@@ -347,28 +347,28 @@ test("urgent mode skips the prerequisite check only for exam work of an urgent a
   expect(read.cuts.map(({ cut }) => cut.omittedScope)).toEqual(["Fresh check: Vectors"]);
   await rio.ok("/planning/tradeoffs/confirm", { course, plan: read.proposal[0]!.plan });
   read = await rio.read(course);
-  expect(read.data.plan!.examUrgent).toBe(true);
-  expect(read.data.next!.candidate).toMatchObject({ subject: next, examRefs: [exam] });
+  expect(read.data.plan!.urgent).toBe(true);
+  expect(read.data.next!.candidate).toMatchObject({ subject: next, deadlineRefs: [exam] });
   expect(await rio.ok("/planning/begin", { course, item: read.data.next!.item })).toEqual({ item: read.data.next!.item });
 
   // Stopping refreshes the plan; the same approved cut lets the new urgent plan activate routinely.
   await rio.ok("/planning/stop", { course, item: read.data.next!.item, actualMinutes: 0 });
   read = await rio.read(course);
-  expect(read.data.plan!.examUrgent).toBe(true);
+  expect(read.data.plan!.urgent).toBe(true);
   const urgentItem = read.data.next!;
-  expect(urgentItem.candidate.examRefs).toEqual([exam]);
+  expect(urgentItem.candidate.deadlineRefs).toEqual([exam]);
 
   // The exam is removed while the urgent plan is still active: urgency no longer applies.
-  await app.planning.removeExam({ learner: rio.user, scope: course, date: day(1) });
-  expect((await rio.read(course)).data.plan!.examUrgent).toBe(true);
+  await app.planning.removeDeadline({ owner: rio.user, scope: course, date: day(1) });
+  expect((await rio.read(course)).data.plan!.urgent).toBe(true);
   expect(await rio.post("/planning/begin", { course, item: urgentItem.item })).toEqual({ status: 400, body: { error: "INVALID_REQUEST", detail: BEGIN_ADMISSION } });
 
   // A routine plan keeps the prerequisite check for the same skill.
   await rio.ok("/planning/propose", { course });
   read = await rio.read(course);
-  expect(read.data.plan!.examUrgent).toBe(false);
+  expect(read.data.plan!.urgent).toBe(false);
   const routineItem = read.data.plan!.items.find(({ candidate, day: when }) => candidate.subject === next && when === TODAY)!;
-  expect(routineItem.candidate.examRefs).toEqual([]);
+  expect(routineItem.candidate.deadlineRefs).toEqual([]);
   expect(await rio.post("/planning/begin", { course, item: routineItem.item })).toEqual({ status: 400, body: { error: "INVALID_REQUEST", detail: BEGIN_ADMISSION } });
   expect((await rio.read(course)).data.next!.status).toBe("TODO");
 }, 60_000);

@@ -7,12 +7,12 @@ import { executionLimits } from "../../src/assembly.ts";
 import { MemoryProvider } from "../../src/concepts/Federating/provider.ts";
 import { MasteryEstimating } from "../../src/concepts/MasteryEstimating/MasteryEstimating.ts";
 import type { User } from "../../src/concepts/Registering/Registering.ts";
-import { StudyPlanning } from "../../src/concepts/StudyPlanning/StudyPlanning.ts";
-import * as concept from "../../src/concepts/StudyPlanning/refusals.ts";
+import { Budgeting } from "../../src/concepts/Budgeting/Budgeting.ts";
+import * as concept from "../../src/concepts/Budgeting/refusals.ts";
 import type { CourseTutor } from "../../src/host/tutor.ts";
 import { createRuntime } from "../../src/host/runtime.ts";
 import { connectMongo, localMongoUri } from "../../src/storage/mongo.ts";
-import { examProblem, examRefusal, PlanningFailure, settle, tradeoffRefusal, type CourseRead, type CourseSkill, type ExamInput, type PlanRead } from "../../frontend/src/planning.ts";
+import { examProblem, examRefusal, PlanningFailure, sentences, settle, tradeoffRefusal, type CourseRead, type CourseSkill, type ExamInput, type PlanRead } from "../../frontend/src/planning.ts";
 
 // The brief's journey for exam dates and confirmed tradeoffs (design/compositions/Planning.md), walked through HTTP.
 // One learner sets, changes, and removes an exam and decides on the proposals it causes; a second learner tries each new
@@ -34,7 +34,8 @@ const SKILLS_REFUSAL = "Choose confirmed skills from this course, each once.";
 const PROPOSAL_REFUSAL = "Choose one of your proposed plans.";
 // What the screen shows for a bare refusal it cannot explain (frontend/src/api.ts). No refusal may end up showing this.
 const GENERIC = "Check the field and try again.";
-const CUT_REASON = "This activity does not fit before the exam within its dates and the available budget.";
+// The planning concept states a cut's reason in its own terms, where an exam is a deadline.
+const CUT_REASON = "This activity does not fit before the deadline within its dates and the available budget.";
 // Over HTTP a refusal is its category with its sentence as `detail`: the planning concept's message or the composition's own.
 const refused = (detail: string) => ({ status: 400, body: { error: "INVALID_REQUEST", detail } });
 const signedOut = { status: 401, body: { error: "UNAUTHORIZED" } };
@@ -52,7 +53,7 @@ async function start() {
   const endpoints = createGateway({ application: runtime.application, executionLimits });
   // Concepts without reactions: the planning concept to read saved records, and mastery to change the planning context
   // without the plan refresh that every HTTP change of it causes.
-  const planning = new StudyPlanning(connection.db, "StudyPlanning", () => TODAY);
+  const planning = new Budgeting(connection.db, "StudyPlanning", () => TODAY);
   const mastery = new MasteryEstimating(connection.db, "MasteryEstimating", () => NOW);
   cleanups.push(async () => {
     await runtime.gateway.beginDrain(); await connection.db.dropDatabase(); await connection.client.close();
@@ -155,7 +156,7 @@ const examExplanation = (learner: Learner, at: string, input: ExamInput) => asyn
 const tradeoffExplanation = (learner: Learner, at: string, plan: string, confirming: boolean) => async () => tradeoffRefusal(plan, (await learner.read(at)).proposal[0], confirming);
 
 // Saved planning records, including removed exams and every plan's status, to show that a refusal saved nothing.
-const saved = async (learner: string, scope: string) => ({ exams: await app.planning._exams({ learner, scope }), plans: await app.planning._plans({ learner, scope }) });
+const saved = async (learner: string, scope: string) => ({ exams: await app.planning._deadlines({ owner: learner, scope }), plans: await app.planning._plans({ owner: learner, scope }) });
 const statusOf = async (plan: string) => (await app.planning._plan({ plan }))[0]?.status;
 // A cut names omitted work by its activity text, which ends with the skill's title.
 const subjectOf = (activity: string) => skills.find((row) => row.status === "CONFIRMED" && activity.endsWith(row.title))!.skill;
@@ -176,7 +177,7 @@ describe("Exam dates and confirmed tradeoffs: one learner's journey through HTTP
     expect(read.exams).toEqual([{ exam, date: EXAM_DAY, covered: [vectors, matrices] }]);
     // Nothing waits for the learner: the new proposal needed no cuts, so it is already the active plan.
     expect([read.proposal, read.proposalItems, read.cuts]).toEqual([[], [], []]);
-    expect(read.data.plan).toMatchObject({ status: "ACTIVE", focusExam: exam, examUrgent: false, estimatedExamMinutes: 20, availableExamMinutes: 30, examCuts: [], needsConfirmation: false });
+    expect(read.data.plan).toMatchObject({ status: "ACTIVE", focusDeadline: exam, urgent: false, requiredMinutes: 20, availableMinutes: 30, cuts: [], needsConfirmation: false });
     firstExamPlan = read.data.plan!.plan;
     expect(firstExamPlan).not.toBe(routinePlan);
     const plans = (await saved(owner.user, course)).plans;
@@ -185,23 +186,23 @@ describe("Exam dates and confirmed tradeoffs: one learner's journey through HTTP
     expect(plans.some(({ status }) => status === "PROPOSED")).toBe(false);
   }, 60_000);
 
-  test("Candidate generation marks preparation for the nearest active exam with examRefs, with latestDay before the exam", async () => {
+  test("Candidate generation marks preparation for the nearest active exam with deadlineRefs, with latestDay before the exam", async () => {
     await journey();
     const read = await owner.read(course), plan = read.data.plan!;
-    const preparation = plan.items.filter(({ candidate }) => candidate.examRefs.length > 0);
-    const routine = plan.items.filter(({ candidate }) => candidate.examRefs.length === 0);
+    const preparation = plan.items.filter(({ candidate }) => candidate.deadlineRefs.length > 0);
+    const routine = plan.items.filter(({ candidate }) => candidate.deadlineRefs.length === 0);
     expect(sorted(preparation.map(({ candidate }) => candidate.subject))).toEqual(sorted([vectors, matrices]));
     for (const { candidate } of preparation) {
-      expect(candidate).toMatchObject({ examRefs: [exam], latestDay: day(2), reason: `Preparation for the exam on ${EXAM_DAY}. This skill needs fresh independent evidence.` });
+      expect(candidate).toMatchObject({ deadlineRefs: [exam], latestDay: day(2), reason: `Preparation for the exam on ${EXAM_DAY}. This skill needs fresh independent evidence.` });
       expect(candidate.key).toEndWith(`:exam:${exam}`);
     }
     // Exam work comes first: it takes today and tomorrow, ahead of every routine review, and the skills the exam does not
     // cover keep routine reviews with no exam reference.
-    expect(plan.items.map(({ day: when, candidate }) => [when, candidate.examRefs.length > 0])).toEqual([[TODAY, true], [day(1), true], [day(2), false], [day(3), false], [day(4), false]]);
+    expect(plan.items.map(({ day: when, candidate }) => [when, candidate.deadlineRefs.length > 0])).toEqual([[TODAY, true], [day(1), true], [day(2), false], [day(3), false], [day(4), false]]);
     expect(sorted(routine.map(({ candidate }) => candidate.subject))).toEqual(sorted([determinants, eigenvalues, projections]));
     expect(Math.min(...preparation.map(({ candidate }) => candidate.priority))).toBeGreaterThan(Math.max(...routine.map(({ candidate }) => candidate.priority)));
     // The learner reads the reason with today's activity and the plan's explanation.
-    expect(read.data.next).toMatchObject({ day: TODAY, status: "TODO", candidate: { examRefs: [exam], reason: preparation[0]!.candidate.reason } });
+    expect(read.data.next).toMatchObject({ day: TODAY, status: "TODO", candidate: { deadlineRefs: [exam], reason: preparation[0]!.candidate.reason } });
     expect(plan.explanation).toContain(PREPARATION_FIRST);
     expect(plan.horizonEnd).toBe(day(6));
   }, 60_000);
@@ -212,11 +213,12 @@ describe("Exam dates and confirmed tradeoffs: one learner's journey through HTTP
     const attempts: [string, ExamInput][] = [["a date before today", { date: day(-1), covered: [vectors] }], ["no covered skill", { date: day(4), covered: [] }]];
     for (const [refusal, input] of attempts) {
       const answer = await owner.post("/planning/exams/set", { course, ...input });
-      expect(answer, refusal).toEqual(refused(new concept.InvalidExamDetails().message));
-      expect(await owner.direct("/planning/exams/set", { course, ...input }), refusal).toEqual(refusedBy("INVALID_EXAM_DETAILS"));
-      // The page checks the same rule before it sends, so normally the request is never made.
-      expect(examProblem(input, before.data, skills), refusal).toBe(new concept.InvalidExamDetails().message);
-      await hear(refusal, answer, new concept.InvalidExamDetails().message, examExplanation(owner, course, input));
+      expect(answer, refusal).toEqual(refused(new concept.InvalidDeadlineDetails().message));
+      expect(await owner.direct("/planning/exams/set", { course, ...input }), refusal).toEqual(refusedBy("INVALID_DEADLINE_DETAILS"));
+      // The page checks the same rule before it sends, so normally the request is never made. It states the rule in
+      // the exam form's own words, about a covered skill, where the concept speaks of a covered subject.
+      expect(examProblem(input, before.data, skills), refusal).toBe(sentences.examDetails);
+      await hear(refusal, answer, new concept.InvalidDeadlineDetails().message, examExplanation(owner, course, input));
     }
     // Nothing was saved: no new exam, the existing exam keeps its skills, and no plan was proposed.
     expect(await owner.read(course)).toEqual(before);
@@ -256,14 +258,14 @@ describe("Exam dates and confirmed tradeoffs: one learner's journey through HTTP
     expect(await statusOf(firstProposal)).toBe("PROPOSED");
     expect((await app.planning._plan({ plan: firstProposal }))[0]).toMatchObject({ needsConfirmation: true });
     // Priority: every study day before the exam holds only preparation; the routine review waits for the exam day.
-    expect(read.proposalItems.map(({ day: when, candidate }) => [when, candidate.examRefs])).toEqual([[TODAY, [exam]], [day(1), [exam]], [day(2), [exam]], [day(3), []]]);
+    expect(read.proposalItems.map(({ day: when, candidate }) => [when, candidate.deadlineRefs])).toEqual([[TODAY, [exam]], [day(1), [exam]], [day(2), [exam]], [day(3), []]]);
     // The left-out preparation is named with its minutes, reason, and consequence.
     expect(read.cuts).toHaveLength(1);
     const { cut } = read.cuts[0]!;
-    expect(cut).toEqual({ exam, candidateKey: expect.stringMatching(new RegExp(`:exam:${exam}$`)), omittedScope: expect.stringMatching(/^Set confidence and try /),
+    expect(cut).toEqual({ deadline: exam, candidateKey: expect.stringMatching(new RegExp(`:exam:${exam}$`)), omittedScope: expect.stringMatching(/^Set confidence and try /),
       minutes: 10, reason: CUT_REASON, consequence: `No scheduled preparation for: ${cut.omittedScope}` });
     // Each covered skill is either scheduled before the exam or named as a cut.
-    const scheduled = read.proposalItems.filter(({ candidate }) => candidate.examRefs.includes(exam)).map(({ candidate }) => candidate.subject);
+    const scheduled = read.proposalItems.filter(({ candidate }) => candidate.deadlineRefs.includes(exam)).map(({ candidate }) => candidate.subject);
     expect(sorted([...scheduled, subjectOf(cut.omittedScope)])).toEqual(sorted([vectors, matrices, determinants, eigenvalues]));
   }, 60_000);
 
@@ -329,7 +331,7 @@ describe("Exam dates and confirmed tradeoffs: one learner's journey through HTTP
     const before = await owner.read(course);
     // Today's activity is exam preparation from the active plan.
     activity = before.data.next!.item;
-    expect(before.data.next).toMatchObject({ day: TODAY, status: "TODO", candidate: { examRefs: [exam] } });
+    expect(before.data.next).toMatchObject({ day: TODAY, status: "TODO", candidate: { deadlineRefs: [exam] } });
     expect(await owner.ok("/planning/begin", { course, item: activity })).toEqual({ item: activity });
     let read = await owner.read(course);
     expect(read.proposal[0]).toMatchObject({ plan: firstProposal, sessionInProgress: true, locallyCurrent: true, contextCurrent: true });
@@ -376,7 +378,7 @@ describe("Exam dates and confirmed tradeoffs: one learner's journey through HTTP
     expect(read.data.plan!.plan).toBe(firstExamPlan);
     expect(read.proposal[0]).toMatchObject({ focusExam: exam, examUrgent: true, estimatedExamMinutes: 40, availableExamMinutes: 20,
       locallyCurrent: true, contextCurrent: true, sessionInProgress: false });
-    expect(read.proposalItems.map(({ day: when, candidate }) => [when, candidate.examRefs])).toEqual([[day(1), [exam]], [day(2), [exam]], [day(3), []]]);
+    expect(read.proposalItems.map(({ day: when, candidate }) => [when, candidate.deadlineRefs])).toEqual([[day(1), [exam]], [day(2), [exam]], [day(3), []]]);
     expect(read.cuts).toHaveLength(2);
     stale = read.proposal[0]!.plan;
   }, 60_000);
@@ -409,7 +411,7 @@ describe("Exam dates and confirmed tradeoffs: one learner's journey through HTTP
     approvedCutKeys = waiting.cuts.map(({ cut }) => cut.candidateKey);
 
     read = await owner.read(course);
-    expect(read.data.plan).toMatchObject({ plan: confirmed, status: "ACTIVE", focusExam: exam, examUrgent: true });
+    expect(read.data.plan).toMatchObject({ plan: confirmed, status: "ACTIVE", focusDeadline: exam, urgent: true });
     expect([read.proposal, read.proposalItems, read.cuts]).toEqual([[], [], []]);
     // One action activated it and replaced the earlier active plan, whose unstarted work is replaced, not missed.
     expect(await statusOf(firstExamPlan)).toBe("SUPERSEDED");
@@ -433,7 +435,7 @@ describe("Exam dates and confirmed tradeoffs: one learner's journey through HTTP
     expect(read.cuts).toHaveLength(3);
     expect(read.cuts.some(({ cut }) => !approvedCutKeys.includes(cut.candidateKey))).toBe(true);
     // Unfinished preparation for Vectors and Matrices is carried (Planning.md), and Projections now has exam work too.
-    const examWork = [...read.proposalItems.filter(({ candidate }) => candidate.examRefs.includes(exam)).map(({ candidate }) => candidate.subject),
+    const examWork = [...read.proposalItems.filter(({ candidate }) => candidate.deadlineRefs.includes(exam)).map(({ candidate }) => candidate.subject),
       ...read.cuts.map(({ cut }) => subjectOf(cut.omittedScope))];
     expect(sorted(examWork)).toEqual(sorted([vectors, matrices, determinants, eigenvalues, projections]));
     laterProposal = read.proposal[0]!.plan;
@@ -464,8 +466,8 @@ describe("Exam dates and confirmed tradeoffs: one learner's journey through HTTP
     read = await owner.read(course);
     // The exam is kept but inactive, so the plan no longer lists it.
     expect(read.exams).toEqual([]);
-    expect((await app.planning._exams({ learner: owner.user, scope: course })).filter(({ date }) => date === EXAM_DAY))
-      .toEqual([expect.objectContaining({ exam, active: false })]);
+    expect((await app.planning._deadlines({ owner: owner.user, scope: course })).filter(({ date }) => date === EXAM_DAY))
+      .toEqual([expect.objectContaining({ deadline: exam, active: false })]);
     // The dependent proposal was replaced and can no longer be confirmed.
     expect(await statusOf(dependent)).toBe("SUPERSEDED");
     const answer = await owner.post("/planning/tradeoffs/confirm", { course, plan: dependent });
@@ -475,11 +477,11 @@ describe("Exam dates and confirmed tradeoffs: one learner's journey through HTTP
     // The new proposal needed no cuts, so it activated: every skill is back to a routine review over seven days.
     expect([read.proposal, read.proposalItems, read.cuts]).toEqual([[], [], []]);
     const plan = read.data.plan!;
-    expect(plan).toMatchObject({ status: "ACTIVE", examUrgent: false, horizonEnd: day(6), estimatedExamMinutes: 0, availableExamMinutes: 0 });
-    expect(plan.focusExam).toBeUndefined();
+    expect(plan).toMatchObject({ status: "ACTIVE", urgent: false, horizonEnd: day(6), requiredMinutes: 0, availableMinutes: 0 });
+    expect(plan.focusDeadline).toBeUndefined();
     expect(plan.plan).not.toBe(confirmed);
     expect(await statusOf(confirmed)).toBe("SUPERSEDED");
-    expect(plan.items.every(({ candidate }) => candidate.examRefs.length === 0)).toBe(true);
+    expect(plan.items.every(({ candidate }) => candidate.deadlineRefs.length === 0)).toBe(true);
     expect(sorted(plan.items.map(({ candidate }) => candidate.subject))).toEqual(sorted([vectors, matrices, determinants, eigenvalues, projections]));
     expect(plan.explanation).not.toContain("exam");
   }, 60_000);
@@ -497,7 +499,7 @@ describe("Exam dates and confirmed tradeoffs: one learner's journey through HTTP
     expect(lost.body).toEqual(retry);
     const read = await owner.read(course);
     expect(read.exams).toEqual([{ exam, date: EXAM_DAY, covered: [vectors, matrices] }]);
-    expect((await app.planning._exams({ learner: owner.user, scope: course })).filter(({ date }) => date === EXAM_DAY)).toHaveLength(1);
+    expect((await app.planning._deadlines({ owner: owner.user, scope: course })).filter(({ date }) => date === EXAM_DAY)).toHaveLength(1);
     // Its unfinished preparation is carried again and cannot all fit, so one proposal waits; the active plan stays.
     expect(read.data).toEqual(before.data);
     expect(read.proposal).toHaveLength(1);
@@ -530,7 +532,7 @@ describe("Exam dates and confirmed tradeoffs: one learner's journey through HTTP
     expect(await owner.direct("/planning/tradeoffs/confirm", confirm)).toEqual(refusedBy("TRADEOFF_PLAN_UNAVAILABLE"));
     await hear("confirming again after a lost reply", answer, new concept.TradeoffPlanUnavailable().message, tradeoffExplanation(owner, course, again, true));
     read = await owner.read(course);
-    expect(read.data.plan).toMatchObject({ plan: again, status: "ACTIVE", focusExam: exam, examUrgent: true });
+    expect(read.data.plan).toMatchObject({ plan: again, status: "ACTIVE", focusDeadline: exam, urgent: true });
     expect([read.proposal, read.proposalItems, read.cuts]).toEqual([[], [], []]);
   }, 60_000);
 
@@ -541,11 +543,11 @@ describe("Exam dates and confirmed tradeoffs: one learner's journey through HTTP
     expect(await owner.ok("/planning/exams/remove", request)).toEqual({ exam, refreshed: true });
     const read = await owner.read(course);
     expect([read.exams, read.proposal, read.proposalItems, read.cuts]).toEqual([[], [], [], []]);
-    expect(read.data.plan).toMatchObject({ status: "ACTIVE", examUrgent: false });
-    expect(read.data.plan!.focusExam).toBeUndefined();
-    expect(read.data.plan!.items.map(({ candidate }) => candidate.examRefs)).toEqual([[], [], [], [], []]);
-    expect((await app.planning._exams({ learner: owner.user, scope: course })).filter(({ date }) => date === EXAM_DAY))
-      .toEqual([expect.objectContaining({ exam, active: false })]);
+    expect(read.data.plan).toMatchObject({ status: "ACTIVE", urgent: false });
+    expect(read.data.plan!.focusDeadline).toBeUndefined();
+    expect(read.data.plan!.items.map(({ candidate }) => candidate.deadlineRefs)).toEqual([[], [], [], [], []]);
+    expect((await app.planning._deadlines({ owner: owner.user, scope: course })).filter(({ date }) => date === EXAM_DAY))
+      .toEqual([expect.objectContaining({ deadline: exam, active: false })]);
   }, 60_000);
 
   test("Refusals reach the learner as the specific reason, not 'Check the field and try again' (the server sends each refusal's sentence as its detail)", async () => {

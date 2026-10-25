@@ -33,8 +33,8 @@ instantiate MasteryEstimating with
   Definition is SkillMapping.Version
   Evidence is AssessmentReviewing.Case
 
-instantiate StudyPlanning with
-  Learner is Registering.User
+instantiate Budgeting as StudyPlanning with
+  Owner is Registering.User
   Scope is SkillMapping.Course
   Subject is SkillMapping.Skill
   Definition is SkillMapping.Version
