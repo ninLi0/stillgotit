@@ -6,7 +6,9 @@ StillGotIt helps college students learn the skills in a course and keep them aft
 
 - **The deployed app:** https://stillgotit.mit-sdg.dev. Sign in with a 6.1040 Commons account.
 - **Demo video:** [a narrated walk through the main journey](PASTE_VIDEO_URL)
-- **Status pages:** [P3, the beta](docs/P3.md), and [P2, the alpha](docs/P2.md).
+- **P4 status:** [docs/P4.md](docs/P4.md) covers what changed since P3, how the work was checked, how the deployed app was tested, how to prepare a user test, and the known limits.
+- **Design document:** [docs/design-document.md](docs/design-document.md) summarizes how the final design differs from the P1 concept design and the P3 visual design, with links to the commits.
+- **Earlier status pages:** [P3, the beta](docs/P3.md), and [P2, the alpha](docs/P2.md).
 - **Design:** the [design index](design/README.md) lists every design document and links each concept to its code. The main parts are:
   - the [concept specifications](design/concepts/), one file per concept;
   - the [compositions](design/compositions/), which describe the endpoints, reactions, views, and formers that connect the concepts;
@@ -104,7 +106,7 @@ Then open **http://127.0.0.1:5174**. The fixture serves the built app with canne
 | `generated.config.ts` | The application that the checks and `bun run generate` assemble. |
 | `tests/` | Concept, HTTP, and scenario tests. `tests/fixtures/` holds the browser fixture and test files, and `tests/output/` holds the saved P3 test run. |
 | `scripts/` | The MongoDB start-up check and the SkillMapping demonstrations from P2, listed as `demo:*` in `package.json`. |
-| `docs/` | The milestone status pages, the tree-drawing research from P1, and the P1 sketches in `docs/images/`. |
+| `docs/` | The design document, the status pages for P2 to P4, the tree-drawing research from P1, and the P1 sketches in `docs/images/`. |
 | `docs/history/` | Earlier records kept for reference: the P1 design submission, the P1 concept design, and the [implementation steps](docs/history/implementation-steps.md) that the README listed until P4. |
 | `reference_docs/` | Copies of the course pages: [background readings, rubrics, and project directions](reference_docs/README.md). |
 | `compose.yaml` | The MongoDB server that `bun run db:up` starts. |

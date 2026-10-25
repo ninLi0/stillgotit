@@ -1,0 +1,39 @@
+# Design document
+
+This page summarizes how the final design of StillGotIt differs from the [P1 concept design](https://github.com/ninLi0/stillgotit/blob/b5c342641615c984a75b3893b0ab8e249d6f5f12/concepts.md) and from the P3 visual design. Each concept change links to the commit that made it. The current specifications are in [design/concepts](../design/concepts/).
+
+## The five P1 concepts and what each became
+
+- **SkillMapping** still holds a course's units, skills, sources, and prerequisites, and the requirements a learner must show. P3 gave each requirements version a link to the version it replaced, so a revised skill shows its "Previous definition", and added an emphasis flag to units ([`7e05eae`](https://github.com/ninLi0/stillgotit/commit/7e05eae0e56ed22d8c806837c0389035cfbefea9)). In P4, the separate proposal receipts, with ten fields and a two-step protocol, became one optional proposal key on each skill, which is enough to make a retried draft save return the skill it already created ([`6a483f5`](https://github.com/ninLi0/stillgotit/commit/6a483f594356e6d2bfde0564224b8a26a490d511)). We kept the requirements versions, because the version history is what makes revising a skill safe for work already done.
+- **GroundedTutoring** still runs lessons and practice from sources the learner can inspect. P3 removed two unused actions, `askFollowup` and `clarifyInput`, whose checks depended on judging what a question means ([`f4942f7`](https://github.com/ninLi0/stillgotit/commit/f4942f7f5a3b5c75a0b39af8a0a5175917e93938)). In P4, the material library moved out into a new concept, MaterialKeeping ([`d66d918`](https://github.com/ninLi0/stillgotit/commit/d66d91864011b7b936249d75e71fcb1ebadd5931)). GroundedTutoring now checks only what it owns: a session names its materials, and its citations name those materials.
+- **AssessmentReviewing** has the same five actions as in P1: submit, assess, import graded work, clarify, and revise.
+- **MasteryEstimating** has the same three actions. P3 made a manual adjustment carry a key, so that a retried adjustment counts once ([`cf90358`](https://github.com/ninLi0/stillgotit/commit/cf903583a6f3b81dded32f6c828f2899c91e3a98)).
+- **StudyPlanning** became the concept **Budgeting**, which the app uses under the name StudyPlanning ([`2a7a851`](https://github.com/ninLi0/stillgotit/commit/2a7a8517ee8bb5f7ceb74a957ef4c2e5e319cc26)). It no longer stores seven totals, such as the minutes an exam needs and whether its cuts need approval, because its queries compute them from the plan's items and saved inputs. Its vocabulary is now general: an owner, deadlines, and required and available minutes.
+
+Six more concepts joined these five. **MaterialKeeping**, used as Library, keeps each learner's materials and their files (P4). **Registering**, **Sessioning**, and **Federating**, reused from ConceptBox, provide Commons sign-in, and **Generating** wraps a call to the AI tutor as an action (P2). **Preferring** remembers a choice among offered options on the server, and the app uses it twice, for the tutor model and for the Home view (P3, [`5f2dc10`](https://github.com/ninLi0/stillgotit/commit/5f2dc10fca7a18ae5f9227444846afb46566322f)).
+
+P1 described five "essential reactions" in prose. The final design has reactions, endpoints, views, and formers in the compositions, and each reaction is written as an explicit when, where, then: the action that triggers it, the conditions it reads, and the actions it takes ([`f7b34be`](https://github.com/ninLi0/stillgotit/commit/f7b34be27508f015f0b4e53419609d8ad621d6c0), [`508b933`](https://github.com/ninLi0/stillgotit/commit/508b933ef57324d3235727806cf3b209c9444982)). A read-back generated from the code, `generated/stillgotit.md`, lists the same rules, and `bun run check` fails when it is out of date.
+
+## How we name concepts
+
+A concept is named for a behavior that many apps share, and the application stage names this app's instance of it. Budgeting is used as StudyPlanning in the same way that Preferring is used as TutorPreferring. StudyPlanning's rules never needed the words study or exam, so we renamed the concept and kept the instance name, which also kept the database collections. GroundedTutoring keeps its name, because tutoring from sources the learner can inspect is the behavior, and "Grounded" names the property that sets it apart. SkillMapping keeps its name because course, unit, and skill are the learning domain's words, which other learning apps use too. A fully general vocabulary, such as collection, section, and goal, would make the specification harder to read for a reuse that nobody can picture.
+
+## Considered and not done
+
+- **A review-schedule concept.** No concept stores a next-review date. The spacing of one, three, and seven days is a pure computation over MasteryEstimating's evidence, and the plan's items carry the dates. A concept would add state where none is needed.
+- **Prerequisites as their own concept.** Knowing what to learn first is part of SkillMapping's purpose. Splitting it out would touch the skill tree, the skill editor, and three computations for little gain.
+- **Transcript review outside GroundedTutoring.** Review is defined over the dialogue's turn numbers, so the two halves cannot be understood apart.
+
+## What the TAs said, and how the design answers it
+
+- **P1: the concepts were too detailed and mixed concerns, like object-oriented classes.** The TA's tests were whether a concept could be reused unchanged in another app and whether every piece of state is clearly motivated. The P4 revamp applied both tests. The material library left GroundedTutoring, the receipts left SkillMapping, the stored totals left the planning concept, and that concept's vocabulary became general enough to reuse.
+- **P1: the reactions hid their complexity in prose.** Every reaction is now written as when, where, then, as described above.
+- **P2: the external functionality was not in a legible pattern.** [design/host.md](../design/host.md) now names each part of the server outside the concepts: what it owns, what it calls or serves, and where it is described.
+- **P2: why were the learning endpoints duplicated instead of having a refusal branch?** Admission and the endpoints now read the same views and condition helpers, and every learning and planning command answers a refusal of its own when its first guard fails ([`3479973`](https://github.com/ninLi0/stillgotit/commit/3479973cf92104feb75c0f3f6f0473383dff6ab9)). Admission still runs first, because it can answer with a sentence before any work starts. [LearningAccess.md](../design/compositions/LearningAccess.md) explains this and lists the differences that remain on purpose.
+- **P2: the tests should be more balanced.** The suite grew from 360 tests in P2 to 932 in P4. Each concept has a test of its operational principle, and each P3 feature has a scenario test. Every endpoint added in P3 is tested against another learner's access, and P4 added tests that send another learner's real identifiers to the learning and planning commands.
+
+## Visual design since P3
+
+The Pixel Nature redesign from P3 stands, as the [visual design study](../design/visual-design.md) describes it. Headings are set in Pixelify Sans and everything else in Instrument Sans. Each screen has one color family, and there are no gradients. Mastery appears as filled cells beside a number. Home shows a grove with a tree for each topic and a leaf for each skill, the Forest view shows the whole course, and Plan draws the week as a sea. This replaced both the black, white, and gray line-art tree of the P1 sketches and the first P3 look, which used Georgia, Avenir Next, and one cyanotype blue.
+
+Planned for P4: the six text colors that fall below a 4.5:1 contrast ratio, listed in the study, will be darkened, and Home will gain a Continue card for lessons in progress.
