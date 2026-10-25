@@ -1,4 +1,5 @@
-import { StudyPlanning } from "../concepts/StudyPlanning/StudyPlanning.ts";
+import { Budgeting } from "../concepts/Budgeting/Budgeting.ts";
+import { upgradeEarlierDocuments } from "../concepts/Budgeting/upgrade.ts";
 import { MasteryEstimating } from "../concepts/MasteryEstimating/MasteryEstimating.ts";
 import { AssessmentReviewing } from "../concepts/AssessmentReviewing/AssessmentReviewing.ts";
 import { GroundedTutoring } from "../concepts/GroundedTutoring/GroundedTutoring.ts";
@@ -37,6 +38,8 @@ export async function createRuntime({ database, provider, providerOrigin, public
   transcribeModel?: string;
   worker?: Partial<Pick<TranscriptionWorkerOptions, "intervalMs" | "renewMs" | "log">>;
 }) {
+  // StudyPlanning documents saved before the concept was named Budgeting are rewritten once, before any request reads them.
+  await upgradeEarlierDocuments(database, "StudyPlanning");
   await moveMaterialCollection(database);
   const imports = new MaterialImportStore(database, "MaterialImport", clock), failures = new TutorFailures();
   const providerFiles = new ProviderFiles(database, gemini, files, clock);
@@ -52,7 +55,7 @@ export async function createRuntime({ database, provider, providerOrigin, public
     SkillMapping: await createSkillMapping(database),
     AssessmentReviewing: new AssessmentReviewing(database, "AssessmentReviewing", clock),
     MasteryEstimating: new MasteryEstimating(database, "MasteryEstimating", clock),
-    StudyPlanning: new StudyPlanning(database, "StudyPlanning", () => clock().toLocaleDateString("en-CA", { timeZone: "America/New_York" })),
+    StudyPlanning: new Budgeting(database, "StudyPlanning", () => clock().toLocaleDateString("en-CA", { timeZone: "America/New_York" })),
     Library: new MaterialKeeping(database, "Library"),
     GroundedTutoring: new GroundedTutoring(database, "GroundedTutoring", clock),
   }, clock);

@@ -1,4 +1,4 @@
-import { StudyPlanning } from "../src/concepts/StudyPlanning/StudyPlanning.ts";
+import { Budgeting } from "../src/concepts/Budgeting/Budgeting.ts";
 import { MasteryEstimating } from "../src/concepts/MasteryEstimating/MasteryEstimating.ts";
 import { AssessmentReviewing } from "../src/concepts/AssessmentReviewing/AssessmentReviewing.ts";
 import { GroundedTutoring } from "../src/concepts/GroundedTutoring/GroundedTutoring.ts";
@@ -299,7 +299,7 @@ describe("Registering recovery", () => {
       SkillMapping: await createSkillMapping(connection!.db, name),
       AssessmentReviewing: new AssessmentReviewing(connection!.db),
       MasteryEstimating: new MasteryEstimating(connection!.db),
-      StudyPlanning: new StudyPlanning(connection!.db),
+      StudyPlanning: new Budgeting(connection!.db, "StudyPlanning"),
       Library: new MaterialKeeping(connection!.db, name),
       GroundedTutoring: new GroundedTutoring(connection!.db, name),
     });

@@ -10,7 +10,7 @@ The ownership views join existing concept queries:
 | [OwnedSkill](view:Access.OwnedSkill) | `_skill`, `_unit`, and `_course` lead to the actor's course. |
 | [OwnedSession](view:Access.OwnedSession) | `GroundedTutoring._session` names the actor as owner, and its topic and version belong together. |
 | [OwnedCase](view:Access.OwnedCase) | `AssessmentReviewing._case` names the actor as author, and its skill and version belong together. |
-| [OwnedPlan](view:Access.OwnedPlan) | `StudyPlanning._plan` names the actor as learner and an owned course as scope. |
+| [OwnedPlan](view:Access.OwnedPlan) | `StudyPlanning._plan` names the actor as owner and an owned course as scope. |
 
 Ownership must hold before reading work, material, transcripts, or judgments into a response. A valid identifier alone does not grant access. Inaccessible records return the same unavailable result as missing records.
 

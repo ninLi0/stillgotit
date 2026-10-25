@@ -1,4 +1,4 @@
-import { StudyPlanning } from "./src/concepts/StudyPlanning/StudyPlanning.ts";
+import { Budgeting } from "./src/concepts/Budgeting/Budgeting.ts";
 import { MasteryEstimating } from "./src/concepts/MasteryEstimating/MasteryEstimating.ts";
 import { AssessmentReviewing } from "./src/concepts/AssessmentReviewing/AssessmentReviewing.ts";
 import { GroundedTutoring } from "./src/concepts/GroundedTutoring/GroundedTutoring.ts";
@@ -28,7 +28,7 @@ function assembleForChecks() {
     SkillMapping: new SkillMapping(client.db("stillgotit_spec_check")),
     AssessmentReviewing: new AssessmentReviewing(client.db("stillgotit_spec_check")),
     MasteryEstimating: new MasteryEstimating(client.db("stillgotit_spec_check")),
-    StudyPlanning: new StudyPlanning(client.db("stillgotit_spec_check")),
+    StudyPlanning: new Budgeting(client.db("stillgotit_spec_check"), "StudyPlanning"),
     Library: new MaterialKeeping(client.db("stillgotit_spec_check"), "Library"),
     GroundedTutoring: new GroundedTutoring(client.db("stillgotit_spec_check")),
     TutorPreferring: new TutorPreferring(client.db("stillgotit_spec_check"), "TutorPreferring"),

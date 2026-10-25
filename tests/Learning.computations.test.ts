@@ -68,7 +68,7 @@ describe("planRequest", () => {
   const input = { input: "i", evidence: "case-1", revision: 1, performedAt: new Date("2026-10-22T16:00:00Z"), signal: "INDEPENDENT", fresh: true, gateMet: true, attribution: "AI assessment" };
   const track = (adjustments: ProgressRow["adjustments"], value: number) => ({ track: "t", subject: "s", definition: "v1", initialConfidence: 50, startingBasis: "SELF_REPORTED",
     initializedAt: new Date("2026-10-20T16:00:00Z"), inputs: [input], adjustments, estimate: { value, basis: "", ready: value >= 70 } }) as ProgressRow;
-  const schedule = (plans: unknown[] = []) => ({ today: "2026-10-23", plans, exams: [] }) as never;
+  const schedule = (plans: unknown[] = []) => ({ today: "2026-10-23", plans, deadlines: [] }) as never;
   const adjustment = { adjustment: "adj-1", value: 40, reason: "Not sure any more.", at: new Date("2026-10-23T15:00:00Z") };
   const plan = (candidate: unknown, status = "TODO") => ({ status: "ACTIVE", items: [{ candidate, status }], deferred: [] });
 
@@ -93,14 +93,14 @@ describe("planRequest", () => {
     const saved = planRequest({ skills, tracks: [track([], 95)], schedule: schedule() }).candidates[0]!;
     expect(saved).toMatchObject({ earliestDay: "2026-10-23", latestDay: "2026-10-29" });
     const later = { ...adjustment, at: new Date("2026-10-25T15:00:00Z") };
-    const result = planRequest({ skills, tracks: [track([later], 40)], schedule: { today: "2026-10-25", plans: [plan(saved)], exams: [] } as never });
+    const result = planRequest({ skills, tracks: [track([later], 40)], schedule: { today: "2026-10-25", plans: [plan(saved)], deadlines: [] } as never });
     expect(result.candidates).toEqual([{ ...saved, key: "s:v1:case-1:1:adj-1:2026-10-25", priority: 60, reason: "This skill needs fresh independent evidence." }]);
     // A second adjustment still copies the evidence's window, not the previous adjustment's day.
     const second = { ...later, adjustment: "adj-2", value: 90, at: new Date("2026-10-27T15:00:00Z") };
-    const again = planRequest({ skills, tracks: [track([later, second], 90)], schedule: { today: "2026-10-27", plans: [plan(saved), plan(result.candidates[0])], exams: [] } as never });
+    const again = planRequest({ skills, tracks: [track([later, second], 90)], schedule: { today: "2026-10-27", plans: [plan(saved), plan(result.candidates[0])], deadlines: [] } as never });
     expect(again.candidates).toEqual([{ ...saved, key: "s:v1:case-1:1:adj-2:2026-10-27", priority: 10, reason: "A later fresh check will test retention." }]);
     // Once the evidence's window has passed, the adjusted review gets the window an unadjusted one would get.
-    const expired = planRequest({ skills, tracks: [track([later], 40)], schedule: { today: "2026-10-30", plans: [plan(saved)], exams: [] } as never });
+    const expired = planRequest({ skills, tracks: [track([later], 40)], schedule: { today: "2026-10-30", plans: [plan(saved)], deadlines: [] } as never });
     expect(expired.candidates).toMatchObject([{ key: "s:v1:case-1:1:adj-1:2026-10-30", earliestDay: "2026-10-30", latestDay: "2026-11-05" }]);
   });
   test("work finished for the same evidence within its window is not offered again because of an adjustment", () => {

@@ -36,14 +36,14 @@ export const Progress = former("skill estimates for (owner) in (course)", ({ own
   Mapping._map({ course }).is({ skills }), Mastery._progress({ learner: owner }).is({ tracks }), compute(computations.progressRows, { skills, tracks }, estimates),
 ).form({ estimates }));
 export const PlanData = former("study plan for (owner) in (course)", ({ owner, course }, { schedule, preferences, budget, next, today, plan }) => where(
-  Planning._schedule({ learner: owner, scope: course }).is({ schedule }), compute(computations.planDetail, { schedule }, { preferences, budget, next, today, plan }),
+  Planning._schedule({ owner, scope: course }).is({ schedule }), compute(computations.planDetail, { schedule }, { preferences, budget, next, today, plan }),
 ).form({ preferences, budget, next, today, plan }));
 export const PlanContext = view("review inputs for (owner) in (course)", ({ owner, course }, { candidates, horizonEnd, basis, explanation }, { skills, tracks, schedule }) => where(
-  Mapping._map({ course }).is({ skills }), Mastery._progress({ learner: owner }).is({ tracks }), Planning._schedule({ learner: owner, scope: course }).is({ schedule }),
+  Mapping._map({ course }).is({ skills }), Mastery._progress({ learner: owner }).is({ tracks }), Planning._schedule({ owner, scope: course }).is({ schedule }),
   compute(computations.planRequest, { skills, tracks, schedule }, { candidates, horizonEnd, basis, explanation }),
 )).one();
 export const CanReplan = view("(owner) can refresh routine reviews in (course)", ({ owner, course }) => where(
-  Courses.OwnedCourse({ owner, course }), Planning._preferences({ learner: owner, scope: course }), no(Planning._next({ learner: owner, scope: course }).is({ status: "IN_PROGRESS" })),
+  Courses.OwnedCourse({ owner, course }), Planning._preferences({ owner, scope: course }), no(Planning._next({ owner, scope: course }).is({ status: "IN_PROGRESS" })),
 )).holds();
 export const NeedsEvidence = view("assessment (assessment) needs evidence for (owner)", ({ owner, assessment }, { skill, definition, revision, result, gateMet, rationale, origin, fresh, performedAt }, { data, tracks }) => where(
   Assessment._case({ case: assessment }).is({ author: owner, subject: skill, definition, fresh, performedAt }),

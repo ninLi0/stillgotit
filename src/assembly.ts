@@ -4,7 +4,7 @@ import { composition as Progress } from "./compositions/progress.ts";
 import { composition as Planning } from "./compositions/planning.ts";
 import { composition as Learning } from "./compositions/learning.ts";
 import { composition as Settings } from "./compositions/settings.ts";
-import type { StudyPlanning } from "./concepts/StudyPlanning/StudyPlanning.ts";
+import type { Budgeting } from "./concepts/Budgeting/Budgeting.ts";
 import type { MasteryEstimating } from "./concepts/MasteryEstimating/MasteryEstimating.ts";
 import type { AssessmentReviewing } from "./concepts/AssessmentReviewing/AssessmentReviewing.ts";
 import { assemble, type ConceptImplementation } from "@mit-sdg/sync-engine/assembly";
@@ -33,7 +33,7 @@ export const executionLimits = {
 export function assembleApplication(instances: {
   AssessmentReviewing: ConceptImplementation<typeof AssessmentReviewing>;
   MasteryEstimating: ConceptImplementation<typeof MasteryEstimating>;
-  StudyPlanning: ConceptImplementation<typeof StudyPlanning>;
+  StudyPlanning: ConceptImplementation<typeof Budgeting>;
   Registering: ConceptImplementation<typeof RegisteringConcept>;
   CommonsFederating: ConceptImplementation<typeof FederatingConcept<User>>;
   Sessioning: ConceptImplementation<typeof SessioningConcept<User>>;

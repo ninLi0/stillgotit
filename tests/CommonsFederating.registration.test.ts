@@ -1,4 +1,4 @@
-import { StudyPlanning } from "../src/concepts/StudyPlanning/StudyPlanning.ts";
+import { Budgeting } from "../src/concepts/Budgeting/Budgeting.ts";
 import { MasteryEstimating } from "../src/concepts/MasteryEstimating/MasteryEstimating.ts";
 import { AssessmentReviewing } from "../src/concepts/AssessmentReviewing/AssessmentReviewing.ts";
 import { GroundedTutoring } from "../src/concepts/GroundedTutoring/GroundedTutoring.ts";
@@ -68,7 +68,7 @@ async function setup() {
     SkillMapping: await createSkillMapping(db, name),
     AssessmentReviewing: new AssessmentReviewing(db),
     MasteryEstimating: new MasteryEstimating(db),
-    StudyPlanning: new StudyPlanning(db),
+    StudyPlanning: new Budgeting(db, "StudyPlanning"),
     Library: new MaterialKeeping(db, name),
     GroundedTutoring: new GroundedTutoring(db, name),
   });

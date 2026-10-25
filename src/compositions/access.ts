@@ -55,7 +55,7 @@ const GradedReady = former("admit graded work (material) for (owner)", ({ owner,
 const CourseReady = former("admit access to (course) for (owner)", ({ owner, course }) => where(Courses.OwnedCourse({ owner, course })).form({ allowed: true })).optional();
 const PlanReady = former("admit a routine plan in (course)", ({ owner, course }) => where(R.CanReplan({ owner, course })).form({ allowed: true })).optional();
 const ItemReady = former("admit progress on (item) in (course)", ({ owner, course, item }) => where(
-  Courses.OwnedCourse({ owner, course }), Planning._item({ item }).is({ learner: owner, scope: course }),
+  Courses.OwnedCourse({ owner, course }), Planning._item({ item }).is({ owner, scope: course }),
 ).form({ allowed: true })).optional();
 // The same view as the Begin endpoint, so admission applies the same urgent-mode prerequisite rule.
 const BeginReady = former("admit starting (item) in (course)", ({ owner, course, item }) => where(

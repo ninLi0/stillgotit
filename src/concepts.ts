@@ -1,4 +1,4 @@
-import { studyPlanning } from "./concepts/StudyPlanning/registry.ts";
+import { budgeting } from "./concepts/Budgeting/registry.ts";
 import { masteryEstimating } from "./concepts/MasteryEstimating/registry.ts";
 import { assessmentReviewing } from "./concepts/AssessmentReviewing/registry.ts";
 import { conceptSet, registerConcept } from "@mit-sdg/sync-engine/assembly";
@@ -33,7 +33,7 @@ export const applicationConceptSet = conceptSet({
   SkillMapping: skillMapping,
   AssessmentReviewing: assessmentReviewing,
   MasteryEstimating: masteryEstimating,
-  StudyPlanning: studyPlanning,
+  StudyPlanning: budgeting,
   Library: materialKeeping,
   GroundedTutoring: groundedTutoring,
   TutorGenerating: generating,

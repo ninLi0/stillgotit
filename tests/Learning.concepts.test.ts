@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { AssessmentReviewing } from "../src/concepts/AssessmentReviewing/AssessmentReviewing.ts";
 import { MasteryEstimating } from "../src/concepts/MasteryEstimating/MasteryEstimating.ts";
-import { StudyPlanning, type Candidate } from "../src/concepts/StudyPlanning/StudyPlanning.ts";
+import { Budgeting, type Candidate } from "../src/concepts/Budgeting/Budgeting.ts";
 import { connectMongo, localMongoUri } from "../src/storage/mongo.ts";
 
 let connection: Awaited<ReturnType<typeof connectMongo>>;
@@ -97,44 +97,44 @@ describe("Mastery replay", () => {
 });
 
 function candidate(key: string, minutes = 10): Candidate { return { key, subject: key, definition: "v1", activity: `Review ${key}`, minutes,
-  priority: 1, earliestDay: "2026-10-13", latestDay: "2026-10-19", reason: "A fresh check is due.", examRefs: [] }; }
+  priority: 1, earliestDay: "2026-10-13", latestDay: "2026-10-19", reason: "A fresh check is due.", deadlineRefs: [] }; }
 async function planner(budget = 20) {
   let date = "2026-10-13";
-  const concept = new StudyPlanning(connection.db, crypto.randomUUID(), () => date);
-  await concept.configure({ learner: "sam", scope: "math", dailyMinutes: budget, focusNote: "" });
-  const propose = (candidates: Candidate[], extra = {}) => concept.replan({ learner: "sam", scope: "math", candidates, horizonEnd: "2026-10-19", explanation: "Review weaker skills.", basis: "v1", workloadComplete: true, ...extra });
+  const concept = new Budgeting(connection.db, crypto.randomUUID(), () => date);
+  await concept.configure({ owner: "sam", scope: "math", dailyMinutes: budget, focusNote: "" });
+  const propose = (candidates: Candidate[], extra = {}) => concept.replan({ owner: "sam", scope: "math", candidates, horizonEnd: "2026-10-19", explanation: "Review weaker skills.", basis: "v1", workloadComplete: true, ...extra });
   return { concept, propose, setDay: (value: string) => { date = value; } };
 }
 describe("Study time", () => {
   test("spends time once, preserves it across replans, and refuses repeated completed work", async () => {
     const p = await planner(), plan = await p.propose([candidate("a"), candidate("b")]);
-    await p.concept.activateRoutine({ learner: "sam", ...plan, currentBasis: "v1" });
-    const [first] = await p.concept._next({ learner: "sam", scope: "math" });
-    await p.concept.begin({ learner: "sam", item: first!.item });
+    await p.concept.activateRoutine({ owner: "sam", ...plan, currentBasis: "v1" });
+    const [first] = await p.concept._next({ owner: "sam", scope: "math" });
+    await p.concept.begin({ owner: "sam", item: first!.item });
     await expect(p.propose([candidate("b")])).rejects.toMatchObject({ code: "PLAN_SESSION_IN_PROGRESS" });
-    await p.concept.finish({ learner: "sam", item: first!.item, actualMinutes: 17 });
+    await p.concept.finish({ owner: "sam", item: first!.item, actualMinutes: 17 });
     await expect(p.propose([candidate("a")])).rejects.toMatchObject({ code: "INVALID_PLAN_INPUT" });
     const next = await p.propose([candidate("b")]);
-    await p.concept.activateRoutine({ learner: "sam", ...next, currentBasis: "v1" });
+    await p.concept.activateRoutine({ owner: "sam", ...next, currentBasis: "v1" });
     expect((await p.concept._items(next))[0]!.day).toBe("2026-10-14");
-    expect((await p.concept._budget({ learner: "sam", scope: "math", day: "2026-10-13" }))[0]).toMatchObject({ spentMinutes: 17, remainingMinutes: 3 });
+    expect((await p.concept._budget({ owner: "sam", scope: "math", day: "2026-10-13" }))[0]).toMatchObject({ spentMinutes: 17, remainingMinutes: 3 });
   });
   test("budget changes and a new day make a proposal stale; another learner cannot activate it", async () => {
     const p = await planner(), plan = await p.propose([candidate("a")]);
-    await expect(p.concept.activateRoutine({ learner: "other", ...plan, currentBasis: "v1" })).rejects.toMatchObject({ code: "ROUTINE_PLAN_UNAVAILABLE" });
+    await expect(p.concept.activateRoutine({ owner: "other", ...plan, currentBasis: "v1" })).rejects.toMatchObject({ code: "ROUTINE_PLAN_UNAVAILABLE" });
     p.setDay("2026-10-14");
-    expect((await p.concept._proposalCheck({ learner: "sam", ...plan, currentBasis: "v1" }))[0]!.locallyCurrent).toBe(false);
-    await expect(p.concept.activateRoutine({ learner: "sam", ...plan, currentBasis: "v1" })).rejects.toMatchObject({ code: "ROUTINE_PLAN_OUTDATED" });
+    expect((await p.concept._proposalCheck({ owner: "sam", ...plan, currentBasis: "v1" }))[0]!.locallyCurrent).toBe(false);
+    await expect(p.concept.activateRoutine({ owner: "sam", ...plan, currentBasis: "v1" })).rejects.toMatchObject({ code: "ROUTINE_PLAN_OUTDATED" });
   });
   test("zero budget defers work; an urgent exam cut needs confirmation and moves maintenance to the exam day", async () => {
     const p = await planner(0), empty = await p.propose([candidate("maintenance")]);
     expect(await p.concept._items(empty)).toEqual([]); expect(await p.concept._deferred(empty)).toHaveLength(1);
-    await p.concept.configure({ learner: "sam", scope: "math", dailyMinutes: 10, focusNote: "Exam" });
-    const { exam } = await p.concept.setExam({ learner: "sam", scope: "math", date: "2026-10-14", covered: ["a", "b"] });
-    const plan = await p.propose([{ ...candidate("a"), examRefs: [exam] }, { ...candidate("b"), examRefs: [exam] }, candidate("maintenance")]);
-    expect((await p.concept._plan(plan))[0]).toMatchObject({ examUrgent: true, needsConfirmation: true });
-    await expect(p.concept.activateRoutine({ learner: "sam", ...plan, currentBasis: "v1" })).rejects.toMatchObject({ code: "EXAM_TRADEOFF_CONFIRMATION_REQUIRED" });
-    await p.concept.confirmTradeoffs({ learner: "sam", ...plan, currentBasis: "v1" });
+    await p.concept.configure({ owner: "sam", scope: "math", dailyMinutes: 10, focusNote: "Exam" });
+    const { deadline: exam } = await p.concept.setDeadline({ owner: "sam", scope: "math", date: "2026-10-14", covered: ["a", "b"] });
+    const plan = await p.propose([{ ...candidate("a"), deadlineRefs: [exam] }, { ...candidate("b"), deadlineRefs: [exam] }, candidate("maintenance")]);
+    expect((await p.concept._plan(plan))[0]).toMatchObject({ urgent: true, needsConfirmation: true });
+    await expect(p.concept.activateRoutine({ owner: "sam", ...plan, currentBasis: "v1" })).rejects.toMatchObject({ code: "DEADLINE_TRADEOFF_CONFIRMATION_REQUIRED" });
+    await p.concept.confirmTradeoffs({ owner: "sam", ...plan, currentBasis: "v1" });
     const items = await p.concept._items(plan);
     expect(items.find((i) => i.candidate.key === "maintenance")!.day).toBe("2026-10-14");
     expect(await p.concept._cuts(plan)).toHaveLength(1);
@@ -142,9 +142,9 @@ describe("Study time", () => {
   test("competing starts on one plan leave only one activity in progress", async () => {
     const p = await planner();
     const plan = await p.propose([candidate("a"), candidate("b")]);
-    await p.concept.activateRoutine({ learner: "sam", ...plan, currentBasis: "v1" });
+    await p.concept.activateRoutine({ owner: "sam", ...plan, currentBasis: "v1" });
     const items = await p.concept._items(plan);
-    const results = await Promise.allSettled(items.map((item) => p.concept.begin({ learner: "sam", item: item.item })));
+    const results = await Promise.allSettled(items.map((item) => p.concept.begin({ owner: "sam", item: item.item })));
     expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
     expect((await p.concept._items(plan)).filter((item) => item.status === "IN_PROGRESS")).toHaveLength(1);
   });

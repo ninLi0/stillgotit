@@ -130,9 +130,9 @@ function addDays(day: string, count: number) {
 }
 type PlanItem = NonNullable<NonNullable<typeof data.value>["plan"]>["items"][number];
 type Kind = "lesson" | "review" | "practice" | "prep";
-function kindOf(item: { candidate: { activity: string; examRefs: string[] } }): Kind {
+function kindOf(item: { candidate: { activity: string; deadlineRefs: string[] } }): Kind {
   const activity = item.candidate.activity;
-  return item.candidate.examRefs.length ? "prep" : /^lesson/i.test(activity) ? "lesson" : /^review/i.test(activity) ? "review" : "practice";
+  return item.candidate.deadlineRefs.length ? "prep" : /^lesson/i.test(activity) ? "lesson" : /^review/i.test(activity) ? "review" : "practice";
 }
 // With a proposal waiting, an unfinished item it cuts or leaves out is shown with a dashed border.
 const deferring = computed(() => {

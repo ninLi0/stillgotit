@@ -16,7 +16,8 @@ export type ExamInput = { date: string; covered: string[] };
  * The planning concept's and the planning composition's own sentences. Over HTTP the host now adds a refusal's
  * sentence as `detail` (src/host/http-policy.ts), and `settle` shows it. A refusal that still arrives bare is
  * explained the old way: the planner checks inputs before sending and, after a refusal, reads the plan again to tell
- * which rule applied, then shows the rule's sentence from this list.
+ * which rule applied, then shows the rule's sentence from this list. `examBudget` and `examDetails` are the exam
+ * form's own wording for two rules that the planning concept states in general terms, about a budget and a deadline.
  */
 export const sentences = {
   courseUnavailable: "Choose one of your own courses.",

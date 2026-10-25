@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import type { SkillRows, SkillInfo, Sessions, StudySession, Cases, CaseInfo, Tracks, Schedule, TutorRequest } from "../learning-data.ts";
 import { isMediaList } from "../media.ts";
 import type { SourceContext } from "../tutor-types.ts";
-import type { Candidate, CutValue } from "../concepts/StudyPlanning/StudyPlanning.ts";
+import type { Candidate, CutValue } from "../concepts/Budgeting/Budgeting.ts";
 import type { ResponseValue, Help } from "../concepts/AssessmentReviewing/AssessmentReviewing.ts";
 import type { Channel } from "../concepts/GroundedTutoring/dialogue.ts";
 import type { EstimateExplanation, ProgressRows, StartingBasis } from "../concepts/MasteryEstimating/MasteryEstimating.ts";
@@ -165,9 +165,9 @@ export function evidenceUpdate({ data, tracks }: { data: CaseInfo; tracks: Track
   const previous = track?.inputs.find((input) => input.evidence === data.case);
   return { needed: Boolean(track && data.judgment && (!previous || previous.revision < data.judgment.revision)) };
 }
-/** The exam the planning concept plans for: the earliest active exam dated today or later. */
+/** The exam the planning concept plans for: the earliest active exam dated today or later. Exams are the concept's deadlines. */
 function focusExam(schedule: Schedule) {
-  return schedule.exams.find((exam) => exam.date >= schedule.today) ?? null;
+  return schedule.deadlines.find((exam) => exam.date >= schedule.today) ?? null;
 }
 /** Covered skills and their prerequisites, followed through the course map. The visited set stops cycles. */
 function examSkills(skills: SkillRows, covered: readonly string[]) {
@@ -195,7 +195,7 @@ export function planRequest({ skills, tracks, schedule }: { skills: SkillRows; t
   const done = new Set(schedule.plans.flatMap((plan) => plan.items.filter((item) => item.status === "DONE").map((item) => item.candidate.key)));
   // A key keeps the content it was first proposed with.
   const saved = (key: string) => prior.find((candidate) => candidate.key === key);
-  const forFocus = (candidate: Candidate) => focus !== null && candidate.examRefs.includes(focus.exam);
+  const forFocus = (candidate: Candidate) => focus !== null && candidate.deadlineRefs.includes(focus.deadline);
   // Carried work: unfinished preparation for the focus exam from any saved plan, once per key, unchanged.
   const candidates: Candidate[] = [];
   for (const candidate of prior) {
@@ -214,7 +214,7 @@ export function planRequest({ skills, tracks, schedule }: { skills: SkillRows; t
     const adjustment = row.track?.adjustments.at(-1)?.adjustment;
     const prefix = adjustment ? `${evidencePrefix}${adjustment}:` : evidencePrefix;
     // Routine key reuse skips earlier work that names an exam, so a routine key never takes on exam content.
-    const routineKey = prior.find((candidate) => candidate.examRefs.length === 0 && occasionKey(candidate.key, prefix) && candidate.latestDay >= day)?.key ?? `${prefix}${occasion}`;
+    const routineKey = prior.find((candidate) => candidate.deadlineRefs.length === 0 && occasionKey(candidate.key, prefix) && candidate.latestDay >= day)?.key ?? `${prefix}${occasion}`;
     const need = 100 - (row.track?.estimate?.value ?? 0);
     const activity = row.track ? `Fresh check: ${row.title}` : `Set confidence and try ${row.title}`;
     const reason = row.track?.estimate?.ready ? "A later fresh check will test retention." : "This skill needs fresh independent evidence.";
@@ -223,23 +223,23 @@ export function planRequest({ skills, tracks, schedule }: { skills: SkillRows; t
       // it is unfinished for the current version, or finished for the current version and latest evidence.
       const covered = prior.some((candidate) => forFocus(candidate) && candidate.subject === row.skill && candidate.definition === row.current &&
         (!done.has(candidate.key) || candidate.key.startsWith(evidencePrefix)));
-      const key = `${routineKey}:exam:${focus.exam}`;
+      const key = `${routineKey}:exam:${focus.deadline}`;
       if (covered || done.has(key)) continue;
       candidates.push(saved(key) ?? { key, subject: row.skill, definition: row.current, activity, minutes: 10, priority: EXAM_PRIORITY + need,
-        earliestDay: occasion, latestDay: lastStudyDay, reason: `Preparation for the exam on ${focus.date}. ${reason}`, examRefs: [focus.exam] });
+        earliestDay: occasion, latestDay: lastStudyDay, reason: `Preparation for the exam on ${focus.date}. ${reason}`, deadlineRefs: [focus.deadline] });
       continue;
     }
     // Routine review, including maintenance of an exam skill whose review falls on or after the exam date. An adjustment is not
     // practice, so routine work already finished for this evidence within its window is not offered again.
     if (earliestDay > horizonEnd || done.has(routineKey) ||
-      prior.some((candidate) => candidate.examRefs.length === 0 && done.has(candidate.key) && candidate.key.startsWith(evidencePrefix) && candidate.latestDay >= day)) continue;
+      prior.some((candidate) => candidate.deadlineRefs.length === 0 && done.has(candidate.key) && candidate.key.startsWith(evidencePrefix) && candidate.latestDay >= day)) continue;
     const kept = saved(routineKey);
     if (kept) { candidates.push(kept); continue; }
     // A new adjusted candidate keeps the evidence's current window and changes only its key, priority, and reason.
-    const evidenced = adjustment ? prior.find((candidate) => candidate.examRefs.length === 0 && occasionKey(candidate.key, evidencePrefix) && candidate.latestDay >= day) ??
-      prior.find((candidate) => candidate.examRefs.length === 0 && candidate.key.startsWith(evidencePrefix) && candidate.latestDay >= day) : undefined;
+    const evidenced = adjustment ? prior.find((candidate) => candidate.deadlineRefs.length === 0 && occasionKey(candidate.key, evidencePrefix) && candidate.latestDay >= day) ??
+      prior.find((candidate) => candidate.deadlineRefs.length === 0 && candidate.key.startsWith(evidencePrefix) && candidate.latestDay >= day) : undefined;
     candidates.push(evidenced ? { ...evidenced, key: routineKey, priority: need, reason } : { key: routineKey, subject: row.skill, definition: row.current, activity,
-      minutes: 10, priority: need, earliestDay: occasion, latestDay: horizonEnd, reason, examRefs: [] });
+      minutes: 10, priority: need, earliestDay: occasion, latestDay: horizonEnd, reason, deadlineRefs: [] });
   }
   // Exam records stay out of the fingerprint; the concept's local check covers them. Prerequisites decide the exam skills.
   const basis = createHash("sha256").update(JSON.stringify({ day, skills: rows.map((row) => [row.skill, row.current, row.prerequisites, row.track && {
@@ -257,8 +257,8 @@ export function coveredSkillsConfirmed({ covered, skills }: { covered: string[];
 }
 /** True when the ACTIVE plan is exam-urgent, its focus exam is still active, and the candidate prepares for that exam. */
 export function urgentExamItem({ schedule, candidate }: { schedule: Schedule; candidate: Candidate }): boolean {
-  const active = schedule.plans.find((plan) => plan.status === "ACTIVE"), focus = active?.focusExam;
-  return Boolean(active?.examUrgent && focus && schedule.exams.some((exam) => exam.exam === focus) && candidate.examRefs.includes(focus));
+  const active = schedule.plans.find((plan) => plan.status === "ACTIVE"), focus = active?.focusDeadline;
+  return Boolean(active?.urgent && focus && schedule.deadlines.some((exam) => exam.deadline === focus) && candidate.deadlineRefs.includes(focus));
 }
 /** Urgent exam preparation may skip the prerequisite check; every other activity keeps it. */
 export function beginAllowed({ skills, tracks, skill, urgent }: { skills: SkillRows; tracks: Tracks; skill: string; urgent: boolean }): boolean {
@@ -287,7 +287,7 @@ export function itemOrder({ day, candidate }: { day: string; candidate: Candidat
 }
 /** Exam identity, then candidate key: the order of StudyPlanning._cuts. */
 export function cutKey({ cut }: { cut: CutValue }): string {
-  return `${codeUnits(cut.exam)}${codeUnits(cut.candidateKey)}`;
+  return `${codeUnits(cut.deadline)}${codeUnits(cut.candidateKey)}`;
 }
 export function planDetail({ schedule }: { schedule: Schedule }) {
   const active = schedule.plans.find((plan) => plan.status === "ACTIVE");
