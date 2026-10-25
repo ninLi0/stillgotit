@@ -501,6 +501,7 @@ Authored path: `Courses.OwnedCourse`.
 Authored path: `Reads.OwnedSkill`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 47.
 - Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 3.
+- Covered by [Progress reactions](../design/compositions/Progress.md), line 37.
 
 ```view
 (owner) owns study skill (skill) — inputs (owner, skill); outputs (course, definition, status); bindings (unit) — answers at most one (course, definition, status)
@@ -526,6 +527,7 @@ Authored path: `Reads.OwnedSession`.
 
 Authored path: `Reads.OpenSession`.
 - Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 3.
+- Covered by [Progress reactions](../design/compositions/Progress.md), line 7.
 
 ```view
 (owner) can change session (studySession) — inputs (owner, studySession); outputs (skill, course, definition); bindings () — answers at most one (skill, course, definition)
@@ -541,6 +543,7 @@ Authored path: `Reads.CanReplan`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 47.
 - Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 23.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 31.
+- Covered by [Progress reactions](../design/compositions/Progress.md), line 35.
 
 ```view
 (owner) can refresh routine reviews in (course) — inputs (owner, course); outputs (); bindings ()
@@ -678,6 +681,7 @@ Authored path: `Courses.UnavailableSkillMaterial`.
 
 Authored path: `Reads.NeedsEvidence`.
 - Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 23.
+- Covered by [Progress reactions](../design/compositions/Progress.md), line 17.
 
 ```view
 assessment (assessment) needs evidence for (owner) — inputs (owner, assessment); outputs (skill, definition, revision, result, gateMet, rationale, origin, fresh, performedAt); bindings (data, tracks) — answers at most one (skill, definition, revision, result, gateMet, rationale, origin, fresh, performedAt)
@@ -695,6 +699,7 @@ Authored path: `Reads.PlanContext`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 47.
 - Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 23.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 11.
+- Covered by [Progress reactions](../design/compositions/Progress.md), line 35.
 
 ```view
 review inputs for (owner) in (course) — inputs (owner, course); outputs (candidates, horizonEnd, basis, explanation); bindings (skills, tracks, schedule) — answers exactly one (candidates, horizonEnd, basis, explanation)
@@ -6008,7 +6013,7 @@ then
 
 Authored path: `Progress.ActivateRoutine`.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 35.
-- Covered by [Progress reactions](../design/compositions/Progress.md), line 15.
+- Covered by [Progress reactions](../design/compositions/Progress.md), line 47.
 
 ```reaction
 when StudyPlanning.replan (learner: owner, scope: course, workloadComplete: false, plan)
@@ -6022,7 +6027,7 @@ then
 ### Progress.AssessedEvidence
 
 Authored path: `Progress.AssessedEvidence`.
-- Covered by [Progress reactions](../design/compositions/Progress.md), line 7.
+- Covered by [Progress reactions](../design/compositions/Progress.md), line 17.
 
 ```reaction
 when AssessmentReviewing.assess (case: assessment)
@@ -6037,7 +6042,7 @@ then
 ### Progress.CloseSubmitted
 
 Authored path: `Progress.CloseSubmitted`.
-- Covered by [Progress reactions](../design/compositions/Progress.md), line 5.
+- Covered by [Progress reactions](../design/compositions/Progress.md), line 11.
 
 ```reaction
 when AssessmentReviewing.submit (author: owner, task)
@@ -6051,7 +6056,7 @@ then
 
 Authored path: `Progress.ImportedEvidence`.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 3.
-- Covered by [Progress reactions](../design/compositions/Progress.md), line 7.
+- Covered by [Progress reactions](../design/compositions/Progress.md), line 23.
 
 ```reaction
 when AssessmentReviewing.importGraded (author: owner, case: assessment)
@@ -6066,7 +6071,7 @@ then
 
 Authored path: `Progress.InitializedEvidence`.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 76.
-- Covered by [Progress reactions](../design/compositions/Progress.md), line 9.
+- Covered by [Progress reactions](../design/compositions/Progress.md), line 27.
 
 ```reaction
 when MasteryEstimating.initialize (definition, learner: owner, subject: skill)
@@ -6081,7 +6086,7 @@ then
 ### Progress.RepairReadClosure
 
 Authored path: `Progress.RepairReadClosure`.
-- Covered by [Progress reactions](../design/compositions/Progress.md), line 19.
+- Covered by [Progress reactions](../design/compositions/Progress.md), line 67.
 
 ```reaction
 when any action is returned (action: "use", concept: "Sessioning", result: identity)
@@ -6101,7 +6106,7 @@ then
 
 Authored path: `Progress.RepairReadEvidence`.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 78.
-- Covered by [Progress reactions](../design/compositions/Progress.md), line 19.
+- Covered by [Progress reactions](../design/compositions/Progress.md), line 65.
 
 ```reaction
 when any action is returned (action: "use", concept: "Sessioning", result: identity)
@@ -6120,7 +6125,7 @@ then
 ### Progress.ReplanAfterBudget
 
 Authored path: `Progress.ReplanAfterBudget`.
-- Covered by [Progress reactions](../design/compositions/Progress.md), line 13.
+- Covered by [Progress reactions](../design/compositions/Progress.md), line 43.
 
 ```reaction
 when StudyPlanning.configure (learner: owner, scope: course)
@@ -6134,7 +6139,7 @@ then
 ### Progress.ReplanAfterConfidence
 
 Authored path: `Progress.ReplanAfterConfidence`.
-- Covered by [Progress reactions](../design/compositions/Progress.md), line 13.
+- Covered by [Progress reactions](../design/compositions/Progress.md), line 39.
 
 ```reaction
 when MasteryEstimating.initialize (learner: owner, subject: skill)
@@ -6150,7 +6155,7 @@ then
 ### Progress.ReplanAfterEvidence
 
 Authored path: `Progress.ReplanAfterEvidence`.
-- Covered by [Progress reactions](../design/compositions/Progress.md), line 13.
+- Covered by [Progress reactions](../design/compositions/Progress.md), line 37.
 
 ```reaction
 when MasteryEstimating.acceptEvidence (learner: owner, subject: skill)
@@ -6167,7 +6172,7 @@ then
 
 Authored path: `Progress.ReplanAfterFinish`.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 37.
-- Covered by [Progress reactions](../design/compositions/Progress.md), line 17.
+- Covered by [Progress reactions](../design/compositions/Progress.md), line 53.
 
 ```reaction
 when StudyPlanning.finish (learner: owner)
@@ -6182,7 +6187,7 @@ then
 ### Progress.ReplanAfterMiss
 
 Authored path: `Progress.ReplanAfterMiss`.
-- Covered by [Progress reactions](../design/compositions/Progress.md), line 17.
+- Covered by [Progress reactions](../design/compositions/Progress.md), line 59.
 
 ```reaction
 when StudyPlanning.miss (item, learner: owner)
@@ -6198,7 +6203,7 @@ then
 
 Authored path: `Progress.ReplanAfterStop`.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 37.
-- Covered by [Progress reactions](../design/compositions/Progress.md), line 17.
+- Covered by [Progress reactions](../design/compositions/Progress.md), line 55.
 
 ```reaction
 when StudyPlanning.stop (learner: owner)
@@ -6213,7 +6218,7 @@ then
 ### Progress.RevisedEvidence
 
 Authored path: `Progress.RevisedEvidence`.
-- Covered by [Progress reactions](../design/compositions/Progress.md), line 7.
+- Covered by [Progress reactions](../design/compositions/Progress.md), line 21.
 
 ```reaction
 when AssessmentReviewing.revise (author: owner, case: assessment)
@@ -6227,7 +6232,7 @@ then
 ### Progress.SubmitReviewed
 
 Authored path: `Progress.SubmitReviewed`.
-- Covered by [Progress reactions](../design/compositions/Progress.md), line 3.
+- Covered by [Progress reactions](../design/compositions/Progress.md), line 7.
 
 ```reaction
 when GroundedTutoring.confirmAttempt (outsideHelp, owner, task, unseen)
