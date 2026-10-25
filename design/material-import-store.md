@@ -4,7 +4,7 @@ The host uses `MaterialImportStore` to preserve one import across requests and a
 
 ## Request and saved record
 
-`getOrCreate` accepts `owner`, `requestId`, and `request`. The browser keeps the same request ID for retries of one intended import. A new intended import uses a new request ID. The server generates the separate `importKey` used later by GroundedTutoring. Neither identifier grants access.
+`getOrCreate` accepts `owner`, `requestId`, and `request`. The browser keeps the same request ID for retries of one intended import. A new intended import uses a new request ID. The server generates the separate `importKey` used later by the Library. Neither identifier grants access.
 
 The request has `scope` (the course ID), `title`, `origin` (`COURSE` or `REFERENCE`), and a nonempty ordered `sources` list. An upload descriptor has `kind: UPLOAD`, `name`, `size` in bytes, and a lowercase SHA-256 digest in `sha256`. A reference descriptor has `kind: REFERENCE` and `locator`. These are declared sources, not proof that bytes were uploaded, checked, or processed. Later import steps must verify the uploaded content against its declared digest and retain reference content as a fixed snapshot.
 
@@ -25,7 +25,7 @@ The saved operation contains:
 | `partial` | From TRANSCRIBING on: the originals as read at upload. Each recording's renditions and limitations are still empty. |
 | `recordings` | From TRANSCRIBING on: one entry for each distinct audio or video file, in original order. Two originals with the same bytes and the same file extension share one retained file and so one entry, and the finished transcript serves both. |
 | `failure` | Optional, only in TRANSCRIBING: a failure of the final preparation. |
-| `prepared` | From READY on: the exact `addMaterial` input. |
+| `prepared` | From READY on: the exact `Library.add` input. |
 | `material` | In COMPLETE: the saved material identity. |
 | `filesDeleted` | Only in DISCARDED: `false` when the import is removed, and `true` once every file its declared sources can have under its import key has been deleted. |
 
@@ -231,7 +231,7 @@ The stages advance in this order. `saveSources` advances CREATED to SOURCES_SAVE
 
 Each transition requires the expected stage and revision, and an atomic update advances both. Transcript saves and failures instead require the recording's claim token, and one atomic update checks the stage and the claim together. A claim and its renewal are atomic updates of one recording that leave the revision unchanged. `markFilesDeleted` is an atomic update that requires DISCARDED. An exact replay of a saved checkpoint returns current progress. Changed preparation, a different material result, a lost claim, or a competing stale transition causes `IMPORT_PROGRESS_CONFLICT`. A caller can reread and retry after another matching request finishes. A lost reply never requires a new import key.
 
-The HTTP host checks ownership, hashes the actual uploaded bytes, retains originals, and reads documents. For an import without recordings, it saves READY, calls GroundedTutoring, and records the returned material identity. For an import with recordings, it saves TRANSCRIBING, and the transcription worker saves each transcript. On each turn, the worker also saves READY for every operation that `preparable` returns, and finishes deleting files for every operation that `deletable` returns, so neither step depends on the process that started the import or removed it. The next learner request that lists imports, or a repeated upload, calls GroundedTutoring and records COMPLETE. A failure between the material save and COMPLETE is recovered by retrying `addMaterial` with the same frozen input and key. GroundedTutoring owns that material and its retry mapping. The [materials composition](compositions/Materials.md) describes these flows.
+The HTTP host checks ownership, hashes the actual uploaded bytes, retains originals, and reads documents. For an import without recordings, it saves READY, calls the Library, and records the returned material identity. For an import with recordings, it saves TRANSCRIBING, and the transcription worker saves each transcript. On each turn, the worker also saves READY for every operation that `preparable` returns, and finishes deleting files for every operation that `deletable` returns, so neither step depends on the process that started the import or removed it. The next learner request that lists imports, or a repeated upload, calls the Library and records COMPLETE. A failure between the material save and COMPLETE is recovered by retrying `Library.add` with the same frozen input and key. The Library, the application's instance of MaterialKeeping, owns that material and its retry mapping. The [materials composition](compositions/Materials.md) describes these flows.
 
 The store never verifies a file by itself. It receives host-prepared references and values. Tests cover concurrent starts and checkpoints, conflicts, owner isolation, frozen input, lost replies, and recovery in a new process. They also cover:
 - claims by two workers, and claims that alternate between owners;

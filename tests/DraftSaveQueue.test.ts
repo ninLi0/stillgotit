@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { DraftSaveQueue } from "../frontend/src/draft-save-queue.ts";
-import type { Material } from "../src/concepts/GroundedTutoring/GroundedTutoring.ts";
+import type { Material } from "../src/concepts/MaterialKeeping/MaterialKeeping.ts";
 
 const draft = { unit: "unit", material: "source" as Material, title: "Multiply matrices", outcome: "Compute products", gate: "Explain two fresh products" };
 function storage() {

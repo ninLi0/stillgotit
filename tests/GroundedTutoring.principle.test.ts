@@ -1,9 +1,10 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import type { Document } from "mongodb";
-import { GroundedTutoring, type Material, type MaterialImport } from "../src/concepts/GroundedTutoring/GroundedTutoring.ts";
+import { GroundedTutoring } from "../src/concepts/GroundedTutoring/GroundedTutoring.ts";
+import { MaterialKeeping, type Material, type MaterialImport } from "../src/concepts/MaterialKeeping/MaterialKeeping.ts";
 import type { Channel, Mode, PassageRef, Session } from "../src/concepts/GroundedTutoring/dialogue.ts";
-import type { MediaValue } from "../src/concepts/GroundedTutoring/media.ts";
+import type { MediaValue } from "../src/media.ts";
 import { connectMongo, localMongoUri } from "../src/storage/mongo.ts";
 
 const database = `stillgotit_test_${randomUUID().replaceAll("-", "")}`;
@@ -56,9 +57,11 @@ const start = new Date("2026-10-13T14:00:00Z");
 function setup() {
   let now = start;
   const tutoring = new GroundedTutoring(connection!.db, "GroundedTutoring", () => now);
+  // The learner's materials are kept by a separate concept, as in the application.
+  const library = new MaterialKeeping(connection!.db, "Library");
   // Each call moves the injected clock forward one minute and returns the new time.
   const tick = () => { now = new Date(now.getTime() + 60_000); return now; };
-  return { tutoring, tick };
+  return { tutoring, library, tick };
 }
 
 const slides: MediaValue = {
@@ -78,8 +81,8 @@ function notes(overrides: Partial<MaterialImport> = {}): MaterialImport {
 }
 
 /** Adds the learner's course notes and returns the session fields that cite them. */
-async function sources(tutoring: GroundedTutoring, owner = "sam") {
-  const { material } = await tutoring.addMaterial(notes({ owner }));
+async function sources(library: MaterialKeeping, owner = "sam") {
+  const { material } = await library.add(notes({ owner }));
   return { owner, topic: "matrix-products", definition: "v1", materials: [material], citations: [{ material, location: "content" }] };
 }
 
@@ -94,8 +97,8 @@ const taskText = {
 
 describe("GroundedTutoring principle", () => {
   test("a cited lesson with a corrected voice question closes, then a CHECK task records a requested hint and a reviewed attempt", async () => {
-    const { tutoring, tick } = setup();
-    const context = await sources(tutoring);
+    const { tutoring, library, tick } = setup();
+    const context = await sources(library);
     const material = context.materials[0]!;
 
     // Lesson: the tutor explains from the learner's sources.
@@ -165,8 +168,8 @@ describe("GroundedTutoring principle", () => {
   });
 
   test("a GUIDED task accepts hints without a request, while each CHECK hint uses up the pending request", async () => {
-    const { tutoring } = setup();
-    const context = await sources(tutoring);
+    const { tutoring, library } = setup();
+    const context = await sources(library);
     const { task: guided } = await tutoring.prepareTask({ ...context, ...taskText, mode: "GUIDED", fresh: true });
     await tutoring.giveHint({ owner: "sam", task: guided, text: "Pair row one of A with column one of B.", channel: "TEXT" });
     await tutoring.giveHint({ owner: "sam", task: guided, text: "Now swap the order and compare.", channel: "VOICE" });
@@ -187,30 +190,32 @@ describe("GroundedTutoring principle", () => {
   });
 
   test("re-adding material with the same import key returns the same source for later sessions", async () => {
-    const { tutoring } = setup();
-    const first = await tutoring.addMaterial(notes());
+    const { tutoring, library } = setup();
+    const first = await library.add(notes());
     const context = { owner: "sam", topic: "matrix-products", definition: "v1", materials: [first.material], citations: [{ material: first.material, location: "content" }] };
     const { lesson } = await tutoring.explain({ ...context, ...lessonText });
 
-    const again = await tutoring.addMaterial(notes());
+    const again = await library.add(notes());
     expect(again).toEqual(first);
     const { task } = await tutoring.prepareTask({ ...context, materials: [again.material],
       citations: [{ material: again.material, location: "slides/4" }], ...taskText, mode: "CHECK", fresh: true });
     expect(await tutoring._sources({ session: task })).toEqual(await tutoring._sources({ session: lesson }));
     const { importKey: _, ...data } = notes();
-    expect(await tutoring._sourceSet({ owner: "sam", scope: "linear-algebra" })).toEqual({ sources: [{ material: first.material, data }] });
+    expect(await library._sourceSet({ owner: "sam", scope: "linear-algebra" })).toEqual({ sources: [{ material: first.material, data }] });
   });
 
   test("another learner cannot add to, review, or close a learner's sessions", async () => {
-    const { tutoring } = setup();
-    const context = await sources(tutoring);
+    const { tutoring, library } = setup();
+    const context = await sources(library);
     const { lesson } = await tutoring.explain({ ...context, ...lessonText });
     const { task } = await tutoring.prepareTask({ ...context, ...taskText, mode: "CHECK", fresh: true });
     await tutoring.respond({ owner: "sam", session: lesson, text: "Does AB equal BA?", media: [], channel: "VOICE" });
     await tutoring.requestHint({ owner: "sam", task });
     await tutoring.respond({ owner: "sam", session: task, text: "AB is 19 22 43 50.", media: [], channel: "VOICE" });
-    // Leo has his own copy of the notes. He still cannot cite Sam's copy.
-    const leo = await sources(tutoring, "leo");
+    // Leo has his own copy of the notes. A session that names his copy cannot cite Sam's copy.
+    // Whether a session's materials are the learner's own is checked by the compositions before this concept is called,
+    // and tests/Learning.http.test.ts covers another learner's material on the course endpoints.
+    const leo = await sources(library, "leo");
     const before = await savedState();
 
     await refuses(tutoring.respond({ owner: "leo", session: task, text: "BA is the same.", media: [], channel: "TEXT" }), "RESPONSE_SESSION_UNAVAILABLE");
@@ -220,8 +225,8 @@ describe("GroundedTutoring principle", () => {
     await refuses(tutoring.confirmTranscript({ owner: "leo", session: lesson, turnIndex: 0, text: "Does AB equal BA?" }), "TRANSCRIPT_SESSION_UNAVAILABLE");
     await refuses(tutoring.confirmAttempt({ owner: "leo", task, dialogueLength: 1, unseen: true, outsideHelp: false }), "ATTEMPT_REVIEW_UNAVAILABLE");
     await refuses(tutoring.close({ owner: "leo", session: lesson }), "SESSION_CLOSE_UNAVAILABLE");
-    await refuses(tutoring.explain({ ...leo, materials: context.materials, citations: context.citations, ...lessonText }), "INVALID_LESSON_SOURCES");
-    await refuses(tutoring.prepareTask({ ...leo, materials: context.materials, citations: context.citations, ...taskText, mode: "GUIDED", fresh: true }), "INVALID_TASK_SOURCES");
+    await refuses(tutoring.explain({ ...leo, citations: context.citations, ...lessonText }), "INVALID_LESSON_SOURCES");
+    await refuses(tutoring.prepareTask({ ...leo, citations: context.citations, ...taskText, mode: "GUIDED", fresh: true }), "INVALID_TASK_SOURCES");
     expect(await savedState()).toEqual(before);
 
     // Sam's pending hint request survived Leo's refused hint.
@@ -233,11 +238,10 @@ describe("GroundedTutoring principle", () => {
   });
 
   test("refuses blank lesson or task content and invalid sources without creating a session", async () => {
-    const { tutoring } = setup();
-    const context = await sources(tutoring);
+    const { tutoring, library } = setup();
+    const context = await sources(library);
     const [material] = context.materials;
-    const { material: physics } = await tutoring.addMaterial(notes({ importKey: "forces", scope: "physics", title: "Forces" }));
-    const { material: inverses } = await tutoring.addMaterial(notes({ importKey: "week-4-notes", title: "Inverses", originals: [] }));
+    const { material: inverses } = await library.add(notes({ importKey: "week-4-notes", title: "Inverses", originals: [] }));
     const before = await savedState();
 
     await refuses(tutoring.explain({ ...context, ...lessonText, request: " " }), "INVALID_LESSON_CONTENT");
@@ -246,16 +250,18 @@ describe("GroundedTutoring principle", () => {
     await refuses(tutoring.prepareTask({ ...context, ...taskText, criteria: "\n", mode: "CHECK", fresh: true }), "INVALID_TASK_CONTENT");
     await refuses(tutoring.prepareTask({ ...context, ...taskText, mode: "COACH" as unknown as Mode, fresh: true }), "INVALID_TASK_CONTENT");
     await refuses(tutoring.prepareTask({ ...context, ...taskText, mode: "CHECK", fresh: "yes" as unknown as boolean }), "INVALID_TASK_CONTENT");
+    // The concept checks only what it can see: the session's own material set and the shape of each citation. Ownership,
+    // a shared course, and whether a cited location exists in its material are checked by the compositions and the host,
+    // so a material from another learner or course, or an invented location, no longer appears in this list.
     const invalidSources: { owner?: string; materials?: Material[]; citations?: PassageRef[] }[] = [
       { materials: [], citations: [] },
       { citations: [] },
-      { materials: [material!, physics] },
       { materials: [material!, material!] },
       { citations: [{ material: inverses, location: "content" }] },
-      { citations: [{ material: material!, location: "slides/9" }] },
-      { materials: [inverses], citations: [{ material: inverses, location: "slides/4" }] },
       { materials: [randomUUID() as Material] },
-      { owner: "leo" },
+      { citations: [{ material: material!, location: " " }] },
+      { citations: [{ material: material!, location: "content" }, { material: material!, location: "content" }] },
+      { owner: " " },
     ];
     for (const invalid of invalidSources) {
       await refuses(tutoring.explain({ ...context, ...lessonText, ...invalid }), "INVALID_LESSON_SOURCES");
@@ -266,9 +272,9 @@ describe("GroundedTutoring principle", () => {
   });
 
   test("refuses blank or malformed dialogue additions without changing the open sessions", async () => {
-    const { tutoring } = setup();
-    const context = await sources(tutoring);
-    const { material: inverses } = await tutoring.addMaterial(notes({ importKey: "week-4-notes", title: "Inverses" }));
+    const { tutoring, library } = setup();
+    const context = await sources(library);
+    const { material: inverses } = await library.add(notes({ importKey: "week-4-notes", title: "Inverses" }));
     const { lesson } = await tutoring.explain({ ...context, ...lessonText });
     const { task } = await tutoring.prepareTask({ ...context, ...taskText, mode: "GUIDED", fresh: true });
     await tutoring.respond({ owner: "sam", session: task, text: "AB is 19 22 43 50.", media: [], channel: "TEXT" });
@@ -299,8 +305,8 @@ describe("GroundedTutoring principle", () => {
   });
 
   test("refuses actions on a closed, unknown, or wrong kind of session", async () => {
-    const { tutoring } = setup();
-    const context = await sources(tutoring);
+    const { tutoring, library } = setup();
+    const context = await sources(library);
     const { lesson } = await tutoring.explain({ ...context, ...lessonText });
     const { task } = await tutoring.prepareTask({ ...context, ...taskText, mode: "GUIDED", fresh: true });
     const { lesson: closedLesson } = await tutoring.explain({ ...context, ...lessonText });
@@ -330,8 +336,8 @@ describe("GroundedTutoring principle", () => {
   });
 
   test("repeated transcript confirmations add a correction only for changed text, and later speech needs another review", async () => {
-    const { tutoring } = setup();
-    const context = await sources(tutoring);
+    const { tutoring, library } = setup();
+    const context = await sources(library);
     const { task } = await tutoring.prepareTask({ ...context, ...taskText, mode: "CHECK", fresh: true });
     await tutoring.respond({ owner: "sam", session: task, text: "AB is 19 22 43 50.", media: [], channel: "VOICE" });
     await tutoring.confirmTranscript({ owner: "sam", session: task, turnIndex: 0, text: "AB is 19 22 43 50." });

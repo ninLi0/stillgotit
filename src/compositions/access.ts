@@ -5,7 +5,7 @@ import { composition as Settings } from "./settings.ts";
 import * as R from "./learning-reads.ts";
 import { composition as PlanningFlows } from "./planning.ts";
 import { composition as Importing } from "./importing.ts";
-const { SkillMapping: Mapping, GroundedTutoring: Tutoring, AssessmentReviewing: Assessment, MasteryEstimating: Mastery, StudyPlanning: Planning } = concepts;
+const { SkillMapping: Mapping, Library, GroundedTutoring: Tutoring, AssessmentReviewing: Assessment, MasteryEstimating: Mastery, StudyPlanning: Planning } = concepts;
 
 const LessonReady = former("admit a lesson for (owner) and (skill)", ({ owner, skill }, { context, sources, materials }) => where(
   R.ActiveSkill({ owner, skill }), R.SkillContext({ owner, skill }).is({ context, sources }), compute(C.selectSkillMaterials, { context }, materials),
@@ -19,12 +19,12 @@ const TaskReady = former("admit practice for (owner) and (skill)", ({ owner, ski
 // Every attachment must be listed once and be the learner's own material in the session's course.
 const ResponseReady = former("admit learner work in (studySession)", ({ owner, studySession, text, channel, attachments, dialogueLength }, { course, data, sources }) => where(
   R.OpenSession({ owner, studySession }).is({ course }), Tutoring._sessionData({ session: studySession }).is({ data }),
-  Tutoring._sourceSet({ owner, scope: course }).is({ sources }), C.dialogueIsCurrent({ data, dialogueLength }),
+  Library._sourceSet({ owner, scope: course }).is({ sources }), C.dialogueIsCurrent({ data, dialogueLength }),
   compute(C.responseInput, { data, text, channel, attachments, sources }, { valid: true }),
 ).form({ allowed: true })).optional();
 const QuestionReady = former("admit a question in (studySession)", ({ owner, studySession, text, channel, attachments, dialogueLength }, { course, data, sources }) => where(
   R.OpenSession({ owner, studySession }).is({ course }), Tutoring._lesson({ lesson: studySession }), Tutoring._sessionData({ session: studySession }).is({ data }),
-  Tutoring._sourceSet({ owner, scope: course }).is({ sources }), C.dialogueIsCurrent({ data, dialogueLength }),
+  Library._sourceSet({ owner, scope: course }).is({ sources }), C.dialogueIsCurrent({ data, dialogueLength }),
   compute(C.responseInput, { data, text, channel, attachments, sources }, { valid: true }),
 ).form({ allowed: true })).optional();
 const ReplyReady = former("admit a tutor reply in (studySession)", ({ owner, studySession }, { data }) => where(
@@ -48,7 +48,7 @@ const RegradeReady = former("admit revision of (assessment)", ({ owner, assessme
 // Only the skill is checked; the concept explains a bad key, value, or reason.
 const AdjustReady = former("admit an estimate adjustment for (owner) and (skill)", ({ owner, skill }) => where(R.ActiveSkill({ owner, skill })).form({ allowed: true })).optional();
 const SuggestionReady = former("admit suggestions from (material)", ({ owner, material }, { course }) => where(
-  Tutoring._material({ material }).is({ owner, scope: course }), Courses.OwnedCourse({ owner, course }),
+  Library._material({ material }).is({ owner, scope: course }), Courses.OwnedCourse({ owner, course }),
 ).form({ allowed: true })).optional();
 // The same answer for an unknown material, another learner's material, one outside the learner's courses, and an ungraded material.
 const GradedReady = former("admit graded work (material) for (owner)", ({ owner, material }) => where(Importing.GradedMaterial({ owner, material })).form({ allowed: true })).optional();

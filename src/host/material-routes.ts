@@ -1,5 +1,5 @@
 import type { InvocationResult } from "@mit-sdg/sync-engine/boundary";
-import type { MediaList } from "../concepts/GroundedTutoring/media.ts";
+import type { MediaList } from "../media.ts";
 import {
   ImportAlreadySaved, ImportNotRetryable, ImportRequestConflict, type ImportOperation, type MaterialImportStore,
 } from "../storage/MaterialImportStore.ts";

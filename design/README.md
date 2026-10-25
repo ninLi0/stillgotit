@@ -7,7 +7,8 @@
 | Concept | Responsibility |
 | --- | --- |
 | [SkillMapping](concepts/SkillMapping.md) | Course skills, draft review, requirements versions, sources, and prerequisites. |
-| [GroundedTutoring](concepts/GroundedTutoring.md) | Materials, grounded lessons, practice, dialogue, hints, and transcript review. |
+| [MaterialKeeping](concepts/MaterialKeeping.md) | Each learner's source materials, with their readable content, retained files, and import retries, used as Library. |
+| [GroundedTutoring](concepts/GroundedTutoring.md) | Grounded lessons, practice, dialogue, hints, and transcript review. |
 | [AssessmentReviewing](concepts/AssessmentReviewing.md) | Original work, judgments, clarifications, and revisions. |
 | [MasteryEstimating](concepts/MasteryEstimating.md) | Provisional confidence and replay of effective assessment evidence. |
 | [StudyPlanning](concepts/StudyPlanning.md) | Budgets, proposals, time records, and explicit exam-cut approval. |
@@ -17,11 +18,11 @@
 | [Generating](concepts/Generating.md) | A stateless external-provider action used as TutorGenerating. |
 | [Preferring](concepts/Preferring.md) | A user's remembered choice among offered options, used as TutorPreferring for the tutor model and thinking level and as ViewPreferring for the home view. |
 
-The eight domain concepts, TutorPreferring, and ViewPreferring own their MongoDB collections. Generating has no durable state. None calls another concept. [Source attribution](../THIRD_PARTY_NOTICES.md) identifies the reused account code and license.
+The nine domain concepts, TutorPreferring, and ViewPreferring own their MongoDB collections. Generating has no durable state. None calls another concept. [Source attribution](../THIRD_PARTY_NOTICES.md) identifies the reused account code and license.
 
 ## Application boundary
 
-[The application stage](stages/materials.md) is selected by `generated.config.ts`. It binds eleven instances. The selected [course flows](compositions/Courses.md), learning, progress, planning, read, admission, computation, and [settings](compositions/Settings.md) documents describe the current engine flows. [Generated read-back](../generated/stillgotit.md) shows the resulting `when / where / then` rules.
+[The application stage](stages/materials.md) is selected by `generated.config.ts`. It binds twelve instances. The selected [course flows](compositions/Courses.md), learning, progress, planning, read, admission, computation, and [settings](compositions/Settings.md) documents describe the current engine flows. [Generated read-back](../generated/stillgotit.md) shows the resulting `when / where / then` rules.
 
 The selected composition documents match the current implementation. Unselected access and identity sketches describe broader work that the selected stage does not bind. The selected stage and its linked flow documents identify the implemented paths. [The onboarding stage](stages/onboarding.md) preserves an earlier increment.
 
@@ -40,4 +41,4 @@ bun test --timeout 15000
 bunx --no-install sync-engine check-design design/concepts/*.md design/compositions/*.md design/compositions/reusable/*.md design/types.md
 ```
 
-The source check covers action/query signatures and refusal mappings for ten concepts. The selected-stage check resolves its links against code. Type checks cover the backend and Vue. These checks do not prove the rules, extraction quality, AI quality, or live account access; tests and browser use provide separate evidence.
+The source check covers action/query signatures and refusal mappings for eleven concepts. The selected-stage check resolves its links against code. Type checks cover the backend and Vue. These checks do not prove the rules, extraction quality, AI quality, or live account access; tests and browser use provide separate evidence.

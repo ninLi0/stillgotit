@@ -1,4 +1,4 @@
-import { GroundedTutoring } from "../../src/concepts/GroundedTutoring/GroundedTutoring.ts";
+import { MaterialKeeping } from "../../src/concepts/MaterialKeeping/MaterialKeeping.ts";
 import { connectMongo } from "../../src/storage/mongo.ts";
 
 const [database, name] = process.argv.slice(2);
@@ -8,7 +8,7 @@ if (!database?.startsWith("stillgotit_test_") || !name) {
 const input = JSON.parse(await Bun.stdin.text());
 const { client, db } = await connectMongo({ uri: process.env.MONGODB_TEST_URI, database });
 try {
-  console.log(JSON.stringify(await new GroundedTutoring(db, name).addMaterial(input)));
+  console.log(JSON.stringify(await new MaterialKeeping(db, name).add(input)));
 } finally {
   await client.close();
 }

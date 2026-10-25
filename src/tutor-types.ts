@@ -1,4 +1,4 @@
-import type { Material, MaterialData } from "./concepts/GroundedTutoring/GroundedTutoring.ts";
+import type { Material, MaterialData } from "./concepts/MaterialKeeping/MaterialKeeping.ts";
 import type { Result } from "./concepts/AssessmentReviewing/AssessmentReviewing.ts";
 export interface SkillSuggestion { title: string; outcome: string; gate: string }
 export interface Suggestions { unitTitle: string; skills: SkillSuggestion[] }

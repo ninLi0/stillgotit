@@ -1,27 +1,28 @@
-import type { Material } from "./GroundedTutoring.ts";
-import type { MediaList } from "./media.ts";
+import type { MediaList } from "../../media.ts";
 
+// `Material` is the concept's external source identity. Its content and access rules belong outside this concept,
+// so the types below take it as a parameter, and the application binds it to the identity its material library issues.
 export type Session = string & { readonly __brand: "TutoringSession" };
 export type Mode = "GUIDED" | "CHECK";
 export type Channel = "TEXT" | "VOICE";
 export type SessionStatus = "OPEN" | "CLOSED";
-export interface PassageRef { material: Material; location: string }
-export type PassageSet = readonly PassageRef[];
-export type MaterialSet = readonly Material[];
-export interface DialogueTurn {
+export interface PassageRef<Material extends string = string> { material: Material; location: string }
+export type PassageSet<Material extends string = string> = readonly PassageRef<Material>[];
+export type MaterialSet<Material extends string = string> = readonly Material[];
+export interface DialogueTurn<Material extends string = string> {
   speaker: "LEARNER" | "TUTOR";
   purpose: "RESPONSE" | "EXPLANATION" | "HINT" | "CORRECTION";
   text: string;
   media: MediaList;
   channel: Channel;
-  citations: PassageSet;
+  citations: PassageSet<Material>;
   at: Date;
   correctionTarget?: number;
 }
-export interface SessionDocument<Learner extends string, Topic extends string, Definition extends string> {
+export interface SessionDocument<Learner extends string, Material extends string, Topic extends string, Definition extends string> {
   _id: Session; owner: Learner; topic: Topic; definition: Definition;
-  kind: "LESSON" | "PRACTICE"; status: SessionStatus; materials: Material[]; citations: PassageRef[];
-  dialogue: DialogueTurn[]; checkedVoiceTurns: number[]; revision: number;
+  kind: "LESSON" | "PRACTICE"; status: SessionStatus; materials: Material[]; citations: PassageRef<Material>[];
+  dialogue: DialogueTurn<Material>[]; checkedVoiceTurns: number[]; revision: number;
   attemptReview?: { dialogueLength: number; unseen: boolean; outsideHelp: boolean };
   request?: string; explanation?: string; question?: string; criteria?: string; mode?: Mode; fresh?: boolean; hintRequested?: boolean;
 }

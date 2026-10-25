@@ -3,7 +3,7 @@
  * Only headers, frame headers, and timestamps are read. Nothing is decoded, rendered, or played.
  * See the detection table in design/material-data.md.
  */
-import type { ImageMediaType } from "../concepts/GroundedTutoring/media.ts";
+import type { ImageMediaType } from "../media.ts";
 
 export interface RecordingInfo {
   /** The media type saved for the original and sent to Gemini. */

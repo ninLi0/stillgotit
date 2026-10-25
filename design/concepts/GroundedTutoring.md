@@ -12,15 +12,13 @@ A learner selects course material and starts a lesson with a free question or a 
 
 ```types
 external Learner
-  The identity that owns materials and sessions.
-external Scope
-  The context to which source material belongs.
+  The identity that owns sessions.
+external Material
+  A source identity whose content and access rules belong outside this concept.
 external Topic
   The subject being learned or practiced.
 external Definition
   The fixed version of the requirements used in a session.
-MaterialOrigin is COURSE or REFERENCE
-  Material brought from the learner's course or chosen as a reference.
 Mode is GUIDED or CHECK
   Guided coaching or an independent check with help only on request.
 SessionStatus is OPEN or CLOSED
@@ -41,8 +39,6 @@ opaque AttemptDeclaration
   The dialogue length reviewed by the learner, whether the exact problems are new, and whether the learner used outside help.
 opaque DialogueTurn
   An immutable value containing speaker, purpose, text, media, channel, citations, server time, and an optional correction target. Purposes are RESPONSE, EXPLANATION, HINT, or CORRECTION. The learner adds RESPONSE and CORRECTION turns. The tutor adds EXPLANATION turns to lessons and HINT turns to tasks. A correction targets an original learner voice response by its dialogue index.
-opaque SourceRecords
-  Owned materials with their source content and retained files.
 opaque StudyRecords
   Sessions with their lessons or tasks, dialogue, effective voice transcripts, and review state.
 opaque StudyRecord
@@ -52,15 +48,6 @@ opaque StudyRecord
 ## State
 
 ```state
-a set of Materials with
-  an owner Learner
-  an optional importKey String
-  a scope Scope
-  a title String
-  a locator String
-  a content String
-  an originals seq of MediaValue
-  an origin MaterialOrigin
 a set of Sessions with
   an owner Learner
   a topic Topic
@@ -82,42 +69,20 @@ a set of Practice Sessions with
   a hintRequested Flag
 Rule: each session is in exactly one of Lesson Sessions or Practice Sessions. A lesson means a member of Lesson Sessions; a task means a member of Practice Sessions.
 Rule: an owner's open lesson or task must exist, have that owner and kind, and have status OPEN. An unknown session belongs to no owner.
-Rule: source rules require a nonempty set of existing materials, all owned by the session owner and in the same scope. Citations are nonempty and identify valid locations in those materials.
-Rule: material records, session sources, topic, definition, and opening content never change. Source edits produce a new Material. Dialogue is append-only while OPEN. CLOSED sessions cannot change.
-Rule: materials contain readable text or readable retained media. Their file references preserve extraction limitations. Unreadable uploads do not become teaching material.
-Rule: material inputs match their declared types and the material data representation. References are nonblank strings. Malformed material inputs are refused before any state change.
-Rule: every new material has a nonblank importKey supplied by the host. Only materials saved before import keys were introduced may lack one. Each (owner, importKey) pair identifies at most one material. The key grants no access and is not returned by material queries.
-Rule: a retry compares scope, title, locator, content, originals, and origin with the saved material. Strings compare exactly, including case and whitespace. List order matters; record field order does not. A matching retry returns the saved material without changing it. Changed input needs a new key and creates a new material. A key belonging to another owner does not recover that owner's material.
+Rule: the source rules hold when the owner is not blank, the materials are a nonempty set of distinct identities, and the citations are nonempty and distinct, each naming one of those materials and a nonblank location. Ownership of the materials and their belonging to one scope are checked by the application before a session is created, and the location of each citation is checked by the host against the material's readable renditions before the answer reaches this concept.
+Rule: session sources, topic, definition, and opening content never change. Dialogue is append-only while OPEN. CLOSED sessions cannot change.
 Rule: dialogue indices are zero-based and remain stable. checkedVoiceTurns contains only indices of learner RESPONSE turns with channel VOICE. The effective transcript is the latest CORRECTION for that response, or its original text when there is no correction.
 Rule: ordinary lessons need no transcript confirmation. Assessment requires every voice response in the task to have its effective transcript confirmed. Closing a session alone does not submit work for assessment.
 Rule: the tutor adds turns to a task only as hints. Any tutor message in a task is recorded as a HINT, even when it is phrased as a question.
 Rule: in a CHECK task, the tutor gives a hint only after the learner requests one. In a GUIDED task, the tutor may give a hint at any time. Recorded hints stay in the dialogue and count as assistance. A learner's transcript correction does not count as assistance.
 Rule: task criteria include both the task requirements and the full demonstration gate. A task's question may contain several problems and follow-up questions. Fresh work has not already been shown solved to the learner; different numbers alone do not establish freshness.
-Rule: a voice response must contain a nonblank transcript. Microphone audio is temporary transcription input, not retained dialogue media. Uploaded source audio remains part of its Material.
+Rule: a voice response must contain a nonblank transcript. Microphone audio is temporary transcription input, not retained dialogue media. Uploaded source audio belongs to its material, which is kept outside this concept.
 Rule: blank text is empty or contains only whitespace. New identities are unique. now is server time. Refused actions change no state; unmentioned state stays unchanged.
 ```
 
 ## Actions
 
 ```actions
-addMaterial(owner: Learner, importKey: String, scope: Scope, title: String, locator: String, content: String, originals: MediaList, origin: MaterialOrigin) : returns (material: Material)
-  where owner, scope, title, locator, content, originals, or origin does not match its declared type or representation, title or locator is blank, or neither content nor originals contains readable source material
-  then
-    refuses INVALID_TUTORING_MATERIAL "Provide a title, source location, and readable material."
-  where material fields are valid and importKey is not a nonblank string
-  then
-    refuses INVALID_MATERIAL_IMPORT_KEY "Provide a nonblank import key."
-  where material fields and importKey are valid, owner has a material with importKey, and any supplied material field differs from that material
-  then
-    refuses MATERIAL_IMPORT_CONFLICT "Use the original material input for this import key."
-  where material fields and importKey are valid, owner has a material with importKey, and every supplied material field matches that material
-  then
-    returns material
-  where material fields and importKey are valid and owner has no material with importKey
-  then
-    create material with owner, importKey, scope, title, locator, content, originals, and origin together
-    returns material
-
 explain(owner: Learner, topic: Topic, definition: Definition, request: String, explanation: String, materials: MaterialSet, citations: PassageSet) : returns (lesson: Session)
   where request or explanation is blank
   then
@@ -158,10 +123,10 @@ answerLesson(owner: Learner, lesson: Session, text: String, citations: PassageSe
   where lesson is not owner's open lesson
   then
     refuses LESSON_ANSWER_UNAVAILABLE "Choose one of your open lessons."
-  where lesson is owner's open lesson, and (text is blank or citations are empty or do not identify valid locations in its materials)
+  where lesson is owner's open lesson, and (text is blank or the source rules do not hold for its materials and these citations)
   then
     refuses INVALID_LESSON_ANSWER "Provide an explanation with references to this lesson's sources."
-  where lesson is owner's open lesson, text is not blank, and citations are nonempty and valid within its materials
+  where lesson is owner's open lesson, text is not blank, and the source rules hold for its materials and these citations
   then
     append a tutor EXPLANATION with text, channel, citations, empty media, time now, and no correction target
     returns
@@ -233,12 +198,6 @@ close(owner: Learner, session: Session) : returns ()
 ## Queries
 
 ```queries
-_materials(owner: Learner, scope: Scope) : many (material: Material, title: String, locator: String, origin: MaterialOrigin)
-  Returns the owner's materials in the scope, ordered by material identity. Returns no rows when none match.
-
-_material(material: Material) : optional (owner: Learner, scope: Scope, title: String, locator: String, content: String, originals: MediaList, origin: MaterialOrigin)
-  Returns the saved material and retained file references. Returns no row for an unknown material.
-
 _sessions(owner: Learner, topic: Topic) : many (session: Session, definition: Definition, status: SessionStatus)
   Returns the owner's sessions for the topic in every status, ordered by session identity. Returns no rows when none match.
 
@@ -265,9 +224,6 @@ _voiceResponses(session: Session) : many (turnIndex: Number, text: String, confi
 
 _review(task: Session) : optional (dialogueLength: Number, uncheckedVoiceCount: Number, ready: Flag)
   Returns the dialogue length and number of unchecked voice responses. ready is true only for an OPEN task with at least one learner response and no unchecked voice responses. Returns no row for an unknown session or a lesson. This query does not judge correctness or source quality.
-
-_sourceSet(owner: Learner, scope: Scope) : one (sources: SourceRecords)
-  Returns only this owner's sources in scope, or an empty list.
 
 _study(owner: Learner, topic: Topic) : one (sessions: StudyRecords)
   Returns this owner's sessions for topic in the order they were started, with their own saved dialogue and review state, or an empty list.

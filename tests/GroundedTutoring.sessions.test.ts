@@ -1,15 +1,22 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { GroundedTutoring } from "../src/concepts/GroundedTutoring/GroundedTutoring.ts";
+import { MaterialKeeping } from "../src/concepts/MaterialKeeping/MaterialKeeping.ts";
 import { connectMongo, localMongoUri } from "../src/storage/mongo.ts";
 
 let connection: Awaited<ReturnType<typeof connectMongo>>;
 beforeAll(async () => { connection = await connectMongo({ uri: process.env.MONGODB_TEST_URI ?? localMongoUri, database: `stillgotit_test_${crypto.randomUUID().replaceAll("-", "")}` }); });
 afterAll(async () => { if (connection) { await connection.db.dropDatabase(); await connection.client.close(); } });
 
+/** Saves Sam's notes in a library of their own, as the application does before any session cites them. */
+async function notes() {
+  const library = new MaterialKeeping(connection.db, `Library_${crypto.randomUUID()}`);
+  return library.add({ owner: "sam", importKey: "lesson", scope: "math", title: "Matrices", locator: "lesson", content: "Rows multiply columns.", originals: [], origin: "COURSE" });
+}
+
 async function setup() {
   const name = `Tutoring_${crypto.randomUUID()}`;
   const tutoring = new GroundedTutoring(connection.db, name);
-  const { material } = await tutoring.addMaterial({ owner: "sam", importKey: "lesson", scope: "math", title: "Matrices", locator: "lesson", content: "Rows multiply columns.", originals: [], origin: "COURSE" });
+  const { material } = await notes();
   const context = { owner: "sam", topic: "matrix-products", definition: "v1", materials: [material], citations: [{ material, location: "content" }] };
   const { task } = await tutoring.prepareTask({ ...context, question: "Solve two new matrix products. Explain why order matters.", criteria: "Correct products and reasoning.", mode: "CHECK", fresh: true });
   return { name, tutoring, context, task };
@@ -50,10 +57,15 @@ describe("Grounded tutoring sessions", () => {
     await expect(tutoring.respond({ owner: "sam", session: task, text: "New work", media: [], channel: "TEXT" })).rejects.toMatchObject({ code: "RESPONSE_SESSION_UNAVAILABLE" });
   });
 
-  test("foreign sources, invented citations, and another learner's session are refused", async () => {
+  test("a citation outside the session's materials, a blank location, and another learner's session are refused", async () => {
+    // Whether the materials belong to the learner and one course, and whether a cited location exists in its material, are
+    // no longer this concept's checks. The Library reads in the compositions admit only the learner's own materials from the
+    // skill's course, and the host checks every cited location against the material's renditions before an answer arrives.
+    // tests/Learning.http.test.ts covers another learner's material on the course endpoints.
     const { tutoring, task, context } = await setup();
-    await expect(tutoring.explain({ ...context, owner: "other", request: "Explain", explanation: "Example" })).rejects.toMatchObject({ code: "INVALID_LESSON_SOURCES" });
-    await expect(tutoring.explain({ ...context, request: "Explain", explanation: "Example", citations: [{ ...context.citations[0]!, location: "invented" }] })).rejects.toMatchObject({ code: "INVALID_LESSON_SOURCES" });
+    const { material: other } = await notes();
+    await expect(tutoring.explain({ ...context, request: "Explain", explanation: "Example", citations: [{ material: other, location: "content" }] })).rejects.toMatchObject({ code: "INVALID_LESSON_SOURCES" });
+    await expect(tutoring.explain({ ...context, request: "Explain", explanation: "Example", citations: [{ ...context.citations[0]!, location: " " }] })).rejects.toMatchObject({ code: "INVALID_LESSON_SOURCES" });
     await expect(tutoring.respond({ owner: "other", session: task, text: "Change", media: [], channel: "TEXT" })).rejects.toMatchObject({ code: "RESPONSE_SESSION_UNAVAILABLE" });
     expect(await tutoring._dialogue({ session: task })).toEqual([]);
   });
@@ -70,7 +82,7 @@ describe("Grounded tutoring sessions", () => {
     // The interface numbers lessons and practice from this order, so a new session must never move an earlier one.
     let now = Date.parse("2026-10-22T15:00:00Z");
     const name = `Tutoring_${crypto.randomUUID()}`, tutoring = new GroundedTutoring(connection.db, name, () => new Date(now));
-    const { material } = await tutoring.addMaterial({ owner: "sam", importKey: "lesson", scope: "math", title: "Matrices", locator: "lesson", content: "Rows multiply columns.", originals: [], origin: "COURSE" });
+    const { material } = await notes();
     const context = { owner: "sam", topic: "matrix-products", definition: "v1", materials: [material], citations: [{ material, location: "content" }] };
     const lessonText = { request: "Show an example.", explanation: "Match each row to each column." };
     const { lesson: first } = await tutoring.explain({ ...context, ...lessonText });

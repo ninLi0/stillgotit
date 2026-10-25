@@ -5,7 +5,7 @@ import type { GradedStatus } from "../computations/importing.ts";
 import { composition as Courses } from "./courses.ts";
 import { composition as Settings } from "./settings.ts";
 import { structuredInput, structuredOutput, validators } from "./reusable/inputs.ts";
-const { Sessioning, SkillMapping: Mapping, GroundedTutoring: Tutoring, AssessmentReviewing: Assessment, TutorGenerating: AI } = concepts;
+const { Sessioning, SkillMapping: Mapping, Library, AssessmentReviewing: Assessment, TutorGenerating: AI } = concepts;
 
 /**
  * Conditions that add the learner's tutor choice to a prepared request, as the learning endpoints do. TutorStatus must be
@@ -34,7 +34,7 @@ const confirmInput: EndpointValidator = (value) => {
 
 // The owner's own material, in a course the owner owns, with a graded title. Every endpoint here requires it first.
 const GradedMaterial = view("(owner) imported graded work (material)", ({ owner, material }, { course, originals }, { title, graded }) => where(
-  Tutoring._material({ material }).is({ owner, scope: course, title, originals }), Courses.OwnedCourse({ owner, course }),
+  Library._material({ material }).is({ owner, scope: course, title, originals }), Courses.OwnedCourse({ owner, course }),
   compute(C.gradedTitle, { title }, graded), is.among(graded, [true]),
 )).optional();
 
@@ -61,7 +61,7 @@ const Extract = endpoint("/courses/graded/extract", ({ session, material, owner,
       .then(Sessioning.use({ session }).responds({ subject: owner })).named("ready"),
   )
   .then(where(GradedMaterial({ owner, material }).is({ course }), Mapping._map({ course }).is({ skills }), compute(C.hasConfirmedSkill, { skills }, confirmed), is.among(confirmed, [true]),
-    Tutoring._sourceSet({ owner, scope: course }).is({ sources }), compute(C.singleMaterial, { material }, materials),
+    Library._sourceSet({ owner, scope: course }).is({ sources }), compute(C.singleMaterial, { material }, materials),
     compute(C.selectSources, { sources, materials }, { selected, valid: true }), compute(C.extractRequest, { selected, skills }, draft),
     ...usingTutorChoice(owner, draft, choice, status, prepared))
     .then(AI.generate({ owner, request: prepared }).responds({ answer })))

@@ -7,6 +7,7 @@ import { commonsFederating } from "../src/concepts/Federating/registry.ts";
 import { MemoryProvider } from "../src/concepts/Federating/provider.ts";
 import { generating } from "../src/concepts/Generating/registry.ts";
 import { groundedTutoring } from "../src/concepts/GroundedTutoring/registry.ts";
+import { materialKeeping } from "../src/concepts/MaterialKeeping/registry.ts";
 import { InvalidInitialConfidence } from "../src/concepts/MasteryEstimating/refusals.ts";
 import { masteryEstimating } from "../src/concepts/MasteryEstimating/registry.ts";
 import { registering } from "../src/concepts/Registering/registry.ts";
@@ -38,7 +39,7 @@ test("the host's sentences are the ones the concepts and compositions state, as 
   expect(stated.length).toBeGreaterThan(100);
   for (const [code, sentence] of stated) expect(refusalDetails[code], code).toBe(sentence);
   // Every refusal class that carries its own message carries that same sentence.
-  for (const { refusals } of [registering, commonsFederating, sessioning, skillMapping, groundedTutoring, assessmentReviewing, masteryEstimating, studyPlanning, generating]) {
+  for (const { refusals } of [registering, commonsFederating, sessioning, skillMapping, materialKeeping, groundedTutoring, assessmentReviewing, masteryEstimating, studyPlanning, generating]) {
     for (const [code, signal] of Object.entries(refusals ?? {})) {
       const Refusal = signal as unknown as new () => Error;
       if (Refusal.length === 0 && message(Refusal)) expect(message(Refusal), code).toBe(refusalDetails[code]!);

@@ -6,7 +6,7 @@ import {
   ImportAlreadySaved, ImportNotRetryable, ImportProgressConflict, ImportRequestConflict, InvalidImportRequest, MaterialImportStore,
   type ImportFailure, type ImportIdentity, type ImportOperation, type ImportRequest,
 } from "../src/storage/MaterialImportStore.ts";
-import type { MediaValue } from "../src/concepts/GroundedTutoring/media.ts";
+import type { MediaValue } from "../src/media.ts";
 import { connectMongo, localMongoUri } from "../src/storage/mongo.ts";
 
 type Start = ImportIdentity & { request: ImportRequest };

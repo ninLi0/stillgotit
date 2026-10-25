@@ -1,5 +1,5 @@
 import type { EndpointValidator } from "@mit-sdg/sync-engine/boundary";
-import { isMediaList } from "../../concepts/GroundedTutoring/media.ts";
+import { isMediaList } from "../../media.ts";
 
 /** ConceptBox's text-only boundary, with a bound on each submitted field. */
 export const textInput: EndpointValidator = (value) => {

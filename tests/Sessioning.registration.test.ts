@@ -2,6 +2,7 @@ import { StudyPlanning } from "../src/concepts/StudyPlanning/StudyPlanning.ts";
 import { MasteryEstimating } from "../src/concepts/MasteryEstimating/MasteryEstimating.ts";
 import { AssessmentReviewing } from "../src/concepts/AssessmentReviewing/AssessmentReviewing.ts";
 import { GroundedTutoring } from "../src/concepts/GroundedTutoring/GroundedTutoring.ts";
+import { MaterialKeeping } from "../src/concepts/MaterialKeeping/MaterialKeeping.ts";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import type { ActionRefusal } from "@mit-sdg/sync-engine/assembly";
@@ -64,6 +65,7 @@ async function setup() {
     AssessmentReviewing: new AssessmentReviewing(db),
     MasteryEstimating: new MasteryEstimating(db),
     StudyPlanning: new StudyPlanning(db),
+    Library: new MaterialKeeping(db, name),
     GroundedTutoring: new GroundedTutoring(db, name),
   });
   const application = await assembleFor(connection!.db);

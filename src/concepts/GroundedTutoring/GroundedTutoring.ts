@@ -1,159 +1,33 @@
-import { isDeepStrictEqual } from "node:util";
-import { type Collection, type Db, MongoServerError } from "mongodb";
-import { isMediaList, nonblank, type MediaList } from "./media.ts";
+import type { Collection, Db } from "mongodb";
+import { isMediaList, nonblank, type MediaList } from "../../media.ts";
 import { effectiveVoice, type Session, type Mode, type Channel, type PassageSet, type MaterialSet, type DialogueTurn, type SessionDocument } from "./dialogue.ts";
 import * as refusal from "./refusals.ts";
 
-export type Material = string & { readonly __brand: "Material" };
-export type MaterialOrigin = "COURSE" | "REFERENCE";
-
-export interface MaterialData<Learner extends string = string, Scope extends string = string> {
-  owner: Learner;
-  scope: Scope;
-  title: string;
-  locator: string;
-  content: string;
-  originals: MediaList;
-  origin: MaterialOrigin;
-}
-
-export interface MaterialImport<Learner extends string = string, Scope extends string = string> extends MaterialData<Learner, Scope> {
-  importKey: string;
-}
-
-interface MaterialDocument<Learner extends string, Scope extends string> extends MaterialData<Learner, Scope> {
-  _id: Material;
-  // Materials written before retry support have no import key.
-  importKey?: string;
-}
-
-export class InvalidTutoringMaterial extends Error {
-  readonly code = "INVALID_TUTORING_MATERIAL";
-
-  constructor() {
-    super("Provide a title, source location, and readable material.");
-    this.name = "InvalidTutoringMaterial";
-  }
-}
-
-export class InvalidMaterialImportKey extends Error {
-  readonly code = "INVALID_MATERIAL_IMPORT_KEY";
-
-  constructor() {
-    super("Provide a nonblank import key.");
-    this.name = "InvalidMaterialImportKey";
-  }
-}
-
-export class MaterialImportConflict extends Error {
-  readonly code = "MATERIAL_IMPORT_CONFLICT";
-
-  constructor() {
-    super("Use the original material input for this import key.");
-    this.name = "MaterialImportConflict";
-  }
-}
-
-/** Material storage from GroundedTutoring. Lesson and practice methods follow in later steps. */
-export class GroundedTutoring<Learner extends string = string, Scope extends string = string, Topic extends string = string, Definition extends string = string> {
-  private readonly materials: Collection<MaterialDocument<Learner, Scope>>;
-  private readonly sessions: Collection<SessionDocument<Learner, Topic, Definition>>;
-  private indexes: Promise<unknown> | undefined;
+/**
+ * The GroundedTutoring concept: lessons and practice tasks that cite material identities, with their dialogue, hints,
+ * and transcript review. The materials themselves are kept elsewhere; this concept stores only their identities.
+ */
+export class GroundedTutoring<Learner extends string = string, Material extends string = string, Topic extends string = string, Definition extends string = string> {
+  private readonly sessions: Collection<SessionDocument<Learner, Material, Topic, Definition>>;
 
   constructor(database: Db, name = "GroundedTutoring", private readonly clock = () => new Date()) {
-    this.materials = database.collection(`${name.toLowerCase()}.materials`, {
-      readPreference: "primary", readConcern: { level: "majority" }, writeConcern: { w: "majority", j: true },
-    });
     this.sessions = database.collection(`${name.toLowerCase()}.sessions`);
   }
 
-  #ready() {
-    this.indexes ??= this.materials.createIndexes([
-      { key: { owner: 1, scope: 1, _id: 1 } },
-      { key: { owner: 1, importKey: 1 }, unique: true, partialFilterExpression: { importKey: { $type: "string" } } },
-    ]).catch((error: unknown) => {
-      this.indexes = undefined;
-      throw error;
-    });
-    return this.indexes;
-  }
-
-  async addMaterial(input: MaterialImport<Learner, Scope>): Promise<{ material: Material }> {
-    if (input === null || typeof input !== "object" || Array.isArray(input)) throw new InvalidTutoringMaterial();
-    const { owner, importKey, scope, title, locator, content, originals, origin } = input;
-    // The specification's refusal branch: invalid fields or no readable source.
-    if (!nonblank(owner) || !nonblank(scope) || !nonblank(title) || !nonblank(locator) ||
-      typeof content !== "string" || !isMediaList(originals) ||
-      (origin !== "COURSE" && origin !== "REFERENCE") ||
-      (!nonblank(content) && !originals.some((source) => source.renditions.length > 0))) {
-      throw new InvalidTutoringMaterial();
-    }
-    if (!nonblank(importKey)) throw new InvalidMaterialImportKey();
-
-    // Snapshot before waiting, so caller edits cannot change an already validated record.
-    const data = structuredClone({ owner, importKey, scope, title, locator, content, originals, origin });
-    await this.#ready();
-    const existing = await this.materials.findOne({ owner, importKey });
-    if (existing !== null) return this.#reuse(existing, data);
-
-    const material = crypto.randomUUID() as Material;
-    try {
-      // One write saves the material and its retry mapping. The unique index settles competing creates.
-      await this.materials.insertOne({ _id: material, ...data });
-    } catch (error) {
-      if (!(error instanceof MongoServerError) || error.code !== 11000) throw error;
-      const saved = await this.materials.findOne({ owner, importKey });
-      if (saved !== null) return this.#reuse(saved, data);
-      // An unrelated constraint failed. Do not turn a database fault into an import conflict.
-      throw error;
-    }
-    return { material };
-  }
-
-  #reuse(saved: MaterialDocument<Learner, Scope>, input: MaterialImport<Learner, Scope>): { material: Material } {
-    if (saved.scope !== input.scope || saved.title !== input.title || saved.locator !== input.locator ||
-      saved.content !== input.content || saved.origin !== input.origin || !isDeepStrictEqual(saved.originals, input.originals)) {
-      throw new MaterialImportConflict();
-    }
-    return { material: saved._id };
-  }
-
-  async _materials({ owner, scope }: { owner: Learner; scope: Scope }): Promise<{
-    material: Material; title: string; locator: string; origin: MaterialOrigin;
-  }[]> {
-    requireIdentity(owner);
-    requireIdentity(scope);
-    const rows = await this.materials.find({ owner, scope })
-      .project<Pick<MaterialDocument<Learner, Scope>, "_id" | "title" | "locator" | "origin">>({
-        _id: 1, title: 1, locator: 1, origin: 1,
-      })
-      .sort({ _id: 1 }).toArray();
-    return rows.map(({ _id, title, locator, origin }) => ({ material: _id, title, locator, origin }));
-  }
-
-  /** Internal lookup. The application must check ownership before returning this data to a browser. */
-  async _material({ material }: { material: Material }): Promise<MaterialData<Learner, Scope>[]> {
-    requireIdentity(material);
-    const found = await this.materials.findOne({ _id: material });
-    if (found === null) return [];
-    const { owner, scope, title, locator, content, originals, origin } = found;
-    return [{ owner, scope, title, locator, content, originals, origin }];
-  }
-
-  async explain(input: { owner: Learner; topic: Topic; definition: Definition; request: string; explanation: string; materials: MaterialSet; citations: PassageSet }): Promise<{ lesson: Session }> {
+  async explain(input: { owner: Learner; topic: Topic; definition: Definition; request: string; explanation: string; materials: MaterialSet<Material>; citations: PassageSet<Material> }): Promise<{ lesson: Session }> {
     const value = structuredClone(input);
     if (!nonblank(value.request) || !nonblank(value.explanation) || !nonblank(value.topic) || !nonblank(value.definition)) throw new refusal.InvalidLessonContent();
-    if (!await this.#validSources(value.owner, value.materials, value.citations)) throw new refusal.InvalidLessonSources();
+    if (!this.#validSources(value.owner, value.materials, value.citations)) throw new refusal.InvalidLessonSources();
     const lesson = timeOrderedId(this.clock()) as Session;
     await this.sessions.insertOne({ _id: lesson, ...value, materials: [...value.materials], citations: [...value.citations],
       kind: "LESSON", status: "OPEN", dialogue: [], checkedVoiceTurns: [], revision: 0 });
     return { lesson };
   }
 
-  async prepareTask(input: { owner: Learner; topic: Topic; definition: Definition; question: string; criteria: string; materials: MaterialSet; citations: PassageSet; mode: Mode; fresh: boolean }): Promise<{ task: Session }> {
+  async prepareTask(input: { owner: Learner; topic: Topic; definition: Definition; question: string; criteria: string; materials: MaterialSet<Material>; citations: PassageSet<Material>; mode: Mode; fresh: boolean }): Promise<{ task: Session }> {
     const value = structuredClone(input);
     if (!nonblank(value.question) || !nonblank(value.criteria) || !["GUIDED", "CHECK"].includes(value.mode) || typeof value.fresh !== "boolean") throw new refusal.InvalidTaskContent();
-    if (!await this.#validSources(value.owner, value.materials, value.citations)) throw new refusal.InvalidTaskSources();
+    if (!this.#validSources(value.owner, value.materials, value.citations)) throw new refusal.InvalidTaskSources();
     const task = timeOrderedId(this.clock()) as Session;
     await this.sessions.insertOne({ _id: task, ...value, materials: [...value.materials], citations: [...value.citations],
       kind: "PRACTICE", status: "OPEN", hintRequested: false, dialogue: [], checkedVoiceTurns: [], revision: 0 });
@@ -169,11 +43,11 @@ export class GroundedTutoring<Learner extends string = string, Scope extends str
     });
   }
 
-  async answerLesson(input: { owner: Learner; lesson: Session; text: string; citations: PassageSet; channel: Channel }): Promise<Record<string, never>> {
+  async answerLesson(input: { owner: Learner; lesson: Session; text: string; citations: PassageSet<Material>; channel: Channel }): Promise<Record<string, never>> {
     const value = structuredClone(input);
     const record = await this.sessions.findOne({ _id: value.lesson, owner: value.owner, kind: "LESSON", status: "OPEN" });
     if (!record) throw new refusal.LessonAnswerUnavailable();
-    if (!nonblank(value.text) || !["TEXT", "VOICE"].includes(value.channel) || !await this.#validSources(value.owner, record.materials, value.citations)) throw new refusal.InvalidLessonAnswer();
+    if (!nonblank(value.text) || !["TEXT", "VOICE"].includes(value.channel) || !this.#validSources(value.owner, record.materials, value.citations)) throw new refusal.InvalidLessonAnswer();
     return this.#edit(value.owner, value.lesson, "LESSON", refusal.LessonAnswerUnavailable, (current) => {
       current.dialogue.push({ speaker: "TUTOR", purpose: "EXPLANATION", text: value.text, media: [], channel: value.channel, citations: value.citations, at: this.clock() });
     });
@@ -262,11 +136,6 @@ export class GroundedTutoring<Learner extends string = string, Scope extends str
       record.dialogue.some((turn) => turn.speaker === "LEARNER" && turn.purpose === "RESPONSE") }];
   }
 
-  async _sourceSet({ owner, scope }: { owner: Learner; scope: Scope }) {
-    return { sources: (await this.materials.find({ owner, scope }).sort({ _id: 1 }).toArray())
-      .map(({ _id, importKey: _, ...data }) => ({ material: _id, data })) };
-  }
-
   async _study({ owner, topic }: { owner: Learner; topic: Topic }) {
     const records = await this.sessions.find({ owner, topic }).sort({ _id: 1 }).toArray();
     // Session identities are time-ordered, so identity order is the order sessions were started. Sessions saved before
@@ -280,7 +149,7 @@ export class GroundedTutoring<Learner extends string = string, Scope extends str
     return record ? [{ data: this.#sessionData(record) }] : [];
   }
 
-  #sessionData(record: SessionDocument<Learner, Topic, Definition>) {
+  #sessionData(record: SessionDocument<Learner, Material, Topic, Definition>) {
     const voice = effectiveVoice(record);
     return { session: record._id, owner: record.owner, topic: record.topic, definition: record.definition, status: record.status,
       materials: record.materials, citations: record.citations,
@@ -291,20 +160,19 @@ export class GroundedTutoring<Learner extends string = string, Scope extends str
         ready: record.status === "OPEN" && voice.every((turn) => turn.confirmed) && record.dialogue.some((turn) => turn.speaker === "LEARNER" && turn.purpose === "RESPONSE") } : null };
   }
 
-  async #validSources(owner: Learner, materials: MaterialSet, citations: PassageSet): Promise<boolean> {
-    if (!nonblank(owner) || !Array.isArray(materials) || !materials.length || !materials.every(nonblank) || new Set(materials).size !== materials.length ||
-      !Array.isArray(citations) || !citations.length || !citations.every((item) => item && nonblank(item.material) && nonblank(item.location)) ||
-      new Set(citations.map((item) => JSON.stringify(item))).size !== citations.length) return false;
-    const sources = await this.materials.find({ _id: { $in: [...materials] as Material[] }, owner }).toArray();
-    if (sources.length !== materials.length || new Set(sources.map((source) => source.scope)).size !== 1) return false;
-    return citations.every((citation) => {
-      const source = sources.find((item) => item._id === citation.material);
-      return source && ((citation.location === "content" && nonblank(source.content)) || source.originals.some((file) => file.renditions.some((part) => part.location === citation.location)));
-    });
+  /**
+   * The source rule that this concept can check alone. Ownership of the materials, their belonging to one scope,
+   * and whether each citation's location exists in its material are checked before the values reach this concept.
+   */
+  #validSources(owner: Learner, materials: MaterialSet<Material>, citations: PassageSet<Material>): boolean {
+    return nonblank(owner) && Array.isArray(materials) && materials.length > 0 && materials.every(nonblank) && new Set(materials).size === materials.length &&
+      Array.isArray(citations) && citations.length > 0 &&
+      citations.every((item) => item && nonblank(item.material) && nonblank(item.location) && materials.includes(item.material)) &&
+      new Set(citations.map((item) => JSON.stringify(item))).size === citations.length;
   }
 
   async #edit(owner: Learner, session: Session, kind: "LESSON" | "PRACTICE" | undefined, Unavailable: new () => Error,
-    change: (record: SessionDocument<Learner, Topic, Definition>) => void): Promise<Record<string, never>> {
+    change: (record: SessionDocument<Learner, Material, Topic, Definition>) => void): Promise<Record<string, never>> {
     requireIdentity(owner); requireIdentity(session);
     for (let attempt = 0; attempt < 8; attempt++) {
       const record = await this.sessions.findOne({ _id: session, owner, status: "OPEN", ...(kind ? { kind } : {}) });

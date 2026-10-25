@@ -1,4 +1,8 @@
-/** Prepared source values. The host verifies the referenced bytes before supplying them. */
+/**
+ * Prepared source values. The host verifies the referenced bytes before supplying them.
+ * This module describes a value rather than a concept: MaterialKeeping and GroundedTutoring both validate it,
+ * and the host and the import store build it, so it lives beside them instead of inside either concept.
+ */
 export type MediaRendition = {
   readonly kind: "TEXT";
   readonly location: string;

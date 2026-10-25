@@ -24,11 +24,15 @@ instantiate Sessioning with
 
 instantiate SkillMapping with
   User is Registering.User
-  Material is GroundedTutoring.Material
+  Material is Library.Material
+
+instantiate MaterialKeeping as Library with
+  Owner is Registering.User
+  Scope is SkillMapping.Course
 
 instantiate GroundedTutoring with
   Learner is Registering.User
-  Scope is SkillMapping.Course
+  Material is Library.Material
   Topic is SkillMapping.Skill
   Definition is SkillMapping.Version
 
@@ -119,7 +123,7 @@ CourseList, Materials, Units, and Skills explicitly order their answers by cours
 The [suggestion flow](reaction:Learning.Suggest) suggests skills from an owned readable material by asking the AI tutor, Google Gemini. Suggestions remain editable in the browser. [ProposeSkill](reaction:Courses.ProposeSkill) saves an accepted suggestion as a draft after joining the unit and material to the same learner and course. [EditDraft](reaction:Courses.EditDraft) applies learner changes after the same source check. [ConfirmSkill](reaction:Courses.ConfirmSkill) makes a draft active; the declared source view rechecks every saved source under the learner lock. [UnavailableSkillMaterial](view:Courses.UnavailableSkillMaterial) rejects a source outside the owner and course. A confirmation assigns no mastery score. [singleMaterial](computation:singleMaterial) builds the selected source set.
 
 ```computations
-singleMaterial(material: GroundedTutoring.Material) : SkillMapping.MaterialSet
+singleMaterial(material: Library.Material) : SkillMapping.MaterialSet
   Produces the one-element source set for the learner's selected import. One imported material can contain several files.
 
 evidenceAttribution(origin: AssessmentReviewing.Origin, rationale: String) : String

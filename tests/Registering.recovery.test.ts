@@ -2,6 +2,7 @@ import { StudyPlanning } from "../src/concepts/StudyPlanning/StudyPlanning.ts";
 import { MasteryEstimating } from "../src/concepts/MasteryEstimating/MasteryEstimating.ts";
 import { AssessmentReviewing } from "../src/concepts/AssessmentReviewing/AssessmentReviewing.ts";
 import { GroundedTutoring } from "../src/concepts/GroundedTutoring/GroundedTutoring.ts";
+import { MaterialKeeping } from "../src/concepts/MaterialKeeping/MaterialKeeping.ts";
 import { afterAll, beforeAll, describe, expect, spyOn, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import { Collection, type Document, type Filter } from "mongodb";
@@ -299,6 +300,7 @@ describe("Registering recovery", () => {
       AssessmentReviewing: new AssessmentReviewing(connection!.db),
       MasteryEstimating: new MasteryEstimating(connection!.db),
       StudyPlanning: new StudyPlanning(connection!.db),
+      Library: new MaterialKeeping(connection!.db, name),
       GroundedTutoring: new GroundedTutoring(connection!.db, name),
     });
     try {

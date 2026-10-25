@@ -1,7 +1,7 @@
 import type { SkillRows, TutorAnswer, TutorRequest } from "../learning-data.ts";
 import type { SourceContext } from "../tutor-types.ts";
-import type { Material } from "../concepts/GroundedTutoring/GroundedTutoring.ts";
-import type { MediaList } from "../concepts/GroundedTutoring/media.ts";
+import type { Material } from "../concepts/MaterialKeeping/MaterialKeeping.ts";
+import type { MediaList } from "../media.ts";
 import type { Help, JsonValue, Result, ResponseValue } from "../concepts/AssessmentReviewing/AssessmentReviewing.ts";
 import { taskCriteria } from "./learning.ts";
 

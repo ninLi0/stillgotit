@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import { DEFAULT_MODEL, FALLBACK_OUTPUT_LIMIT, FilesApiError, Gemini, GeminiError, objectSchema } from "../src/host/gemini.ts";
 import { fakeGemini, googleError as filesError } from "./fixtures/fake-gemini.ts";
 import { CourseTutor } from "../src/host/tutor.ts";
-import type { Material, MaterialData } from "../src/concepts/GroundedTutoring/GroundedTutoring.ts";
+import type { Material, MaterialData } from "../src/concepts/MaterialKeeping/MaterialKeeping.ts";
 
 const KEY = "test-key-not-real";
 const schema = objectSchema({ answer: { type: "string" } });

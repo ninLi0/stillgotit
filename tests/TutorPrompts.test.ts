@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { AnswerNotGrounded, TutorFailures, tutorGenerator } from "../src/host/tutor-generation.ts";
 import { CourseTutor, objectSchema, SUBMITTED_WORK } from "../src/host/tutor.ts";
-import type { Material } from "../src/concepts/GroundedTutoring/GroundedTutoring.ts";
-import type { MediaValue } from "../src/concepts/GroundedTutoring/media.ts";
+import type { Material } from "../src/concepts/MaterialKeeping/MaterialKeeping.ts";
+import type { MediaValue } from "../src/media.ts";
 import type { TutorRequest } from "../src/learning-data.ts";
 
 const material = "notes" as Material;

@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, spyOn, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { Collection, type Document, type Filter } from "mongodb";
-import { GroundedTutoring, type Material, type MaterialData, type MaterialImport } from "../src/concepts/GroundedTutoring/GroundedTutoring.ts";
+import { MaterialKeeping, type Material, type MaterialData, type MaterialImport } from "../src/concepts/MaterialKeeping/MaterialKeeping.ts";
 import { connectMongo, localMongoUri } from "../src/storage/mongo.ts";
 
 const database = `stillgotit_test_${randomUUID().replaceAll("-", "")}`;
@@ -17,10 +17,10 @@ afterAll(async () => {
 });
 
 function setup() {
-  const name = `GroundedTutoring_${randomUUID()}`;
+  const name = `MaterialKeeping_${randomUUID()}`;
   return {
     name,
-    tutoring: new GroundedTutoring(connection!.db, name),
+    library: new MaterialKeeping(connection!.db, name),
     records: connection!.db.collection<MaterialData & { _id: Material; importKey?: string }>(`${name.toLowerCase()}.materials`),
   };
 }
@@ -44,7 +44,7 @@ function request(overrides: Partial<MaterialImport> = {}): MaterialImport {
 // Hold both real reads after they see an unused key. The database must settle the competing inserts.
 async function race(fixture: ReturnType<typeof setup>, inputs: [MaterialImport, MaterialImport]) {
   const other = await connectMongo({ uri, database });
-  const second = new GroundedTutoring(other.db, fixture.name);
+  const second = new MaterialKeeping(other.db, fixture.name);
   const original = Collection.prototype.findOne;
   const ready = Promise.withResolvers<void>();
   const timeout = setTimeout(() => ready.reject(new Error("Both import reads must arrive.")), 5_000);
@@ -64,7 +64,7 @@ async function race(fixture: ReturnType<typeof setup>, inputs: [MaterialImport, 
   );
   try {
     const outcomes = await Promise.allSettled([
-      fixture.tutoring.addMaterial(inputs[0]), second.addMaterial(inputs[1]),
+      fixture.library.add(inputs[0]), second.add(inputs[1]),
     ]);
     expect(reads).toBe(2);
     return outcomes;
@@ -88,38 +88,38 @@ async function retryInNewProcess(name: string, input: MaterialImport) {
   return JSON.parse(output);
 }
 
-describe("GroundedTutoring import retries", () => {
+describe("MaterialKeeping import retries", () => {
   test("matching retries return the same material without changing its record", async () => {
-    const { tutoring, records } = setup();
+    const { library, records } = setup();
     const input = request();
-    const saved = await tutoring.addMaterial(input);
+    const saved = await library.add(input);
     const before = await records.find().toArray();
-    expect(await tutoring.addMaterial(structuredClone(input))).toEqual(saved);
-    expect(await tutoring.addMaterial(input)).toEqual(saved);
+    expect(await library.add(structuredClone(input))).toEqual(saved);
+    expect(await library.add(input)).toEqual(saved);
     expect(await records.find().toArray()).toEqual(before);
     expect(before).toEqual([{ _id: saved.material, ...input }]);
     const { importKey: _, ...material } = input;
-    expect(await tutoring._material(saved)).toEqual([material]);
-    expect(await tutoring._materials(input)).toEqual([{
+    expect(await library._material(saved)).toEqual([material]);
+    expect(await library._materials(input)).toEqual([{
       ...saved, title: input.title, locator: input.locator, origin: input.origin,
     }]);
   });
 
   test("blank and malformed import keys are refused before storage work", async () => {
-    const { tutoring, records } = setup();
+    const { library, records } = setup();
     for (const importKey of [undefined, null, "", " \n", "\u00a0", 17, { $ne: "" }, ["key"]]) {
-      await expect(tutoring.addMaterial(request({ importKey: importKey as string }))).rejects.toMatchObject({
+      await expect(library.add(request({ importKey: importKey as string }))).rejects.toMatchObject({
         code: "INVALID_MATERIAL_IMPORT_KEY", message: "Provide a nonblank import key.",
       });
     }
     expect(await connection!.db.listCollections({ name: records.collectionName }).toArray()).toEqual([]);
-    expect(await tutoring.addMaterial(request())).toHaveProperty("material");
+    expect(await library.add(request())).toHaveProperty("material");
   });
 
   test("changed fields and nested media refuse the used key and preserve all saved data", async () => {
-    const { tutoring, records } = setup();
+    const { library, records } = setup();
     const input = request();
-    const saved = await tutoring.addMaterial(input);
+    const saved = await library.add(input);
     const before = await records.find().toArray();
     const changes: Partial<MaterialImport>[] = [
       { scope: "course-physics" }, { title: "Different title" }, { locator: "source:other" },
@@ -135,20 +135,20 @@ describe("GroundedTutoring import retries", () => {
       { renditions: [{ kind: "IMAGE" as const, location: "lesson/page/2", file: "other-page", mediaType: "image/png" as const }] },
     ]) changes.push({ originals: [{ ...source, ...change }] });
     for (const change of changes) {
-      await expect(tutoring.addMaterial({ ...input, ...change })).rejects.toMatchObject({
+      await expect(library.add({ ...input, ...change })).rejects.toMatchObject({
         code: "MATERIAL_IMPORT_CONFLICT", message: "Use the original material input for this import key.",
       });
       expect(await records.find().toArray()).toEqual(before);
     }
-    expect(await tutoring.addMaterial(input)).toEqual(saved);
+    expect(await library.add(input)).toEqual(saved);
   });
 
   test("equivalent records can change field order, but list order is significant", async () => {
-    const { tutoring } = setup();
+    const { library } = setup();
     const first = request().originals[0]!;
     const second = { ...first, file: "other-original", limitations: ["First gap.", "Second gap."] };
     const input = request({ originals: [first, second] });
-    const saved = await tutoring.addMaterial(input);
+    const saved = await library.add(input);
     const reordered = input.originals.map(({ file, name, mediaType, renditions, limitations }) => ({
       limitations,
       renditions: renditions.map((item) => item.kind === "TEXT"
@@ -157,22 +157,22 @@ describe("GroundedTutoring import retries", () => {
         : { mediaType: item.mediaType, file: item.file, location: item.location, kind: item.kind }),
       mediaType, name, file,
     }));
-    expect(await tutoring.addMaterial({ ...input, originals: reordered })).toEqual(saved);
-    await expect(tutoring.addMaterial({ ...input, originals: [second, first] })).rejects.toMatchObject({ code: "MATERIAL_IMPORT_CONFLICT" });
-    await expect(tutoring.addMaterial({ ...input, originals: [first, { ...second, limitations: [...second.limitations].reverse() }] }))
+    expect(await library.add({ ...input, originals: reordered })).toEqual(saved);
+    await expect(library.add({ ...input, originals: [second, first] })).rejects.toMatchObject({ code: "MATERIAL_IMPORT_CONFLICT" });
+    await expect(library.add({ ...input, originals: [first, { ...second, limitations: [...second.limitations].reverse() }] }))
       .rejects.toMatchObject({ code: "MATERIAL_IMPORT_CONFLICT" });
   });
 
   test("keys are exact and scoped to the learner; new keys create independent materials", async () => {
-    const { tutoring, records } = setup();
+    const { library, records } = setup();
     const input = request();
     const inputs = [input, { ...input, importKey: input.importKey.toUpperCase() },
       { ...input, importKey: ` ${input.importKey} ` }, { ...input, owner: "learner-leo" },
       { ...input, importKey: "revised-lesson", content: "A revised explanation." }];
-    const results = await Promise.all(inputs.map((item) => tutoring.addMaterial(item)));
+    const results = await Promise.all(inputs.map((item) => library.add(item)));
     expect(new Set(results.map(({ material }) => material)).size).toBe(inputs.length);
     for (let index = 0; index < inputs.length; index++) {
-      expect(await tutoring.addMaterial(inputs[index]!)).toEqual(results[index]);
+      expect(await library.add(inputs[index]!)).toEqual(results[index]);
     }
     expect(await records.countDocuments()).toBe(inputs.length);
   });
@@ -202,7 +202,7 @@ describe("GroundedTutoring import retries", () => {
     const winnerIndex = outcomes.findIndex((outcome) => outcome.status === "fulfilled");
     const saved = winners[0]!.value;
     expect(await fixture.records.find().toArray()).toEqual([{ _id: saved.material, ...inputs[winnerIndex]! }]);
-    expect(await fixture.tutoring.addMaterial(inputs[winnerIndex]!)).toEqual(saved);
+    expect(await fixture.library.add(inputs[winnerIndex]!)).toEqual(saved);
   });
 
   test("a committed save with a lost reply is recovered by a fresh process", async () => {
@@ -223,7 +223,7 @@ describe("GroundedTutoring import retries", () => {
       },
     );
     try {
-      await expect(new GroundedTutoring(writer.db, name).addMaterial(input)).rejects.toBe(lostReply);
+      await expect(new MaterialKeeping(writer.db, name).add(input)).rejects.toBe(lostReply);
       expect(intercepted).toBe(true);
     } finally {
       insert.mockRestore();
@@ -240,45 +240,45 @@ describe("GroundedTutoring import retries", () => {
     const writer = await connectMongo({ uri, database });
     const input = request();
     let saved: { material: Material };
-    try { saved = await new GroundedTutoring(writer.db, name).addMaterial(input); }
+    try { saved = await new MaterialKeeping(writer.db, name).add(input); }
     finally { await writer.client.close(); }
     expect(await retryInNewProcess(name, input)).toEqual(saved);
     expect(await records.find().toArray()).toEqual([{ _id: saved.material, ...input }]);
   });
 
   test("a rejected save reserves no key and the same request can succeed later", async () => {
-    const { tutoring, records } = setup();
+    const { library, records } = setup();
     const input = request();
     await connection!.db.createCollection(records.collectionName, { validator: { title: { $ne: input.title } } });
-    await expect(tutoring.addMaterial(input)).rejects.toMatchObject({ code: 121 });
+    await expect(library.add(input)).rejects.toMatchObject({ code: 121 });
     expect(await records.countDocuments()).toBe(0);
     await connection!.db.command({ collMod: records.collectionName, validator: {} });
-    const saved = await tutoring.addMaterial(input);
-    expect(await tutoring.addMaterial(input)).toEqual(saved);
+    const saved = await library.add(input);
+    expect(await library.add(input)).toEqual(saved);
     expect(await records.find().toArray()).toEqual([{ _id: saved.material, ...input }]);
   });
 
   test("an unrelated unique-index failure remains a database error", async () => {
-    const { tutoring, records } = setup();
+    const { library, records } = setup();
     await records.createIndex({ testConstraint: 1 }, { unique: true });
     const input = request();
-    const saved = await tutoring.addMaterial(input);
-    await expect(tutoring.addMaterial({ ...input, importKey: "another-import" })).rejects.toMatchObject({
+    const saved = await library.add(input);
+    await expect(library.add({ ...input, importKey: "another-import" })).rejects.toMatchObject({
       code: 11000, keyPattern: { testConstraint: 1 },
     });
     expect(await records.find().toArray()).toEqual([{ _id: saved.material, ...input }]);
   });
 
   test("older materials stay readable and cannot be claimed by matching their content", async () => {
-    const { tutoring, records } = setup();
+    const { library, records } = setup();
     const { importKey: _, ...data } = request();
     const old = [{ _id: randomUUID() as Material, ...data }, { _id: randomUUID() as Material, ...data }];
     await records.insertMany(old);
     const input = request();
-    const saved = await tutoring.addMaterial(input);
+    const saved = await library.add(input);
     expect(old.some(({ _id }) => _id === saved.material)).toBe(false);
-    for (const { _id } of old) expect(await tutoring._material({ material: _id })).toEqual([data]);
-    expect(await tutoring.addMaterial(input)).toEqual(saved);
+    for (const { _id } of old) expect(await library._material({ material: _id })).toEqual([data]);
+    expect(await library.add(input)).toEqual(saved);
     expect(await records.countDocuments()).toBe(3);
     expect(await records.find({ importKey: { $exists: false } }).toArray()).toEqual(old);
   });
