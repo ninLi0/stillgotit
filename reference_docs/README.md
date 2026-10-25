@@ -24,9 +24,16 @@
 7. [Rubric for testing and validating software](Rubrics/07-testing-validating.md) · [Source](https://61040.github.io/fa26/rubrics/testing-validating/)
 8. [Rubric for interaction design](Rubrics/08-interaction-design.md) · [Source](https://61040.github.io/fa26/rubrics/interaction-design/)
 9. [Rubric for visual design](Rubrics/09-visual-design.md) · [Source](https://61040.github.io/fa26/rubrics/visual-design/)
+10. [Rubric for professionalism](Rubrics/10-professionalism.md) · [Source](https://61040.github.io/fa26/rubrics/professionalism/)
 
 ## Project directions
 
 1. [P1: Design](Project%20directions/P1.md) · [Source](https://61040.github.io/fa26/assignments/p1/)
 2. [P2: Alpha (MVP)](Project%20directions/P2.md) · [Source](https://61040.github.io/fa26/assignments/p2/)
 3. [P3: Beta (complete functionality)](Project%20directions/P3.md) · [Source](https://61040.github.io/fa26/assignments/p3/)
+4. [P4: Code complete](Project%20directions/P4.md) · [Source](https://61040.github.io/fa26/assignments/p4/)
+5. [P5: User testing](Project%20directions/P5.md) · [Source](https://61040.github.io/fa26/assignments/p5/) (the page had only the milestone table when it was downloaded)
+
+## Course
+
+1. [Schedule](schedule.md) · [Source](https://61040.github.io/fa26/schedule/)
