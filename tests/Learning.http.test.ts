@@ -149,8 +149,8 @@ test("skill draft saves recover lost replies through HTTP and preserve later edi
   expect((await learner.ok("/courses/read", { course })).skills).toHaveLength(1);
   expect(await Promise.all(Array.from({ length: 4 }, () => learner.ok("/courses/skills/propose", input))))
     .toEqual(Array.from({ length: 4 }, () => recovered));
-  const conflict = await learner.post("/courses/skills/propose", { ...input, gate: "Changed requirements" });
-  expect(conflict.status).toBe(409); expect(conflict.body.error).toBe("CONFLICT");
+  // A used key returns the skill it created, even when the content differs.
+  expect(await learner.ok("/courses/skills/propose", { ...input, gate: "Changed requirements" })).toEqual(recovered);
   expect((await other.post("/courses/skills/propose", input)).status).toBe(403);
   const { proposalKey: _key, ...withoutKey } = input;
   expect((await learner.post("/courses/skills/propose", withoutKey)).status).toBe(400);

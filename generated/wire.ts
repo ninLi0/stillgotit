@@ -274,7 +274,7 @@ export type StillGotItWire = {
     output: {
       "skill": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["propose"]>>, ["skill"]>>;
     };
-    error: { error: AppWideError | "COURSE_UNAVAILABLE" | "GRADED_MATERIAL_NOT_SOURCE" | "INVALID_INPUT" | "INVALID_SKILL_PROPOSAL" | "INVALID_SKILL_PROPOSAL_KEY" | "MATERIAL_UNAVAILABLE" | "NOT_SIGNED_IN" | "PROPOSAL_UNIT_UNAVAILABLE" | "SKILL_PROPOSAL_CONFLICT" | "SKILL_PROPOSAL_DISCARDED" };
+    error: { error: AppWideError | "COURSE_UNAVAILABLE" | "GRADED_MATERIAL_NOT_SOURCE" | "INVALID_INPUT" | "INVALID_SKILL_PROPOSAL" | "INVALID_SKILL_PROPOSAL_KEY" | "MATERIAL_UNAVAILABLE" | "NOT_SIGNED_IN" | "PROPOSAL_UNIT_UNAVAILABLE" };
   };
   "/courses/skills/restore": {
     input: {
@@ -1074,7 +1074,7 @@ export type StillGotItHttp = {
     output: {
       "skill": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["propose"]>>, ["skill"]>>;
     };
-    error: { error: HttpAppWideError | "CONFLICT" | "FORBIDDEN" | "INVALID_REQUEST" | "UNAUTHORIZED" };
+    error: { error: HttpAppWideError | "FORBIDDEN" | "INVALID_REQUEST" | "UNAUTHORIZED" };
   };
   "/courses/skills/restore": {
     input: {

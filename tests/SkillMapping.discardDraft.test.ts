@@ -6,7 +6,6 @@ import {
   createSkillMapping,
   DraftDiscardUnavailableError,
   DraftRevisionUnavailableError,
-  SkillProposalDiscardedError,
   type SkillMapping,
 } from "../src/concepts/SkillMapping.ts";
 import { connectMongo, localMongoUri } from "../src/storage/mongo.ts";
@@ -141,7 +140,7 @@ describe("SkillMapping draft discard", () => {
     expect(await savedState()).toEqual(before);
   });
 
-  test("a failed version removal still hides the draft and its versions, and replay cannot recreate it", async () => {
+  test("a failed version removal still hides the draft and its versions, and a replayed save creates a new draft", async () => {
     const instanceName = "DiscardFailure";
     const concept = await createSkillMapping(connection!.db, instanceName);
     const owner = randomUUID();
@@ -176,11 +175,18 @@ describe("SkillMapping draft discard", () => {
       expect(await concept._version({ version })).toEqual([]);
     }
     expect(await concept._versions({ skill })).toEqual([]);
-    // The draft is already gone, so a retry is refused, and the kept receipt
-    // still stops a replay of the original save from recreating it.
+    // The draft is already gone, so a retry of the discard is refused.
     await expect(concept.discardDraft({ owner, skill })).rejects.toBeInstanceOf(DraftDiscardUnavailableError);
-    await expect(concept.propose(proposal)).rejects.toBeInstanceOf(SkillProposalDiscardedError);
-    expect(await concept._skills({ unit })).toEqual([]);
+    // The proposal key was removed with the skill, so replaying the original
+    // save creates a new draft. The versions that the failed removal left
+    // behind still name the removed skill, so they stay hidden.
+    const replayed = await concept.propose(proposal);
+    expect(replayed.skill).not.toBe(skill);
+    expect((await concept._skills({ unit })).map((row) => row.skill)).toEqual([replayed.skill]);
+    expect(await concept._versions({ skill })).toEqual([]);
+    for (const version of [first, latest]) {
+      expect(await concept._version({ version })).toEqual([]);
+    }
   });
 
   test("two concurrent discards produce one success and one refusal", async () => {
