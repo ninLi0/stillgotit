@@ -459,7 +459,7 @@ Concrete types:
 - `planDetail(schedule: StudyPlanning.ScheduleValue) : PlanDetail` — [Learning computations](../design/compositions/LearningComputations.md), line 48.
 - `planRequest(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows, schedule: StudyPlanning.ScheduleValue) : ReviewProposal` — [Learning computations](../design/compositions/LearningComputations.md), line 51.
 - `prerequisiteSet(prerequisites: SkillList) : SkillMapping.SkillSet` — [Courses, materials, and skills](../design/compositions/Courses.md), line 55.
-- `prerequisiteToPractice(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows, skill: SkillMapping.Skill) : PrerequisiteChoice` — [Request admission](../design/compositions/LearningAccess.md), line 33.
+- `prerequisiteToPractice(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows, skill: SkillMapping.Skill) : PrerequisiteChoice` — [Request admission](../design/compositions/LearningAccess.md), line 49.
 - `prerequisitesReady(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows, skill: SkillMapping.Skill) : Flag` — [Learning computations](../design/compositions/LearningComputations.md), line 56.
 - `progressRows(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows) : SkillProgress` — [Learning computations](../design/compositions/LearningComputations.md), line 59.
 - `requestChoice(request: TutorRequest) : TutorChoice` — [Settings](../design/compositions/Settings.md), line 86.
@@ -557,7 +557,7 @@ Authored path: `Reads.OpenSession`.
 
 Authored path: `Reads.CanReplan`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 49.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 23.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 25.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 31.
 - Covered by [Progress reactions](../design/compositions/Progress.md), line 35.
@@ -581,6 +581,19 @@ Authored path: `Reads.ActiveSkill`.
   where view "(owner) owns study skill (skill)" with (owner, skill) has (course, definition, status: "CONFIRMED")
 ```
 
+### (owner) can use open session (studySession) with its sources
+
+Authored path: `Reads.SessionSources`.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 5.
+
+```view
+(owner) can use open session (studySession) with its sources — inputs (owner, studySession); outputs (course, data, sources); bindings () — answers at most one (course, data, sources)
+  where
+    view "(owner) can change session (studySession)" with (owner, studySession) has (course)
+    GroundedTutoring._sessionData (session: studySession) has (data)
+    Library._sourceSet (owner, scope: course) has (sources)
+```
+
 ### (owner) has an activity in progress
 
 Authored path: `Planning.ActivityInProgress`.
@@ -594,6 +607,22 @@ Authored path: `Planning.ActivityInProgress`.
   where
     SkillMapping._courses (owner) has (course)
     StudyPlanning._next (owner, scope: course) has (status: "IN_PROGRESS")
+```
+
+### (owner) has an ungraded attempt in (studySession)
+
+Authored path: `Reads.PendingGrade`.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 5.
+
+```view
+(owner) has an ungraded attempt in (studySession) — inputs (owner, studySession); outputs (course, assessment, data, sessionData, sources); bindings () — answers at most one (course, assessment, data, sessionData, sources)
+  where
+    view "(owner) owns study session (studySession)" with (owner, studySession) has (course)
+    AssessmentReviewing._byTask (author: owner, task: studySession) has (case: assessment)
+    no AssessmentReviewing._effectiveJudgment (case: assessment)
+    AssessmentReviewing._caseData (case: assessment) has (data)
+    GroundedTutoring._sessionData (session: studySession) has (data: sessionData)
+    Library._sourceSet (owner, scope: course) has (sources)
 ```
 
 ### (owner) imported graded work (material)
@@ -699,7 +728,7 @@ Authored path: `Courses.UnavailableSkillMaterial`.
 ### assessment (assessment) needs evidence for (owner)
 
 Authored path: `Reads.NeedsEvidence`.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 23.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 25.
 - Covered by [Progress reactions](../design/compositions/Progress.md), line 17.
 
 ```view
@@ -716,7 +745,7 @@ assessment (assessment) needs evidence for (owner) — inputs (owner, assessment
 
 Authored path: `Reads.PlanContext`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 49.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 23.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 25.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 11.
 - Covered by [Progress reactions](../design/compositions/Progress.md), line 35.
 
@@ -732,7 +761,7 @@ review inputs for (owner) in (course) — inputs (owner, course); outputs (candi
 ### the current context of (skill) for (owner)
 
 Authored path: `Reads.SkillContext`.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 5.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 7.
 
 ```view
 the current context of (skill) for (owner) — inputs (owner, skill); outputs (context, definition, skills, tracks, sources); bindings (course) — answers at most one (context, definition, skills, tracks, sources)
@@ -809,14 +838,13 @@ Authored path: `Access.QuestionReady`.
 - Covered by [Request admission](../design/compositions/LearningAccess.md), line 28.
 
 ```former
-Former "admit a question in (studySession)" — inputs (owner, studySession, text, channel, attachments, dialogueLength); bindings (course, data, sources); promises at most one record — forms:
+Former "admit a question in (studySession)" — inputs (owner, studySession, text, channel, attachments, dialogueLength); bindings (data, sources, currentDialogue); promises at most one record — forms:
   a record of
-    where view "(owner) can change session (studySession)" with (owner, studySession) has (course)
-    where GroundedTutoring._lesson (lesson: studySession)
-    where GroundedTutoring._sessionData (session: studySession) has (data)
-    where Library._sourceSet (owner, scope: course) has (sources)
-    where dialogueIsCurrent (data, dialogueLength)
+    where view "(owner) can use open session (studySession) with its sources" with (owner, studySession) has (data, sources)
+    where currentDialogue is dialogueIsCurrent (data, dialogueLength)
+    where currentDialogue is among [true]
     where (valid: true) is responseInput (attachments, channel, data, sources, text)
+    where GroundedTutoring._lesson (lesson: studySession)
     allowed: true
 ```
 
@@ -852,8 +880,7 @@ Authored path: `Access.ReplyReady`.
 ```former
 Former "admit a tutor reply in (studySession)" — inputs (owner, studySession); bindings (data); promises at most one record — forms:
   a record of
-    where view "(owner) can change session (studySession)" with (owner, studySession)
-    where GroundedTutoring._sessionData (session: studySession) has (data)
+    where view "(owner) can use open session (studySession) with its sources" with (owner, studySession) has (data)
     where hasLessonQuestion (data)
     allowed: true
 ```
@@ -917,12 +944,11 @@ Authored path: `Access.ResponseReady`.
 - Covered by [Request admission](../design/compositions/LearningAccess.md), line 13.
 
 ```former
-Former "admit learner work in (studySession)" — inputs (owner, studySession, text, channel, attachments, dialogueLength); bindings (course, data, sources); promises at most one record — forms:
+Former "admit learner work in (studySession)" — inputs (owner, studySession, text, channel, attachments, dialogueLength); bindings (data, sources, currentDialogue); promises at most one record — forms:
   a record of
-    where view "(owner) can change session (studySession)" with (owner, studySession) has (course)
-    where GroundedTutoring._sessionData (session: studySession) has (data)
-    where Library._sourceSet (owner, scope: course) has (sources)
-    where dialogueIsCurrent (data, dialogueLength)
+    where view "(owner) can use open session (studySession) with its sources" with (owner, studySession) has (data, sources)
+    where currentDialogue is dialogueIsCurrent (data, dialogueLength)
+    where currentDialogue is among [true]
     where (valid: true) is responseInput (attachments, channel, data, sources, text)
     allowed: true
 ```
@@ -931,7 +957,7 @@ Former "admit learner work in (studySession)" — inputs (owner, studySession, t
 
 Authored path: `Access.TaskReady`.
 - Covered by [Request admission](../design/compositions/LearningAccess.md), line 12.
-- Covered by [Request admission](../design/compositions/LearningAccess.md), line 30.
+- Covered by [Request admission](../design/compositions/LearningAccess.md), line 46.
 
 ```former
 Former "admit practice for (owner) and (skill)" — inputs (owner, skill); bindings (definition, skills, tracks, context, sources, materials); promises at most one record — forms:
@@ -977,11 +1003,9 @@ Authored path: `Access.RetryReady`.
 - Covered by [Request admission](../design/compositions/LearningAccess.md), line 18.
 
 ```former
-Former "admit retry of (studySession)" — inputs (owner, studySession); bindings (assessment); promises at most one record — forms:
+Former "admit retry of (studySession)" — inputs (owner, studySession); bindings (); promises at most one record — forms:
   a record of
-    where view "(owner) owns study session (studySession)" with (owner, studySession)
-    where AssessmentReviewing._byTask (author: owner, task: studySession) has (case: assessment)
-    where no AssessmentReviewing._effectiveJudgment (case: assessment)
+    where view "(owner) has an ungraded attempt in (studySession)" with (owner, studySession)
     allowed: true
 ```
 
@@ -1042,7 +1066,7 @@ Former "admit suggestions from (material)" — inputs (owner, material); binding
 ### saved study session (studySession)
 
 Authored path: `Reads.SessionData`.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 7.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 9.
 
 ```former
 Former "saved study session (studySession)" — inputs (studySession); bindings (data); promises exactly one record — forms:
@@ -1054,7 +1078,7 @@ Former "saved study session (studySession)" — inputs (studySession); bindings 
 ### skill estimates for (owner) in (course)
 
 Authored path: `Reads.Progress`.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 7.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 9.
 
 ```former
 Former "skill estimates for (owner) in (course)" — inputs (owner, course); bindings (skills, tracks, estimates); promises exactly one record — forms:
@@ -1069,7 +1093,7 @@ Former "skill estimates for (owner) in (course)" — inputs (owner, course); bin
 
 Authored path: `Reads.SkillData`.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 46.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 7.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 9.
 
 ```former
 Former "study data for (owner) and (skill) at (at)" — inputs (owner, skill, at); bindings (context, definition, tracks, sessions, cases, track, estimate, explanation, timeline); promises exactly one record — forms:
@@ -1091,7 +1115,7 @@ Former "study data for (owner) and (skill) at (at)" — inputs (owner, skill, at
 ### study plan for (owner) in (course)
 
 Authored path: `Reads.PlanData`.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 7.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 9.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 7.
 
 ```former
@@ -1215,7 +1239,7 @@ Former "the prerequisite links in (course)" — inputs (course); bindings (unit,
 ### the prerequisite to work on before practicing (skill) for (owner)
 
 Authored path: `Access.PracticePrerequisite`.
-- Covered by [Request admission](../design/compositions/LearningAccess.md), line 30.
+- Covered by [Request admission](../design/compositions/LearningAccess.md), line 46.
 
 ```former
 Former "the prerequisite to work on before practicing (skill) for (owner)" — inputs (owner, skill); bindings (skills, tracks, title); promises at most one record — forms:
@@ -3499,12 +3523,7 @@ Authored path: `Learning.Assess`.
 when GroundedTutoring.confirmAttempt (dialogueLength, outsideHelp, owner, task: studySession, unseen), asked by Learning.Assess:missing#3
 at the flow's settlement frontier
 where
-  view "(owner) owns study session (studySession)" with (owner, studySession) has (course)
-  AssessmentReviewing._byTask (author: owner, task: studySession) has (case: assessment)
-  no AssessmentReviewing._effectiveJudgment (case: assessment)
-  AssessmentReviewing._caseData (case: assessment) has (data)
-  GroundedTutoring._sessionData (session: studySession) has (data: sessionData)
-  Library._sourceSet (owner, scope: course) has (sources)
+  view "(owner) has an ungraded attempt in (studySession)" with (owner, studySession) has (assessment, data, sessionData, sources)
   materials is sessionMaterials (data: sessionData)
   (selected, valid: true) is selectSources (materials, sources)
   draft is gradeRequest (data, selected)
@@ -3612,12 +3631,7 @@ Authored path: `Learning.Assess`.
 when GroundedTutoring.confirmAttempt (dialogueLength, outsideHelp, owner, task: studySession, unseen), asked by Learning.Assess:ready#3
 at the flow's settlement frontier
 where
-  view "(owner) owns study session (studySession)" with (owner, studySession) has (course)
-  AssessmentReviewing._byTask (author: owner, task: studySession) has (case: assessment)
-  no AssessmentReviewing._effectiveJudgment (case: assessment)
-  AssessmentReviewing._caseData (case: assessment) has (data)
-  GroundedTutoring._sessionData (session: studySession) has (data: sessionData)
-  Library._sourceSet (owner, scope: course) has (sources)
+  view "(owner) has an ungraded attempt in (studySession)" with (owner, studySession) has (assessment, data, sessionData, sources)
   materials is sessionMaterials (data: sessionData)
   (selected, valid: true) is selectSources (materials, sources)
   draft is gradeRequest (data, selected)
@@ -4026,9 +4040,7 @@ where
   view "the tutor choice that applies to (owner)" with (owner) has (choice, status)
   status is among ["SAVED", "DEFAULT"]
   earlier, RequestBoundary.request (path: "/learning/hint", requestId, session, studySession)
-  view "(owner) can change session (studySession)" with (owner, studySession) has (course)
-  GroundedTutoring._sessionData (session: studySession) has (data)
-  Library._sourceSet (owner, scope: course) has (sources)
+  view "(owner) can use open session (studySession) with its sources" with (owner, studySession) has (data, sources)
   materials is sessionMaterials (data)
   (selected, valid: true) is selectSources (materials, sources)
   draft is sessionRequest (data, kind: "HINT", selected)
@@ -4129,9 +4141,7 @@ Authored path: `Learning.Hint`.
 ```reaction
 when GroundedTutoring.requestHint (owner, task: studySession), asked by Learning.Hint:ready#2
 where
-  view "(owner) can change session (studySession)" with (owner, studySession) has (course)
-  GroundedTutoring._sessionData (session: studySession) has (data)
-  Library._sourceSet (owner, scope: course) has (sources)
+  view "(owner) can use open session (studySession) with its sources" with (owner, studySession) has (data, sources)
   materials is sessionMaterials (data)
   (selected, valid: true) is selectSources (materials, sources)
   draft is sessionRequest (data, kind: "HINT", selected)
@@ -4522,9 +4532,7 @@ where
   view "the tutor choice that applies to (owner)" with (owner) has (choice, status)
   status is among ["SAVED", "DEFAULT"]
   earlier, RequestBoundary.request (attachments, channel, dialogueLength, path: "/learning/question", requestId, session, studySession, text)
-  view "(owner) can change session (studySession)" with (owner, studySession) has (course)
-  GroundedTutoring._sessionData (session: studySession) has (data)
-  Library._sourceSet (owner, scope: course) has (sources)
+  view "(owner) can use open session (studySession) with its sources" with (owner, studySession) has (data, sources)
   materials is sessionMaterials (data)
   (selected, valid: true) is selectSources (materials, sources)
   draft is sessionRequest (data, kind: "REPLY", selected)
@@ -4610,13 +4618,11 @@ Authored path: `Learning.Question`.
 when Sessioning.use (session, subject: owner), asked by Learning.Question
 where
   earlier, RequestBoundary.request (attachments, channel, dialogueLength, path: "/learning/question", requestId, session, studySession, text)
-  view "(owner) can change session (studySession)" with (owner, studySession) has (course)
-  GroundedTutoring._lesson (lesson: studySession)
-  GroundedTutoring._sessionData (session: studySession) has (data)
-  Library._sourceSet (owner, scope: course) has (sources)
+  view "(owner) can use open session (studySession) with its sources" with (owner, studySession) has (data, sources)
   currentDialogue is dialogueIsCurrent (data, dialogueLength)
   currentDialogue is among [true]
   (media, valid: true) is responseInput (attachments, channel, data, sources, text)
+  GroundedTutoring._lesson (lesson: studySession)
 then
   GroundedTutoring.respond (channel, media, owner, session: studySession, text)
 ```
@@ -4631,9 +4637,7 @@ Authored path: `Learning.Question`.
 ```reaction
 when GroundedTutoring.respond (channel, media, owner, session: studySession, text), asked by Learning.Question:ready#2
 where
-  view "(owner) can change session (studySession)" with (owner, studySession) has (course)
-  GroundedTutoring._sessionData (session: studySession) has (data)
-  Library._sourceSet (owner, scope: course) has (sources)
+  view "(owner) can use open session (studySession) with its sources" with (owner, studySession) has (data, sources)
   materials is sessionMaterials (data)
   (selected, valid: true) is selectSources (materials, sources)
   draft is sessionRequest (data, kind: "REPLY", selected)
@@ -5124,14 +5128,12 @@ where
   view "the tutor choice that applies to (owner)" with (owner) has (choice, status)
   status is among ["SAVED", "DEFAULT"]
   earlier, RequestBoundary.request (path: "/learning/reply", requestId, session, studySession)
-  view "(owner) can change session (studySession)" with (owner, studySession) has (course)
-  GroundedTutoring._sessionData (session: studySession) has (data)
-  hasLessonQuestion (data)
-  Library._sourceSet (owner, scope: course) has (sources)
+  view "(owner) can use open session (studySession) with its sources" with (owner, studySession) has (data, sources)
   materials is sessionMaterials (data)
   (selected, valid: true) is selectSources (materials, sources)
   draft is sessionRequest (data, kind: "REPLY", selected)
   prepared is withChoice (choice, request: draft)
+  hasLessonQuestion (data)
 then
   TutorGenerating.generate (owner, request: prepared)
 ```
@@ -5237,14 +5239,12 @@ where
   view "the tutor choice that applies to (owner)" with (owner) has (choice, status)
   status is among ["SAVED", "DEFAULT"]
   earlier, RequestBoundary.request (path: "/learning/reply", requestId, session, studySession)
-  view "(owner) can change session (studySession)" with (owner, studySession) has (course)
-  GroundedTutoring._sessionData (session: studySession) has (data)
-  hasLessonQuestion (data)
-  Library._sourceSet (owner, scope: course) has (sources)
+  view "(owner) can use open session (studySession) with its sources" with (owner, studySession) has (data, sources)
   materials is sessionMaterials (data)
   (selected, valid: true) is selectSources (materials, sources)
   draft is sessionRequest (data, kind: "REPLY", selected)
   prepared is withChoice (choice, request: draft)
+  hasLessonQuestion (data)
 then
   TutorGenerating.generate (owner, request: prepared)
 ```
@@ -5355,9 +5355,7 @@ Authored path: `Learning.Respond`.
 when Sessioning.use (session, subject: owner), asked by Learning.Respond
 where
   earlier, RequestBoundary.request (attachments, channel, dialogueLength, path: "/learning/respond", requestId, session, studySession, text)
-  view "(owner) can change session (studySession)" with (owner, studySession) has (course)
-  GroundedTutoring._sessionData (session: studySession) has (data)
-  Library._sourceSet (owner, scope: course) has (sources)
+  view "(owner) can use open session (studySession) with its sources" with (owner, studySession) has (data, sources)
   currentDialogue is dialogueIsCurrent (data, dialogueLength)
   currentDialogue is among [true]
   (media, valid: true) is responseInput (attachments, channel, data, sources, text)
@@ -5422,12 +5420,7 @@ where
   view "the tutor choice that applies to (owner)" with (owner) has (choice, status)
   status is among ["SAVED", "DEFAULT"]
   earlier, RequestBoundary.request (path: "/learning/retry", requestId, session, studySession)
-  view "(owner) owns study session (studySession)" with (owner, studySession) has (course)
-  AssessmentReviewing._byTask (author: owner, task: studySession) has (case: assessment)
-  no AssessmentReviewing._effectiveJudgment (case: assessment)
-  AssessmentReviewing._caseData (case: assessment) has (data)
-  GroundedTutoring._sessionData (session: studySession) has (data: sessionData)
-  Library._sourceSet (owner, scope: course) has (sources)
+  view "(owner) has an ungraded attempt in (studySession)" with (owner, studySession) has (assessment, data, sessionData, sources)
   materials is sessionMaterials (data: sessionData)
   (selected, valid: true) is selectSources (materials, sources)
   draft is gradeRequest (data, selected)
@@ -5515,12 +5508,7 @@ where
   view "the tutor choice that applies to (owner)" with (owner) has (choice, status)
   status is among ["SAVED", "DEFAULT"]
   earlier, RequestBoundary.request (path: "/learning/retry", requestId, session, studySession)
-  view "(owner) owns study session (studySession)" with (owner, studySession) has (course)
-  AssessmentReviewing._byTask (author: owner, task: studySession) has (case: assessment)
-  no AssessmentReviewing._effectiveJudgment (case: assessment)
-  AssessmentReviewing._caseData (case: assessment) has (data)
-  GroundedTutoring._sessionData (session: studySession) has (data: sessionData)
-  Library._sourceSet (owner, scope: course) has (sources)
+  view "(owner) has an ungraded attempt in (studySession)" with (owner, studySession) has (assessment, data, sessionData, sources)
   materials is sessionMaterials (data: sessionData)
   (selected, valid: true) is selectSources (materials, sources)
   draft is gradeRequest (data, selected)
@@ -6032,7 +6020,7 @@ when Sessioning.use (session, subject: owner), asked by Learning.Task:missing#4
 where
   earlier, RequestBoundary.respond (error: "SKILL_UNAVAILABLE", requestId), asked by Learning.Task:missing#2
   earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Task:missing#3
-  (definition) is generationDefinition (request: prepared)
+  (criteria, definition) is generationDefinition (request: prepared)
   earlier, RequestBoundary.request (path: "/learning/task", requestId, session, skill)
   no view "(owner) can study confirmed (skill)" with (owner, skill) has (definition)
 then
@@ -6142,7 +6130,7 @@ Authored path: `Learning.Task`.
 when Sessioning.use (session, subject: owner), asked by Learning.Task:ready#4
 where
   earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Task:ready#3
-  (definition) is generationDefinition (request: prepared)
+  (criteria, definition) is generationDefinition (request: prepared)
   earlier, RequestBoundary.request (path: "/learning/task", requestId, session, skill)
   no view "(owner) can study confirmed (skill)" with (owner, skill) has (definition)
 then

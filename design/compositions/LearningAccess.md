@@ -27,6 +27,22 @@ A command that asks the tutor first passes [TutorReady](former:Settings.TutorRea
 
 [QuestionReady](former:Access.QuestionReady) requires an open lesson, current dialogue length, and valid learner content, with the same attachment rule as ResponseReady.
 
+## Admission and the endpoints read the same conditions
+
+Admission and the endpoints check the same conditions, and each condition is stated once. Each learning command endpoint has a refusal branch for its first guard, so the endpoint by itself answers every caller. Admission adds two things on top: a sentence that tells the learner what to do, and a stop before the endpoint starts work that cannot finish, such as saving a question when the dialogue the learner saw is out of date. Admission therefore does not replace the endpoint's checks, and the endpoint does not repeat admission's checks in a separate copy.
+
+The shared conditions live in two places. The [shared reads](LearningReads.md) declare views, such as SessionSources and PendingGrade, that both sides read. The learning composition declares condition helpers that return a list of conditions: `learnerWork` admits learner work, and Respond, Question, ResponseReady, and QuestionReady all state it; `sessionTutorRequest` prepares the tutor request of Question, Reply, and Hint from the open session; `gradeRequest` prepares the grading request of Assess, RetryAssessment, and Regrade; and `afterTutor` states the two paths after the tutor answers, saving the answer when the skill or session is unchanged and answering `SKILL_CHANGED` or `SESSION_CHANGED` otherwise. ReplyReady reads SessionSources and RetryReady reads PendingGrade, the same views their endpoints read. A change to one of these conditions therefore changes admission and the endpoint together.
+
+Some differences between admission and the endpoints are deliberate:
+
+- AssessmentReady also checks the dialogue length and the attempt's content with `attemptIsReady`. The endpoint checks only the learner's review and declarations with `reviewApproved`, and `GroundedTutoring.confirmAttempt` checks the dialogue length itself.
+- After the attempt is confirmed, the submitted case closes the session, so Assess grades through PendingGrade rather than OpenSession.
+- HintReady requires `GroundedTutoring._task`. The endpoint's first stage checks only OpenSession, and the concept refuses a hint outside a practice task.
+- QuestionReady and the Question endpoint require `GroundedTutoring._lesson`, and ReplyReady and the Reply endpoint require `hasLessonQuestion`.
+- The tutor choice is read in the stage that asks the tutor, which for Question and Hint comes after their first write. Admission checks the choice earlier, with TutorReady.
+- Regrade answers `REGRADE_IMPORTED_UNAVAILABLE` for an imported case, which RegradeReady admits so that Correct can use it.
+- Adjust and the planning endpoints keep their own inline details.
+
 When [TaskReady](former:Access.TaskReady) declines, [PracticePrerequisite](former:Access.PracticePrerequisite) reads the same skill context and uses [prerequisiteToPractice](computation:prerequisiteToPractice) to look for a prerequisite that is not ready. If it finds one, the explanation names it: Work on “<title>” first. This skill builds on it. Otherwise the practice explanation stays: Set starting confidence and check the prerequisites before starting fresh practice.
 
 ```computations

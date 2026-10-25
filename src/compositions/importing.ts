@@ -3,17 +3,9 @@ import { compute, each, former, is, no, now, view, where } from "@mit-sdg/sync-e
 import { concepts, computations as C } from "../concepts.ts";
 import type { GradedStatus } from "../computations/importing.ts";
 import { composition as Courses } from "./courses.ts";
-import { composition as Settings } from "./settings.ts";
+import { usingTutorChoice } from "./settings.ts";
 import { structuredInput, structuredOutput, validators } from "./reusable/inputs.ts";
 const { Sessioning, SkillMapping: Mapping, Library, AssessmentReviewing: Assessment, TutorGenerating: AI } = concepts;
-
-/**
- * Conditions that add the learner's tutor choice to a prepared request, as the learning endpoints do. TutorStatus must be
- * SAVED or DEFAULT, and withChoice adds exactly that validated model and level, so extraction never sends a value from the browser.
- */
-const usingTutorChoice = (owner: symbol, draft: symbol, choice: symbol, status: symbol, prepared: symbol) => [
-  Settings.TutorStatus({ owner }).is({ choice, status }), is.among(status, ["SAVED", "DEFAULT"]), compute(C.withChoice, { request: draft, choice }, prepared),
-] as const;
 
 /** A nonblank material identity; the session comes from the cookie. */
 const gradedMaterialInput: EndpointValidator = (value) => {

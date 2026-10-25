@@ -13,6 +13,18 @@ export const OpenSession = view("(owner) can change session (studySession)", ({ 
   OwnedSession({ owner, studySession }).is({ skill, course, definition }), Tutoring._session({ session: studySession }).is({ status: "OPEN" }),
   no(Assessment._byTask({ author: owner, task: studySession })),
 )).optional();
+// The learner's open session with its saved dialogue and the learner's sources in its course. The two queries always
+// answer for an existing session, so this view holds exactly when OpenSession holds; OpenSession stays the refusal guard.
+export const SessionSources = view("(owner) can use open session (studySession) with its sources", ({ owner, studySession }, { course, data, sources }) => where(
+  OpenSession({ owner, studySession }).is({ course }), Tutoring._sessionData({ session: studySession }).is({ data }), Library._sourceSet({ owner, scope: course }).is({ sources }),
+)).optional();
+// A submitted attempt in the learner's own session that has no judgment yet, with the case's work, the saved session, and
+// the learner's sources in its course: everything a grading request reads.
+export const PendingGrade = view("(owner) has an ungraded attempt in (studySession)", ({ owner, studySession }, { course, assessment, data, sessionData, sources }) => where(
+  OwnedSession({ owner, studySession }).is({ course }), Assessment._byTask({ author: owner, task: studySession }).is({ case: assessment }),
+  no(Assessment._effectiveJudgment({ case: assessment })), Assessment._caseData({ case: assessment }).is({ data }),
+  Tutoring._sessionData({ session: studySession }).is({ data: sessionData }), Library._sourceSet({ owner, scope: course }).is({ sources }),
+)).optional();
 export const OwnedCase = view("(owner) owns assessment (assessment)", ({ owner, assessment }, { skill, course, definition, task }) => where(
   Assessment._case({ case: assessment }).is({ author: owner, subject: skill, definition, task }), OwnedSkill({ owner, skill }).is({ course }),
 )).optional();
@@ -51,4 +63,4 @@ export const NeedsEvidence = view("assessment (assessment) needs evidence for (o
   Assessment._caseData({ case: assessment }).is({ data }), Mastery._progress({ learner: owner }).is({ tracks }),
   compute(computations.evidenceUpdate, { data, tracks }, { needed: true }),
 )).optional();
-export const composition = { OwnedSkill, ActiveSkill, OwnedSession, OpenSession, OwnedCase, OwnedAnyCase, SkillContext, SkillData, SessionData, Progress, PlanData, PlanContext, CanReplan, NeedsEvidence };
+export const composition = { OwnedSkill, ActiveSkill, OwnedSession, OpenSession, SessionSources, PendingGrade, OwnedCase, OwnedAnyCase, SkillContext, SkillData, SessionData, Progress, PlanData, PlanContext, CanReplan, NeedsEvidence };

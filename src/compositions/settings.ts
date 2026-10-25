@@ -24,6 +24,15 @@ const TutorSettings = former("the tutor settings for (owner)", ({ owner }, { mod
   compute(C.tutorCatalog, {}, models), TutorStatus({ owner }).is({ choice, status }), compute(C.defaultChoice, {}, fallback),
 ).form({ models, choice, status, defaultChoice: fallback }));
 
+/**
+ * Conditions that add the learner's tutor choice to a prepared request. TutorStatus must be SAVED or DEFAULT, and withChoice
+ * adds exactly that validated model and level, so TutorGenerating.generate never sends a value from the browser. The learning
+ * and importing endpoints that ask the tutor share it.
+ */
+export const usingTutorChoice = (owner: symbol, draft: symbol, choice: symbol, status: symbol, prepared: symbol) => [
+  TutorStatus({ owner }).is({ choice, status }), is.among(status, ["SAVED", "DEFAULT"]), compute(C.withChoice, { request: draft, choice }, prepared),
+] as const;
+
 /** Admission for every command that asks the tutor: no saved choice, or a saved choice that is still offered. */
 const TutorReady = former("admit a tutor request for (owner)", ({ owner }, { status }) => where(
   TutorStatus({ owner }).is({ status }), is.among(status, ["SAVED", "DEFAULT"]),

@@ -1,22 +1,60 @@
 import { endpoint, receive, respond } from "@mit-sdg/sync-engine/boundary";
-import { compute, no, is, now, reaction, when, where } from "@mit-sdg/sync-engine/language";
+import { compute, no, is, now, reaction, when, where, type Condition, type ReadLine } from "@mit-sdg/sync-engine/language";
 import { concepts, computations as C } from "../concepts.ts";
 import { composition as Courses } from "./courses.ts";
-import { composition as Settings } from "./settings.ts";
+import { composition as Settings, usingTutorChoice } from "./settings.ts";
 import * as R from "./learning-reads.ts";
 import { ActivityInProgress } from "./planning.ts";
 import { learningInput, structuredOutput, validators } from "./reusable/inputs.ts";
 const { Sessioning, Library, GroundedTutoring: Tutoring, AssessmentReviewing: Assessment, MasteryEstimating: Mastery, StudyPlanning: Planning, TutorGenerating: AI } = concepts;
 const options = { validators: { ...validators, input: learningInput, output: structuredOutput } };
 
-/**
- * Conditions that add the learner's tutor choice to a prepared request. TutorStatus must be SAVED or DEFAULT, and withChoice
- * adds exactly that validated model and level, so TutorGenerating.generate never sends a value from the browser.
- */
-const usingTutorChoice = (owner: symbol, draft: symbol, choice: symbol, status: symbol, prepared: symbol) => [
-  Settings.TutorStatus({ owner }).is({ choice, status }), is.among(status, ["SAVED", "DEFAULT"]), compute(C.withChoice, { request: draft, choice }, prepared),
-] as const;
 const useAgain = (session: symbol, owner: symbol) => Sessioning.use({ session }).responds({ subject: owner });
+type Symbols<K extends string> = Record<K, symbol>;
+type Branch = ReturnType<ReturnType<typeof where>["then"]>;
+
+/**
+ * Conditions that admit learner work in the open session: the dialogue the learner saw is still current, and the response
+ * has text or attachments, each the learner's own source in the session's course and listed once. Respond and Question
+ * state them, and so do their admission formers in access.ts, so admission and the endpoints cannot drift apart. The
+ * endpoints also bind `media`, the saved files to send with the turn; admission only needs to know the input is valid.
+ */
+export const learnerWork = (owner: symbol, studySession: symbol, { text, channel, attachments, dialogueLength, data, sources, currentDialogue, media }:
+  Symbols<"text" | "channel" | "attachments" | "dialogueLength" | "data" | "sources" | "currentDialogue"> & { media?: symbol }) => [
+  R.SessionSources({ owner, studySession }).is({ data, sources }),
+  compute(C.dialogueIsCurrent, { data, dialogueLength }, currentDialogue), is.among(currentDialogue, [true]),
+  media === undefined ? compute(C.responseInput, { data, text, channel, attachments, sources }, { valid: true })
+    : compute(C.responseInput, { data, text, channel, attachments, sources }, { valid: true, media }),
+] as const;
+/**
+ * Conditions that prepare a tutor request of one kind from the learner's open session. Every material saved with the
+ * session must still be among the learner's sources in its course, and the learner's tutor choice is added last.
+ */
+const sessionTutorRequest = (owner: symbol, studySession: symbol, kind: "REPLY" | "HINT", { data, sources, materials, selected, draft, choice, status, prepared }:
+  Symbols<"data" | "sources" | "materials" | "selected" | "draft" | "choice" | "status" | "prepared">) => [
+  R.SessionSources({ owner, studySession }).is({ data, sources }), compute(C.sessionMaterials, { data }, materials),
+  compute(C.selectSources, { sources, materials }, { selected, valid: true }), compute(C.sessionRequest, { selected, data, kind }, draft),
+  ...usingTutorChoice(owner, draft, choice, status, prepared),
+] as const;
+/**
+ * Conditions that prepare a grading request for a saved case from its work, the materials saved with its session, and the
+ * learner's sources in its course. Assess, RetryAssessment, and Regrade share them; each reads the case its own way first.
+ */
+const gradeRequest = (owner: symbol, { data, sessionData, sources, materials, selected, draft, choice, status, prepared }:
+  Symbols<"data" | "sessionData" | "sources" | "materials" | "selected" | "draft" | "choice" | "status" | "prepared">) => [
+  compute(C.sessionMaterials, { data: sessionData }, materials), compute(C.selectSources, { sources, materials }, { selected, valid: true }),
+  compute(C.gradeRequest, { selected, data }, draft), ...usingTutorChoice(owner, draft, choice, status, prepared),
+] as const;
+/**
+ * The two paths after the tutor answers. While the guard still holds, the `saved` chain stores the answer and answers the
+ * request; otherwise the endpoint answers the "changed" code and stores nothing. `lead` binds what the guard reads, such as
+ * the requirements version the request was prepared for, and both paths state it first. Each call builds fresh read lines.
+ */
+const afterTutor = (guard: () => ReadLine, changed: "SKILL_CHANGED" | "SESSION_CHANGED", saved: (...held: Condition[]) => Branch,
+  lead: () => Condition[] = () => []) => [
+  saved(...lead(), guard()).named(changed === "SKILL_CHANGED" ? "current" : "open"),
+  where(...lead(), no(guard())).then(respond({ error: changed })).named(changed === "SKILL_CHANGED" ? "changed" : "closed"),
+] as const;
 
 // Each command endpoint below answers a refusal when its first guard fails, as Read and Transcript do, so a caller that
 // skips admission gets an answer instead of waiting for the request limit. A later stage follows every branch of the
@@ -52,13 +90,11 @@ const Lesson = endpoint("/learning/lesson", ({ session, skill, request, owner, d
     compute(C.lessonRequest, { selected, context, request }, draft), ...usingTutorChoice(owner, draft, choice, status, prepared))
     .then(AI.generate({ owner, request: prepared }).responds({ answer })))
   .then(Sessioning.use({ session }).responds({ subject: owner }))
-  .then(
-    where(compute(C.generationDefinition, { request: prepared }, { definition }), R.ActiveSkill({ owner, skill }).is({ definition }), compute(C.generationFields, { answer }, { text: explanation, citations, materials }))
+  .then(...afterTutor(() => R.ActiveSkill({ owner, skill }).is({ definition }), "SKILL_CHANGED",
+    (...held) => where(...held, compute(C.generationFields, { answer }, { text: explanation, citations, materials }))
       .then(Tutoring.explain({ owner, topic: skill, definition, request, explanation, materials, citations }).responds({ lesson }))
-      .then(respond({ lesson, tutor: Settings.SentTutor({ request: prepared }) })).named("current"),
-    where(compute(C.generationDefinition, { request: prepared }, { definition }), no(R.ActiveSkill({ owner, skill }).is({ definition })))
-      .then(respond({ error: "SKILL_CHANGED" })).named("changed"),
-  ), options);
+      .then(respond({ lesson, tutor: Settings.SentTutor({ request: prepared }) })),
+    () => [compute(C.generationDefinition, { request: prepared }, { definition })])), options);
 const Task = endpoint("/learning/task", ({ session, skill, owner, definition, context, skills, tracks, sources, materials, selected, sessions, draft, choice, status, prepared, answer, question, citations, criteria, task }) => receive({ session, skill })
   .then(Sessioning.use({ session }).responds({ subject: owner }))
   .then(
@@ -72,82 +108,67 @@ const Task = endpoint("/learning/task", ({ session, skill, owner, definition, co
     ...usingTutorChoice(owner, draft, choice, status, prepared))
     .then(AI.generate({ owner, request: prepared }).responds({ answer })))
   .then(Sessioning.use({ session }).responds({ subject: owner }))
-  .then(
-    where(compute(C.generationDefinition, { request: prepared }, { definition, criteria }), R.ActiveSkill({ owner, skill }).is({ definition }), compute(C.generationFields, { answer }, { text: question, citations, materials }))
+  .then(...afterTutor(() => R.ActiveSkill({ owner, skill }).is({ definition }), "SKILL_CHANGED",
+    (...held) => where(...held, compute(C.generationFields, { answer }, { text: question, citations, materials }))
       .then(Tutoring.prepareTask({ owner, topic: skill, definition, question, criteria, materials, citations, mode: "CHECK", fresh: true }).responds({ task }))
-      .then(respond({ task, tutor: Settings.SentTutor({ request: prepared }) })).named("current"),
-    where(compute(C.generationDefinition, { request: prepared }, { definition }), no(R.ActiveSkill({ owner, skill }).is({ definition })))
-      .then(respond({ error: "SKILL_CHANGED" })).named("changed"),
-  ), options);
+      .then(respond({ task, tutor: Settings.SentTutor({ request: prepared }) })),
+    () => [compute(C.generationDefinition, { request: prepared }, { definition, criteria })])), options);
 
-const Respond = endpoint("/learning/respond", ({ session, studySession, text, channel, attachments, dialogueLength, owner, course, data, sources, media, currentDialogue }) => receive({ session, studySession, text, channel, attachments, dialogueLength })
+const Respond = endpoint("/learning/respond", ({ session, studySession, text, channel, attachments, dialogueLength, owner, data, sources, media, currentDialogue }) => receive({ session, studySession, text, channel, attachments, dialogueLength })
   .then(Sessioning.use({ session }).responds({ subject: owner })).then(
-    where(R.OpenSession({ owner, studySession }).is({ course }), Tutoring._sessionData({ session: studySession }).is({ data }),
-      Library._sourceSet({ owner, scope: course }).is({ sources }), compute(C.dialogueIsCurrent, { data, dialogueLength }, currentDialogue), is.among(currentDialogue, [true]),
-      compute(C.responseInput, { data, text, channel, attachments, sources }, { valid: true, media }))
+    where(...learnerWork(owner, studySession, { text, channel, attachments, dialogueLength, data, sources, currentDialogue, media }))
       .then(Tutoring.respond({ owner, session: studySession, text, channel, media }).responds({})).then(respond({})).named("ready"),
     where(no(R.OpenSession({ owner, studySession }))).then(respond({ error: "SESSION_UNAVAILABLE" })).named("missing"),
   ), options);
-const Question = endpoint("/learning/question", ({ session, studySession, text, channel, attachments, dialogueLength, owner, course, data, sources, media, currentDialogue, materials, selected, draft, choice, status, prepared, answer, reply, citations }) => receive({ session, studySession, text, channel, attachments, dialogueLength })
+const Question = endpoint("/learning/question", ({ session, studySession, text, channel, attachments, dialogueLength, owner, data, sources, media, currentDialogue, materials, selected, draft, choice, status, prepared, answer, reply, citations }) => receive({ session, studySession, text, channel, attachments, dialogueLength })
   .then(Sessioning.use({ session }).responds({ subject: owner })).then(
-    where(R.OpenSession({ owner, studySession }).is({ course }), Tutoring._lesson({ lesson: studySession }), Tutoring._sessionData({ session: studySession }).is({ data }),
-      Library._sourceSet({ owner, scope: course }).is({ sources }), compute(C.dialogueIsCurrent, { data, dialogueLength }, currentDialogue), is.among(currentDialogue, [true]),
-      compute(C.responseInput, { data, text, channel, attachments, sources }, { valid: true, media }))
+    where(...learnerWork(owner, studySession, { text, channel, attachments, dialogueLength, data, sources, currentDialogue, media }), Tutoring._lesson({ lesson: studySession }))
       .then(Tutoring.respond({ owner, session: studySession, text, channel, media }).responds({})).named("ready"),
     where(no(R.OpenSession({ owner, studySession }))).then(respond({ error: "SESSION_UNAVAILABLE" })).named("missing"),
   )
-  .then(where(R.OpenSession({ owner, studySession }).is({ course }), Tutoring._sessionData({ session: studySession }).is({ data }),
-    Library._sourceSet({ owner, scope: course }).is({ sources }), compute(C.sessionMaterials, { data }, materials),
-    compute(C.selectSources, { sources, materials }, { selected, valid: true }), compute(C.sessionRequest, { selected, data, kind: "REPLY" }, draft),
-    ...usingTutorChoice(owner, draft, choice, status, prepared))
+  // The tutor choice is read here, after the question is saved; admission has already checked it.
+  .then(where(...sessionTutorRequest(owner, studySession, "REPLY", { data, sources, materials, selected, draft, choice, status, prepared }))
     .then(AI.generate({ owner, request: prepared }).responds({ answer })))
   .then(Sessioning.use({ session }).responds({ subject: owner }))
-  .then(
-    where(R.OpenSession({ owner, studySession }), compute(C.generationFields, { answer }, { text: reply, citations }))
+  .then(...afterTutor(() => R.OpenSession({ owner, studySession }), "SESSION_CHANGED",
+    (...held) => where(...held, compute(C.generationFields, { answer }, { text: reply, citations }))
       .then(Tutoring.answerLesson({ owner, lesson: studySession, text: reply, citations, channel: "TEXT" }).responds({}))
-      .then(respond({ tutor: Settings.SentTutor({ request: prepared }) })).named("open"),
-    where(no(R.OpenSession({ owner, studySession }))).then(respond({ error: "SESSION_CHANGED" })).named("closed"),
-  ), options);
-const Reply = endpoint("/learning/reply", ({ session, studySession, owner, course, data, materials, sources, selected, draft, choice, status, prepared, answer, text, citations }) => receive({ session, studySession })
+      .then(respond({ tutor: Settings.SentTutor({ request: prepared }) })))), options);
+const Reply = endpoint("/learning/reply", ({ session, studySession, owner, data, materials, sources, selected, draft, choice, status, prepared, answer, text, citations }) => receive({ session, studySession })
   .then(Sessioning.use({ session }).responds({ subject: owner })).then(
     where(R.OpenSession({ owner, studySession })).then(useAgain(session, owner)).named("ready"),
     where(no(R.OpenSession({ owner, studySession }))).then(respond({ error: "SESSION_UNAVAILABLE" })).named("missing"),
   )
-  .then(where(R.OpenSession({ owner, studySession }).is({ course }), Tutoring._sessionData({ session: studySession }).is({ data }), C.hasLessonQuestion({ data }),
-    Library._sourceSet({ owner, scope: course }).is({ sources }), compute(C.sessionMaterials, { data }, materials),
-    compute(C.selectSources, { sources, materials }, { selected, valid: true }), compute(C.sessionRequest, { selected, data, kind: "REPLY" }, draft),
-    ...usingTutorChoice(owner, draft, choice, status, prepared))
+  .then(where(...sessionTutorRequest(owner, studySession, "REPLY", { data, sources, materials, selected, draft, choice, status, prepared }), C.hasLessonQuestion({ data }))
     .then(AI.generate({ owner, request: prepared }).responds({ answer })))
   .then(Sessioning.use({ session }).responds({ subject: owner }))
-  .then(
-    where(R.OpenSession({ owner, studySession }), compute(C.generationFields, { answer }, { text, citations }))
+  .then(...afterTutor(() => R.OpenSession({ owner, studySession }), "SESSION_CHANGED",
+    (...held) => where(...held, compute(C.generationFields, { answer }, { text, citations }))
       .then(Tutoring.answerLesson({ owner, lesson: studySession, text, citations, channel: "TEXT" }).responds({}))
-      .then(respond({ tutor: Settings.SentTutor({ request: prepared }) })).named("open"),
-    where(no(R.OpenSession({ owner, studySession }))).then(respond({ error: "SESSION_CHANGED" })).named("closed"),
-  ), options);
-const Hint = endpoint("/learning/hint", ({ session, studySession, owner, course, data, sources, materials, selected, draft, choice, status, prepared, answer, text }) => receive({ session, studySession })
+      .then(respond({ tutor: Settings.SentTutor({ request: prepared }) })))), options);
+const Hint = endpoint("/learning/hint", ({ session, studySession, owner, data, sources, materials, selected, draft, choice, status, prepared, answer, text }) => receive({ session, studySession })
   .then(Sessioning.use({ session }).responds({ subject: owner })).then(
     where(R.OpenSession({ owner, studySession })).then(Tutoring.requestHint({ owner, task: studySession }).responds({})).named("ready"),
     where(no(R.OpenSession({ owner, studySession }))).then(respond({ error: "SESSION_UNAVAILABLE" })).named("missing"),
   )
-  .then(where(R.OpenSession({ owner, studySession }).is({ course }), Tutoring._sessionData({ session: studySession }).is({ data }), Library._sourceSet({ owner, scope: course }).is({ sources }),
-    compute(C.sessionMaterials, { data }, materials), compute(C.selectSources, { sources, materials }, { selected, valid: true }),
-    compute(C.sessionRequest, { selected, data, kind: "HINT" }, draft), ...usingTutorChoice(owner, draft, choice, status, prepared))
+  // The tutor choice is read here, after the request for help is saved; admission has already checked it.
+  .then(where(...sessionTutorRequest(owner, studySession, "HINT", { data, sources, materials, selected, draft, choice, status, prepared }))
     .then(AI.generate({ owner, request: prepared }).responds({ answer })))
   .then(Sessioning.use({ session }).responds({ subject: owner }))
-  .then(
-    where(R.OpenSession({ owner, studySession }), compute(C.generationFields, { answer }, { text }))
+  .then(...afterTutor(() => R.OpenSession({ owner, studySession }), "SESSION_CHANGED",
+    (...held) => where(...held, compute(C.generationFields, { answer }, { text }))
       .then(Tutoring.giveHint({ owner, task: studySession, text, channel: "TEXT" }).responds({}))
-      .then(respond({ tutor: Settings.SentTutor({ request: prepared }) })).named("open"),
-    where(no(R.OpenSession({ owner, studySession }))).then(respond({ error: "SESSION_CHANGED" })).named("closed"),
-  ), options);
+      .then(respond({ tutor: Settings.SentTutor({ request: prepared }) })))), options);
 const Transcript = endpoint("/learning/transcript", ({ session, studySession, turnIndex, text, owner }) => receive({ session, studySession, turnIndex, text })
   .then(Sessioning.use({ session }).responds({ subject: owner })).then(
     where(R.OpenSession({ owner, studySession })).then(Tutoring.confirmTranscript({ owner, session: studySession, turnIndex, text }).responds({})).then(respond({})).named("owned"),
     where(no(R.OpenSession({ owner, studySession }))).then(respond({ error: "SESSION_UNAVAILABLE" })).named("missing"),
   ), options);
 
-const Assess = endpoint("/learning/assess", ({ session, studySession, dialogueLength, reviewed, unseen, outsideHelp, owner, skill, definition, course, assessment, data, sessionData, sources, materials, selected, draft, choice, status, prepared, answer, result, gateMet, rationale, approved }) => receive({ session, studySession, dialogueLength, reviewed, unseen, outsideHelp })
+// Admission also checks the dialogue length and the attempt's content with attemptIsReady; the endpoint checks only the
+// learner's review and declarations, and Tutoring.confirmAttempt checks the dialogue length itself. Confirming the attempt
+// submits it, and CloseSubmitted closes the session, so the grading stage reads PendingGrade rather than an open session.
+const Assess = endpoint("/learning/assess", ({ session, studySession, dialogueLength, reviewed, unseen, outsideHelp, owner, skill, definition, assessment, data, sessionData, sources, materials, selected, draft, choice, status, prepared, answer, result, gateMet, rationale, approved }) => receive({ session, studySession, dialogueLength, reviewed, unseen, outsideHelp })
   .then(Sessioning.use({ session }).responds({ subject: owner })).then(
     where(R.OpenSession({ owner, studySession })).then(useAgain(session, owner)).named("ready"),
     where(no(R.OpenSession({ owner, studySession }))).then(respond({ error: "SESSION_UNAVAILABLE" })).named("missing"),
@@ -155,27 +176,21 @@ const Assess = endpoint("/learning/assess", ({ session, studySession, dialogueLe
   .then(where(R.OpenSession({ owner, studySession }).is({ skill, definition }), compute(C.reviewApproved, { reviewed, unseen, outsideHelp }, approved), is.among(approved, [true]),
     Mastery._track({ learner: owner, subject: skill, definition }))
     .then(Tutoring.confirmAttempt({ owner, task: studySession, dialogueLength, unseen, outsideHelp }).responds({})))
-  .afterFlowSettles().where(R.OwnedSession({ owner, studySession }).is({ course }), Assessment._byTask({ author: owner, task: studySession }).is({ case: assessment }),
-    no(Assessment._effectiveJudgment({ case: assessment })), Assessment._caseData({ case: assessment }).is({ data }), Tutoring._sessionData({ session: studySession }).is({ data: sessionData }),
-    Library._sourceSet({ owner, scope: course }).is({ sources }), compute(C.sessionMaterials, { data: sessionData }, materials),
-    compute(C.selectSources, { sources, materials }, { selected, valid: true }), compute(C.gradeRequest, { selected, data }, draft),
-    ...usingTutorChoice(owner, draft, choice, status, prepared))
+  .afterFlowSettles().where(R.PendingGrade({ owner, studySession }).is({ assessment, data, sessionData, sources }),
+    ...gradeRequest(owner, { data, sessionData, sources, materials, selected, draft, choice, status, prepared }))
   .then(AI.generate({ owner, request: prepared }).responds({ answer }))
   .then(Sessioning.use({ session }).responds({ subject: owner }))
   .then(where(Assessment._byTask({ author: owner, task: studySession }).is({ case: assessment }), compute(C.generationFields, { answer }, { result, gateMet, rationale }))
     .then(Assessment.assess({ case: assessment, result, gateMet, rationale }).responds({})))
   .afterFlowSettles().then(respond({ studySession, tutor: Settings.SentTutor({ request: prepared }) })), options);
-const RetryAssessment = endpoint("/learning/retry", ({ session, studySession, owner, assessment, course, data, sessionData, sources, materials, selected, draft, choice, status, prepared, answer, result, gateMet, rationale }) => receive({ session, studySession })
+const RetryAssessment = endpoint("/learning/retry", ({ session, studySession, owner, assessment, data, sessionData, sources, materials, selected, draft, choice, status, prepared, answer, result, gateMet, rationale }) => receive({ session, studySession })
   .then(Sessioning.use({ session }).responds({ subject: owner })).then(
     // The attempt's session is closed once it is submitted, so retry guards on ownership rather than an open session.
     where(R.OwnedSession({ owner, studySession })).then(useAgain(session, owner)).named("ready"),
     where(no(R.OwnedSession({ owner, studySession }))).then(respond({ error: "SESSION_UNAVAILABLE" })).named("missing"),
   )
-  .then(where(R.OwnedSession({ owner, studySession }).is({ course }), Assessment._byTask({ author: owner, task: studySession }).is({ case: assessment }),
-    no(Assessment._effectiveJudgment({ case: assessment })), Assessment._caseData({ case: assessment }).is({ data }), Tutoring._sessionData({ session: studySession }).is({ data: sessionData }),
-    Library._sourceSet({ owner, scope: course }).is({ sources }), compute(C.sessionMaterials, { data: sessionData }, materials),
-    compute(C.selectSources, { sources, materials }, { selected, valid: true }), compute(C.gradeRequest, { selected, data }, draft),
-    ...usingTutorChoice(owner, draft, choice, status, prepared))
+  .then(where(R.PendingGrade({ owner, studySession }).is({ assessment, data, sessionData, sources }),
+    ...gradeRequest(owner, { data, sessionData, sources, materials, selected, draft, choice, status, prepared }))
     .then(AI.generate({ owner, request: prepared }).responds({ answer })))
   .then(Sessioning.use({ session }).responds({ subject: owner }))
   .then(where(Assessment._byTask({ author: owner, task: studySession }).is({ case: assessment }), compute(C.generationFields, { answer }, { result, gateMet, rationale }))
@@ -210,9 +225,7 @@ const Regrade = endpoint("/learning/regrade", ({ session, case: assessment, base
     where(no(R.OwnedAnyCase({ owner, assessment }))).then(respond({ error: "REVISION_CASE_UNAVAILABLE" })).named("missing"),
   )
   .then(where(R.OwnedCase({ owner, assessment }).is({ course, task }), Assessment._caseData({ case: assessment }).is({ data }), Tutoring._sessionData({ session: task }).is({ data: sessionData }),
-    Library._sourceSet({ owner, scope: course }).is({ sources }), compute(C.sessionMaterials, { data: sessionData }, materials),
-    compute(C.selectSources, { sources, materials }, { selected, valid: true }), compute(C.gradeRequest, { selected, data }, draft),
-    ...usingTutorChoice(owner, draft, choice, status, prepared))
+    Library._sourceSet({ owner, scope: course }).is({ sources }), ...gradeRequest(owner, { data, sessionData, sources, materials, selected, draft, choice, status, prepared }))
     .then(AI.generate({ owner, request: prepared }).responds({ answer })))
   .then(Sessioning.use({ session }).responds({ subject: owner }))
   .then(where(compute(C.generationFields, { answer }, { result, gateMet, rationale }))
