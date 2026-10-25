@@ -72,7 +72,7 @@ describe("SkillMapping proposal retries", () => {
     } finally { await second.client.close(); }
   });
 
-  test("keys are required, belong to one unit, and cannot reveal foreign skills", async () => {
+  test("keys are required, belong to one course, and cannot reveal foreign skills", async () => {
     const first = await ownedUnit(), second = await ownedUnit(), proposalKey = randomUUID();
     for (const invalid of ["", " \n", "x".repeat(101)]) {
       await expect(mapping.propose({ ...first, ...content, proposalKey: invalid })).rejects.toBeInstanceOf(InvalidSkillProposalKeyError);
@@ -93,6 +93,20 @@ describe("SkillMapping proposal retries", () => {
     const before = await savedState();
     expect(await mapping.propose(input)).toEqual(saved);
     expect(await savedState()).toEqual(before);
+  });
+
+  test("replay finds a draft that was moved to another unit of its course and creates nothing", async () => {
+    const { owner, course, unit } = await ownedUnit(), input = { owner, unit, proposalKey: randomUUID(), ...content };
+    const saved = await mapping.propose(input);
+    const other = await mapping.addUnit({ owner, course, title: "Vectors" });
+    // The draft moves after its save, as if the reply was lost and the learner
+    // edited the draft before retrying. The retry still names the original unit.
+    await mapping.reviseDraft({ ...input, ...saved, unit: other.unit });
+    const before = await savedState();
+    expect(await mapping.propose(input)).toEqual(saved);
+    expect(await savedState()).toEqual(before);
+    expect(await mapping._skills({ unit })).toEqual([]);
+    expect((await mapping._skills({ unit: other.unit })).map((row) => row.skill)).toEqual([saved.skill]);
   });
 
   test("a lost reply from a stopped process is recovered by a new process", async () => {

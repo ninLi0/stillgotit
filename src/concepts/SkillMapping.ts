@@ -44,9 +44,10 @@ interface SkillDocument {
   prerequisites: Skill[];
   current: Version;
   status: SkillStatus;
-  // The key the browser sent with the save that created this skill. A unique
-  // index on the unit and key pair lets a repeated save find this skill instead
-  // of creating a second one. Skills saved before this field existed have none.
+  // The key the browser sent with the save that created this skill. A repeated
+  // save looks for this key in every unit of the course, so it finds the skill
+  // even after the skill moves to another unit, instead of creating a second
+  // one. Skills saved before this field existed have none.
   proposalKey?: string;
 }
 
@@ -522,7 +523,8 @@ export class SkillMapping {
     // Freeze the set before any database wait. Its order is not part of the request.
     const sourceReferences = [...new Set(materials)];
     // A unit's course and a course's owner cannot change under this spec.
-    if (!await this.#ownedCourse(unit, owner)) {
+    const course = await this.#ownedCourse(unit, owner);
+    if (!course) {
       throw new ProposalUnitUnavailableError();
     }
     if ([title, outcome, gate].some((text) => text.trim().length === 0)) {
@@ -533,10 +535,16 @@ export class SkillMapping {
     }
 
     return untilWritten(async () => {
-      // A used unit and key pair names the skill that an earlier save created.
-      // That skill is returned as it is now, so a retry after a lost reply keeps
-      // any edits or confirmation that happened in between.
-      const existing = await this.skills.findOne({ unit, proposalKey }, { projection: { _id: 1 } });
+      // A used key names the skill that an earlier save created. That skill
+      // keeps its key when it moves to another unit of the course, so the
+      // lookup covers every unit of the course. The skill is returned as it is
+      // now, so a retry after a lost reply keeps any edits, moves, or
+      // confirmation that happened in between.
+      const courseUnits = await this.units.find({ course: course._id }, { projection: { _id: 1 } }).toArray();
+      const existing = await this.skills.findOne(
+        { unit: { $in: courseUnits.map(({ _id }) => _id) }, proposalKey },
+        { projection: { _id: 1 } },
+      );
       if (existing) {
         return { skill: existing._id };
       }
@@ -1039,8 +1047,10 @@ export async function createSkillMapping(
   await units.createIndex({ course: 1, _id: 1 });
   await skills.createIndex({ unit: 1, _id: 1 });
   await skills.createIndex({ prerequisites: 1, status: 1 });
-  // Each unit and proposal key pair identifies at most one skill, so a repeated
-  // save cannot create a second draft. The index is partial rather than sparse.
+  // Concurrent saves of one draft send the same unit and key, so this index
+  // stops them from both creating a skill. The course-wide lookup in propose
+  // finds a draft that later moved to another unit. The index is partial
+  // rather than sparse.
   // Every skill has a unit, so a sparse compound index would still include the
   // skills saved without a key, all under a null key, and two of them in one
   // unit would break it.

@@ -57,7 +57,7 @@ Rule: a revised version's previous version is the version of the same skill that
 Rule: an outcome describes the ability. A gate describes the complete demonstration required for that ability.
 Rule: a confirmed skill's prerequisites are confirmed skills in the same course. A skill cannot require itself, and prerequisite links cannot form a cycle. Archived skills may retain links to archived prerequisites.
 Rule: blank text is empty or contains only whitespace. Titles, outcomes, and gates are not blank.
-Rule: a proposal key is a nonblank string of at most 100 characters. Each unit and key pair identifies at most one skill. Proposing again with a used pair returns that skill, whatever its current content, and creates nothing.
+Rule: a proposal key is a nonblank string of at most 100 characters. Each course and key pair identifies at most one skill, and a skill keeps its key when it moves to another unit of its course. Proposing again with a key that a skill in the unit's course already has returns that skill, whatever its current unit and content, and creates nothing.
 Rule: no query returns a partial skill or version. A version whose skill does not exist is not returned. If an action stops partway, repeating the same request finishes it or is refused.
 Rule: new identities are unique. A refused action changes no state. Unmentioned state stays unchanged.
 ```
@@ -105,11 +105,11 @@ propose(owner: User, unit: Unit, proposalKey: String, title: String, outcome: St
   where unit belongs to owner, title, outcome, and gate are not blank, and proposalKey is invalid
   then
     refuses INVALID_SKILL_PROPOSAL_KEY "Provide a nonblank proposal key of at most 100 characters."
-  where input is valid and a skill in unit already has proposalKey
+  where input is valid and a skill in unit's course already has proposalKey
   then
-    use that skill and keep its current content, version, and status unchanged
+    use that skill and keep its current unit, content, version, and status unchanged
     returns skill
-  where input is valid and no skill in unit has proposalKey
+  where input is valid and no skill in unit's course has proposalKey
   then
     create a version with outcome and gate for a new skill
     create that skill with unit, proposalKey, title, materials, an empty prerequisites set, that version as current, and status DRAFT
