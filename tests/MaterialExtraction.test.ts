@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 import { strToU8, zipSync } from "fflate";
 import {
   ARCHIVE, classify, extract, IMAGE_UNREADABLE, joinContent, MAX_TEXT, OFFICE_LIMITATION, OLD_OFFICE, OTHER_AUDIO, OTHER_IMAGE, OTHER_VIDEO,
-  RECORDING_TOO_LONG, RECORDING_UNREADABLE, TOO_MUCH_TEXT, UNSUPPORTED,
+  RECORDING_TOO_LONG, RECORDING_UNREADABLE, TOO_MUCH_TEXT, transcriptText, UNSUPPORTED,
 } from "../src/host/extract.ts";
 import { wholeSeconds } from "../src/host/media-detect.ts";
 import { docx, pdf, png, pptx, xlsx } from "./fixtures/office.ts";
@@ -217,6 +217,69 @@ describe("Text, notebooks, and images", () => {
   test("an unknown extension is read as text when it is UTF-8", async () => {
     expect(texts((await read("Makefile", strToU8("all:\n\techo hi\n"))).renditions)).toEqual([[`${key}/lines/1-2`, "all:\n\techo hi"]]);
     expect(classify("notes.tex", strToU8("\\section{A}"))).toEqual({ kind: "text" });
+  });
+});
+
+describe("Caption files", () => {
+  const vtt = [
+    "WEBVTT Kind: captions", "Language: en", "",
+    "NOTE Recorded in lecture 3.", "This note has two lines.", "",
+    "STYLE", "::cue { color: yellow }", "",
+    "intro", "00:00:00.000 --> 00:00:02.500 align:start position:10%", "<v Professor Jackson>Welcome back. Today we look at", "<i>concept design</i>.", "",
+    "00:00:02.600 --> 00:00:04.000", "It starts from purposes &amp; ends", "",
+    // A long pause after a cue that does not end a sentence keeps the paragraph going.
+    "00:00:07.000 --> 00:00:08.000", "with <00:00:07.500><c>syncs</c>.", "",
+    "00:00:11.000 --> 00:00:12.000", "<v Professor Jackson>After a pause, a new paragraph.", "",
+    "3", "00:00:12.200 --> 00:00:13.000", "<v.loud Student>Can a concept   have two purposes?", "",
+  ].join("\n");
+  const vttText = "Professor Jackson: Welcome back. Today we look at concept design. It starts from purposes & ends with syncs.\n\n" +
+    "Professor Jackson: After a pause, a new paragraph.\n\nStudent: Can a concept have two purposes?";
+
+  test("a WebVTT file is read as paragraphs without its header, notes, styles, cue names, times, or tags", async () => {
+    expect(transcriptText(vtt)).toBe(vttText);
+    const result = await read("lecture3.vtt", strToU8(vtt));
+    expect(texts(result.renditions)).toEqual([[`${key}/lines/1-5`, vttText]]);
+    expect(result.limitations).toEqual([]);
+    // The original stays as it was received; only its readable text changes.
+    expect(result).toMatchObject({ file: reference, name: "lecture3.vtt", mediaType: "application/octet-stream" });
+  });
+
+  test("a SubRip file is read as paragraphs without its cue numbers, times, or tags", async () => {
+    const srt = "1\r\n00:00:01,000 --> 00:00:03,000\r\n<i>Matrix multiplication</i> is not\r\ncommutative.\r\n\r\n" +
+      "2\r\n00:00:03,500 --> 00:00:05,000\r\n<font color=\"#ffff00\">AB</font> and BA can differ.\r\n\r\n" +
+      "3\r\n00:00:08,000 --> 00:00:10,000\r\nCheck the inner dimensions first.\r\n";
+    const text = "Matrix multiplication is not commutative. AB and BA can differ.\n\nCheck the inner dimensions first.";
+    expect(texts((await read("lecture.srt", strToU8(srt))).renditions)).toEqual([[`${key}/lines/1-3`, text]]);
+  });
+
+  test("a caption file is recognized by its content, whatever its name", async () => {
+    expect(texts((await read("captions.txt", strToU8(vtt))).renditions)).toEqual([[`${key}/lines/1-5`, vttText]]);
+    expect(texts((await read("notes.vtt", strToU8("Not captions\n"))).renditions)).toEqual([[`${key}/lines/1-1`, "Not captions"]]);
+  });
+
+  test("ordinary text that mentions cue times is unchanged", async () => {
+    const notes = "Lecture notes\n00:00:01.000 --> 00:00:02.000 is how a cue time looks.\n\n1. Read <i>Chapter 3</i> &amp; take notes.";
+    expect(transcriptText(notes)).toBeNull();
+    expect(texts((await read("notes.txt", strToU8(notes))).renditions)).toEqual([[`${key}/lines/1-4`, notes]]);
+  });
+
+  test("speakers, pauses, and loosely written cues", () => {
+    // A voice tag starts a paragraph when the speaker changes; a cue without one continues the current speaker.
+    expect(transcriptText("WEBVTT\n00:01.000 --> 00:02.000\n<v Ann>Hi.\n<v Bob>Hello <b>there</b>.\n\n00:02.500 --> 00:03.000\nStill Bob.\n\n" +
+      "00:06.000 --> 00:07.000\nAfter a pause.")).toBe("Ann: Hi.\n\nBob: Hello there. Still Bob.\n\nBob: After a pause.");
+    // Cues without a blank line between them, text after a blank line inside a cue, and angle brackets that are not tags.
+    expect(transcriptText("1\n00:00:01,000 --> 00:00:02,000\nNo blank line.\n2\n00:00:02,000 --> 00:00:03,000\nNext cue.\n\nSame cue. x < y, a<b and c>d"))
+      .toBe("No blank line. Next cue. Same cue. x < y, a<b and c>d");
+  });
+
+  test("blocks hold 100 lines and end with a paragraph, and a file with no cue text has no readable text", async () => {
+    const cues = Array.from({ length: 60 }, (_, i) => `${i + 1}\n00:${String(i).padStart(2, "0")}:00,000 --> 00:${String(i).padStart(2, "0")}:01,000\nSentence ${i + 1}.`);
+    const result = await read("long.srt", strToU8(cues.join("\n\n")));
+    const paragraphs = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => `Sentence ${from + i}.`).join("\n\n");
+    expect(texts(result.renditions)).toEqual([[`${key}/lines/1-99`, paragraphs(1, 50)], [`${key}/lines/101-119`, paragraphs(51, 60)]]);
+    const empty = await read("empty.vtt", strToU8("WEBVTT\n\nNOTE Nothing was said.\n\n00:01.000 --> 00:02.000\n<c> </c>\n"));
+    expect(empty.renditions).toEqual([]);
+    expect(empty.content).toBe("");
   });
 });
 
