@@ -583,8 +583,10 @@ Authored path: `Reads.ActiveSkill`.
 ### (owner) has an activity in progress
 
 Authored path: `Planning.ActivityInProgress`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 49.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 29.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 31.
+- Covered by [Progress reactions](../design/compositions/Progress.md), line 35.
 
 ```view
 (owner) has an activity in progress — inputs (owner); outputs (); bindings (course)
@@ -3306,6 +3308,7 @@ where
   MasteryEstimating._track (definition, learner: owner, subject: skill) has (track)
   MasteryEstimating._adjustments (track) has (adjustment)
   view "(owner) can refresh routine reviews in (course)" with (course, owner)
+  no view "(owner) has an activity in progress" with (owner)
   view "review inputs for (owner) in (course)" with (course, owner) has (basis)
   StudyPlanning._plans (owner, scope: course) has (plan, status)
   status is among ["PROPOSED", "ACTIVE"]
@@ -3329,6 +3332,26 @@ where
   MasteryEstimating._track (definition, learner: owner, subject: skill) has (track)
   MasteryEstimating._adjustments (track) has (adjustment)
   no view "(owner) can refresh routine reviews in (course)" with (course, owner)
+  earlier, RequestBoundary.request (adjustmentKey, path: "/learning/adjust", reason, requestId, session, skill, value)
+then
+  RequestBoundary.respond (adjustment, requestId)
+```
+
+### Learning.Adjust:active:waiting#3
+
+Authored path: `Learning.Adjust`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 33.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 111.
+
+```reaction
+when MasteryEstimating.adjust (adjustmentKey, definition, learner: owner, reason, subject: skill, value, adjustment), asked by Learning.Adjust:active#2
+at the flow's settlement frontier
+where
+  view "(owner) can study confirmed (skill)" with (owner, skill) has (course, definition)
+  MasteryEstimating._track (definition, learner: owner, subject: skill) has (track)
+  MasteryEstimating._adjustments (track) has (adjustment)
+  view "(owner) can refresh routine reviews in (course)" with (course, owner)
+  view "(owner) has an activity in progress" with (owner)
   earlier, RequestBoundary.request (adjustmentKey, path: "/learning/adjust", reason, requestId, session, skill, value)
 then
   RequestBoundary.respond (adjustment, requestId)
@@ -3360,6 +3383,7 @@ when RequestBoundary.respond (detail: "Choose one of your confirmed skills befor
 at the flow's settlement frontier
 where
   earlier, Sessioning.use (session, subject: owner), asked by Learning.Adjust
+  no view "(owner) has an activity in progress" with (owner)
   earlier, RequestBoundary.request (adjustmentKey, path: "/learning/adjust", reason, requestId, session, skill, value)
   view "(owner) can study confirmed (skill)" with (owner, skill) has (course, definition)
   MasteryEstimating._track (definition, learner: owner, subject: skill) has (track)
@@ -3389,6 +3413,27 @@ where
   MasteryEstimating._track (definition, learner: owner, subject: skill) has (track)
   MasteryEstimating._adjustments (track) has (adjustment)
   no view "(owner) can refresh routine reviews in (course)" with (course, owner)
+then
+  RequestBoundary.respond (adjustment, requestId)
+```
+
+### Learning.Adjust:missing:waiting#3
+
+Authored path: `Learning.Adjust`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 33.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 111.
+
+```reaction
+when RequestBoundary.respond (detail: "Choose one of your confirmed skills before adjusting its estimate.", error: "SKILL_UNAVAILABLE", requestId), asked by Learning.Adjust:missing#2
+at the flow's settlement frontier
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Learning.Adjust
+  view "(owner) has an activity in progress" with (owner)
+  earlier, RequestBoundary.request (adjustmentKey, path: "/learning/adjust", reason, requestId, session, skill, value)
+  view "(owner) can study confirmed (skill)" with (owner, skill) has (course, definition)
+  MasteryEstimating._track (definition, learner: owner, subject: skill) has (track)
+  MasteryEstimating._adjustments (track) has (adjustment)
+  view "(owner) can refresh routine reviews in (course)" with (course, owner)
 then
   RequestBoundary.respond (adjustment, requestId)
 ```
@@ -4406,6 +4451,7 @@ at the flow's settlement frontier
 where
   view "(owner) owns study skill (skill)" with (owner, skill) has (course)
   view "(owner) can refresh routine reviews in (course)" with (course, owner)
+  no view "(owner) has an activity in progress" with (owner)
   view "review inputs for (owner) in (course)" with (course, owner) has (basis, candidates, explanation, horizonEnd)
 then
   StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false)
@@ -6147,6 +6193,7 @@ Authored path: `Progress.ReplanAfterBudget`.
 when StudyPlanning.configure (owner, scope: course)
 where
   view "(owner) can refresh routine reviews in (course)" with (course, owner)
+  no view "(owner) has an activity in progress" with (owner)
   view "review inputs for (owner) in (course)" with (course, owner) has (basis, candidates, explanation, horizonEnd)
 then
   StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false)
@@ -6163,6 +6210,7 @@ at the flow's settlement frontier
 where
   view "(owner) owns study skill (skill)" with (owner, skill) has (course)
   view "(owner) can refresh routine reviews in (course)" with (course, owner)
+  no view "(owner) has an activity in progress" with (owner)
   view "review inputs for (owner) in (course)" with (course, owner) has (basis, candidates, explanation, horizonEnd)
 then
   StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false)
@@ -6179,6 +6227,7 @@ at the flow's settlement frontier
 where
   view "(owner) owns study skill (skill)" with (owner, skill) has (course)
   view "(owner) can refresh routine reviews in (course)" with (course, owner)
+  no view "(owner) has an activity in progress" with (owner)
   view "review inputs for (owner) in (course)" with (course, owner) has (basis, candidates, explanation, horizonEnd)
 then
   StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false)
@@ -6195,6 +6244,7 @@ when StudyPlanning.finish (owner)
 where
   SkillMapping._courses (owner) has (course)
   view "(owner) can refresh routine reviews in (course)" with (course, owner)
+  no view "(owner) has an activity in progress" with (owner)
   view "review inputs for (owner) in (course)" with (course, owner) has (basis, candidates, explanation, horizonEnd)
 then
   StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false)
@@ -6210,6 +6260,7 @@ when StudyPlanning.miss (item, owner)
 where
   StudyPlanning._item (item) has (owner, scope: course)
   view "(owner) can refresh routine reviews in (course)" with (course, owner)
+  no view "(owner) has an activity in progress" with (owner)
   view "review inputs for (owner) in (course)" with (course, owner) has (basis, candidates, explanation, horizonEnd)
 then
   StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false)
@@ -6226,6 +6277,7 @@ when StudyPlanning.stop (owner)
 where
   SkillMapping._courses (owner) has (course)
   view "(owner) can refresh routine reviews in (course)" with (course, owner)
+  no view "(owner) has an activity in progress" with (owner)
   view "review inputs for (owner) in (course)" with (course, owner) has (basis, candidates, explanation, horizonEnd)
 then
   StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false)

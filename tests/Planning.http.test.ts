@@ -333,6 +333,40 @@ test("an activity elsewhere keeps the plan until it ends; finishing or stopping 
   expect(read.data.plan!.items.every(({ candidate }) => candidate.deadlineRefs.length === 0)).toBe(true);
 }, 60_000);
 
+test("an activity in one course does not refuse a budget, a missed activity, or an adjustment in another; finishing refreshes both", async () => {
+  const app = await setup(), noa = await app.learner("replan-noa");
+  const physics = await noa.course("Physics", ["Forces"]);
+  const algebra = await noa.course("Linear algebra", ["Vectors", "Matrices"]);
+  await noa.ok("/learning/confidence", { skill: algebra.skills[0], confidence: 60 });
+  await noa.ok("/planning/configure", { course: physics.course, dailyMinutes: 30 });
+  await noa.ok("/planning/configure", { course: algebra.course, dailyMinutes: 10 });
+  const physicsPlan = await noa.read(physics.course), algebraPlan = await noa.read(algebra.course);
+  await noa.ok("/planning/begin", { course: physics.course, item: physicsPlan.data.next!.item });
+
+  // A new budget in the other course is saved and answered; its plan waits for the activity to end.
+  expect(await noa.post("/planning/configure", { course: algebra.course, dailyMinutes: 40 })).toMatchObject({ status: 200 });
+  let read = await noa.read(algebra.course);
+  expect(read.data).toMatchObject({ preferences: { dailyMinutes: 40 } });
+  expect(read.data.plan!.plan).toBe(algebraPlan.data.plan!.plan);
+  // Marking an activity of the other course missed is answered and saved, and the plan waits too.
+  const missed = algebraPlan.data.next!.item;
+  expect(await noa.post("/planning/miss", { course: algebra.course, item: missed })).toEqual({ status: 200, body: { item: missed } });
+  // An estimate adjustment in the other course is answered as well.
+  expect(await noa.post("/learning/adjust", { skill: algebra.skills[0], adjustmentKey: crypto.randomUUID(), value: 30, reason: "I forgot most of it." }))
+    .toEqual({ status: 200, body: { adjustment: expect.any(String) } });
+  read = await noa.read(algebra.course);
+  expect(read.data.plan!.plan).toBe(algebraPlan.data.plan!.plan);
+  expect(read.data.plan!.items.find(({ item }) => item === missed)!.status).toBe("MISSED");
+  expect((await noa.read(physics.course)).data.next).toMatchObject({ item: physicsPlan.data.next!.item, status: "IN_PROGRESS" });
+
+  // Finishing the physics activity refreshes both courses.
+  await noa.ok("/planning/finish", { course: physics.course, item: physicsPlan.data.next!.item, actualMinutes: 12 });
+  expect((await noa.read(physics.course)).data.plan!.plan).not.toBe(physicsPlan.data.plan!.plan);
+  read = await noa.read(algebra.course);
+  expect(read.data.plan!.plan).not.toBe(algebraPlan.data.plan!.plan);
+  expect(read.data).toMatchObject({ preferences: { dailyMinutes: 40 }, plan: { status: "ACTIVE" } });
+}, 60_000);
+
 test("urgent mode skips the prerequisite check only for exam work of an urgent active plan whose exam is still active", async () => {
   const app = await setup(), rio = await app.learner("exam-rio");
   const { course, skills: [base, next] } = await rio.course("Linear algebra", ["Vectors", "Matrices"]);

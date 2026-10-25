@@ -4,6 +4,7 @@ import { concepts, computations as C } from "../concepts.ts";
 import { composition as Courses } from "./courses.ts";
 import { composition as Settings } from "./settings.ts";
 import * as R from "./learning-reads.ts";
+import { ActivityInProgress } from "./planning.ts";
 import { learningInput, structuredOutput, validators } from "./reusable/inputs.ts";
 const { Sessioning, Library, GroundedTutoring: Tutoring, AssessmentReviewing: Assessment, MasteryEstimating: Mastery, StudyPlanning: Planning, TutorGenerating: AI } = concepts;
 const options = { validators: { ...validators, input: learningInput, output: structuredOutput } };
@@ -188,9 +189,10 @@ const Regrade = endpoint("/learning/regrade", ({ session, case: assessment, base
     .then(Assessment.revise({ author: owner, case: assessment, basedOn, result, gateMet, rationale, origin: "AI" }).responds({ judgment })))
   .afterFlowSettles().then(respond({ judgment, tutor: Settings.SentTutor({ request: prepared }) })), options);
 // The learner sets the estimate by hand. The settled stage answers only in a terminal state of ReplanAfterAdjustment:
-// no replan can run, or a proposed or active plan carries the current fingerprint, which includes this adjustment.
-// Until then it does not answer, so a refused replan reaches the learner as the answer.
-// It reads the saved adjustment again; the missing path never reaches it because ActiveSkill does not hold there.
+// no replan can run, because CanReplan fails or an activity is in progress in another course, or a proposed or active plan
+// carries the current fingerprint, which includes this adjustment. Until then it does not answer, so a refused replan
+// reaches the learner as the answer. It reads the saved adjustment again; the missing path never reaches it because
+// ActiveSkill does not hold there.
 const Adjust = endpoint("/learning/adjust", ({ session, skill, adjustmentKey, value, reason, owner, course, definition, track, adjustment, basis, plan, status }) => receive({ session, skill, adjustmentKey, value, reason })
   .then(Sessioning.use({ session }).responds({ subject: owner })).then(
     where(R.ActiveSkill({ owner, skill }).is({ definition }))
@@ -201,12 +203,14 @@ const Adjust = endpoint("/learning/adjust", ({ session, skill, adjustmentKey, va
     where(R.ActiveSkill({ owner, skill }).is({ course, definition }), Mastery._track({ learner: owner, subject: skill, definition }).is({ track }),
       Mastery._adjustments({ track }).is({ adjustment }), no(R.CanReplan({ owner, course }))).then(respond({ adjustment })).named("unplanned"),
     where(R.ActiveSkill({ owner, skill }).is({ course, definition }), Mastery._track({ learner: owner, subject: skill, definition }).is({ track }),
-      Mastery._adjustments({ track }).is({ adjustment }), R.CanReplan({ owner, course }), R.PlanContext({ owner, course }).is({ basis }),
+      Mastery._adjustments({ track }).is({ adjustment }), R.CanReplan({ owner, course }), ActivityInProgress({ owner })).then(respond({ adjustment })).named("waiting"),
+    where(R.ActiveSkill({ owner, skill }).is({ course, definition }), Mastery._track({ learner: owner, subject: skill, definition }).is({ track }),
+      Mastery._adjustments({ track }).is({ adjustment }), R.CanReplan({ owner, course }), no(ActivityInProgress({ owner })), R.PlanContext({ owner, course }).is({ basis }),
       Planning._plans({ owner, scope: course }).is({ plan, status }), is.among(status, ["PROPOSED", "ACTIVE"]), Planning._plan({ plan }).is({ basis }))
       .then(respond({ adjustment })).named("planned"),
   ), options);
 const ReplanAfterAdjustment = reaction(({ owner, skill, course, candidates, horizonEnd, basis, explanation }) => when(Mastery.adjust({ learner: owner, subject: skill }).responds({}))
-  .afterFlowSettles().where(R.OwnedSkill({ owner, skill }).is({ course }), R.CanReplan({ owner, course }), R.PlanContext({ owner, course }).is({ candidates, horizonEnd, basis, explanation }))
+  .afterFlowSettles().where(R.OwnedSkill({ owner, skill }).is({ course }), R.CanReplan({ owner, course }), no(ActivityInProgress({ owner })), R.PlanContext({ owner, course }).is({ candidates, horizonEnd, basis, explanation }))
   .then(Planning.replan({ owner, scope: course, candidates, horizonEnd, basis, explanation, workloadComplete: false })));
 // Graded work is evidence, not a teaching source. The check applies only to the learner's own material in a course they own;
 // any other material keeps the admission refusal. Every branch shares the stages that follow, so the tutor request lives there

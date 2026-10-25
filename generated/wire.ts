@@ -369,6 +369,10 @@ export type StillGotItWire = {
     } | {
       "adjustment": Jsonify<AllOf<[AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["adjust"]>>, ["adjustment"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_adjustments"]>>>, ["adjustment"]>]>>;
     } | {
+      "adjustment": Jsonify<AllOf<[AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["adjust"]>>, ["adjustment"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_adjustments"]>>>, ["adjustment"]>]>>;
+    } | {
+      "adjustment": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_adjustments"]>>>, ["adjustment"]>>;
+    } | {
       "adjustment": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_adjustments"]>>>, ["adjustment"]>>;
     } | {
       "adjustment": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_adjustments"]>>>, ["adjustment"]>>;
@@ -1160,6 +1164,10 @@ export type StillGotItHttp = {
       "adjustment": Jsonify<AllOf<[AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["adjust"]>>, ["adjustment"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_adjustments"]>>>, ["adjustment"]>]>>;
     } | {
       "adjustment": Jsonify<AllOf<[AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["adjust"]>>, ["adjustment"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_adjustments"]>>>, ["adjustment"]>]>>;
+    } | {
+      "adjustment": Jsonify<AllOf<[AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["adjust"]>>, ["adjustment"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_adjustments"]>>>, ["adjustment"]>]>>;
+    } | {
+      "adjustment": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_adjustments"]>>>, ["adjustment"]>>;
     } | {
       "adjustment": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_adjustments"]>>>, ["adjustment"]>>;
     } | {

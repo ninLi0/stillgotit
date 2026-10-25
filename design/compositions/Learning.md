@@ -46,7 +46,7 @@ An adjustment never makes a skill ready by itself. The concept's readiness rule 
 [ReplanAfterAdjustment](reaction:Learning.ReplanAfterAdjustment) proposes new reviews after an adjustment, the same way ReplanAfterEvidence does after evidence in the [progress reactions](Progress.md). It belongs to this composition so this work does not edit the progress composition.
 
 - When `MasteryEstimating.adjust` succeeds for a learner and skill, it waits for ordinary work in that flow to settle.
-- Where [OwnedSkill](view:Reads.OwnedSkill) gives the skill's course, [CanReplan](view:Reads.CanReplan) holds for the learner and that course, and [PlanContext](view:Reads.PlanContext) gives the review candidates, horizon end, explanation, and fingerprint,
+- Where [OwnedSkill](view:Reads.OwnedSkill) gives the skill's course, [CanReplan](view:Reads.CanReplan) holds for the learner and that course, [ActivityInProgress](view:Planning.ActivityInProgress) does not hold for the learner, and [PlanContext](view:Reads.PlanContext) gives the review candidates, horizon end, explanation, and fingerprint,
 - then it calls `StudyPlanning.replan` with the learner, the course as scope, those values, and `workloadComplete` false.
 
 Planning sees adjustments because the tracks PlanContext reads now list each track's adjustments. The intended effect of this replan is:
@@ -57,7 +57,7 @@ Planning sees adjustments because the tracks PlanContext reads now list each tra
 
 [planRequest](computation:planRequest) states how candidate keys and the fingerprint carry adjustments.
 
-When CanReplan does not hold, because the course has no saved budget or an activity is in progress, no proposal is made. That is not a failure. The Adjust endpoint waits for this reaction before answering. If the replan is refused or faults, the answer is that failure: the planning concept's refusal message, or the general internal error. The adjustment stays saved, because one concept's write is not rolled back when another concept fails. The answer cannot say which step failed, so after any failed or lost reply the page:
+When CanReplan does not hold, because the course has no saved budget or an activity is in progress in it, no proposal is made. When an activity is in progress in another course, ActivityInProgress holds and no proposal is made either, because the planning concept would refuse it; finishing or stopping that activity refreshes this course. Neither case is a failure, and the Adjust endpoint answers with the saved adjustment. The Adjust endpoint waits for this reaction before answering. If the replan is refused or faults, the answer is that failure: the planning concept's refusal message, or the general internal error. The adjustment stays saved, because one concept's write is not rolled back when another concept fails. The answer cannot say which step failed, so after any failed or lost reply the page:
 
 - shows the failure's message, followed by "The timeline below shows whether your adjustment was saved. Sending it again will not add it twice.";
 - reads the skill again, so the timeline shows whether the adjustment was saved; and
