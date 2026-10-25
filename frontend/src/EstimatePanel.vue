@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
+import EstimateChart from "./EstimateChart.vue";
 import { api, errorMessage, failureText } from "./api.ts";
+import type { ChartPoint } from "./estimate-chart.ts";
 import { focusedControl, restoreFocus } from "./focus.ts";
 import { planDay, resultLabels } from "./labels.ts";
 import { PendingAdjustment, sessionStore, type AdjustmentInput } from "./pending-adjustment.ts";
@@ -131,6 +133,13 @@ const basisText = computed(() => {
   return basis && basis !== props.data.estimate?.basis.trim() ? basis : "";
 });
 function openCase(item: Case) { if (item.task) emit("openSession", item.task); }
+/** The chart's points: the starting point, then every change in the concept's order, with the timeline's own labels. */
+const chartPoints = computed<ChartPoint[]>(() => {
+  const explanation = props.data.explanation;
+  if (!explanation) return [];
+  return [{ at: explanation.start.at, kind: "START", before: null, after: explanation.start.confidence, label: "Starting point" },
+    ...explanation.changes.map((change): ChartPoint => ({ at: change.at, kind: change.kind, before: change.before, after: change.after, label: kindLabel(change) }))];
+});
 </script>
 
 <template>
@@ -163,6 +172,8 @@ function openCase(item: Case) { if (item.task) emit("openSession", item.task); }
     <div role="status"><p v-if="sending" class="working-note">Saving your adjustment…</p><p v-else-if="saved" ref="savedBox" class="notice" tabindex="-1">{{ saved }}</p></div>
 
     <template v-if="data.explanation">
+      <h3 id="estimate-chart-heading">Estimate over time</h3>
+      <EstimateChart :points="chartPoints" :provisional="data.explanation.provisional" labelledby="estimate-chart-heading" />
       <h3>How the estimate got here</h3>
       <p v-if="basisText" class="basis">{{ basisText }}</p>
       <p v-if="data.explanation.provisional" class="basis"><span class="provisional">Provisional</span>No assessed attempt has counted toward this estimate yet.</p>

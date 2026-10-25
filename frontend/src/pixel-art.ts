@@ -7,6 +7,8 @@ export const PAL: Record<string, string> = {
   B: "#2F7D9B", b: "#2A6B85", s: "#63A7C1", w: "#D6E4EC", k: "#12333F", R: "#D9663A", r: "#B5502B", o: "#EE9C78", Y: "#E3A233",
   y: "#C08324", l: "#F3CD7A", G: "#2F8A5F", g: "#256F4C", h: "#6DB892", P: "#6B5BD2", p: "#5546B0", v: "#9A8EE6", S: "#5C6B73",
   d: "#48555C", E: "#8E9BA2", e: "#AEBAC0", f: "#CBD5DA", c: "#E9D6A8", C: "#CDB884", W: "#FFFFFF",
+  // The filled mastery cell's green (MasteryCells.vue), for marks that stand for the estimate itself.
+  m: "#4A775A",
 };
 
 /** The mastery cells: `n` squares, the first `round(p% × n)` filled. */
@@ -54,6 +56,36 @@ export const SPRITES = {
   flag: [".......", "...dRR.", "...dRo.", "...d...", "...d...", "...d...", "......."],
 } as const;
 export type Stage = keyof typeof SPRITES;
+
+/**
+ * The evidence marks, 10×10, shared by the estimate chart's markers and the evidence timeline's row icons: a hollow
+ * square for the starting point, a filled square for an assessed attempt, a hollow diamond for the learner's own
+ * adjustment, a falling stair for time without practice, and a grey square for an attempt that did not count.
+ */
+export const MARKS = {
+  start: ["..........", ".SSSSSSSS.", ".SSSSSSSS.", ".SS....SS.", ".SS....SS.", ".SS....SS.", ".SS....SS.", ".SSSSSSSS.", ".SSSSSSSS.", ".........."],
+  attempt: ["..........", ".pppppppp.", ".pppppppp.", ".pppppppp.", ".pppppppp.", ".pppppppp.", ".pppppppp.", ".pppppppp.", ".pppppppp.", ".........."],
+  adjustment: ["....pp....", "...pppp...", "..pp..pp..", ".pp....pp.", "pp......pp", "pp......pp", ".pp....pp.", "..pp..pp..", "...pppp...", "....pp...."],
+  time: ["..........", "mmmm......", "mmmm......", "..mm......", "..mmmmm...", "..mmmmm...", ".....mm...", ".....mmmmm", ".....mmmmm", ".........."],
+  ignored: ["..........", ".EEEEEEEE.", ".EEEEEEEE.", ".EEEEEEEE.", ".EEEEEEEE.", ".EEEEEEEE.", ".EEEEEEEE.", ".EEEEEEEE.", ".EEEEEEEE.", ".........."],
+} as const;
+export type MarkName = keyof typeof MARKS;
+
+/** A grid grown by `r` cells on every side, every cell near a filled one filled white: the 2px surface ring behind a mark. */
+export function ringOf(rows: readonly string[], r = 2): string[] {
+  const filled = (x: number, y: number) => { const ch = rows[y]?.[x]; return ch !== undefined && ch !== "."; };
+  const width = rows[0]?.length ?? 0, out: string[] = [];
+  for (let y = -r; y < rows.length + r; y++) {
+    let line = "";
+    for (let x = -r; x < width + r; x++) {
+      let on = false;
+      for (let dy = -r; dy <= r && !on; dy++) for (let dx = -r; dx <= r && !on; dx++) on = filled(x + dx, y + dy);
+      line += on ? "W" : ".";
+    }
+    out.push(line);
+  }
+  return out;
+}
 
 /** The growth stage of a mastery value: no estimate is a bud; then sprout, leaf, full and bloom at 35, 65 and 80. */
 export function stageOf(m: number | undefined | null): Stage {
