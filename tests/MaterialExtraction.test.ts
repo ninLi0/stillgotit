@@ -272,6 +272,52 @@ describe("Caption files", () => {
       .toBe("No blank line. Next cue. Same cue. x < y, a<b and c>d");
   });
 
+  test("a cue line that repeats the previous cue's last line is left out, as in rolling automatic captions", () => {
+    // YouTube's automatic captions as yt-dlp saves them: each cue repeats the line before it, and short cues repeat it again.
+    const rolling = [
+      "WEBVTT", "Kind: captions", "Language: en", "",
+      "00:00:00.160 --> 00:00:02.869 align:start position:0%", " ",
+      "so<00:00:00.480><c> today</c><00:00:00.800><c> we're</c><00:00:01.040><c> going</c><00:00:01.280><c> to</c>", "",
+      "00:00:02.869 --> 00:00:02.879 align:start position:0%", "so today we're going to", " ", "",
+      "00:00:02.879 --> 00:00:05.990 align:start position:0%", "so today we're going to", "talk<00:00:03.200><c> about</c><00:00:03.520><c> eigenvalues</c>", "",
+      "00:00:05.990 --> 00:00:06.000 align:start position:0%", "talk about eigenvalues", " ", "",
+      "00:00:06.000 --> 00:00:08.000 align:start position:0%", "talk about eigenvalues", "and<00:00:06.400><c> eigenvectors</c>", "",
+    ].join("\n");
+    expect(transcriptText(rolling)).toBe("so today we're going to talk about eigenvalues and eigenvectors");
+    // Only a repeat at the top of the next cue is left out; the same words said again later stay.
+    expect(transcriptText("WEBVTT\n\n00:01.000 --> 00:02.000\nYes.\n\n00:02.000 --> 00:03.000\nNo.\n\n00:03.000 --> 00:04.000\nYes.\nYes."))
+      .toBe("Yes. No. Yes. Yes.");
+  });
+
+  test("a short name and a colon that start most cues are read as the speaker, as in Zoom transcripts", () => {
+    const cues = (...texts: string[]) => `WEBVTT\n\n${texts.map((text, i) => `${i + 1}\n00:00:${String(2 * i).padStart(2, "0")}.000 --> 00:00:${String(2 * i + 1).padStart(2, "0")}.500\n${text}`).join("\n\n")}`;
+    const zoom = cues("Eric Ni: Okay, let's get started.", "Eric Ni: Today we finish the proof.", "Sam Lee: Can you repeat the last step?", "Eric Ni: Sure. Note: the kernel is trivial.");
+    expect(transcriptText(zoom)).toBe("Eric Ni: Okay, let's get started. Today we finish the proof.\n\nSam Lee: Can you repeat the last step?\n\nEric Ni: Sure. Note: the kernel is trivial.");
+    // Labels that never repeat, or that start only half of the cues, stay as text.
+    expect(transcriptText(cues("Definition: a group is a set.", "It has an operation.", "Example: the integers.")))
+      .toBe("Definition: a group is a set. It has an operation. Example: the integers.");
+    expect(transcriptText(cues("Eric Ni: Hello.", "More words.", "Still more.", "Eric Ni: Bye."))).toBe("Eric Ni: Hello. More words. Still more. Eric Ni: Bye.");
+  });
+
+  test("a paragraph that runs past a minute ends at the next sentence end, or at the longest pause when nothing ends a sentence", () => {
+    const stamp = (seconds: number) => {
+      const ms = Math.round(seconds * 1000), two = (n: number) => String(n).padStart(2, "0");
+      return `${two(Math.floor(ms / 3_600_000))}:${two(Math.floor(ms / 60_000) % 60)}:${two(Math.floor(ms / 1000) % 60)},${String(ms % 1000).padStart(3, "0")}`;
+    };
+    // Cue i runs from 5i to 5i + 4.5 seconds, so no pause between cues is longer than 2 seconds.
+    const srt = (count: number, text: (i: number) => string, end = (i: number) => 5 * i + 4.5) =>
+      Array.from({ length: count }, (_, i) => `${i + 1}\n${stamp(5 * i)} --> ${stamp(end(i))}\n${text(i)}`).join("\n\n");
+    const joined = (from: number, to: number, text: (i: number) => string) => Array.from({ length: to - from + 1 }, (_, i) => text(from + i)).join(" ");
+    // Punctuated: each paragraph ends with the first sentence that ends after it has run a minute (64.5 seconds here).
+    const sentence = (i: number) => `Sentence ${i}.`;
+    expect(transcriptText(srt(30, sentence))).toBe([joined(0, 12, sentence), joined(13, 25, sentence), joined(26, 29, sentence)].join("\n\n"));
+    // Unpunctuated: in the paragraph's second minute it ends at the longest pause (after cue 15), then at the first of equal pauses.
+    const word = (i: number) => `word ${i}`;
+    expect(transcriptText(srt(40, word, (i) => i === 15 ? 78 : 5 * i + 4.5))).toBe([joined(0, 15, word), joined(16, 28, word), joined(29, 39, word)].join("\n\n"));
+    // A pause that would leave less than half a minute after it does not split the paragraph.
+    expect(transcriptText(srt(16, word))).toBe(joined(0, 15, word));
+  });
+
   test("blocks hold 100 lines and end with a paragraph, and a file with no cue text has no readable text", async () => {
     const cues = Array.from({ length: 60 }, (_, i) => `${i + 1}\n00:${String(i).padStart(2, "0")}:00,000 --> 00:${String(i).padStart(2, "0")}:01,000\nSentence ${i + 1}.`);
     const result = await read("long.srt", strToU8(cues.join("\n\n")));

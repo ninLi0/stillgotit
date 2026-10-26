@@ -337,12 +337,22 @@ const CUE_TAG = /<\/(?:c|i|b|u|v|lang|ruby|rt|font|s)[ \t]*>|<(?:c|i|b|u|v|ruby|
 const SENTENCE_END = /[.!?…。！？]["'”’)\]]*$/;
 /** A paragraph ends with a sentence when the next cue starts more than this many seconds later. */
 const PAUSE_SECONDS = 2;
+/** A paragraph that has run this many seconds ends soon after, as `splitLong` describes. */
+const LONG_SECONDS = 60;
 
 const cueSeconds = (match: RegExpExecArray, at: number) =>
   Number(match[at] ?? 0) * 3600 + Number(match[at + 1]) * 60 + Number(match[at + 2]) + Number(match[at + 3]!.padEnd(3, "0")) / 1000;
 /** Cue text without its tags, with character references decoded and every run of whitespace made one space. */
 const cueText = (text: string) =>
   decodeXml(text.replace(CUE_TAG, "").replace(/&nbsp;/gi, " ").replace(/&(?:lrm|rlm);/gi, "")).replace(/[\s\x1c-\x1e\x85]+/g, " ").trim();
+/** Part of one cue line: the speaker its voice tag names, if it starts with one, and the cleaned text that follows. */
+type CuePiece = { voice?: string; text: string };
+const lineText = (pieces: readonly CuePiece[]) => pieces.map((piece) => piece.text).filter(Boolean).join(" ");
+/** A short name and a colon at the start of cue text, followed by what that speaker said: up to 40 characters with a letter. */
+function speakerPrefix(text: string): { speaker: string; rest: string } | null {
+  const match = /^([^\s:][^:]{0,39}):\s+(?=\S)/.exec(text), speaker = match?.[1]!.trim();
+  return match && speaker && /\p{L}/u.test(speaker) ? { speaker, rest: text.slice(match[0].length) } : null;
+}
 
 /**
  * The readable text of a WebVTT or SubRip caption file, or null when the text is neither. It keeps what was said, in
@@ -372,28 +382,87 @@ export function transcriptText(text: string): string | null {
     // Text after a blank line inside a cue stays with that cue.
     cues.at(-1)?.lines.push(line);
   });
-  const paragraphs: { speaker: string; parts: string[] }[] = [];
+  // Each cue's lines as cleaned pieces, split where a voice tag names a speaker.
+  let previousLine = "";
+  const spoken = cues.map(({ start, end, lines: cueLines }) => {
+    const pieces = cueLines.map((line) => {
+      const parts = line.split(VOICE), out: CuePiece[] = [];
+      for (let p = 0; p < parts.length; p += 2) out.push({ voice: p ? cueText(parts[p - 1]!) || undefined : undefined, text: cueText(parts[p]!) });
+      return out;
+    });
+    const written = pieces.filter((line) => lineText(line));
+    if (written.length) {
+      // Automatic captions roll: each cue repeats the previous cue's last line before adding its own. The repeat is left out.
+      const lastLine = lineText(written.at(-1)!);
+      if (lineText(written[0]!) === previousLine) for (const piece of written[0]!) piece.text = "";
+      previousLine = lastLine;
+    }
+    return { start, end, shown: written.length > 0, pieces: pieces.flat() };
+  });
+  // Zoom and other tools write the speaker as text, "Eric Ni: Okay.", instead of a voice tag. When no cue has a voice tag,
+  // more than half of the cues with text start with a short name and a colon, and some name starts two or more cues,
+  // each such name is read as a voice tag.
+  if (!spoken.some((cue) => cue.pieces.some((piece) => piece.voice))) {
+    const firsts = spoken.flatMap((cue) => cue.pieces.find((piece) => piece.text) ?? []), names = firsts.map((piece) => speakerPrefix(piece.text));
+    const counts = new Map<string, number>();
+    for (const name of names) if (name) counts.set(name.speaker, (counts.get(name.speaker) ?? 0) + 1);
+    if (2 * names.filter(Boolean).length > firsts.length && [...counts.values()].some((count) => count > 1)) {
+      firsts.forEach((piece, i) => { const name = names[i]; if (name) { piece.voice = name.speaker; piece.text = name.rest; } });
+    }
+  }
+  const paragraphs: Paragraph[] = [];
   let last: { end: number; text: string } | undefined;
-  for (const cue of cues) {
+  spoken.forEach((cue, index) => {
     // A voice tag names the speaker for the rest of its cue. A cue without one continues the current speaker.
     let speaker: string | undefined, said = "";
-    for (const line of cue.lines) {
-      const pieces = line.split(VOICE);
-      for (let p = 0; p < pieces.length; p += 2) {
-        if (p) speaker = cueText(pieces[p - 1]!) || speaker;
-        const piece = cueText(pieces[p]!);
-        if (!piece) continue;
-        let paragraph = paragraphs.at(-1);
-        const pause = !said && !!last && SENTENCE_END.test(last.text) && cue.start - last.end > PAUSE_SECONDS;
-        if (!paragraph || pause || (speaker !== undefined && speaker !== paragraph.speaker)) {
-          paragraph = { speaker: speaker ?? paragraph?.speaker ?? "", parts: [] };
-          paragraphs.push(paragraph);
-        }
-        paragraph.parts.push(piece);
-        said = piece;
+    for (const { voice, text: piece } of cue.pieces) {
+      if (voice) speaker = voice;
+      if (!piece) continue;
+      let paragraph = paragraphs.at(-1);
+      const pause = !said && !!last && SENTENCE_END.test(last.text) && cue.start - last.end > PAUSE_SECONDS;
+      if (!paragraph || pause || (speaker !== undefined && speaker !== paragraph.speaker)) {
+        paragraph = { speaker: speaker ?? paragraph?.speaker ?? "", said: [] };
+        paragraphs.push(paragraph);
       }
+      paragraph.said.push({ cue: index, start: cue.start, end: cue.end, text: piece });
+      said = piece;
     }
-    if (said) last = { end: cue.end, text: said };
+    if (cue.shown && !said) {
+      // A cue that only repeats earlier text still shows that text until it ends.
+      const previous = paragraphs.at(-1)?.said.at(-1);
+      if (previous) previous.end = Math.max(previous.end, cue.end);
+    }
+    if (cue.shown) last = { end: cue.end, text: said || last?.text || "" };
+  });
+  return paragraphs.flatMap(splitLong).map(({ speaker, said }) => (speaker ? `${speaker}: ` : "") + said.map((piece) => piece.text).join(" ")).join("\n\n");
+}
+
+/** One speaker's paragraph, as the pieces of cue text it joins, each with its cue's place and times. */
+type Paragraph = { speaker: string; said: { cue: number; start: number; end: number; text: string }[] };
+
+/**
+ * Splits a paragraph that runs long. Once it has run a minute, from the start of its first cue to the end of a cue, it ends
+ * at the next cue that ends a sentence. When no cue ends a sentence in that next minute, it ends instead at the longest
+ * pause between cues in that minute (the first of equal pauses) that leaves at least half a minute of the paragraph after
+ * it. Failing both, it ends at the first cue after that minute that leaves half a minute. The rest is split the same way.
+ */
+function splitLong({ speaker, said }: Paragraph): Paragraph[] {
+  const out: Paragraph[] = [];
+  for (;;) {
+    const start = said[0]!.start, finish = said.at(-1)!.end;
+    let sentence = -1, pause = -1, later = -1;
+    for (let i = 0; i + 1 < said.length && sentence < 0; i++) {
+      const piece = said[i]!, next = said[i + 1]!, ran = piece.end - start;
+      if (piece.cue === next.cue || ran < LONG_SECONDS) continue;
+      if (ran > 2 * LONG_SECONDS) { if (finish - piece.end >= LONG_SECONDS / 2) later = i; break; }
+      if (SENTENCE_END.test(piece.text)) sentence = i;
+      else if (finish - piece.end >= LONG_SECONDS / 2 && (pause < 0 || next.start - piece.end > said[pause + 1]!.start - said[pause]!.end)) pause = i;
+    }
+    const cut = sentence >= 0 ? sentence : pause >= 0 ? pause : later;
+    if (cut < 0) break;
+    out.push({ speaker, said: said.slice(0, cut + 1) });
+    said = said.slice(cut + 1);
   }
-  return paragraphs.map(({ speaker, parts }) => (speaker ? `${speaker}: ` : "") + parts.join(" ")).join("\n\n");
+  out.push({ speaker, said });
+  return out;
 }
