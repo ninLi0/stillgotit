@@ -1,11 +1,16 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { PAL, SPRITES, rng } from "./pixel-art.ts";
+import ContinueCard from "./ContinueCard.vue";
+import type { OpenSession } from "./continue-session.ts";
 
 // The Home hero scene (design/revamp/README.md): a pixel meadow drawn on a canvas at 4px cells × devicePixelRatio, a
 // dotted path from "You · today" past one post per day to the exam hill and its waving flag. The panel on top is the
-// slot. Clouds and the flag move on a 450ms tick unless the device asks for reduced motion.
-const props = withDefaults(defineProps<{ days?: number; sign?: { title: string; when: string } | null; progress?: number }>(), { days: 5, sign: null, progress: 0 });
+// slot. Clouds and the flag move on a 450ms tick unless the device asks for reduced motion. Below the scene, the
+// Continue card lists the open lessons and practice tasks; `open` asks the shell to open a row's skill.
+const props = withDefaults(defineProps<{ days?: number; sign?: { title: string; when: string } | null; progress?: number; sessions?: readonly OpenSession[] }>(),
+  { days: 5, sign: null, progress: 0, sessions: () => [] });
+const emit = defineEmits<{ open: [skill: string] }>();
 const wrap = ref<HTMLElement | null>(null), canvas = ref<HTMLCanvasElement | null>(null);
 const size = ref({ w: 900, h: 214 });
 let tick = 0, timer: number | undefined, observer: ResizeObserver | undefined;
@@ -81,6 +86,7 @@ onBeforeUnmount(() => { observer?.disconnect(); if (timer) window.clearInterval(
     </div>
     <div class="scene-panel"><slot /></div>
   </section>
+  <ContinueCard v-if="sessions.length" :sessions="sessions" @open="emit('open', $event)" />
 </template>
 
 <style scoped>

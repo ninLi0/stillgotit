@@ -466,6 +466,7 @@ Concrete types:
 - `selectSkill(skills: SkillMapping.SkillMapRows, skill: SkillMapping.Skill) : SkillContext` — [Learning computations](../design/compositions/LearningComputations.md), line 68.
 - `selectSkillMaterials(context: SkillContext) : GroundedTutoring.MaterialSet` — [Learning computations](../design/compositions/LearningComputations.md), line 71.
 - `selectSources(sources: Library.SourceRecords, materials: GroundedTutoring.MaterialSet) : SourceSelection` — [Learning computations](../design/compositions/LearningComputations.md), line 74.
+- `sessionActivity(data: GroundedTutoring.StudyRecord) : SessionActivity` — [Shared learning reads](../design/compositions/LearningReads.md), line 36.
 - `sessionMaterials(data: GroundedTutoring.StudyRecord) : GroundedTutoring.MaterialSet` — [Learning computations](../design/compositions/LearningComputations.md), line 77.
 - `sessionRequest(selected: Library.SourceRecords, data: GroundedTutoring.StudyRecord, kind: String) : TutorRequest` — [Learning computations](../design/compositions/LearningComputations.md), line 80.
 - `sessionSubject(identity: SessionIdentity) : SessionOwner` — [Learning computations](../design/compositions/LearningComputations.md), line 108.
@@ -500,6 +501,7 @@ Authored path: `Importing.AlreadyImported`.
 Authored path: `Courses.OwnedCourse`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 7.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 19.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 28.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 7.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 3.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 97.
@@ -555,7 +557,7 @@ Authored path: `Reads.OpenSession`.
 
 Authored path: `Reads.CanReplan`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 49.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 25.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 46.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 31.
 - Covered by [Progress reactions](../design/compositions/Progress.md), line 35.
@@ -726,7 +728,7 @@ Authored path: `Courses.UnavailableSkillMaterial`.
 ### assessment (assessment) needs evidence for (owner)
 
 Authored path: `Reads.NeedsEvidence`.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 25.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 46.
 - Covered by [Progress reactions](../design/compositions/Progress.md), line 17.
 
 ```view
@@ -743,7 +745,7 @@ assessment (assessment) needs evidence for (owner) — inputs (owner, assessment
 
 Authored path: `Reads.PlanContext`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 49.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 25.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 46.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 11.
 - Covered by [Progress reactions](../design/compositions/Progress.md), line 35.
 
@@ -1059,6 +1061,28 @@ Former "admit suggestions from (material)" — inputs (owner, material); binding
     where Library._material (material) has (owner, scope: course)
     where view "(owner) owns (course) with (title)" with (course, owner)
     allowed: true
+```
+
+### open study sessions for (owner) in (course)
+
+Authored path: `Reads.OpenStudy`.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 28.
+
+```former
+Former "open study sessions for (owner) in (course)" — inputs (owner, course); bindings (unit, skill, title, studySession, data, kind, lastActive); promises exactly one record — forms:
+  each SkillMapping._units (course) has (unit)
+    where SkillMapping._skills (unit) has (skill, status: "CONFIRMED", title)
+    where GroundedTutoring._sessions (owner, topic: skill) has (session: studySession, status: "OPEN")
+    where view "(owner) can change session (studySession)" with (owner, studySession) has (course, skill)
+    where GroundedTutoring._sessionData (session: studySession) has (data)
+    where (kind, lastActive) is sessionActivity (data)
+    arranged by studySession
+    form a record of
+      kind
+      lastActive
+      skill
+      studySession
+      title
 ```
 
 ### saved study session (studySession)
@@ -7767,6 +7791,48 @@ then
   AssessmentReviewing.submit (author: owner, criteria, definition, fresh, help, performedAt: at, question, response, sourceKey, subject: skill, task)
 ```
 
+### Reads.Continue
+
+Authored path: `Reads.Continue`.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 25.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 41.
+
+```reaction
+when RequestBoundary.request (course, path: "/learning/continue", requestId, session)
+then
+  Sessioning.use (session)
+```
+
+### Reads.Continue:missing#2
+
+Authored path: `Reads.Continue`.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 25.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 41.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Reads.Continue
+where
+  earlier, RequestBoundary.request (course, path: "/learning/continue", requestId, session)
+  no view "(owner) owns (course) with (title)" with (course, owner)
+then
+  RequestBoundary.respond (error: "COURSE_UNAVAILABLE", requestId)
+```
+
+### Reads.Continue:owned#2
+
+Authored path: `Reads.Continue`.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 25.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 41.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Reads.Continue
+where
+  earlier, RequestBoundary.request (course, path: "/learning/continue", requestId, session)
+  view "(owner) owns (course) with (title)" with (course, owner)
+then
+  RequestBoundary.respond (requestId, sessions: former "open study sessions for (owner) in (course)" with (course, owner))
+```
+
 ### Settings.ChooseTutor
 
 Authored path: `Settings.ChooseTutor`.
@@ -8433,6 +8499,7 @@ not listed here have no explicit input contract.
 - `/learning/adjust` — requires `adjustmentKey`, `reason`, `session`, `skill`, `value`
 - `/learning/assess` — requires `dialogueLength`, `outsideHelp`, `reviewed`, `session`, `studySession`, `unseen`
 - `/learning/confidence` — requires `confidence`, `session`, `skill`
+- `/learning/continue` — requires `course`, `session`
 - `/learning/correct` — requires `basedOn`, `case`, `gateMet`, `reason`, `result`, `session`
 - `/learning/hint` — requires `session`, `studySession`
 - `/learning/lesson` — requires `request`, `session`, `skill`

@@ -402,7 +402,7 @@ watch(view, (now) => { if (now === "setup" && material.value && !preview.value) 
 
     <section v-show="view === 'home'" class="home-view" aria-labelledby="home-title">
       <h1 id="home-title" class="sr-only" tabindex="-1">Home</h1>
-      <HomeScene :days="homePlan.days.value" :sign="sign" :progress="sunProgress">
+      <HomeScene :days="homePlan.days.value" :sign="sign" :progress="sunProgress" :sessions="homePlan.sessions.value" @open="openSkill">
         <template v-if="!plan && homePlan.error.value">
           <p class="eyebrow scene-eyebrow">{{ todayLong }}</p>
           <div role="alert"><p class="scene-reason">{{ homePlan.error.value }}</p></div>

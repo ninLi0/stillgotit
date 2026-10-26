@@ -151,6 +151,10 @@ export function responseInput({ data, text, channel, attachments, sources }: { d
 }
 export function dialogueIsCurrent({ data, dialogueLength }: { data: StudySession; dialogueLength: number }): boolean { return data.dialogue.length === dialogueLength; }
 export function hasLessonQuestion({ data }: { data: StudySession }): boolean { return Boolean(data.lesson && data.dialogue.at(-1)?.turn.speaker === "LEARNER"); }
+/** The session's kind and the time of its latest dialogue turn, the only time the concept records; null before any turn. */
+export function sessionActivity({ data }: { data: StudySession }): { kind: "LESSON" | "PRACTICE"; lastActive: Date | null } {
+  return { kind: data.lesson ? "LESSON" : "PRACTICE", lastActive: data.dialogue.at(-1)?.turn.at ?? null };
+}
 export function submissionInput({ data, unseen, outsideHelp }: { data: StudySession; unseen: boolean; outsideHelp: boolean }) {
   const responses = data.dialogue.filter(({ turn }) => turn.speaker === "LEARNER" && turn.purpose === "RESPONSE");
   const text = responses.map(({ turn, turnIndex }) => data.voice.find((item) => item.turnIndex === turnIndex)?.text ?? turn.text).join("\n\n");

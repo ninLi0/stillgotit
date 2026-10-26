@@ -17,6 +17,7 @@ import { PendingAdjustment, sessionStore } from "./pending-adjustment.ts";
 import { listenUnavailable, stopSpeaking } from "./speech.ts";
 import type { StillGotItHttp } from "../../generated/wire.ts";
 import { answerKey, newAnswers, takeTutor, tutorLabel, type TutorUsed } from "./tutor-choice.ts";
+import { sessionRequest, takeSession } from "./continue-session.ts";
 type SkillData = StillGotItHttp["/learning/read"]["output"]["data"];
 type StudySession = SkillData["sessions"][number];
 /** A photo uploaded for the answer being written. `preview` is a local picture of it, so learners can tell photos apart. */
@@ -243,6 +244,14 @@ watch(() => props.skill, (skill) => {
   act(load);
 }, { immediate: true });
 watch(() => props.initialDraft, (draft) => { void applyDraft(draft); }, { immediate: true });
+// Home's Continue card names a session of this skill. A page that has not loaded yet shows it once loaded; a loaded page
+// switches to it when the current step finishes, and reads again if the session is newer than what it has.
+watch([() => props.skill, sessionRequest], () => {
+  const id = takeSession(props.skill); if (!id) return;
+  const show = () => { freshLesson.value = false; selected.value = id; reviewOpen.value = false; if (data.value && !data.value.sessions.some((session) => session.session === id)) void act(load); };
+  if (!data.value || (!busy.value && !recording.value)) { show(); return; }
+  const stop = watch([busy, recording], ([working, speaking]) => { if (!working && !speaking) { stop(); show(); } });
+}, { immediate: true });
 /** The shell's "Check my understanding": the same admission as the header button. A refusal shows its sentence in the alert area. */
 async function startPractice() {
   if (busy.value || !data.value) return;

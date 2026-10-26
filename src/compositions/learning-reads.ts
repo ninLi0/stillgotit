@@ -1,7 +1,9 @@
+import { endpoint, receive, respond } from "@mit-sdg/sync-engine/boundary";
 import { compute, each, former, no, view, where, whether } from "@mit-sdg/sync-engine/language";
 import { concepts, computations } from "../concepts.ts";
 import { composition as Courses } from "./courses.ts";
-const { SkillMapping: Mapping, Library, GroundedTutoring: Tutoring, AssessmentReviewing: Assessment, MasteryEstimating: Mastery, StudyPlanning: Planning } = concepts;
+import { learningInput, structuredOutput, validators } from "./reusable/inputs.ts";
+const { Sessioning, SkillMapping: Mapping, Library, GroundedTutoring: Tutoring, AssessmentReviewing: Assessment, MasteryEstimating: Mastery, StudyPlanning: Planning } = concepts;
 export const OwnedSkill = view("(owner) owns study skill (skill)", ({ owner, skill }, { course, definition, status }, { unit }) => where(
   Mapping._skill({ skill }).is({ unit, current: definition, status }), Mapping._unit({ unit }).is({ course }), Courses.OwnedCourse({ owner, course }),
 )).optional();
@@ -63,4 +65,19 @@ export const NeedsEvidence = view("assessment (assessment) needs evidence for (o
   Assessment._caseData({ case: assessment }).is({ data }), Mastery._progress({ learner: owner }).is({ tracks }),
   compute(computations.evidenceUpdate, { data, tracks }, { needed: true }),
 )).optional();
-export const composition = { OwnedSkill, ActiveSkill, OwnedSession, OpenSession, SessionSources, PendingGrade, OwnedCase, OwnedAnyCase, SkillContext, SkillData, SessionData, Progress, PlanData, PlanContext, CanReplan, NeedsEvidence };
+// The sessions Home offers to continue: each session of a confirmed skill in the course that OpenSession admits, so a task
+// with submitted work is left out. The kind and the latest turn's time come from the session's own record.
+export const OpenStudy = former("open study sessions for (owner) in (course)", ({ owner, course }, { unit, skill, title, studySession, data, kind, lastActive }) =>
+  each(Mapping._units({ course }).is({ unit }))
+    .where(Mapping._skills({ unit }).is({ skill, title, status: "CONFIRMED" }), Tutoring._sessions({ owner, topic: skill }).is({ session: studySession, status: "OPEN" }),
+      OpenSession({ owner, studySession }).is({ skill, course }), Tutoring._sessionData({ session: studySession }).is({ data }),
+      compute(computations.sessionActivity, { data }, { kind, lastActive }))
+    .arranged(studySession)
+    .form({ studySession, skill, title, kind, lastActive }),
+);
+const Continue = endpoint("/learning/continue", ({ session, course, owner }) => receive({ session, course })
+  .then(Sessioning.use({ session }).responds({ subject: owner })).then(
+    where(Courses.OwnedCourse({ owner, course })).then(respond({ sessions: OpenStudy({ owner, course }) })).named("owned"),
+    where(no(Courses.OwnedCourse({ owner, course }))).then(respond({ error: "COURSE_UNAVAILABLE" })).named("missing"),
+  ), { validators: { ...validators, input: learningInput, output: structuredOutput } });
+export const composition = { OwnedSkill, ActiveSkill, OwnedSession, OpenSession, SessionSources, PendingGrade, OwnedCase, OwnedAnyCase, SkillContext, SkillData, SessionData, Progress, PlanData, PlanContext, CanReplan, NeedsEvidence, OpenStudy, Continue };
