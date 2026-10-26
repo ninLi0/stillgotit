@@ -343,6 +343,9 @@ const cueSeconds = (match: RegExpExecArray, at: number) =>
 /** Cue text without its tags, with character references decoded and every run of whitespace made one space. */
 const cueText = (text: string) =>
   decodeXml(text.replace(CUE_TAG, "").replace(/&nbsp;/gi, " ").replace(/&(?:lrm|rlm);/gi, "")).replace(/[\s\x1c-\x1e\x85]+/g, " ").trim();
+/** Part of one cue line: the speaker its voice tag names, if it starts with one, and the cleaned text that follows. */
+type CuePiece = { voice?: string; text: string };
+const lineText = (pieces: readonly CuePiece[]) => pieces.map((piece) => piece.text).filter(Boolean).join(" ");
 
 /**
  * The readable text of a WebVTT or SubRip caption file, or null when the text is neither. It keeps what was said, in
@@ -372,28 +375,42 @@ export function transcriptText(text: string): string | null {
     // Text after a blank line inside a cue stays with that cue.
     cues.at(-1)?.lines.push(line);
   });
+  // Each cue's lines as cleaned pieces, split where a voice tag names a speaker.
+  let previousLine = "";
+  const spoken = cues.map(({ start, end, lines: cueLines }) => {
+    const pieces = cueLines.map((line) => {
+      const parts = line.split(VOICE), out: CuePiece[] = [];
+      for (let p = 0; p < parts.length; p += 2) out.push({ voice: p ? cueText(parts[p - 1]!) || undefined : undefined, text: cueText(parts[p]!) });
+      return out;
+    });
+    const written = pieces.filter((line) => lineText(line));
+    if (written.length) {
+      // Automatic captions roll: each cue repeats the previous cue's last line before adding its own. The repeat is left out.
+      const lastLine = lineText(written.at(-1)!);
+      if (lineText(written[0]!) === previousLine) for (const piece of written[0]!) piece.text = "";
+      previousLine = lastLine;
+    }
+    return { start, end, shown: written.length > 0, pieces: pieces.flat() };
+  });
   const paragraphs: { speaker: string; parts: string[] }[] = [];
   let last: { end: number; text: string } | undefined;
-  for (const cue of cues) {
+  for (const cue of spoken) {
     // A voice tag names the speaker for the rest of its cue. A cue without one continues the current speaker.
     let speaker: string | undefined, said = "";
-    for (const line of cue.lines) {
-      const pieces = line.split(VOICE);
-      for (let p = 0; p < pieces.length; p += 2) {
-        if (p) speaker = cueText(pieces[p - 1]!) || speaker;
-        const piece = cueText(pieces[p]!);
-        if (!piece) continue;
-        let paragraph = paragraphs.at(-1);
-        const pause = !said && !!last && SENTENCE_END.test(last.text) && cue.start - last.end > PAUSE_SECONDS;
-        if (!paragraph || pause || (speaker !== undefined && speaker !== paragraph.speaker)) {
-          paragraph = { speaker: speaker ?? paragraph?.speaker ?? "", parts: [] };
-          paragraphs.push(paragraph);
-        }
-        paragraph.parts.push(piece);
-        said = piece;
+    for (const { voice, text: piece } of cue.pieces) {
+      if (voice) speaker = voice;
+      if (!piece) continue;
+      let paragraph = paragraphs.at(-1);
+      const pause = !said && !!last && SENTENCE_END.test(last.text) && cue.start - last.end > PAUSE_SECONDS;
+      if (!paragraph || pause || (speaker !== undefined && speaker !== paragraph.speaker)) {
+        paragraph = { speaker: speaker ?? paragraph?.speaker ?? "", parts: [] };
+        paragraphs.push(paragraph);
       }
+      paragraph.parts.push(piece);
+      said = piece;
     }
-    if (said) last = { end: cue.end, text: said };
+    // A cue that only repeats earlier text still shows that text until it ends.
+    if (cue.shown) last = { end: cue.end, text: said || last?.text || "" };
   }
   return paragraphs.map(({ speaker, parts }) => (speaker ? `${speaker}: ` : "") + parts.join(" ")).join("\n\n");
 }

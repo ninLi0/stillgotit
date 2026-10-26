@@ -156,6 +156,7 @@ The readable text keeps what was said and leaves out the rest:
 - A voice tag such as `<v Professor Jackson>` puts `Professor Jackson: ` at the start of each of that speaker's paragraphs. A cue without a voice tag continues the current speaker.
 - The lines of one cue are joined with spaces, and cues are joined into paragraphs in file order. A new paragraph starts when the speaker changes, or when a cue ends a sentence and the next cue starts more than 2 seconds after it ends. A cue ends a sentence when its text ends with `.`, `!`, `?`, or `…`, before any closing quote or bracket. Runs of spaces and line breaks become one space.
 - Text after a blank line inside a cue stays with that cue. A cue number right before a timing line is left out even when no blank line comes before it.
+- A cue's first line is left out when it repeats the previous cue's last line, as in rolling automatic captions such as YouTube's, where each cue repeats the line before it. Tags and spacing are ignored in the comparison. The same words said again anywhere else stay.
 - Paragraphs are separated by a blank line. The text is split into blocks of 100 lines like other text, except that a block ends with its last paragraph rather than the blank line after it, so its location may end one line early, as in `key/lines/1-99`.
 
 The original caption file stays retained and downloadable, with its times. A caption file with no cue text has no readable text. Caption files imported before this rule keep the text they were saved with.

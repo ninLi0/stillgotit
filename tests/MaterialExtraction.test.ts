@@ -272,6 +272,23 @@ describe("Caption files", () => {
       .toBe("No blank line. Next cue. Same cue. x < y, a<b and c>d");
   });
 
+  test("a cue line that repeats the previous cue's last line is left out, as in rolling automatic captions", () => {
+    // YouTube's automatic captions as yt-dlp saves them: each cue repeats the line before it, and short cues repeat it again.
+    const rolling = [
+      "WEBVTT", "Kind: captions", "Language: en", "",
+      "00:00:00.160 --> 00:00:02.869 align:start position:0%", " ",
+      "so<00:00:00.480><c> today</c><00:00:00.800><c> we're</c><00:00:01.040><c> going</c><00:00:01.280><c> to</c>", "",
+      "00:00:02.869 --> 00:00:02.879 align:start position:0%", "so today we're going to", " ", "",
+      "00:00:02.879 --> 00:00:05.990 align:start position:0%", "so today we're going to", "talk<00:00:03.200><c> about</c><00:00:03.520><c> eigenvalues</c>", "",
+      "00:00:05.990 --> 00:00:06.000 align:start position:0%", "talk about eigenvalues", " ", "",
+      "00:00:06.000 --> 00:00:08.000 align:start position:0%", "talk about eigenvalues", "and<00:00:06.400><c> eigenvectors</c>", "",
+    ].join("\n");
+    expect(transcriptText(rolling)).toBe("so today we're going to talk about eigenvalues and eigenvectors");
+    // Only a repeat at the top of the next cue is left out; the same words said again later stay.
+    expect(transcriptText("WEBVTT\n\n00:01.000 --> 00:02.000\nYes.\n\n00:02.000 --> 00:03.000\nNo.\n\n00:03.000 --> 00:04.000\nYes.\nYes."))
+      .toBe("Yes. No. Yes. Yes.");
+  });
+
   test("blocks hold 100 lines and end with a paragraph, and a file with no cue text has no readable text", async () => {
     const cues = Array.from({ length: 60 }, (_, i) => `${i + 1}\n00:${String(i).padStart(2, "0")}:00,000 --> 00:${String(i).padStart(2, "0")}:01,000\nSentence ${i + 1}.`);
     const result = await read("long.srt", strToU8(cues.join("\n\n")));
