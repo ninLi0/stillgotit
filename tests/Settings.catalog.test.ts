@@ -12,14 +12,17 @@ const table: Omit<TutorModelOffer, "appDefault">[] = [
   { model: "gemini-3.8-flash", name: "Gemini 3.8 Flash", description: "A fast general model for lessons, practice, and feedback.",
     levels: ["LOW", "MEDIUM", "HIGH"], defaultLevel: "MEDIUM", slowLevels: [],
     tradeoff: "It balances speed, cost, and care; raise the level for harder problems." },
-  { model: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro (preview)", description: "The most careful model offered, for difficult material and grading.",
+  { model: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro (preview)", description: "A careful model for difficult material and grading.",
     levels: ["LOW", "MEDIUM", "HIGH"], defaultLevel: "HIGH", slowLevels: ["HIGH"],
     tradeoff: "It is slower and costs more, and as a preview Google may change or withdraw it." },
+  { model: "gemini-4-argon", name: "Gemini 4 Argon", description: "Google's flagship reasoning model, for the hardest material and grading.",
+    levels: ["LOW", "MEDIUM", "HIGH"], defaultLevel: "MEDIUM", slowLevels: ["HIGH"],
+    tradeoff: "It is the most capable model offered and the most expensive, and at High a long request may not finish in time." },
 ];
 const configured = configuredModelName(process.env.GEMINI_MODEL);
 
 describe("tutor catalog", () => {
-  test("lists the three offered models in table order, with each entry's fields and a mark on the default", () => {
+  test("lists the four offered models in table order, with each entry's fields and a mark on the default", () => {
     expect(tutorCatalog({})).toEqual(table.map((entry) => ({ ...entry, appDefault: entry.model === configured })));
     expect(tutorCatalog({}).filter((entry) => entry.appDefault)).toHaveLength(1);
     // Every entry lists its levels in the order Minimal, Low, Medium, High.
@@ -28,7 +31,7 @@ describe("tutor catalog", () => {
     // A caller cannot change the fixed table through a returned record.
     const copy = tutorCatalog({});
     copy[0]!.levels.pop(); copy.pop();
-    expect(tutorCatalog({})).toHaveLength(3);
+    expect(tutorCatalog({})).toHaveLength(4);
     expect(TUTOR_MODELS[0]!.levels).toHaveLength(4);
   });
 

@@ -32,9 +32,12 @@ const TABLE: Omit<TutorModelOffer, "appDefault">[] = [
   { model: "gemini-3.8-flash", name: "Gemini 3.8 Flash", description: "A fast general model for lessons, practice, and feedback.",
     levels: ["LOW", "MEDIUM", "HIGH"], defaultLevel: "MEDIUM", slowLevels: [],
     tradeoff: "It balances speed, cost, and care; raise the level for harder problems." },
-  { model: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro (preview)", description: "The most careful model offered, for difficult material and grading.",
+  { model: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro (preview)", description: "A careful model for difficult material and grading.",
     levels: ["LOW", "MEDIUM", "HIGH"], defaultLevel: "HIGH", slowLevels: ["HIGH"],
     tradeoff: "It is slower and costs more, and as a preview Google may change or withdraw it." },
+  { model: "gemini-4-argon", name: "Gemini 4 Argon", description: "Google's flagship reasoning model, for the hardest material and grading.",
+    levels: ["LOW", "MEDIUM", "HIGH"], defaultLevel: "MEDIUM", slowLevels: ["HIGH"],
+    tradeoff: "It is the most capable model offered and the most expensive, and at High a long request may not finish in time." },
 ];
 type Status = "SAVED" | "RETIRED" | "DEFAULT";
 /** The offered models in table order, with the entry that GEMINI_MODEL names marked as the app default. */
@@ -290,7 +293,8 @@ describe("model-picker: one learner's journey through HTTP, a second learner bes
     expect(google.calls).toHaveLength(calls);
     // The record the Tutor panel draws from lists only the levels each model accepts.
     expect(settings.models.map((entry: TutorModelOffer) => [entry.model, entry.levels])).toEqual([
-      ["gemini-3.5-flash-lite", ["MINIMAL", "LOW", "MEDIUM", "HIGH"]], ["gemini-3.8-flash", ["LOW", "MEDIUM", "HIGH"]], ["gemini-3.1-pro-preview", ["LOW", "MEDIUM", "HIGH"]]]);
+      ["gemini-3.5-flash-lite", ["MINIMAL", "LOW", "MEDIUM", "HIGH"]], ["gemini-3.8-flash", ["LOW", "MEDIUM", "HIGH"]], ["gemini-3.1-pro-preview", ["LOW", "MEDIUM", "HIGH"]],
+      ["gemini-4-argon", ["LOW", "MEDIUM", "HIGH"]]]);
     await samLooks("Maya's unsupported level was refused");
   }, 30_000);
 
@@ -330,7 +334,7 @@ describe("model-picker: one learner's journey through HTTP, a second learner bes
     const { database, maya, sam, samLooks } = await journey();
     expect(await maya.ok("/settings/tutor/choose", PRO_LOW)).toEqual(record(PRO_LOW, "SAVED"));
     // The server restarts, and Gemini's model list no longer has Pro, so the startup check withdraws it from the offer.
-    const restarted = await restartServer({ database, listed: ["gemini-3.5-flash-lite", "gemini-3.8-flash"],
+    const restarted = await restartServer({ database, listed: ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-4-argon"],
       maya: { session: maya.session, skill: maya.skill }, sam: { session: sam.session }, again: FLASH_HIGH });
     expect(restarted.list).toEqual([{ url: `${GOOGLE}?pageSize=200`, method: "GET", headers: { "x-goog-api-key": KEY } }]);
     expect(restarted.logs).toEqual(["Tutor models withdrawn because Gemini's model list lacks them: gemini-3.1-pro-preview."]);

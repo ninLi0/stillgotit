@@ -452,13 +452,13 @@ Concrete types:
 - `attemptIsReady(data: GroundedTutoring.StudyRecord, dialogueLength: Number, reviewed: Flag, unseen: Flag, outsideHelp: Flag) : Flag` — [Learning computations](../design/compositions/LearningComputations.md), line 105.
 - `beginAllowed(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows, skill: SkillMapping.Skill, urgent: Flag) : Flag` — [Daily planning flows](../design/compositions/Planning.md), line 106.
 - `carriedEstimate(tracks: MasteryEstimating.ProgressRows, skill: SkillMapping.Skill, current: SkillMapping.Version) : CarriedEstimate` — [Courses, materials, and skills](../design/compositions/Courses.md), line 58.
-- `choiceOffered(choice: TutorChoice) : Flag` — [Settings](../design/compositions/Settings.md), line 43.
+- `choiceOffered(choice: TutorChoice) : Flag` — [Settings](../design/compositions/Settings.md), line 44.
 - `correctionNote(reason: String) : AttemptClarification` — [Learning computations](../design/compositions/LearningComputations.md), line 21.
 - `courseScore(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows) : CourseScore` — [Shared learning reads](../design/compositions/LearningReads.md), line 134.
 - `coveredSkillsConfirmed(covered: StudyPlanning.SubjectSet, skills: SkillMapping.SkillMapRows) : Flag` — [Daily planning flows](../design/compositions/Planning.md), line 100.
 - `cutKey(cut: StudyPlanning.CutValue) : String` — [Daily planning flows](../design/compositions/Planning.md), line 112.
-- `defaultChoice() : TutorChoice` — [Settings](../design/compositions/Settings.md), line 31.
-- `defaultHomeView() : HomeView` — [Settings](../design/compositions/Settings.md), line 147.
+- `defaultChoice() : TutorChoice` — [Settings](../design/compositions/Settings.md), line 32.
+- `defaultHomeView() : HomeView` — [Settings](../design/compositions/Settings.md), line 148.
 - `dialogueIsCurrent(data: GroundedTutoring.StudyRecord, dialogueLength: Number) : Flag` — [Learning computations](../design/compositions/LearningComputations.md), line 24.
 - `estimateTimeline(explanation?: MasteryEstimating.EstimateExplanation, tracks: MasteryEstimating.ProgressRows) : EstimateTimeline` — [Learning computations](../design/compositions/LearningComputations.md), line 86.
 - `evidenceAttribution(origin: AssessmentReviewing.Origin, rationale: String) : String` — [P2 learning journey](../design/stages/materials.md), line 136.
@@ -476,18 +476,18 @@ Concrete types:
 - `hasConfirmedSkill(skills: SkillMapping.SkillMapRows) : Flag` — [Importing graded work](../design/compositions/Importing.md), line 109.
 - `hasGradedRows(answer: TutorAnswer) : Flag` — [Importing graded work](../design/compositions/Importing.md), line 115.
 - `hasLessonQuestion(data: GroundedTutoring.StudyRecord) : Flag` — [Learning computations](../design/compositions/LearningComputations.md), line 39.
-- `homeViewOffered(view: String) : Flag` — [Settings](../design/compositions/Settings.md), line 141.
+- `homeViewOffered(view: String) : Flag` — [Settings](../design/compositions/Settings.md), line 142.
 - `itemOrder(day: Date, candidate: StudyPlanning.Candidate) : String` — [Daily planning flows](../design/compositions/Planning.md), line 109.
 - `itemSubject(candidate: StudyPlanning.Candidate) : ItemSubject` — [Learning computations](../design/compositions/LearningComputations.md), line 42.
 - `leftAloneDays(explanation: MasteryEstimating.EstimateExplanation, at: DateTime) : LeftAloneDays` — [Shared learning reads](../design/compositions/LearningReads.md), line 113.
 - `leftAlonePath(explanation: MasteryEstimating.EstimateExplanation, at: DateTime, u0: Number, v1: Number, v3: Number, v7: Number, v14: Number, v30: Number, v60: Number, v90: Number) : LeftAlonePath` — [Shared learning reads](../design/compositions/LearningReads.md), line 116.
 - `lessonRequest(selected: Library.SourceRecords, context: SkillContext, request: String) : TutorRequest` — [Learning computations](../design/compositions/LearningComputations.md), line 45.
-- `levelSupported(model: String, level: String) : Flag` — [Settings](../design/compositions/Settings.md), line 37.
+- `levelSupported(model: String, level: String) : Flag` — [Settings](../design/compositions/Settings.md), line 38.
 - `memoryCurve(at: DateTime, explanation: MasteryEstimating.EstimateExplanation, threshold: Number, search: ReviewSearch, v1: Number, v3: Number, v7: Number, v14: Number, v30: Number, v60: Number, v90: Number) : MemoryCurve` — [Shared learning reads](../design/compositions/LearningReads.md), line 110.
 - `memoryInstants(at: DateTime) : SampleInstants` — [Shared learning reads](../design/compositions/LearningReads.md), line 98.
-- `modelOffered(model: String) : Flag` — [Settings](../design/compositions/Settings.md), line 34.
-- `offeredChoice(model: String, level: String) : TutorChoice` — [Settings](../design/compositions/Settings.md), line 40.
-- `offeredHomeView(view: String) : HomeView` — [Settings](../design/compositions/Settings.md), line 144.
+- `modelOffered(model: String) : Flag` — [Settings](../design/compositions/Settings.md), line 35.
+- `offeredChoice(model: String, level: String) : TutorChoice` — [Settings](../design/compositions/Settings.md), line 41.
+- `offeredHomeView(view: String) : HomeView` — [Settings](../design/compositions/Settings.md), line 145.
 - `offeredTreeKind(kind: String) : TreeKind` — [Courses, materials, and skills](../design/compositions/Courses.md), line 85.
 - `planDetail(schedule: StudyPlanning.ScheduleValue) : PlanDetail` — [Learning computations](../design/compositions/LearningComputations.md), line 48.
 - `planRequest(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows, schedule: StudyPlanning.ScheduleValue) : ReviewProposal` — [Learning computations](../design/compositions/LearningComputations.md), line 51.
@@ -497,7 +497,7 @@ Concrete types:
 - `progressRows(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows) : SkillProgress` — [Learning computations](../design/compositions/LearningComputations.md), line 59.
 - `recentSession(data: GroundedTutoring.StudyRecord, skillTitle: String) : RecentSession` — [Shared learning reads](../design/compositions/LearningReads.md), line 60.
 - `referenceCurve(v0: Number, v1: Number, v3: Number, v7: Number, v14: Number, v30: Number, v60: Number, v90: Number) : ReferenceCurve` — [Shared learning reads](../design/compositions/LearningReads.md), line 95.
-- `requestChoice(request: TutorRequest) : TutorChoice` — [Settings](../design/compositions/Settings.md), line 86.
+- `requestChoice(request: TutorRequest) : TutorChoice` — [Settings](../design/compositions/Settings.md), line 87.
 - `responseInput(data: GroundedTutoring.StudyRecord, text: String, channel: GroundedTutoring.Channel, attachments: AttachmentList, sources: Library.SourceRecords) : ResponseInput` — [Learning computations](../design/compositions/LearningComputations.md), line 62.
 - `reviewApproved(reviewed: Flag, unseen: Flag, outsideHelp: Flag) : Flag` — [Learning computations](../design/compositions/LearningComputations.md), line 65.
 - `reviewNarrow(search: ReviewSearch, value: Number, threshold: Number) : ReviewSearch` — [Shared learning reads](../design/compositions/LearningReads.md), line 107.
@@ -517,10 +517,10 @@ Concrete types:
 - `suggestRequest(selected: Library.SourceRecords) : TutorRequest` — [Learning computations](../design/compositions/LearningComputations.md), line 99.
 - `taskRequest(selected: Library.SourceRecords, context: SkillContext, sessions: GroundedTutoring.StudyRecords) : TutorRequest` — [Learning computations](../design/compositions/LearningComputations.md), line 102.
 - `treeKindOffered(kind: String) : Flag` — [Courses, materials, and skills](../design/compositions/Courses.md), line 82.
-- `tutorCatalog() : TutorCatalog` — [Settings](../design/compositions/Settings.md), line 28.
-- `tutorStatus(saved: Flag, offered: Flag) : String` — [Settings](../design/compositions/Settings.md), line 46.
+- `tutorCatalog() : TutorCatalog` — [Settings](../design/compositions/Settings.md), line 29.
+- `tutorStatus(saved: Flag, offered: Flag) : String` — [Settings](../design/compositions/Settings.md), line 47.
 - `urgentExamItem(schedule: StudyPlanning.ScheduleValue, candidate: StudyPlanning.Candidate) : Flag` — [Daily planning flows](../design/compositions/Planning.md), line 103.
-- `withChoice(request: TutorRequest, choice: TutorChoice) : TutorRequest` — [Settings](../design/compositions/Settings.md), line 83.
+- `withChoice(request: TutorRequest, choice: TutorChoice) : TutorRequest` — [Settings](../design/compositions/Settings.md), line 84.
 
 ## Views
 
@@ -835,7 +835,7 @@ the current context of (skill) for (owner) — inputs (owner, skill); outputs (c
 ### the home view that applies to (owner)
 
 Authored path: `Settings.AppliedHomeView`.
-- Covered by [Settings](../design/compositions/Settings.md), line 151.
+- Covered by [Settings](../design/compositions/Settings.md), line 152.
 
 ```view
 the home view that applies to (owner) — inputs (owner); outputs (view); bindings (saved, offered) — answers exactly one (view)
@@ -914,7 +914,7 @@ the memory curve of (skill) at (definition) for (owner) at (at) — inputs (owne
 
 Authored path: `Settings.TutorStatus`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 112.
-- Covered by [Settings](../design/compositions/Settings.md), line 54.
+- Covered by [Settings](../design/compositions/Settings.md), line 55.
 
 ```view
 the tutor choice that applies to (owner) — inputs (owner); outputs (choice, status); bindings (offered) — answers exactly one (choice, status)
@@ -1006,7 +1006,7 @@ Former "admit a tutor reply in (studySession)" — inputs (owner, studySession);
 Authored path: `Settings.TutorReady`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 112.
 - Covered by [Request admission](../design/compositions/LearningAccess.md), line 7.
-- Covered by [Settings](../design/compositions/Settings.md), line 90.
+- Covered by [Settings](../design/compositions/Settings.md), line 91.
 
 ```former
 Former "admit a tutor request for (owner)" — inputs (owner); bindings (status); promises at most one record — forms:
@@ -1619,7 +1619,7 @@ Former "the tree kinds (owner) chose for the units in (course)" — inputs (owne
 ### the tutor choice that (request) carried
 
 Authored path: `Settings.SentTutor`.
-- Covered by [Settings](../design/compositions/Settings.md), line 96.
+- Covered by [Settings](../design/compositions/Settings.md), line 97.
 
 ```former
 Former "the tutor choice that (request) carried" — inputs (request); bindings (model, level); promises exactly one record — forms:
@@ -1632,7 +1632,7 @@ Former "the tutor choice that (request) carried" — inputs (request); bindings 
 ### the tutor settings for (owner)
 
 Authored path: `Settings.TutorSettings`.
-- Covered by [Settings](../design/compositions/Settings.md), line 62.
+- Covered by [Settings](../design/compositions/Settings.md), line 63.
 
 ```former
 Former "the tutor settings for (owner)" — inputs (owner); bindings (models, choice, status, fallback); promises exactly one record — forms:
@@ -8598,8 +8598,8 @@ then
 ### Settings.ChooseTutor
 
 Authored path: `Settings.ChooseTutor`.
-- Covered by [Settings](../design/compositions/Settings.md), line 66.
-- Covered by [Settings](../design/compositions/Settings.md), line 190.
+- Covered by [Settings](../design/compositions/Settings.md), line 67.
+- Covered by [Settings](../design/compositions/Settings.md), line 191.
 
 ```reaction
 when RequestBoundary.request (level, model, path: "/settings/tutor/choose", requestId, session)
@@ -8610,8 +8610,8 @@ then
 ### Settings.ChooseTutor:level#2
 
 Authored path: `Settings.ChooseTutor`.
-- Covered by [Settings](../design/compositions/Settings.md), line 66.
-- Covered by [Settings](../design/compositions/Settings.md), line 190.
+- Covered by [Settings](../design/compositions/Settings.md), line 67.
+- Covered by [Settings](../design/compositions/Settings.md), line 191.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Settings.ChooseTutor
@@ -8628,8 +8628,8 @@ then
 ### Settings.ChooseTutor:offered#2
 
 Authored path: `Settings.ChooseTutor`.
-- Covered by [Settings](../design/compositions/Settings.md), line 66.
-- Covered by [Settings](../design/compositions/Settings.md), line 190.
+- Covered by [Settings](../design/compositions/Settings.md), line 67.
+- Covered by [Settings](../design/compositions/Settings.md), line 191.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Settings.ChooseTutor
@@ -8647,8 +8647,8 @@ then
 ### Settings.ChooseTutor:offered#3
 
 Authored path: `Settings.ChooseTutor`.
-- Covered by [Settings](../design/compositions/Settings.md), line 66.
-- Covered by [Settings](../design/compositions/Settings.md), line 190.
+- Covered by [Settings](../design/compositions/Settings.md), line 67.
+- Covered by [Settings](../design/compositions/Settings.md), line 191.
 
 ```reaction
 when TutorPreferring.set (option: choice, user: owner), asked by Settings.ChooseTutor:offered#2
@@ -8661,8 +8661,8 @@ then
 ### Settings.ChooseTutor:unknown#2
 
 Authored path: `Settings.ChooseTutor`.
-- Covered by [Settings](../design/compositions/Settings.md), line 66.
-- Covered by [Settings](../design/compositions/Settings.md), line 190.
+- Covered by [Settings](../design/compositions/Settings.md), line 67.
+- Covered by [Settings](../design/compositions/Settings.md), line 191.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Settings.ChooseTutor
@@ -8677,8 +8677,8 @@ then
 ### Settings.ClearTutor
 
 Authored path: `Settings.ClearTutor`.
-- Covered by [Settings](../design/compositions/Settings.md), line 74.
-- Covered by [Settings](../design/compositions/Settings.md), line 191.
+- Covered by [Settings](../design/compositions/Settings.md), line 75.
+- Covered by [Settings](../design/compositions/Settings.md), line 192.
 
 ```reaction
 when RequestBoundary.request (path: "/settings/tutor/clear", requestId, session)
@@ -8689,8 +8689,8 @@ then
 ### Settings.ClearTutor#2
 
 Authored path: `Settings.ClearTutor`.
-- Covered by [Settings](../design/compositions/Settings.md), line 74.
-- Covered by [Settings](../design/compositions/Settings.md), line 191.
+- Covered by [Settings](../design/compositions/Settings.md), line 75.
+- Covered by [Settings](../design/compositions/Settings.md), line 192.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Settings.ClearTutor
@@ -8701,8 +8701,8 @@ then
 ### Settings.ClearTutor#3
 
 Authored path: `Settings.ClearTutor`.
-- Covered by [Settings](../design/compositions/Settings.md), line 74.
-- Covered by [Settings](../design/compositions/Settings.md), line 191.
+- Covered by [Settings](../design/compositions/Settings.md), line 75.
+- Covered by [Settings](../design/compositions/Settings.md), line 192.
 
 ```reaction
 when TutorPreferring.clear (user: owner), asked by Settings.ClearTutor#2
@@ -8715,8 +8715,8 @@ then
 ### Settings.ReadHomeView
 
 Authored path: `Settings.ReadHomeView`.
-- Covered by [Settings](../design/compositions/Settings.md), line 159.
-- Covered by [Settings](../design/compositions/Settings.md), line 192.
+- Covered by [Settings](../design/compositions/Settings.md), line 160.
+- Covered by [Settings](../design/compositions/Settings.md), line 193.
 
 ```reaction
 when RequestBoundary.request (path: "/settings/view", requestId, session)
@@ -8727,8 +8727,8 @@ then
 ### Settings.ReadHomeView#2
 
 Authored path: `Settings.ReadHomeView`.
-- Covered by [Settings](../design/compositions/Settings.md), line 159.
-- Covered by [Settings](../design/compositions/Settings.md), line 192.
+- Covered by [Settings](../design/compositions/Settings.md), line 160.
+- Covered by [Settings](../design/compositions/Settings.md), line 193.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Settings.ReadHomeView
@@ -8742,8 +8742,8 @@ then
 ### Settings.ReadTutor
 
 Authored path: `Settings.ReadTutor`.
-- Covered by [Settings](../design/compositions/Settings.md), line 64.
-- Covered by [Settings](../design/compositions/Settings.md), line 189.
+- Covered by [Settings](../design/compositions/Settings.md), line 65.
+- Covered by [Settings](../design/compositions/Settings.md), line 190.
 
 ```reaction
 when RequestBoundary.request (path: "/settings/tutor", requestId, session)
@@ -8754,8 +8754,8 @@ then
 ### Settings.ReadTutor#2
 
 Authored path: `Settings.ReadTutor`.
-- Covered by [Settings](../design/compositions/Settings.md), line 64.
-- Covered by [Settings](../design/compositions/Settings.md), line 189.
+- Covered by [Settings](../design/compositions/Settings.md), line 65.
+- Covered by [Settings](../design/compositions/Settings.md), line 190.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Settings.ReadTutor
@@ -8768,8 +8768,8 @@ then
 ### Settings.SetHomeView
 
 Authored path: `Settings.SetHomeView`.
-- Covered by [Settings](../design/compositions/Settings.md), line 161.
-- Covered by [Settings](../design/compositions/Settings.md), line 193.
+- Covered by [Settings](../design/compositions/Settings.md), line 162.
+- Covered by [Settings](../design/compositions/Settings.md), line 194.
 
 ```reaction
 when RequestBoundary.request (path: "/settings/view/set", requestId, session, view)
@@ -8780,8 +8780,8 @@ then
 ### Settings.SetHomeView:offered#2
 
 Authored path: `Settings.SetHomeView`.
-- Covered by [Settings](../design/compositions/Settings.md), line 161.
-- Covered by [Settings](../design/compositions/Settings.md), line 193.
+- Covered by [Settings](../design/compositions/Settings.md), line 162.
+- Covered by [Settings](../design/compositions/Settings.md), line 194.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Settings.SetHomeView
@@ -8797,8 +8797,8 @@ then
 ### Settings.SetHomeView:offered#3
 
 Authored path: `Settings.SetHomeView`.
-- Covered by [Settings](../design/compositions/Settings.md), line 161.
-- Covered by [Settings](../design/compositions/Settings.md), line 193.
+- Covered by [Settings](../design/compositions/Settings.md), line 162.
+- Covered by [Settings](../design/compositions/Settings.md), line 194.
 
 ```reaction
 when ViewPreferring.set (option: chosen, user: owner), asked by Settings.SetHomeView:offered#2
@@ -8811,8 +8811,8 @@ then
 ### Settings.SetHomeView:unknown#2
 
 Authored path: `Settings.SetHomeView`.
-- Covered by [Settings](../design/compositions/Settings.md), line 161.
-- Covered by [Settings](../design/compositions/Settings.md), line 193.
+- Covered by [Settings](../design/compositions/Settings.md), line 162.
+- Covered by [Settings](../design/compositions/Settings.md), line 194.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Settings.SetHomeView
