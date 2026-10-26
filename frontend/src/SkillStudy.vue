@@ -399,7 +399,7 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
                 <article class="message from-tutor opening-card" :class="{ latest: !current.dialogue.length }" :title="openingTime?.label">
                   <div class="speaker-row"><span class="speaker"><span class="avatar"><PixelIcon name="leaf" :size="16" /></span> StillGotIt<span v-if="openingTime" class="sr-only">, <time :datetime="openingTime.iso">{{ openingTime.label }}</time></span><span v-if="current.task" class="tag task">Practice task</span></span></div>
                   <div class="prose-blocks"><template v-for="(part, partIndex) in blocks(current.lesson?.explanation || current.task?.question || '')" :key="partIndex"><pre v-if="part.code" class="code-block">{{ part.text }}</pre><p v-else class="prose">{{ part.text }}</p></template></div>
-                  <SourcesUsed v-if="current.citations.length" :key="current.session" :citations="current.citations" :titles="materialTitles" :id-prefix="`passage-${current.session}`" @open="openSource" />
+                  <SourcesUsed v-if="current.citations.length" :key="current.session" compact :citations="current.citations" :titles="materialTitles" :id-prefix="`passage-${current.session}`" @open="openSource" />
                   <div class="reply-foot"><ReplyMeta :seconds="measured[answerKey('session', current.session)]" :sources="current.citations.length" :tutor="answerLabel('session', current.session)" /><ReplyActions :message-key="`${current.session}:opening`" :text="current.lesson?.explanation || current.task?.question || ''" :what="current.lesson ? 'lesson' : 'practice question'" describedby="listen-reason" /></div>
                 </article>
               </div>
