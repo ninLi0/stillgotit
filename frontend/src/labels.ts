@@ -32,6 +32,17 @@ export function sourceLabel(location: string, materialTitle?: string): string {
   return `${materialTitle?.trim() || "Course material"} · ${placeLabel(location)}`;
 }
 
+/** A wait in whole seconds, such as "7 s", or "2 min 5 s" from a minute up. */
+export function secondsLabel(seconds: number): string {
+  const whole = Math.max(0, Math.round(seconds)), minutes = Math.floor(whole / 60), rest = whole % 60;
+  return minutes ? `${minutes} min${rest ? ` ${rest} s` : ""}` : `${whole} s`;
+}
+
+/** How many sources one answer cites: "1 source", "2 sources". */
+export function sourcesLabel(count: number): string {
+  return `${count} ${count === 1 ? "source" : "sources"}`;
+}
+
 /**
  * Sidebar names for a skill's conversations: "Lesson 1", "Lesson 2", … and "Practice 1", … counted separately.
  * Sessions arrive in the order they were started, so a new conversation never renumbers an earlier one.

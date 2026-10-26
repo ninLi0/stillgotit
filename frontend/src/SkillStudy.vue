@@ -4,6 +4,7 @@ import { useAttachUpload } from "./attach-upload.ts";
 import SpeechInput from "./SpeechInput.vue";
 import ListenButton from "./ListenButton.vue";
 import SourcesUsed from "./SourcesUsed.vue";
+import ReplyMeta from "./ReplyMeta.vue";
 import EstimatePanel from "./EstimatePanel.vue";
 import PixelIcon from "./PixelIcon.vue";
 import MasteryCells from "./MasteryCells.vue";
@@ -11,7 +12,8 @@ import InfoBubble from "./InfoBubble.vue";
 import { stageOf } from "./pixel-art.ts";
 import type { OpenSource } from "./revamp-types.ts";
 import { api, unwrap } from "./api.ts";
-import { resultLabels, sessionLabels } from "./labels.ts";
+import { resultLabels, secondsLabel, sessionLabels } from "./labels.ts";
+import { answerSeconds } from "./reply-stats.ts";
 import { focusedControl, restoreFocus } from "./focus.ts";
 import { PendingAdjustment, sessionStore } from "./pending-adjustment.ts";
 import { listenUnavailable, stopSpeaking } from "./speech.ts";
@@ -55,11 +57,12 @@ async function load() {
   data.value = result;
   if (!freshLesson.value && !result.sessions.some((session) => session.session === selected.value)) selected.value = result.sessions.find((session) => session.status === "OPEN")?.session ?? result.sessions.at(-1)?.session ?? "";
 }
-// `success` is shown after the step finishes. Focus returns to the control the learner used, or to the result when that control is gone.
-async function act(work: () => Promise<void>, success = "") {
+// `success` is shown after the step finishes; a function gives a sentence that depends on how the step went.
+// Focus returns to the control the learner used, or to the result when that control is gone.
+async function act(work: () => Promise<void>, success: string | (() => string) = "") {
   const previous = focusedControl();
   busy.value = true; error.value = ""; notice.value = "";
-  try { await work(); await load(); notice.value = success; emit("changed"); }
+  try { await work(); await load(); notice.value = typeof success === "function" ? success() : success; emit("changed"); }
   catch (problem) { error.value = problem instanceof Error ? problem.message : "This step could not finish."; await load().catch(() => undefined); }
   finally {
     busy.value = false; await nextTick();
@@ -67,10 +70,22 @@ async function act(work: () => Promise<void>, success = "") {
   }
 }
 // While the tutor answers, the message leaves the box and waits in the thread as "Sending". A failure puts it back.
-const pending = ref<{ text: string; files: string[] } | null>(null);
+// `reply` says whether the tutor answers it: a lesson question does, while a practice answer is only saved.
+const pending = ref<{ text: string; files: string[]; reply: boolean } | null>(null);
+// The tutor's place shows how long the learner has waited, in whole seconds. It stops when the answer lands.
+const waitStarted = ref(0), waitNow = ref(0);
+let waitTicker: ReturnType<typeof setInterval> | undefined;
+watch(pending, (now) => {
+  clearInterval(waitTicker); waitTicker = undefined;
+  if (!now?.reply) return;
+  waitStarted.value = waitNow.value = Date.now();
+  waitTicker = setInterval(() => { waitNow.value = Date.now(); }, 1000);
+});
+const waited = computed(() => secondsLabel(Math.floor((waitNow.value - waitStarted.value) / 1000)));
+onBeforeUnmount(() => clearInterval(waitTicker));
 function takeDraft() {
   const text = response.value, sent = attachments.value, ch = channel.value;
-  pending.value = { text, files: sent.map((item) => item.name) };
+  pending.value = { text, files: sent.map((item) => item.name), reply: !current.value?.task };
   response.value = ""; attachments.value = []; channel.value = "TEXT";
   void scrollToLatest();
   return { text, sent, ch, restore() { response.value = text; attachments.value = sent; channel.value = ch; pending.value = null; } };
@@ -94,6 +109,7 @@ async function startTask() { await act(async () => { const result = unwrap(await
 async function send() {
   const session = current.value; if (!session) return;
   const draft = takeDraft();
+  let recovered = "";
   await act(async () => {
     // Photos go in the order the learner attached them.
     const input = { studySession: session.session, text: draft.text, channel: draft.ch, attachments: draft.sent.map((item) => item.material), dialogueLength: session.dialogue.length };
@@ -110,10 +126,12 @@ async function send() {
       const saved = !!now && now.session === session.session &&
         now.dialogue.slice(session.dialogue.length).some((item) => item.turn.speaker === "LEARNER" && item.turn.text === draft.text);
       if (saved) draft.sent.forEach(forgetPreview); else draft.restore();
+      // A practice answer waits for no tutor reply, so once it is saved the send has done its work and ends as a success.
+      if (saved && !session.lesson) { reviewed.value = false; recovered = "Your answer was saved."; return; }
       throw problem;
     }
     finally { pending.value = null; }
-  });
+  }, () => recovered);
 }
 function forgetPreview(item: Attachment) { if (item.preview) { URL.revokeObjectURL(item.preview); previews.delete(item.preview); } }
 const attach = useAttachUpload(() => props.course);
@@ -211,13 +229,16 @@ function blocks(text: string): { code: boolean; text: string }[] {
   return out.filter((part) => part.code || part.text.trim());
 }
 const SUCCESS = new Set(["INDEPENDENT", "SUPPORTED"]);
-/** The estimate after an assessed attempt and its change, from the explanation's timeline. */
+/** The estimate before and after an assessed attempt, and the change, from the timeline row whose attempt is that case. */
 function attemptChange(assessment: string) {
   const change = data.value?.explanation?.changes.find((row) => row.kind === "ATTEMPT" && row.source === assessment);
   if (!change) return null;
-  const delta = Math.round(change.after - change.before);
-  return { after: `${Math.round(change.after)}%`, delta: delta === 0 ? "No change" : `${delta > 0 ? "+" : "−"}${Math.abs(delta)} ${Math.abs(delta) === 1 ? "point" : "points"}` };
+  const delta = Math.round(change.after) - Math.round(change.before);
+  return { before: `${Math.round(change.before)}%`, after: `${Math.round(change.after)}%`,
+    delta: delta === 0 ? "No change" : `${delta > 0 ? "+" : "−"}${Math.abs(delta)} ${Math.abs(delta) === 1 ? "point" : "points"}` };
 }
+/** Why an assessed attempt did not count toward the estimate, as the timeline gives it, or empty when it counted. */
+function ignoredReason(assessment: string) { return data.value?.explanation?.ignored.find((row) => row.evidence === assessment)?.reason ?? ""; }
 // Under 1240px the rail slides over the lesson; the mastery chip opens it. evidenceOpen keeps its old meaning: the evidence is in view.
 const narrow = ref(false), railChip = ref<HTMLElement | null>(null), railClose = ref<HTMLButtonElement | null>(null);
 let narrowQuery: MediaQueryList | null = null;
@@ -309,7 +330,7 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
             <div v-if="current.lesson" class="message from-you"><span class="sr-only">You</span><p class="prose">{{ current.lesson.request }}</p></div>
             <article class="message from-tutor"><div class="speaker-row"><span class="speaker"><PixelIcon name="leaf" :size="18" /> StillGotIt<span v-if="current.task" class="tag task">Practice task</span></span><ListenButton :message-key="`${current.session}:opening`" :text="current.lesson?.explanation || current.task?.question || ''" :what="current.lesson ? 'lesson' : 'practice question'" describedby="listen-reason" /></div>
               <div class="prose-blocks"><template v-for="(part, partIndex) in blocks(current.lesson?.explanation || current.task?.question || '')" :key="partIndex"><pre v-if="part.code" class="code-block">{{ part.text }}</pre><p v-else class="prose">{{ part.text }}</p></template></div>
-              <p v-if="answerLabel('session', current.session)" class="tutor-label">{{ answerLabel('session', current.session) }}</p>
+              <ReplyMeta :sources="current.citations.length" :tutor="answerLabel('session', current.session)" />
               <SourcesUsed v-if="current.citations.length" :key="current.session" :citations="current.citations" :titles="materialTitles" :id-prefix="`passage-${current.session}`" @open="openSource" />
             </article>
             <article v-for="item in current.dialogue" :key="item.turnIndex" class="message" :class="item.turn.speaker === 'LEARNER' ? 'from-you' : 'from-tutor'">
@@ -317,7 +338,8 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
               <template v-else><span class="sr-only">You{{ purposeNote(item.turn.purpose) }}</span><span v-if="purposeNote(item.turn.purpose)" class="tag you-tag" aria-hidden="true">{{ purposeNote(item.turn.purpose).replace(' · ', '') }}</span></template>
               <div v-if="item.turn.speaker === 'TUTOR'" class="prose-blocks"><template v-for="(part, partIndex) in blocks(item.turn.text)" :key="partIndex"><pre v-if="part.code" class="code-block">{{ part.text }}</pre><p v-else class="prose">{{ part.text }}</p></template></div>
               <p v-else class="prose">{{ item.turn.text }}</p>
-              <p v-for="(file, fileIndex) in item.turn.media" :key="file.file" class="attachment-label"><span class="attach-thumb" aria-hidden="true" />{{ item.turn.media.length > 1 ? `Attachment ${fileIndex + 1} of ${item.turn.media.length}` : 'Attachment' }} · {{ file.name }}</p><p v-if="answerLabel('turn', current.session, item.turnIndex)" class="tutor-label">{{ answerLabel('turn', current.session, item.turnIndex) }}</p></article>
+              <p v-for="(file, fileIndex) in item.turn.media" :key="file.file" class="attachment-label"><span class="attach-thumb" aria-hidden="true" />{{ item.turn.media.length > 1 ? `Attachment ${fileIndex + 1} of ${item.turn.media.length}` : 'Attachment' }} · {{ file.name }}</p>
+              <ReplyMeta v-if="item.turn.speaker === 'TUTOR'" :seconds="answerSeconds(current.dialogue, item.turnIndex)" :sources="item.turn.citations.length" :tutor="answerLabel('turn', current.session, item.turnIndex)" /></article>
             <button v-if="current.lesson && current.dialogue.at(-1)?.turn.speaker === 'LEARNER' && !pending" class="message-action" :disabled="busy || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="retryReply">Retry tutor reply</button>
             <div v-if="current.task && current.status === 'OPEN' && current.dialogue.some(item => item.turn.speaker === 'LEARNER' && item.turn.purpose === 'RESPONSE')" class="review-step">
               <button class="secondary dawn" :disabled="busy || recording" :aria-expanded="reviewOpen" @click="reviewOpen = !reviewOpen">{{ reviewOpen ? 'Close review' : 'Review and assess my work' }}</button>
@@ -331,7 +353,8 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
             <button v-if="current.status === 'CLOSED' && !currentCases.some(item => item.judgment)" class="secondary dawn" :disabled="busy || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="assess">Retry saved assessment</button>
             <article v-for="item in currentCases" :key="item.case" class="assessment">
               <template v-if="item.judgment">
-                <div class="result-top"><div><p class="eyebrow">Assessment</p><h3 :class="{ success: SUCCESS.has(item.judgment.result) }">{{ resultLabels[item.judgment.result] }}</h3></div><div v-if="attemptChange(item.case)" class="result-figure"><p class="result-pct">{{ attemptChange(item.case)!.after }}</p><p class="result-delta">{{ attemptChange(item.case)!.delta }}</p></div></div>
+                <div class="result-top"><div><p class="eyebrow">Assessment</p><h3 :class="{ success: SUCCESS.has(item.judgment.result) }">{{ resultLabels[item.judgment.result] }}</h3></div><div v-if="attemptChange(item.case)" class="result-figure"><p class="eyebrow">Mastery</p><p class="result-pct"><span aria-hidden="true">{{ attemptChange(item.case)!.before }} → {{ attemptChange(item.case)!.after }}</span><span class="sr-only">from {{ attemptChange(item.case)!.before }} to {{ attemptChange(item.case)!.after }}</span></p><p class="result-delta">{{ attemptChange(item.case)!.delta }}</p></div>
+                  <div v-else-if="ignoredReason(item.case)" class="result-figure unchanged"><p class="eyebrow">Mastery</p><p class="result-same">Did not change the estimate</p><p class="result-delta">{{ ignoredReason(item.case) }}</p></div></div>
                 <p class="prose rationale">{{ item.judgment.rationale }}</p>
                 <p v-if="answerLabel('judgment', item.judgment.judgment)" class="tutor-label">{{ answerLabel('judgment', item.judgment.judgment) }}</p>
                 <div class="result-actions"><button v-if="current.status === 'CLOSED'" class="secondary dawn" :disabled="busy || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="startTask">Try a fresh check</button></div>
@@ -344,7 +367,7 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
           <div role="status"><p v-if="notice && !busy" ref="noticeBox" class="notice" tabindex="-1">{{ notice }}</p></div>
           <div role="alert"><p v-if="error" ref="errorBox" class="error" tabindex="-1">{{ error }}</p></div>
           <article v-if="pending" class="message from-you pending" aria-live="polite"><span class="sr-only">You</span><p class="prose">{{ pending.text }}</p><p v-for="(name, fileIndex) in pending.files" :key="fileIndex" class="attachment-label"><span class="attach-thumb" aria-hidden="true" />Attachment · {{ name }}</p><p class="sending">Sending…</p></article>
-          <article v-if="pending" class="message from-tutor thinking" aria-hidden="true"><div class="speaker-row"><span class="speaker"><PixelIcon name="leaf" :size="18" /> StillGotIt</span></div><p class="prose dots"><span>·</span><span>·</span><span>·</span></p></article>
+          <article v-if="pending?.reply" class="message from-tutor thinking" aria-hidden="true"><div class="speaker-row"><span class="speaker"><PixelIcon name="leaf" :size="18" /> StillGotIt</span></div><p class="prose dots"><span>·</span><span>·</span><span>·</span></p><span class="waited">{{ waited }}</span></article>
         </div>
       </div>
       <div class="composer-area">
@@ -483,9 +506,10 @@ button.mastery-chip:hover{border-color:#C9C1F0}
 .result-top .eyebrow{margin:0 0 4px;font-size:12px}
 .result-top h3{margin:0;font-family:var(--font-display);font-weight:400;font-size:24px;color:var(--ink)}
 .result-top h3.success{color:var(--strong)}
-.result-figure{text-align:right;flex:none}
-.result-pct{margin:0;font-family:var(--font-display);font-size:26px}
-.result-delta{margin:0;font-size:12px;color:var(--muted)}
+.result-figure{text-align:right;flex:none;max-width:45%}
+.result-pct{margin:0;font-family:var(--font-display);font-size:24px;line-height:1.2;white-space:nowrap}
+.result-same{margin:0;font-size:14px;font-weight:700;color:var(--ink)}
+.result-delta{margin:2px 0 0;font-size:12px;color:var(--muted)}
 .rationale{margin:12px 0 0;font-size:14px;line-height:1.7}
 .result-actions{display:flex;gap:16px;margin-top:14px}
 .result-actions .secondary{min-height:36px;font-size:13px}
@@ -535,6 +559,7 @@ button.mastery-chip:hover{border-color:#C9C1F0}
 .message.pending{opacity:.85}
 .sending{margin:4px 0 0;font-size:11px;font-weight:600;color:var(--muted)}
 .thinking .dots{display:inline-flex;gap:3px;font-size:22px;line-height:1;color:var(--muted)}
+.waited{margin-left:10px;font-size:12px;font-weight:600;color:var(--faint);font-variant-numeric:tabular-nums}
 .thinking .dots span{animation:sgDot 1.2s ease-in-out infinite}.thinking .dots span:nth-child(2){animation-delay:.2s}.thinking .dots span:nth-child(3){animation-delay:.4s}
 @keyframes sgDot{0%,80%,100%{opacity:.25;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
 @media (prefers-reduced-motion:reduce){.thinking .dots span{animation:none;opacity:.6}}
