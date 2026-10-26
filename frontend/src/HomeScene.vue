@@ -4,6 +4,8 @@ import { SPRITES, iconRects, rng } from "./pixel-art.ts";
 import { cloudDrift, cloudRects, snapStyle, sprite, type CellRect, type Sprite } from "./scene-motion.ts";
 import ContinueCard from "./ContinueCard.vue";
 import type { OpenSession } from "./continue-session.ts";
+import { MOON, dayOrNight, isNight, leafColor, scatterStars, sceneColor } from "./scene-palette.ts";
+import { currentTheme } from "./theme.ts";
 
 // The Home hero scene (design/revamp/README.md): a pixel meadow drawn on a canvas at 4px cells × devicePixelRatio, a
 // dotted path from "You · today" past one post per day to the exam hill and its flag. The panel on top is the slot.
@@ -49,7 +51,7 @@ const sprites = computed<Sprite[]>(() => {
     CLOTH.forEach((column, k) => out.push(sprite(`cloth-${k}`, xE + 1, fy - 9, U, column, { y: [0, 1, 1.5, 2][k], seconds: 0.8, phase: 0.15 * k })));
   }
   // "You · today": the leaf bobs a few pixels above its mound.
-  out.push(sprite("leaf", xT - 3, G + 3 - 7, U, LEAF, { y: -3, seconds: 1.6 }));
+  out.push(sprite("leaf", xT - 3, G + 3 - 7, U, LEAF.map((r) => ({ ...r, fill: leafColor(r.fill) })), { y: -3, seconds: 1.6 }));
   return out;
 });
 
@@ -59,14 +61,15 @@ function draw() {
   if (cv.width !== W * U * ratio || cv.height !== H * U * ratio) { cv.width = W * U * ratio; cv.height = H * U * ratio; }
   const ctx = cv.getContext("2d"); if (!ctx) return;
   ctx.setTransform(ratio, 0, 0, ratio, 0, 0); ctx.imageSmoothingEnabled = false;
-  const cell = (x: number, y: number, c: string) => { ctx.fillStyle = c; ctx.fillRect(Math.round(x) * U, Math.round(y) * U, U, U); };
-  const rect = (x: number, y: number, w: number, h: number, c: string) => { ctx.fillStyle = c; ctx.fillRect(Math.round(x) * U, Math.round(y) * U, Math.round(w) * U, Math.round(h) * U); };
+  const cell = (x: number, y: number, c: string) => { ctx.fillStyle = sceneColor(c); ctx.fillRect(Math.round(x) * U, Math.round(y) * U, U, U); };
+  const rect = (x: number, y: number, w: number, h: number, c: string) => { ctx.fillStyle = sceneColor(c); ctx.fillRect(Math.round(x) * U, Math.round(y) * U, Math.round(w) * U, Math.round(h) * U); };
   // Sky as solid bands, never a gradient.
   const sky = ["#CFE6F0", "#D7EBF2", "#E0EFF3", "#E9F3F1", "#F3F4E6"], bh = Math.ceil(G / sky.length);
   sky.forEach((c, i) => rect(0, i * bh, W, bh, c));
-  // The sun's arc follows today's minutes against the budget.
+  // The sun's arc follows today's minutes against the budget; by night the moon takes its place.
   const p = Math.max(0, Math.min(1, props.progress)), sx = Math.round(xT + (xE - xT) * p * 0.8), sy = Math.round(G * 0.5 - Math.sin(Math.max(0.2, p) * Math.PI) * G * 0.32);
-  for (let dy = -5; dy <= 5; dy++) for (let dx = -5; dx <= 5; dx++) { const q = dx * dx + dy * dy; if (q <= 26) cell(sx + dx, sy + dy, q <= 10 ? "#E3A233" : "#F3CD7A"); }
+  for (let dy = -5; dy <= 5; dy++) for (let dx = -5; dx <= 5; dx++) { const q = dx * dx + dy * dy; if (q <= 26) cell(sx + dx, sy + dy, q <= 10 ? dayOrNight("#E3A233", MOON.face) : dayOrNight("#F3CD7A", MOON.rim)); }
+  if (isNight()) { cell(sx + 1, sy - 2, MOON.crater); cell(sx - 2, sy + 1, MOON.crater); cell(sx + 2, sy + 1, MOON.crater); }
   for (let x = 0; x < W; x++) { const top = Math.round(G - (G * 0.24 + Math.sin(x / 23 + 0.4) * G * 0.08)); rect(x, top, 1, G - top, "#BFDCC8"); }
   for (let x = 0; x < W; x++) { const top = Math.round(G - (G * 0.1 + Math.sin(x / 13 + 1) * 2)); rect(x, top, 1, G - top, "#A3D6B4"); }
   rect(0, G, W, H - G, "#7CC497"); rect(0, G, W, 1, "#9AD6AE"); rect(0, Math.round(G + (H - G) * 0.6), W, H, "#6DB892");
@@ -82,6 +85,7 @@ function draw() {
   if (props.sign) rect(xE, G - 16, 1, 9, "#48555C");
   // The mound under "You · today"; its leaf is a sprite.
   rect(xT - 4, py, 9, 1, "#5FAE85");
+  scatterStars(ctx, U * ratio, W, G, 3);
 }
 
 onMounted(() => {
@@ -94,7 +98,7 @@ onMounted(() => {
   dpr.value = window.devicePixelRatio || 1;
   draw();
 });
-watch([size, dpr, () => props.days, () => props.sign, () => props.progress], draw, { flush: "post" });
+watch([size, dpr, () => props.days, () => props.sign, () => props.progress, currentTheme], draw, { flush: "post" });
 onBeforeUnmount(() => { observer?.disconnect(); });
 </script>
 

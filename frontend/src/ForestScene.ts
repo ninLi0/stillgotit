@@ -4,6 +4,7 @@
 // and changes only when the selection, hover or topic changes. The caller owns the canvases and passes the
 // device-pixel size of one cell, so every cell lands on whole device pixels and stays crisp.
 import { PAL, SPRITES, genTree, hash, rng, stageOf, type Segment } from "./pixel-art.ts";
+import { MOON, dayOrNight, leafColor, sceneColor } from "./scene-palette.ts";
 import type { ViewSkill, ViewUnit } from "./revamp-types.ts";
 
 export type ForestLeaf = { skill: ViewSkill; unit: string; x: number; y: number };
@@ -99,7 +100,7 @@ function painter(ctx: CanvasRenderingContext2D, px: number): Paint {
   const rect = (x: number, y: number, w: number, h: number, c: string) => {
     const rw = Math.round(w), rh = Math.round(h);
     if (rw <= 0 || rh <= 0) return;
-    ctx.fillStyle = c;
+    ctx.fillStyle = sceneColor(c);
     ctx.fillRect(Math.round(x) * px, Math.round(y) * px, rw * px, rh * px);
   };
   const cell = (x: number, y: number, c: string) => rect(x, y, 1, 1, c);
@@ -109,12 +110,13 @@ function painter(ctx: CanvasRenderingContext2D, px: number): Paint {
   return { rect, cell, disc };
 }
 
-/** Sky bands (solid, never a gradient) and the sun on its arc. */
+/** Sky bands (solid, never a gradient) and the sun on its arc, or the moon by night (scene-palette.ts). */
 export function drawSky(ctx: CanvasRenderingContext2D, layout: ForestLayout, px: number) {
   const { rect, cell, disc } = painter(ctx, px), { Wc, Wv, G } = layout, bh = Math.ceil(G / SKY.length);
   SKY.forEach((c, i) => rect(0, i * bh, Wc, bh, c));
   const sx = Math.round(Wv * (0.1 + 0.8 * SUN_AT)), sy = Math.round(G * 0.5 - Math.sin(SUN_AT * Math.PI) * G * 0.32);
-  disc(sx, sy, 8, "#F9E3A8"); disc(sx, sy, 6, "#F3CD7A"); disc(sx, sy, 4, "#E3A233"); cell(sx - 2, sy - 2, "#F9E3A8");
+  disc(sx, sy, 8, dayOrNight("#F9E3A8", MOON.glow)); disc(sx, sy, 6, dayOrNight("#F3CD7A", MOON.rim)); disc(sx, sy, 4, dayOrNight("#E3A233", MOON.face));
+  cell(sx - 2, sy - 2, dayOrNight("#F9E3A8", MOON.crater));
 }
 
 /** Where each cloud sits, in cells, and how wide it is, from a fixed seed so the clouds keep their places. */
@@ -192,7 +194,7 @@ function drawTree({ rect, cell }: Paint, t: ForestTree, state: LandState) {
   for (const b of t.buds) { cell(b.x, b.y, "#6DB892"); cell(b.x + 1, b.y - 1, "#6DB892"); }
   for (const lf of t.leaves) {
     SPRITES[stageOf(lf.skill.mastery)].forEach((row, ry) => {
-      for (let rx = 0; rx < row.length; rx++) { const ch = row.charAt(rx); if (ch !== ".") cell(lf.x - 3 + rx, lf.y - 3 + ry, PAL[ch] ?? "#000000"); }
+      for (let rx = 0; rx < row.length; rx++) { const ch = row.charAt(rx); if (ch !== ".") cell(lf.x - 3 + rx, lf.y - 3 + ry, leafColor(PAL[ch] ?? "#000000")); }
     });
     if (lf.skill.dueToday) { rect(lf.x + 3, lf.y - 8, 1, 5, "#48555C"); rect(lf.x + 4, lf.y - 8, 2, 2, "#D9663A"); cell(lf.x + 5, lf.y - 7, "#EE9C78"); }
     const mark = lf.skill.skill === state.selected ? "#151515" : lf.skill.skill === state.hover ? "#5F5F5C" : null;

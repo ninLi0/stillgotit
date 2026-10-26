@@ -98,6 +98,9 @@
   --load-ground: rgba(27,28,26,.9); --load-text: #9CCFE7;
   /* Cards and the planting plot over a scene take the dark card, so their light text stays readable. */
   --scene-card: rgba(27,28,26,.94); --plot: rgba(27,28,26,.78); --plot-hover: rgba(27,28,26,.9);
+  /* The scenes by night (scene-palette.ts): the grounds behind their canvases, their edges, and the labels laid over them. */
+  --sky: #1D2643; --home-sky: #19223D; --home-line: #2A3346; --sea: #2A4D69; --sea-line: #24485A; --scene-chip: rgba(27,28,26,.85);
+  --scene-label: rgba(18,19,17,.72); --meadow-label: #A3DBB5; --sea-label: #9CD0E7; --today-column: rgba(255,255,255,.07); --today-ring: rgba(255,255,255,.45);
   --viewer: #161715; --viewer-rail: #191A18; --thumb-ring: #34352F; --thumb-bar: #45463F; --page: #1F201D; --page-ink: #E6E6E0;
   --slide-accent: #4F9BBE; --slide-title: #D3E8F1; --slide-text: #C3CCD0; --slide-foot: #929FA5;
 }
@@ -130,6 +133,9 @@
     --load-ground: rgba(27,28,26,.9); --load-text: #9CCFE7;
     /* Cards and the planting plot over a scene take the dark card, so their light text stays readable. */
     --scene-card: rgba(27,28,26,.94); --plot: rgba(27,28,26,.78); --plot-hover: rgba(27,28,26,.9);
+    /* The scenes by night (scene-palette.ts): the grounds behind their canvases, their edges, and the labels laid over them. */
+    --sky: #1D2643; --home-sky: #19223D; --home-line: #2A3346; --sea: #2A4D69; --sea-line: #24485A; --scene-chip: rgba(27,28,26,.85);
+    --scene-label: rgba(18,19,17,.72); --meadow-label: #A3DBB5; --sea-label: #9CD0E7; --today-column: rgba(255,255,255,.07); --today-ring: rgba(255,255,255,.45);
     --viewer: #161715; --viewer-rail: #191A18; --thumb-ring: #34352F; --thumb-bar: #45463F; --page: #1F201D; --page-ink: #E6E6E0;
     --slide-accent: #4F9BBE; --slide-title: #D3E8F1; --slide-text: #C3CCD0; --slide-foot: #929FA5;
   }

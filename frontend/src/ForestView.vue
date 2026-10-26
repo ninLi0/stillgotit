@@ -8,6 +8,8 @@ import { cloudPlaces, drawLand, drawSky, hitForest, layoutForest, plotX, type Fo
 import { focusedControl } from "./focus.ts";
 import { rng, stageOf, type Stage } from "./pixel-art.ts";
 import { cloudDrift, cloudRects, snapStyle, sprite, type Sprite } from "./scene-motion.ts";
+import { scatterStars } from "./scene-palette.ts";
+import { currentTheme } from "./theme.ts";
 import type { ForestProps, ViewSkill, ViewUnit } from "./revamp-types.ts";
 
 // The course forest (design/revamp/README.md, "Forest view"): a full-screen overlay with one pixel tree per topic.
@@ -138,7 +140,7 @@ function paintSky() {
   const L = layout.value, target = sky.value;
   if (!L || !target) return;
   const ctx = prepare(target, L);
-  if (ctx) drawSky(ctx, L, cellPx.value);
+  if (ctx) { drawSky(ctx, L, cellPx.value); scatterStars(ctx, cellPx.value, L.Wc, L.G, 11); }
 }
 function paintLand() {
   const L = layout.value, target = canvas.value;
@@ -156,6 +158,7 @@ watch(layout, () => {
 }, { flush: "post" });
 // A changed estimate or due flag keeps the same layout but changes the sprites.
 watch(() => props.units, paintAll, { deep: true, flush: "post" });
+watch(currentTheme, paintAll, { flush: "post" });
 watch([() => props.selected, hover, topic], paintLand, { flush: "post" });
 
 function measure() {

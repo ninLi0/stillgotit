@@ -4,6 +4,8 @@ import InfoBubble from "./InfoBubble.vue";
 import PixelIcon from "./PixelIcon.vue";
 import { STAGE_LABELS, type Stage } from "./pixel-art.ts";
 import { CELL, GROUND, HEIGHT, PLOT, average, drawGrove, growGrove, leafNear, shiftGrove, type GroveLeaf, type GroveTopic } from "./GroveScene.ts";
+import { scatterStars } from "./scene-palette.ts";
+import { currentTheme } from "./theme.ts";
 
 // The grove: one pixel tree per topic, each confirmed skill a leaf at a branch tip (design/revamp/README.md,
 // "Tree view"). The canvas is decoration; every leaf is also a real button laid over it, so the grove works from the
@@ -109,9 +111,12 @@ const tagStyle = computed(() => {
 watch(tagLeaf, async () => { await nextTick(); tagWidth.value = tagEl.value?.offsetWidth ?? 0; }, { immediate: true });
 
 function draw() {
-  if (canvas.value) drawGrove(canvas.value, placed.value.grove, placed.value.cssWidth, dpr.value, props.selected, hot.value);
+  if (!canvas.value) return;
+  drawGrove(canvas.value, placed.value.grove, placed.value.cssWidth, dpr.value, props.selected, hot.value);
+  const ctx = canvas.value.getContext("2d");
+  if (ctx) scatterStars(ctx, CELL * dpr.value, Math.ceil(placed.value.cssWidth / CELL), GROUND, 7);
 }
-watch([placed, () => props.selected, hot, dpr], draw, { flush: "post" });
+watch([placed, () => props.selected, hot, dpr, currentTheme], draw, { flush: "post" });
 
 // Hit-testing happens in cell space: the nearest leaf within about five cells.
 function leafAtPointer(event: MouseEvent) {

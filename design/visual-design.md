@@ -170,7 +170,8 @@ Every color the interface uses is a token on `:root` in [frontend/src/style.css]
 - **Text turns over.** Ink becomes `#ECECE7`, soft `#C4C4BE`, muted `#A5A59F`, and faint `#94948E`, so the four levels keep their order.
 - **Each biome keeps its hue.** Primary buttons take a lighter, calmer version of the biome's color (meadow `#7CC094`, ocean `#7BBCD8`, sand `#E0B67D`, dawn `#A69CE8`) with very dark text in the same hue, and the edge under them stays one step darker. Soft colors, washes, and the sidebar's capsules become deep tints of the hue, such as meadow soft `#1E3327`, with light text in the hue.
 - **Borders where shadows disappear.** A shadow does not show on a dark ground, so dialogs draw a 1 px light edge, and cards keep their 1 px ring. Focus rings are light ink.
-- **What stays the same.** Layout, type, and motion do not change. The coral badge, the exam plank's blue, and the sun-yellow of practice keep their colors, because they pass on both grounds. The pixel icons and sprites keep their palette, because their light fills carry each shape on a dark card. The evidence marks are the exception: their color is all they have, so their slate, violet, and green turn lighter (`#8E9BA2`, `#8F82E8`, `#6DB487`). PDF pages and images stay as the file has them. The scenes keep their daytime colors, and the cards laid over them take the dark card.
+- **What stays the same.** Layout, type, and motion do not change. The coral badge, the exam plank's blue, and the sun-yellow of practice keep their colors, because they pass on both grounds. The pixel icons, and the leaf sprites on cards and in legends, keep their palette, because their light fills carry each shape on a dark card. The evidence marks are the exception: their color is all they have, so their slate, violet, and green turn lighter (`#8E9BA2`, `#8F82E8`, `#6DB487`). PDF pages and images stay as the file has them.
+- **The scenes turn to night.** Home's meadow, the grove, the Plan sea, the Forest view, and the sample grove on the sign-in page are drawn by night. Each sky runs from dusk at the horizon to deep blue above, the moon takes the sun's place, and a few stars are scattered once over the open sky. Land and sea keep their hues and their order from light to dark: [frontend/src/scene-palette.ts](../frontend/src/scene-palette.ts) dims each day color by one rule in OKLab, and chooses the skies, seas, clouds, and a few others by hand. Lights stay lit: the lighthouse lamp and its beam, the flags, the buoys, and the flowers. The leaves carry each skill's stage, so their greens turn lighter rather than darker and stand out from the dark crowns; poles turn pale, and the selected leaf's brackets turn from ink to pale. Cards and labels over a scene take the dark card, and the scenes draw again as soon as the theme changes.
 
 These are the ratios for the same pairs in the dark theme, with the pairs that matter only there added. They are computed the same way as above. A translucent ground is measured over white, the brightest thing a scene can show beneath it.
 
@@ -218,6 +219,9 @@ These are the ratios for the same pairs in the dark theme, with the pairs that m
 | `#8C8D87` on a field `#151614` | Checkbox outlines (3:1 needed) | 5.42:1 |
 | Ink `#ECECE7` on a card | Focus rings (3:1 needed) | 14.43:1 |
 | `#8E9BA2`, `#8F82E8`, and `#6DB487` on a card | The evidence marks for the starting point, an attempt or adjustment, and time without practice (3:1 needed) | 6.00:1, 5.32:1, 6.95:1 |
+| `#A3DBB5` and `#9CD0E7` on `rgba(18, 19, 17, .72)` over the night sky and sea | "You · today" on Home and on the Plan sea | 10.95:1, 9.56:1 |
+| A leaf `#3E9C6C`, its highlight `#7CC59D`, and a bud `#E3A233` on a night crown `#354B43` | The leaves on the grove and in the Forest view (by day the leaf is 2.60:1 on its crown) | 2.76:1, 4.61:1, 4.24:1 |
+| `#F2EFE4` on a night crown `#354B43` | The brackets around the selected leaf | 8.15:1 |
 
 ## Sources
 
