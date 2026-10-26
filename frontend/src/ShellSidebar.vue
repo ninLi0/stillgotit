@@ -5,8 +5,9 @@ import type { IconName } from "./pixel-art.ts";
 import { useSlidingMark } from "./sliding-mark.ts";
 
 // The app's sidebar (design/revamp/README.md): brand, course switcher (the slot, owned by App.vue), the nav rows with
-// their biome capsules and badges, and at the bottom the Today card, the tutor model row and Settings. Under 760px it
-// becomes a top bar with the nav rows as a horizontal strip.
+// their biome capsules and badges, the Conversations group (the second slot, owned by CourseWorkspace.vue), and at the
+// bottom the Today card, the tutor model row and Settings. Under 760px it becomes a top bar with the nav rows as a
+// horizontal strip.
 export type ShellView = "home" | "plan" | "setup" | "chat";
 const props = defineProps<{ view: ShellView; forestOpen: boolean; lessonTitle?: string; materialsBadge: number; homeBadge?: number;
   today: { spent: number; total: number } | null; tutorLabel: string; username: string }>();
@@ -59,6 +60,7 @@ const cells = computed(() => {
         </button>
       </template>
     </nav>
+    <slot name="conversations" />
     <div class="bottom">
       <div class="today card">
         <div class="today-top"><PixelIcon name="sun" :size="20" /><span class="eyebrow">Today</span><span class="today-min">{{ today ? `${today.spent} of ${today.total} min` : 'No study time set' }}</span></div>

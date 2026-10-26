@@ -155,6 +155,28 @@ export function hasLessonQuestion({ data }: { data: StudySession }): boolean { r
 export function sessionActivity({ data }: { data: StudySession }): { kind: "LESSON" | "PRACTICE"; lastActive: Date | null } {
   return { kind: data.lesson ? "LESSON" : "PRACTICE", lastActive: data.dialogue.at(-1)?.turn.at ?? null };
 }
+/** The confirmed skills of a course map: the topics whose conversations the sidebar lists. */
+export function studyTopics({ skills }: { skills: SkillRows }): string[] {
+  return skills.filter((skill) => skill.status === "CONFIRMED").map((skill) => skill.skill);
+}
+const TITLE_LENGTH = 60;
+/** Text shortened to about 60 characters at a word boundary, with an ellipsis when it was cut. */
+function shortTitle(text: string) {
+  const flat = text.replace(/\s+/g, " ").trim();
+  if (flat.length <= TITLE_LENGTH) return flat;
+  const cut = flat.slice(0, TITLE_LENGTH - 1), space = cut.lastIndexOf(" ");
+  return `${(space > TITLE_LENGTH / 2 ? cut.slice(0, space) : cut).replace(/[\s,.;:–—-]+$/, "")}…`;
+}
+/**
+ * A conversation as the sidebar lists it. A lesson is titled by its opening request, shortened; practice by its skill.
+ * Session identities are time-ordered (GroundedTutoring), so the start time is read from the identity, as _recent orders
+ * by it; an older identity records no time. The last activity is the latest turn's time, or the start before any turn.
+ */
+export function recentSession({ data, skillTitle }: { data: StudySession; skillTitle: string }): { kind: "LESSON" | "PRACTICE"; title: string; startedAt: Date | null; lastActivity: Date | null } {
+  const id = String(data.session), startedAt = id[14] === "7" ? new Date(parseInt(id.replace(/-/g, "").slice(0, 12), 16)) : null;
+  return { kind: data.lesson ? "LESSON" : "PRACTICE", title: data.lesson ? shortTitle(data.lesson.request) || "Lesson" : `Practice · ${skillTitle}`,
+    startedAt, lastActivity: data.dialogue.at(-1)?.turn.at ?? startedAt };
+}
 export function submissionInput({ data, unseen, outsideHelp }: { data: StudySession; unseen: boolean; outsideHelp: boolean }) {
   const responses = data.dialogue.filter(({ turn }) => turn.speaker === "LEARNER" && turn.purpose === "RESPONSE");
   const text = responses.map(({ turn, turnIndex }) => data.voice.find((item) => item.turnIndex === turnIndex)?.text ?? turn.text).join("\n\n");

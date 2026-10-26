@@ -41,6 +41,30 @@ sessionActivity(data: GroundedTutoring.StudyRecord) : SessionActivity
 Reads.Continue at /learning/continue
 ```
 
+## Conversations in the sidebar
+
+The sidebar lists the learner's latest conversations in the course, open or closed, so the learner can go back to any of them from any page. [Recent](reaction:Reads.Recent) answers that list.
+
+- When the request arrives with a course, `Sessioning.use` turns the session into the acting learner, as for Continue.
+- Where [OwnedCourse](view:Courses.OwnedCourse) holds for that learner and course, the endpoint answers `sessions` with [RecentStudy](former:Reads.RecentStudy).
+- Where OwnedCourse does not hold, the endpoint answers `COURSE_UNAVAILABLE` and reads no session.
+
+RecentStudy reads the course map with `SkillMapping._map`, and [studyTopics](computation:studyTopics) keeps its confirmed skills, since only a confirmed skill has a study page. `GroundedTutoring._recent` then gives at most 40 of the learner's sessions in those skills, in every status, most recently active first: by the latest turn's time, or, before the first turn, by the time the session started. The cap and the order come from the concept query, because a former can order rows but cannot keep only the first few. For each of those sessions, RecentStudy reads the skill's title with `SkillMapping._skill` and the session's record with `GroundedTutoring._sessionData`, and [recentSession](computation:recentSession) gives its kind, its title, when it started, and when it was last active. A row keeps the order `_recent` gave it.
+
+Each row gives the session, its skill and the skill's title, its kind, its status, its title, `startedAt`, and `lastActivity`. A lesson's title is its opening request, shortened to about 60 characters at a word boundary; a practice session's title is "Practice · " and the skill's title. `startedAt` is null for a session saved before identities recorded the time, and `lastActivity` is then null until its first turn. Selecting a row opens that skill's study page on that session, the way a Continue row does.
+
+```computations
+studyTopics(skills: SkillMapping.SkillMapRows) : TopicList
+  Lists the skills in the course map whose status is CONFIRMED.
+
+recentSession(data: GroundedTutoring.StudyRecord, skillTitle: String) : RecentSession
+  Names the session's kind, LESSON or PRACTICE, and gives its title: a lesson's opening request with its spaces collapsed and, when it is longer than 60 characters, cut at the last word before that with an ellipsis; or "Practice · " followed by skillTitle. startedAt is the time the session's identity records, or null when it records none. lastActivity is the server time of the latest dialogue turn, or startedAt when there is no turn.
+```
+
+```endpoints
+Reads.Recent at /learning/recent
+```
+
 ## Planning reads
 
 [PlanContext](view:Reads.PlanContext) computes candidate reviews, exam preparation, and a context fingerprint from the course map, learner progress, and planning schedule, which includes the course's active exams. [CanReplan](view:Reads.CanReplan) requires course ownership, saved preferences, and no activity in progress. [NeedsEvidence](view:Reads.NeedsEvidence) requires an effective judgment, a matching mastery track, and an absent or older contribution. Reading it has no side effects.

@@ -68,6 +68,7 @@ The charts add no colors; each one comes from the palette above or from `pixel-a
 
 ### The lesson's conversation
 
+- **Conversations stay in the sidebar.** Under the views, the sidebar lists the learner's latest conversations in the course, as ChatGPT lists recent chats. "+ New conversation" comes first, in the dawn text color, and starts a conversation in the open skill, or opens Home's tree when no skill is open. The rows follow, grouped under Today, Yesterday, Earlier this week (since Monday), and Earlier by the day of their last activity in New York time, newest first and at most 40. Each row is the conversation's title in 14 px (a lesson's opening request, shortened, or "Practice · " and the skill), and under it the skill's name and a short time such as "3 h" in the tabs' 12 px meta style, in muted grey so it stays above 4.5:1 on every row background. A small dawn square marks a conversation that is still open. The conversation on screen sits in a dawn capsule (`#DEDAFF`), the shape the views' capsules have. The list scrolls on its own between the views and the Today card. On phones it folds behind a "Conversations" button with the number of conversations, which opens the list below it like a drawer and closes again once a row is chosen.
 - **Tabs name each conversation.** Above the thread, each tab shows the conversation's kind and number ("Lesson 2", "Practice 1"), the day it started, and how many turns it has, such as "Oct 25 · 4 turns", with ✓ once it is assessed.
 - **The opening is a card.** The tutor's lesson, or the practice task, sits in a white card with a ring, below the learner's request. A rule labelled "Conversation", in the eyebrow style, separates it from the dialogue that follows.
 - **The learner's messages are bubbles; the tutor's replies are not.** The learner's messages are compact dawn bubbles (`#EEEBFF`) on the right, at most 70% of the thread's width (85% on phones). The tutor's replies run the full width without a bubble: a first line with the leaf in a small dawn tile and "StillGotIt", then the reply at 15 px with a 1.8 line height, and code and maths in mono blocks.
@@ -116,6 +117,9 @@ Text should reach 4.5:1 against its background, and outlines and cells that carr
 | `#7A4A12` on `#FCEFD9` | Sand secondary buttons | 6.57:1 |
 | `#3B2F8F` on `#EEEBFF` | Dawn secondary buttons | 9.03:1 |
 | Ink on the sidebar capsules `#C6EAD1`, `#C3E6F4`, `#FADFB5` | The selected row in the sidebar | 13.99:1, 13.87:1, 14.16:1 |
+| Ink and muted on the dawn capsule `#DEDAFF` | The title and meta line of the conversation on screen | 13.55:1, 4.75:1 |
+| Muted `#5F5F5C` on `#F1F1EE` | A conversation's meta line under the pointer | 5.66:1 |
+| `#3B2F8F` on white, and on the dawn capsule | "+ New conversation", and the square that marks an open conversation (3:1 needed) | 10.56:1, 7.83:1 |
 | White on `#1E6F96` | The exam day's plank on Plan | 5.57:1 |
 | `#A8412F` on `#FBE6DC` | Error messages and the Due today pill | 5.04:1 |
 | `#8A5A12` on `#FBF0D6` | The New pill | 5.22:1 |
@@ -156,7 +160,8 @@ For example, ink `#151515` has v = 21 / 255 = 0.0824 in each channel, so each ch
 | `#C6EAD1` | 0.7545 | `#7A4A12` | 0.0908 | `#4A775A` | 0.1539 |
 | `#C3E6F4` | 0.7473 | `#EEEBFF` | 0.8481 | `#E6E6E2` | 0.7891 |
 | `#FADFB5` | 0.7644 | `#3B2F8F` | 0.0495 | `#1E6F96` | 0.1385 |
-| `#7A7397` | 0.1863 | | | `#CFE7F2` | 0.7683 |
+| `#7A7397` | 0.1863 | `#DEDAFF` | 0.7289 | `#CFE7F2` | 0.7683 |
+| `#F1F1EE` | 0.8778 | | | | |
 
 </details>
 

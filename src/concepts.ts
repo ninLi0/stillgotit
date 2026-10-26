@@ -9,7 +9,7 @@ import { skillMapping } from "./concepts/SkillMapping.registry.ts";
 import { groundedTutoring } from "./concepts/GroundedTutoring/registry.ts";
 import { materialKeeping } from "./concepts/MaterialKeeping/registry.ts";
 import { singleMaterial, evidenceAttribution } from "./computations.ts";
-import { carriedEstimate, prerequisiteSet, prerequisiteToPractice, sessionSubject, attemptIsReady, beginAllowed, correctionNote, coveredSkillsConfirmed, cutKey, dialogueIsCurrent, evidenceUpdate, generationDefinition, generationFields, gradeRequest, hasLessonQuestion, itemOrder, itemSubject, lessonRequest, planDetail, planRequest, prerequisitesReady, progressRows, responseInput, reviewApproved, selectSkill, selectSkillMaterials, selectSources, sessionActivity, sessionMaterials, sessionRequest, studyDetail, submissionInput, suggestRequest, taskRequest, urgentExamItem, estimateTimeline } from "./computations/learning.ts";
+import { carriedEstimate, prerequisiteSet, prerequisiteToPractice, sessionSubject, attemptIsReady, beginAllowed, correctionNote, coveredSkillsConfirmed, cutKey, dialogueIsCurrent, evidenceUpdate, generationDefinition, generationFields, gradeRequest, hasLessonQuestion, itemOrder, itemSubject, lessonRequest, planDetail, planRequest, prerequisitesReady, progressRows, responseInput, reviewApproved, selectSkill, selectSkillMaterials, selectSources, sessionActivity, recentSession, studyTopics, sessionMaterials, sessionRequest, studyDetail, submissionInput, suggestRequest, taskRequest, urgentExamItem, estimateTimeline } from "./computations/learning.ts";
 import { generating } from "./concepts/Generating/registry.ts";
 import preferringSpec from "@design/concepts/Preferring.md" with { type: "text" };
 import { Preferring } from "./concepts/Preferring/Preferring.ts";
@@ -39,7 +39,7 @@ export const applicationConceptSet = conceptSet({
   TutorGenerating: generating,
   TutorPreferring: tutorPreferring,
   ViewPreferring: viewPreferring,
-}, { singleMaterial, evidenceAttribution, carriedEstimate, prerequisiteSet, prerequisiteToPractice, sessionSubject, attemptIsReady, beginAllowed, correctionNote, coveredSkillsConfirmed, cutKey, dialogueIsCurrent, evidenceUpdate, generationDefinition, generationFields, gradeRequest, hasLessonQuestion, itemOrder, itemSubject, lessonRequest, planDetail, planRequest, prerequisitesReady, progressRows, responseInput, reviewApproved, selectSkill, selectSkillMaterials, selectSources, sessionActivity, sessionMaterials, sessionRequest, studyDetail, submissionInput, suggestRequest, taskRequest, urgentExamItem, estimateTimeline,
+}, { singleMaterial, evidenceAttribution, carriedEstimate, prerequisiteSet, prerequisiteToPractice, sessionSubject, attemptIsReady, beginAllowed, correctionNote, coveredSkillsConfirmed, cutKey, dialogueIsCurrent, evidenceUpdate, generationDefinition, generationFields, gradeRequest, hasLessonQuestion, itemOrder, itemSubject, lessonRequest, planDetail, planRequest, prerequisitesReady, progressRows, responseInput, reviewApproved, selectSkill, selectSkillMaterials, selectSources, sessionActivity, recentSession, studyTopics, sessionMaterials, sessionRequest, studyDetail, submissionInput, suggestRequest, taskRequest, urgentExamItem, estimateTimeline,
   tutorCatalog, defaultChoice, modelOffered, levelSupported, offeredChoice, choiceOffered, withChoice, requestChoice, tutorStatus,
   homeViewOffered, offeredHomeView, defaultHomeView,
   gradedTitle, hasConfirmedSkill, extractRequest, hasGradedRows, gradedToday, gradedReview, gradedKey, gradedImport, gradedSource });

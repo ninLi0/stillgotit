@@ -31,6 +31,8 @@ opaque MediaList
   An ordered sequence of MediaValue records. The order preserves pages, slides, files, or other supplied parts.
 opaque MaterialSet
   A finite set of Material identities, with no duplicates or ordering.
+opaque TopicSet
+  A finite set of Topic identities, with no duplicates or ordering.
 opaque PassageRef
   An immutable Material identity and a location within that material. Locations may identify pages, paragraphs, slides, cells, image regions, code lines, notebook cells, or audio timestamps.
 opaque PassageSet
@@ -230,4 +232,7 @@ _study(owner: Learner, topic: Topic) : one (sessions: StudyRecords)
 
 _sessionData(session: Session) : optional (data: StudyRecord)
   Returns the session and its own dialogue, source identities, and review state. Returns no row for an unknown session. The application checks ownership.
+
+_recent(owner: Learner, topics: TopicSet, limit: Number) : many (session: Session, topic: Topic, status: SessionStatus)
+  Returns at most limit of the owner's sessions whose topic is in topics, in every status, most recently active first. A session's activity is the server time of its latest dialogue turn or, before its first turn, the time it started. Session identities are time-ordered, so each records when its session started; a session whose identity records no time and that has no turn comes last. Sessions with the same activity are ordered newest start first. Returns no rows when none match or limit is 0.
 ```

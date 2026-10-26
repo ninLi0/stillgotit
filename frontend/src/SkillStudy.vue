@@ -28,8 +28,9 @@ type Attachment = { material: string; name: string; preview: string };
 // aiReason explains why AI features are off when aiAvailable is false. materials gives titles for cited sources.
 // initialDraft prefills the message box of a new conversation (for example "Ask about this page" in Materials); it is never sent by itself.
 const props = defineProps<{ skill: string; course: string; materials: { material: string; title: string }[]; aiAvailable: boolean; aiReason: string; active?: boolean; initialDraft?: string }>();
-// `back` returns to the skill tree. `open-source` asks the shell to show a cited source in Materials.
-const emit = defineEmits<{ changed: []; back: []; "open-source": [source: OpenSource] }>();
+// `back` returns to the skill tree. `open-source` asks the shell to show a cited source in Materials. `session` names
+// the conversation on screen (null for a new one), so the sidebar can mark it.
+const emit = defineEmits<{ changed: []; back: []; "open-source": [source: OpenSource]; session: [skill: string, session: string | null] }>();
 const data = shallowRef<SkillData | null>(null), selected = ref<StudySession["session"] | "">(""), busy = ref(false), error = ref(""), notice = ref("");
 const noticeBox = ref<HTMLElement | null>(null), errorBox = ref<HTMLElement | null>(null), composerInput = ref<HTMLTextAreaElement | null>(null), heading = ref<HTMLElement | null>(null);
 const confidence = ref(50), freshLesson = ref(false), recording = ref(false), reviewOpen = ref(false), thread = ref<HTMLElement | null>(null), evidenceOpen = ref(false);
@@ -319,7 +320,7 @@ watch(() => props.initialDraft, (draft) => { void applyDraft(draft); }, { immedi
 // switches to it when the current step finishes, and reads again if the session is newer than what it has.
 watch([() => props.skill, sessionRequest], () => {
   const id = takeSession(props.skill); if (!id) return;
-  const show = () => { freshLesson.value = false; selected.value = id; reviewOpen.value = false; if (data.value && !data.value.sessions.some((session) => session.session === id)) void act(load); };
+  const show = () => { freshLesson.value = false; selected.value = id; reviewOpen.value = false; void scrollToLatest(true); if (data.value && !data.value.sessions.some((session) => session.session === id)) void act(load); };
   if (!data.value || (!busy.value && !recording.value)) { show(); return; }
   const stop = watch([busy, recording], ([working, speaking]) => { if (!working && !speaking) { stop(); show(); } });
 }, { immediate: true });
@@ -330,7 +331,14 @@ async function startPractice() {
   if (refusal) { notice.value = ""; error.value = refusal; await nextTick(); errorBox.value?.focus(); return; }
   await startTask();
 }
-defineExpose({ startPractice });
+/** The sidebar's "+ New conversation": a new conversation here, once the current step finishes, with the box focused. */
+function newConversation() {
+  const start = async () => { newLesson(); await nextTick(); composerInput.value?.focus(); };
+  if (!busy.value && !recording.value) { void start(); return; }
+  const stop = watch([busy, recording], ([working, speaking]) => { if (!working && !speaking) { stop(); void start(); } });
+}
+watch(() => current.value?.session ?? null, (session) => emit("session", props.skill, session), { immediate: true });
+defineExpose({ startPractice, newConversation });
 watch(selected, (next, previous) => {
   unsent.set(previous, { text: response.value, channel: channel.value, attachments: attachments.value });
   const saved = unsent.get(next); response.value = saved?.text ?? ""; channel.value = saved?.channel ?? "TEXT"; attachments.value = saved?.attachments ?? []; reviewed.value = false;

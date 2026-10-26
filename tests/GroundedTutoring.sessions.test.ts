@@ -94,4 +94,33 @@ describe("Grounded tutoring sessions", () => {
     expect([first, task, second].every((id) => /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(id))).toBe(true);
     expect((await tutoring._study({ owner: "sam", topic: "matrix-products" })).sessions.map(({ session }): string => session)).toEqual([legacy, first, task, second]);
   });
+
+  test("recent lists the owner's sessions in the given topics, most recently active first, up to the limit", async () => {
+    let now = Date.parse("2026-10-22T15:00:00Z");
+    const name = `Tutoring_${crypto.randomUUID()}`, tutoring = new GroundedTutoring(connection.db, name, () => new Date(now));
+    const { material } = await notes();
+    const context = { owner: "sam", topic: "products", definition: "v1", materials: [material], citations: [{ material, location: "content" }] };
+    const lessonText = { request: "Show an example.", explanation: "Match each row to each column." };
+    const { lesson: older } = await tutoring.explain({ ...context, ...lessonText });
+    now += 60_000; const { task } = await tutoring.prepareTask({ ...context, topic: "dimensions", question: "Check two pairs.", criteria: "Correct checks.", mode: "CHECK", fresh: true });
+    now += 60_000; const { lesson: newer } = await tutoring.explain({ ...context, ...lessonText });
+    // Another topic and another owner are left out.
+    await tutoring.explain({ ...context, topic: "transposes", ...lessonText });
+    await tutoring.explain({ ...context, owner: "alex", ...lessonText });
+    // A session saved before identities recorded the time, with no turn, comes last.
+    const sessions = connection.db.collection<{ _id: string }>(`${name.toLowerCase()}.sessions`), legacy = "00000000-0000-4000-8000-000000000000";
+    await sessions.insertOne({ ...(await sessions.findOne({ _id: older }))!, _id: legacy });
+    const recent = async (limit = 10) => (await tutoring._recent({ owner: "sam", topics: ["products", "dimensions"], limit })).map(({ session }): string => session);
+    expect(await recent()).toEqual([newer, task, older, legacy]);
+    // A turn makes a session the most recent one; closing it keeps it listed with its status.
+    now += 60_000; await tutoring.respond({ owner: "sam", session: older, text: "Why?", media: [], channel: "TEXT" });
+    await tutoring.close({ owner: "sam", session: older });
+    expect((await tutoring._recent({ owner: "sam", topics: ["products", "dimensions"], limit: 10 })).map((row) => ({ ...row, session: String(row.session) }))).toEqual([
+      { session: String(older), topic: "products", status: "CLOSED" }, { session: String(newer), topic: "products", status: "OPEN" },
+      { session: String(task), topic: "dimensions", status: "OPEN" }, { session: legacy, topic: "products", status: "OPEN" }]);
+    expect(await recent(2)).toEqual([older, newer]);
+    expect(await recent(0)).toEqual([]);
+    expect(await tutoring._recent({ owner: "sam", topics: [], limit: 10 })).toEqual([]);
+    await expect(tutoring._recent({ owner: "sam", topics: ["products"], limit: 1.5 })).rejects.toThrow(TypeError);
+  });
 });
