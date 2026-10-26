@@ -99,7 +99,7 @@ No new endpoint is needed. The existing read returns every location and file ref
 
 ## Listening
 
-Listening to lessons, practice questions, tutor replies, and hints is screen-only. The browser speaks text that Read already returns, so it needs no endpoint or contract.
+Listening to lessons, practice questions, tutor replies, and hints is screen-only. The browser speaks text that Read already returns, so it needs no endpoint or contract. Formulas are read as words where the form is common, such as "x squared" for `x^2` and "a over b" for `\frac{a}{b}`, and otherwise as their source without the delimiters.
 
 ## Suggestions and ordering
 

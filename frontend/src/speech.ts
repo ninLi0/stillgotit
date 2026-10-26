@@ -1,4 +1,5 @@
 import { computed, ref } from "vue";
+import { spokenText } from "./math-speech.ts";
 
 /** Reading text aloud with the browser's own speech synthesis. Screen-only: nothing is sent to the server. */
 const synth = typeof window !== "undefined" && "speechSynthesis" in window && typeof SpeechSynthesisUtterance === "function"
@@ -40,12 +41,12 @@ export function speechParts(text: string, limit = 220): string[] {
   return parts;
 }
 
-/** Read one message aloud. Any message already being read stops first. */
+/** Read one message aloud, with its formulas in words (math-speech.ts). Any message already being read stops first. */
 export function speak(id: string, text: string) {
   if (!synth) return;
   const mine = ++reading;
   synth.cancel();
-  const parts = speechParts(text);
+  const parts = speechParts(spokenText(text));
   speakingId.value = parts.length ? id : null;
   // Chrome stops speaking a page that has been read aloud for a while unless speech is resumed; resuming is harmless.
   if (synth.paused) synth.resume();
