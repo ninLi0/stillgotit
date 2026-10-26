@@ -561,6 +561,25 @@ export type StillGotItWire = {
     };
     error: { error: AppWideError | "DEADLINE_TRADEOFF_CONFIRMATION_REQUIRED" | "EVIDENCE_DATE_MISMATCH" | "EVIDENCE_REVISION_NOT_NEW" | "EVIDENCE_TRACK_MISMATCH" | "EVIDENCE_TRACK_UNAVAILABLE" | "INVALID_INPUT" | "INVALID_MASTERY_EVIDENCE" | "INVALID_PLAN_INPUT" | "NOT_SIGNED_IN" | "PLAN_PREFERENCES_UNAVAILABLE" | "PLAN_SESSION_IN_PROGRESS" | "ROUTINE_PLAN_OUTDATED" | "ROUTINE_PLAN_UNAVAILABLE" | "ROUTINE_SESSION_IN_PROGRESS" | "SESSION_CLOSE_UNAVAILABLE" | "SKILL_UNAVAILABLE" };
   };
+  "/learning/recent": {
+    input: {
+      "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_map"]>[0], ["course"]>]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+    };
+    output: {
+      "sessions": {
+        "kind": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["recentSession"]["fn"]>>, ["kind"]>>;
+        "lastActivity": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["recentSession"]["fn"]>>, ["lastActivity"]>>;
+        "skill": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_skill"]>[0], ["skill"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_recent"]>>>, ["topic"]>]>>;
+        "skillTitle": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["recentSession"]["fn"]>[0], ["skillTitle"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_skill"]>>>, ["title"]>]>>;
+        "startedAt": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["recentSession"]["fn"]>>, ["startedAt"]>>;
+        "status": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_recent"]>>>, ["status"]>>;
+        "studySession": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_sessionData"]>[0], ["session"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_recent"]>>>, ["session"]>]>>;
+        "title": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["recentSession"]["fn"]>>, ["title"]>>;
+      }[];
+    };
+    error: { error: AppWideError | "COURSE_UNAVAILABLE" | "INVALID_INPUT" | "NOT_SIGNED_IN" };
+  };
   "/learning/regrade": {
     input: {
       "basedOn": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["revise"]>[0], ["basedOn"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_effectiveJudgment"]>>>, ["judgment"]>]>>;
@@ -1398,6 +1417,24 @@ export type StillGotItHttp = {
       };
     };
     error: { error: HttpAppWideError | "INVALID_REQUEST" | "UNAUTHORIZED" };
+  };
+  "/learning/recent": {
+    input: {
+      "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_map"]>[0], ["course"]>]>>;
+    };
+    output: {
+      "sessions": {
+        "kind": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["recentSession"]["fn"]>>, ["kind"]>>;
+        "lastActivity": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["recentSession"]["fn"]>>, ["lastActivity"]>>;
+        "skill": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_skill"]>[0], ["skill"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_recent"]>>>, ["topic"]>]>>;
+        "skillTitle": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["recentSession"]["fn"]>[0], ["skillTitle"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_skill"]>>>, ["title"]>]>>;
+        "startedAt": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["recentSession"]["fn"]>>, ["startedAt"]>>;
+        "status": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_recent"]>>>, ["status"]>>;
+        "studySession": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_sessionData"]>[0], ["session"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_recent"]>>>, ["session"]>]>>;
+        "title": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["recentSession"]["fn"]>>, ["title"]>>;
+      }[];
+    };
+    error: { error: HttpAppWideError | "FORBIDDEN" | "INVALID_REQUEST" | "UNAUTHORIZED" };
   };
   "/learning/regrade": {
     input: {

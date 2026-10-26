@@ -58,8 +58,12 @@ const tutor: Pick<CourseTutor, "suggest" | "generate"> = live ? new CourseTutor(
 } }, new MaterialFiles()) : fixtureTutor;
 // STILLGOTIT_TEST_FAIL_REPLIES=1 fails every lesson reply after the question is saved, to check how the browser recovers.
 const failReplies = process.env.STILLGOTIT_TEST_FAIL_REPLIES === "1";
-const testTutor: Pick<CourseTutor, "suggest" | "generate"> = failReplies ? { suggest: (...args) => tutor.suggest(...args), generate: async (...args: Parameters<CourseTutor["generate"]>) => {
-  if (args[2].startsWith("Answer the latest learner question")) throw new Error("Test interruption: the tutor's reply was lost.");
+// STILLGOTIT_TEST_REPLY_DELAY_MS=4000 makes each canned answer wait that many milliseconds (at most 60000), so the
+// interface's waiting state, such as the composer's loading ring, stays on screen long enough to check.
+const replyDelay = Math.min(60_000, Math.max(0, Number(process.env.STILLGOTIT_TEST_REPLY_DELAY_MS) || 0));
+const testTutor: Pick<CourseTutor, "suggest" | "generate"> = failReplies || replyDelay ? { suggest: (...args) => tutor.suggest(...args), generate: async (...args: Parameters<CourseTutor["generate"]>) => {
+  if (replyDelay) await Bun.sleep(replyDelay);
+  if (failReplies && args[2].startsWith("Answer the latest learner question")) throw new Error("Test interruption: the tutor's reply was lost.");
   return tutor.generate(...args);
 } } : tutor;
 const runtime = await createRuntime({ database: db, provider, providerOrigin: origin, publicOrigin: origin, tutor: testTutor, gemini });

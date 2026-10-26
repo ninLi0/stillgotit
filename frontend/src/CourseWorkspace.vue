@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onMounted, ref, shallowRef, watch } from "vue";
 import { api, unwrap, type Course } from "./api.ts";
 import { aiStatus, type AIStatus } from "./host-api.ts";
 import { DraftSaveQueue } from "./draft-save-queue.ts";
@@ -20,13 +20,16 @@ import MasteryCells from "./MasteryCells.vue";
 import InfoBubble from "./InfoBubble.vue";
 import ForestView from "./ForestView.vue";
 import MaterialViewer from "./MaterialViewer.vue";
+import SidebarConversations from "./SidebarConversations.vue";
+import { requestSession } from "./continue-session.ts";
+import type { RecentSession } from "./recent-groups.ts";
 import { useHomePlan } from "./HomePlan.ts";
 import { docIcon, stageOf } from "./pixel-art.ts";
 import type { AskAboutPage, HomeView, OpenSource, ViewerSkill, ViewSkill, ViewUnit } from "./revamp-types.ts";
 
 // The shell (sidebar + app card) lives here because the views do; App.vue fills the course switcher slot and owns
 // Settings, the tutor panel and the Home view preference.
-const props = defineProps<{ course: Course; username: string; tutorChoice: string; homeView: HomeView }>();
+const props = defineProps<{ course: Course; username: string; homeView: HomeView }>();
 const emit = defineEmits<{ settings: []; tutor: []; "update:homeView": [view: HomeView] }>();
 const view = ref<"home" | "setup" | "chat" | "plan">("home");
 const viewKey = `stillgotit-view:${props.course.course}`;
@@ -99,6 +102,7 @@ async function refresh() {
     sessionStorage.setItem(sourceSelectionKey, material.value);
   }
   if (!unit.value && result.units.length) unit.value = result.units[0]!.unit;
+  void loadRecent();
   await refreshProgress();
 }
 async function refreshProgress() {
@@ -108,6 +112,7 @@ async function refreshProgress() {
 }
 // Lesson changes update the tree's shading in the background. This must not clear the message from the learner's last action.
 function progressChanged() {
+  void loadRecent();
   refreshProgress().catch((problem) => { error.value = problem instanceof Error ? problem.message : "Your progress could not be refreshed. Reload the page to try again."; });
 }
 async function refreshAI() {
@@ -228,10 +233,31 @@ function openForest() { design.value = readNumber(groveKey); forestOpen.value = 
 function regrow() { design.value++; groveVersion.value++; try { localStorage.setItem(groveKey, String(design.value)); } catch { /* The new seed applies until reload. */ } }
 function navigate(next: "home" | "plan" | "setup" | "chat") { forestOpen.value = false; view.value = next; }
 // The Learn and Plan screens expose these; optional so the page works before they do.
-const study = ref<{ startPractice?: () => unknown } | null>(null), planner = ref<{ openBudget?: () => unknown } | null>(null);
+const study = ref<{ startPractice?: () => unknown; newConversation?: () => unknown } | null>(null), planner = ref<{ openBudget?: () => unknown } | null>(null);
 async function practise(skill: string) { openSkill(skill); await nextTick(); await study.value?.startPractice?.(); }
 async function setStudyTime() { navigate("plan"); await nextTick(); await planner.value?.openBudget?.(); }
 function plant() { navigate("setup"); adding.value = true; }
+// ---- Conversations in the sidebar ----
+// The learner's latest conversations in the course (/learning/recent). They are read again whenever the course or a
+// lesson changes. A failed first read shows its reason with Try again; a later failure keeps the last list.
+const recent = shallowRef<readonly RecentSession[]>([]), recentLoaded = ref(false), recentError = ref("");
+async function loadRecent() {
+  try { recent.value = unwrap(await api.learning.recent({ course: props.course.course })).sessions; recentError.value = ""; }
+  catch (problem) { if (!recentLoaded.value || recentError.value) recentError.value = problem instanceof Error ? problem.message : "Your conversations could not be loaded."; }
+  finally { recentLoaded.value = true; }
+}
+// The conversation each open study page shows, by skill, so the sidebar can mark the one on screen.
+const shownSessions = ref<Record<string, string | null>>({});
+function sessionShown(skill: string, session: string | null) { shownSessions.value = { ...shownSessions.value, [skill]: session }; }
+const shownSession = computed(() => view.value === "chat" && !forestOpen.value && current.value?.status === "CONFIRMED" ? shownSessions.value[current.value.skill] ?? null : null);
+/** A row opens its skill on that conversation, as a row of Home's Continue card does. */
+function openConversation(row: RecentSession) { requestSession(row.skill, row.studySession); openSkill(row.skill); }
+/** A new conversation in the open skill. With no skill open, Home's tree is where a skill is chosen. */
+async function newConversation() {
+  const skill = current.value?.status === "CONFIRMED" ? current.value.skill : null;
+  if (!skill) { navigate("home"); await nextTick(); document.getElementById("home-title")?.focus(); return; }
+  openSkill(skill); await nextTick(); await study.value?.newConversation?.();
+}
 const draftWaiting = computed(() => drafts.value.length + pendingDraftCount.value);
 const homePlan = useHomePlan(props.course.course);
 const plan = homePlan.data, next = homePlan.next;
@@ -409,9 +435,10 @@ watch(view, (now) => { if (now === "setup" && material.value && !preview.value) 
 <template>
   <div class="app-frame">
     <ShellSidebar :view="view" :forest-open="forestOpen" :lesson-title="view === 'chat' && current?.status === 'CONFIRMED' ? current.title : undefined"
-      :materials-badge="draftWaiting" :today="homePlan.minutes.value" :tutor-label="tutorChoice" :username="username"
-      @navigate="navigate" @forest="openForest" @lesson="openChat" @tutor="emit('tutor')" @settings="emit('settings')">
+      :materials-badge="draftWaiting" :today="homePlan.minutes.value" :username="username"
+      @navigate="navigate" @forest="openForest" @lesson="openChat" @settings="emit('settings')">
       <template #switcher><slot name="switcher" /></template>
+      <template #conversations><SidebarConversations :rows="recent" :current="shownSession" :loaded="recentLoaded" :error="recentError" @open="openConversation" @new="newConversation" @retry="loadRecent" /></template>
     </ShellSidebar>
   <section class="course-space app-card" :aria-busy="busy">
     <p v-if="error && view !== 'setup'" class="error page-error" role="alert">{{ error }}</p>
@@ -630,7 +657,7 @@ watch(view, (now) => { if (now === "setup" && material.value && !preview.value) 
       </div>
     </section>
     <div v-show="view === 'chat'" class="lesson-view">
-      <KeepAlive :max="12"><SkillStudy v-if="current?.status === 'CONFIRMED'" ref="study" :key="current.skill" :skill="current.skill" :course="course.course" :materials="data.materials" :ai-available="ai.available" :ai-reason="ai.reason" :active="view === 'chat'" :initial-draft="lessonDraft?.skill === current.skill ? lessonDraft.text : undefined" @changed="progressChanged" @back="showOnTree(current.skill)" @open-source="openSource" /></KeepAlive>
+      <KeepAlive :max="12"><SkillStudy v-if="current?.status === 'CONFIRMED'" ref="study" :key="current.skill" :skill="current.skill" :course="course.course" :materials="data.materials" :ai-available="ai.available" :ai-reason="ai.reason" :active="view === 'chat'" :initial-draft="lessonDraft?.skill === current.skill ? lessonDraft.text : undefined" @changed="progressChanged" @back="showOnTree(current.skill)" @open-source="openSource" @session="sessionShown" @tutor="emit('tutor')" /></KeepAlive>
       <div v-if="current?.status !== 'CONFIRMED'" class="no-lesson"><h2 class="display" tabindex="-1">Choose a leaf to begin.</h2><button class="primary meadow" @click="view = 'home'">Go to your tree</button></div>
     </div>
   </section>

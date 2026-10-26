@@ -115,7 +115,7 @@ The 80-second limit for one Gemini call stays, and it cannot grow for higher lev
 
 ## The Tutor panel
 
-A "Tutor" button in the app header, shown on every page once the learner is signed in, names the choice that applies, for example "Tutor: Gemini 3.8 Flash, Medium". On narrow screens it shows only "Tutor". It opens the Tutor panel. The page reads TutorSettings after sign-in and again each time the panel opens, so a second browser shows the same saved choice. The header shows the latest TutorSettings record the page received. Another browser's header keeps its last record until its panel opens or the page reloads, while the server always uses the newest saved choice. When the status is RETIRED, the header button reads "Tutor: choose again" instead of naming the choice, and the panel opens on the RETIRED status line, which says the choice is no longer offered and asks the learner to choose again.
+A button in the lesson's message box, among its tools, names the choice that applies, for example "Gemini 3.8 Flash · Medium". On phones it shows only the model, and its tooltip and spoken name keep the level. It opens Settings at the Tutor panel. The page reads TutorSettings after sign-in and again each time the panel opens, so a second browser shows the same saved choice. The button shows the latest TutorSettings record the page received. Another browser's button keeps its last record until its panel opens or the page reloads, while the server always uses the newest saved choice. When the status is RETIRED, the button reads "Tutor: choose again" instead of naming the choice, and the panel opens on the RETIRED status line, which says the choice is no longer offered and asks the learner to choose again.
 
 The panel contains, in order:
 

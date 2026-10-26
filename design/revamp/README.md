@@ -100,7 +100,6 @@ The file pages inside the viewer (PDF, slides, photos, markdown) are typeset moc
   - When a lesson is open, Home gets a sub-row: a lavender `#F1EEFF` chip with a `#8B7FE0` square and the skill name.
 - **Bottom of the sidebar:**
   - A Today card (sun icon, "8 of 30 min", 15 sun-yellow cells `#E3A233` on `#F1EBDA`).
-  - Tutor model ("Gemini 3.8 Flash · Medium"), which opens Settings.
   - Settings (pixel sliders icon, then the username).
 
 ### Home
@@ -166,7 +165,7 @@ The file pages inside the viewer (PDF, slides, photos, markdown) are typeset moc
   - The "From <source> ↗" chip opens that file at the cited page in Materials.
 - **Assessment review:** "Ready for assessment?" with ⓘ and three custom checkboxes. Assess is disabled until "I reviewed…" is checked.
 - **Result card:** result (green or ink), new %, delta, rationale, "Try a fresh check", and a regrade link.
-- **Composer:** radius 22, with "＋ Photo of work", "Speak" (coral square) and "Ask for a hint" (practice only). ⓘ sits next to send; the note text lives there. Send is a 38px square with radius 12.
+- **Composer:** radius 22, with "＋ Photo of work", "Speak" (coral square), the tutor model ("Gemini 3.8 Flash · Medium", a quiet pill that opens Settings at the Tutor section) and "Ask for a hint" (practice only). ⓘ sits next to send; the note text lives there. Send is a 38px square with radius 12.
 - **Rail** (312px, `#FAF9FE`; on screens under 1240px it slides over and the chip opens it). Stacked white cards with radius 18 and ring `#ECE9F5`:
   1. Your mastery: sprite, 30px %, 10 cells, ⓘ.
   2. Goal: the outcome. A divider follows, then "To master it" with the gate. This is the only place the gate appears.

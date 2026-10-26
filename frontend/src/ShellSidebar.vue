@@ -5,12 +5,13 @@ import type { IconName } from "./pixel-art.ts";
 import { useSlidingMark } from "./sliding-mark.ts";
 
 // The app's sidebar (design/revamp/README.md): brand, course switcher (the slot, owned by App.vue), the nav rows with
-// their biome capsules and badges, and at the bottom the Today card, the tutor model row and Settings. Under 760px it
-// becomes a top bar with the nav rows as a horizontal strip.
+// their biome capsules and badges, the Conversations group (the second slot, owned by CourseWorkspace.vue), and at the
+// bottom the Today card and Settings. Under 760px it becomes a top bar with the nav rows as a
+// horizontal strip.
 export type ShellView = "home" | "plan" | "setup" | "chat";
 const props = defineProps<{ view: ShellView; forestOpen: boolean; lessonTitle?: string; materialsBadge: number; homeBadge?: number;
-  today: { spent: number; total: number } | null; tutorLabel: string; username: string }>();
-const emit = defineEmits<{ navigate: [view: ShellView]; forest: []; lesson: []; tutor: []; settings: [] }>();
+  today: { spent: number; total: number } | null; username: string }>();
+const emit = defineEmits<{ navigate: [view: ShellView]; forest: []; lesson: []; settings: [] }>();
 
 type Row = { view: ShellView | "forest"; label: string; icon: IconName; biome: string; badge?: number };
 const rows = computed<Row[]>(() => [
@@ -59,6 +60,7 @@ const cells = computed(() => {
         </button>
       </template>
     </nav>
+    <slot name="conversations" />
     <div class="bottom">
       <div class="today card">
         <div class="today-top"><PixelIcon name="sun" :size="20" /><span class="eyebrow">Today</span><span class="today-min">{{ today ? `${today.spent} of ${today.total} min` : 'No study time set' }}</span></div>
@@ -66,7 +68,6 @@ const cells = computed(() => {
           <span v-for="(on, i) in cells" :key="i" class="today-cell" :class="{ on }" />
         </span>
       </div>
-      <button type="button" class="foot-row" aria-haspopup="dialog" @click="emit('tutor')"><PixelIcon name="leaf" :size="20" /><span class="foot-label">{{ tutorLabel || 'Tutor' }}</span></button>
       <button type="button" class="foot-row" aria-haspopup="dialog" @click="emit('settings')"><PixelIcon name="settings" :size="20" /><span class="foot-label">{{ username }}</span><span class="sr-only"> · Settings</span></button>
     </div>
   </aside>

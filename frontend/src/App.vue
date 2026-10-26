@@ -5,7 +5,6 @@ import PixelIcon from "./PixelIcon.vue";
 import CourseWorkspace from "./CourseWorkspace.vue";
 import TutorPanel from "./TutorPanel.vue";
 import WelcomeScene from "./WelcomeScene.vue";
-import { levelName, modelName, tutorSettings } from "./tutor-choice.ts";
 import { HOME_VIEW_KEY, type HomeView } from "./revamp-types.ts";
 
 // The Home view preference (tree or tasks) lives on the server (design/compositions/Settings.md, "The home view"), so it
@@ -167,14 +166,8 @@ async function restoreCourse(course: Course) {
 }
 
 const settingsDialog = ref<HTMLDialogElement | null>(null);
-// The header names the choice in the latest tutor settings record the page received. It reads only "Tutor" until one arrives.
 const tutorPanel = ref<InstanceType<typeof TutorPanel> | null>(null);
-const tutorChoice = computed(() => {
-  const record = tutorSettings.value;
-  if (!record) return "";
-  return record.status === "RETIRED" ? "Tutor: choose again" : `${modelName(record.choice.model, record)} · ${levelName(record.choice.level)}`;
-});
-// The tutor row opens Settings at its Tutor section.
+// The tutor button in the lesson's message box opens Settings at its Tutor section.
 async function openSettings(atTutor = false) {
   settingsDialog.value?.showModal();
   if (atTutor) { await nextTick(); await tutorPanel.value?.open(); }
@@ -214,7 +207,7 @@ onMounted(async () => {
 <template>
   <p v-if="loading" class="loading boot" role="status">Opening your study space…</p>
   <template v-else-if="inCourse">
-    <CourseWorkspace :key="selected!.course" :course="selected!" :username="username!" :tutor-choice="tutorChoice" :home-view="homeView"
+    <CourseWorkspace :key="selected!.course" :course="selected!" :username="username!" :home-view="homeView"
       @update:home-view="saveHomeView" @settings="openSettings()" @tutor="openSettings(true)">
       <template #switcher>
         <div ref="switcher" class="switcher" @keydown.esc="closeMenu(true)">

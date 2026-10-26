@@ -80,4 +80,20 @@ const Continue = endpoint("/learning/continue", ({ session, course, owner }) => 
     where(Courses.OwnedCourse({ owner, course })).then(respond({ sessions: OpenStudy({ owner, course }) })).named("owned"),
     where(no(Courses.OwnedCourse({ owner, course }))).then(respond({ error: "COURSE_UNAVAILABLE" })).named("missing"),
   ), { validators: { ...validators, input: learningInput, output: structuredOutput } });
-export const composition = { OwnedSkill, ActiveSkill, OwnedSession, OpenSession, SessionSources, PendingGrade, OwnedCase, OwnedAnyCase, SkillContext, SkillData, SessionData, Progress, PlanData, PlanContext, CanReplan, NeedsEvidence, OpenStudy, Continue };
+/** How many conversations the sidebar lists. */
+export const RECENT_LIMIT = 40;
+// The sidebar's conversations: the learner's latest lessons and practice sessions across the course's confirmed skills,
+// open or closed, most recently active first. _recent orders and caps them; each row then reads its own record.
+export const RecentStudy = former("recent study sessions for (owner) in (course)", ({ owner, course }, { skills, topics, studySession, skill, status, skillTitle, data, kind, title, startedAt, lastActivity }) =>
+  each(Mapping._map({ course }).is({ skills }))
+    .where(compute(computations.studyTopics, { skills }, topics), Tutoring._recent({ owner, topics, limit: RECENT_LIMIT }).is({ session: studySession, topic: skill, status }),
+      Mapping._skill({ skill }).is({ title: skillTitle }), Tutoring._sessionData({ session: studySession }).is({ data }),
+      compute(computations.recentSession, { data, skillTitle }, { kind, title, startedAt, lastActivity }))
+    .form({ studySession, skill, skillTitle, kind, status, title, startedAt, lastActivity }),
+);
+const Recent = endpoint("/learning/recent", ({ session, course, owner }) => receive({ session, course })
+  .then(Sessioning.use({ session }).responds({ subject: owner })).then(
+    where(Courses.OwnedCourse({ owner, course })).then(respond({ sessions: RecentStudy({ owner, course }) })).named("owned"),
+    where(no(Courses.OwnedCourse({ owner, course }))).then(respond({ error: "COURSE_UNAVAILABLE" })).named("missing"),
+  ), { validators: { ...validators, input: learningInput, output: structuredOutput } });
+export const composition = { OwnedSkill, ActiveSkill, OwnedSession, OpenSession, SessionSources, PendingGrade, OwnedCase, OwnedAnyCase, SkillContext, SkillData, SessionData, Progress, PlanData, PlanContext, CanReplan, NeedsEvidence, OpenStudy, Continue, RecentStudy, Recent };

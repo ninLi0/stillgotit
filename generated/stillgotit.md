@@ -211,6 +211,7 @@ Defined in [GroundedTutoring](../design/concepts/GroundedTutoring.md), line 1.
 - `_review(task: Session) : optional (dialogueLength: Number, uncheckedVoiceCount: Number, ready: Flag)`
 - `_study(owner: Learner, topic: Topic) : one (sessions: StudyRecords)`
 - `_sessionData(session: Session) : optional (data: StudyRecord)`
+- `_recent(owner: Learner, topics: TopicSet, limit: Number) : many (session: Session, topic: Topic, status: SessionStatus)`
 
 #### Instances
 
@@ -464,6 +465,7 @@ Concrete types:
 - `prerequisiteToPractice(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows, skill: SkillMapping.Skill) : PrerequisiteChoice` — [Request admission](../design/compositions/LearningAccess.md), line 50.
 - `prerequisitesReady(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows, skill: SkillMapping.Skill) : Flag` — [Learning computations](../design/compositions/LearningComputations.md), line 56.
 - `progressRows(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows) : SkillProgress` — [Learning computations](../design/compositions/LearningComputations.md), line 59.
+- `recentSession(data: GroundedTutoring.StudyRecord, skillTitle: String) : RecentSession` — [Shared learning reads](../design/compositions/LearningReads.md), line 60.
 - `requestChoice(request: TutorRequest) : TutorChoice` — [Settings](../design/compositions/Settings.md), line 86.
 - `responseInput(data: GroundedTutoring.StudyRecord, text: String, channel: GroundedTutoring.Channel, attachments: AttachmentList, sources: Library.SourceRecords) : ResponseInput` — [Learning computations](../design/compositions/LearningComputations.md), line 62.
 - `reviewApproved(reviewed: Flag, unseen: Flag, outsideHelp: Flag) : Flag` — [Learning computations](../design/compositions/LearningComputations.md), line 65.
@@ -476,6 +478,7 @@ Concrete types:
 - `sessionSubject(identity: SessionIdentity) : SessionOwner` — [Learning computations](../design/compositions/LearningComputations.md), line 108.
 - `singleMaterial(material: Library.Material) : SkillMapping.MaterialSet` — [P2 learning journey](../design/stages/materials.md), line 126.
 - `studyDetail(context: SkillContext, tracks: MasteryEstimating.ProgressRows, sessions: GroundedTutoring.StudyRecords, cases: AssessmentReviewing.CaseRecords) : StudyDetail` — [Learning computations](../design/compositions/LearningComputations.md), line 83.
+- `studyTopics(skills: SkillMapping.SkillMapRows) : TopicList` — [Shared learning reads](../design/compositions/LearningReads.md), line 57.
 - `submissionInput(data: GroundedTutoring.StudyRecord, unseen: Flag, outsideHelp: Flag) : SubmissionInput` — [Learning computations](../design/compositions/LearningComputations.md), line 96.
 - `suggestRequest(selected: Library.SourceRecords) : TutorRequest` — [Learning computations](../design/compositions/LearningComputations.md), line 99.
 - `taskRequest(selected: Library.SourceRecords, context: SkillContext, sessions: GroundedTutoring.StudyRecords) : TutorRequest` — [Learning computations](../design/compositions/LearningComputations.md), line 102.
@@ -507,6 +510,7 @@ Authored path: `Courses.OwnedCourse`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 19.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 19.
 - Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 28.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 49.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 7.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 3.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 97.
@@ -564,7 +568,7 @@ Authored path: `Reads.OpenSession`.
 
 Authored path: `Reads.CanReplan`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 71.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 46.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 70.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 31.
 - Covered by [Progress reactions](../design/compositions/Progress.md), line 35.
@@ -746,7 +750,7 @@ Authored path: `Courses.UnavailableSkillMaterial`.
 ### assessment (assessment) needs evidence for (owner)
 
 Authored path: `Reads.NeedsEvidence`.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 46.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 70.
 - Covered by [Progress reactions](../design/compositions/Progress.md), line 17.
 
 ```view
@@ -763,7 +767,7 @@ assessment (assessment) needs evidence for (owner) — inputs (owner, assessment
 
 Authored path: `Reads.PlanContext`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 71.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 46.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 70.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 11.
 - Covered by [Progress reactions](../design/compositions/Progress.md), line 35.
 
@@ -1113,6 +1117,30 @@ Former "open study sessions for (owner) in (course)" — inputs (owner, course);
       kind
       lastActive
       skill
+      studySession
+      title
+```
+
+### recent study sessions for (owner) in (course)
+
+Authored path: `Reads.RecentStudy`.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 49.
+
+```former
+Former "recent study sessions for (owner) in (course)" — inputs (owner, course); bindings (skills, topics, studySession, skill, status, skillTitle, data, kind, title, startedAt, lastActivity); promises exactly one record — forms:
+  each SkillMapping._map (course) has (skills)
+    where topics is studyTopics (skills)
+    where GroundedTutoring._recent (limit: 40, owner, topics) has (session: studySession, status, topic: skill)
+    where SkillMapping._skill (skill) has (title: skillTitle)
+    where GroundedTutoring._sessionData (session: studySession) has (data)
+    where (kind, lastActivity, startedAt, title) is recentSession (data, skillTitle)
+    form a record of
+      kind
+      lastActivity
+      skill
+      skillTitle
+      startedAt
+      status
       studySession
       title
 ```
@@ -8142,6 +8170,48 @@ then
   RequestBoundary.respond (requestId, sessions: former "open study sessions for (owner) in (course)" with (course, owner))
 ```
 
+### Reads.Recent
+
+Authored path: `Reads.Recent`.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 46.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 65.
+
+```reaction
+when RequestBoundary.request (course, path: "/learning/recent", requestId, session)
+then
+  Sessioning.use (session)
+```
+
+### Reads.Recent:missing#2
+
+Authored path: `Reads.Recent`.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 46.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 65.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Reads.Recent
+where
+  earlier, RequestBoundary.request (course, path: "/learning/recent", requestId, session)
+  no view "(owner) owns (course) with (title)" with (course, owner)
+then
+  RequestBoundary.respond (error: "COURSE_UNAVAILABLE", requestId)
+```
+
+### Reads.Recent:owned#2
+
+Authored path: `Reads.Recent`.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 46.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 65.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Reads.Recent
+where
+  earlier, RequestBoundary.request (course, path: "/learning/recent", requestId, session)
+  view "(owner) owns (course) with (title)" with (course, owner)
+then
+  RequestBoundary.respond (requestId, sessions: former "recent study sessions for (owner) in (course)" with (course, owner))
+```
+
 ### Settings.ChooseTutor
 
 Authored path: `Settings.ChooseTutor`.
@@ -8819,6 +8889,7 @@ not listed here have no explicit input contract.
 - `/learning/progress` — requires `course`, `session`
 - `/learning/question` — requires `attachments`, `channel`, `dialogueLength`, `session`, `studySession`, `text`
 - `/learning/read` — requires `session`, `skill`
+- `/learning/recent` — requires `course`, `session`
 - `/learning/regrade` — requires `basedOn`, `case`, `reason`, `session`
 - `/learning/reply` — requires `session`, `studySession`
 - `/learning/respond` — requires `attachments`, `channel`, `dialogueLength`, `session`, `studySession`, `text`

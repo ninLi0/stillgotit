@@ -1,4 +1,4 @@
-import type { Collection, Db } from "mongodb";
+import type { Collection, Db, Filter } from "mongodb";
 import { isMediaList, nonblank, type MediaList } from "../../media.ts";
 import { effectiveVoice, type Session, type Mode, type Channel, type PassageSet, type MaterialSet, type DialogueTurn, type SessionDocument } from "./dialogue.ts";
 import * as refusal from "./refusals.ts";
@@ -149,6 +149,26 @@ export class GroundedTutoring<Learner extends string = string, Material extends 
     return record ? [{ data: this.#sessionData(record) }] : [];
   }
 
+  /**
+   * At most `limit` of the owner's sessions in the given topics, most recently active first. A session's activity is its
+   * latest turn's time, or, before its first turn, the time it started, which its identity records. Sessions whose
+   * identity records no time and that have no turn come last; ties keep the newest start first.
+   */
+  async _recent({ owner, topics, limit }: { owner: Learner; topics: readonly Topic[]; limit: number }) {
+    requireIdentity(owner);
+    if (!Array.isArray(topics) || !topics.every((topic) => nonblank(topic)) || !Number.isInteger(limit) || limit < 0) throw new TypeError("Provide a list of topic identities and a whole limit.");
+    if (!topics.length || !limit) return [];
+    // The filter is cast because the driver's types cannot match $in against a generic identity type.
+    const filter = { owner, topic: { $in: [...topics] } } as Filter<SessionDocument<Learner, Material, Topic, Definition>>;
+    // Only the latest turn is read, since its time is all the order needs.
+    const records = await this.sessions.find(filter, { projection: { topic: 1, status: 1, dialogue: { $slice: -1 } } }).toArray();
+    const activity = (record: (typeof records)[number]) => record.dialogue.at(-1)?.at.getTime() ?? startedAt(record._id) ?? -Infinity;
+    return records.map((record) => ({ record, at: activity(record) }))
+      .sort((a, b) => b.at - a.at || (a.record._id < b.record._id ? 1 : a.record._id > b.record._id ? -1 : 0))
+      .slice(0, limit)
+      .map(({ record }) => ({ session: record._id, topic: record.topic, status: record.status }));
+  }
+
   #sessionData(record: SessionDocument<Learner, Material, Topic, Definition>) {
     const voice = effectiveVoice(record);
     return { session: record._id, owner: record.owner, topic: record.topic, definition: record.definition, status: record.status,
@@ -192,6 +212,9 @@ function timeOrderedId(at: Date): string {
 }
 
 function isTimeOrdered(id: string): boolean { return id[14] === "7"; }
+
+/** When a session started, in milliseconds, read from its time-ordered identity; null for an identity that records no time. */
+function startedAt(id: string): number | null { return isTimeOrdered(id) ? parseInt(id.replace(/-/g, "").slice(0, 12), 16) : null; }
 
 function requireIdentity(value: unknown): asserts value is string {
   if (!nonblank(value)) throw new TypeError("Provide a nonblank identity.");

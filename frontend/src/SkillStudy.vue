@@ -10,6 +10,7 @@ import PixelIcon from "./PixelIcon.vue";
 import MasteryCells from "./MasteryCells.vue";
 import MarkdownText from "./MarkdownText.vue";
 import InfoBubble from "./InfoBubble.vue";
+import SourcePreview from "./SourcePreview.vue";
 import { stageOf } from "./pixel-art.ts";
 import type { OpenSource } from "./revamp-types.ts";
 import { api, unwrap } from "./api.ts";
@@ -19,7 +20,7 @@ import { focusedControl, restoreFocus } from "./focus.ts";
 import { PendingAdjustment, sessionStore } from "./pending-adjustment.ts";
 import { listenUnavailable, stopSpeaking } from "./speech.ts";
 import type { StillGotItHttp } from "../../generated/wire.ts";
-import { answerKey, newAnswers, takeTutor, tutorLabel, type TutorUsed } from "./tutor-choice.ts";
+import { answerKey, newAnswers, takeTutor, tutorLabel, tutorPick, tutorSettings, type TutorUsed } from "./tutor-choice.ts";
 import { sessionRequest, takeSession } from "./continue-session.ts";
 import { useSlidingMark } from "./sliding-mark.ts";
 type SkillData = StillGotItHttp["/learning/read"]["output"]["data"];
@@ -29,8 +30,10 @@ type Attachment = { material: string; name: string; preview: string };
 // aiReason explains why AI features are off when aiAvailable is false. materials gives titles for cited sources.
 // initialDraft prefills the message box of a new conversation (for example "Ask about this page" in Materials); it is never sent by itself.
 const props = defineProps<{ skill: string; course: string; materials: { material: string; title: string }[]; aiAvailable: boolean; aiReason: string; active?: boolean; initialDraft?: string }>();
-// `back` returns to the skill tree. `open-source` asks the shell to show a cited source in Materials.
-const emit = defineEmits<{ changed: []; back: []; "open-source": [source: OpenSource] }>();
+// `back` returns to the skill tree. `open-source` asks the shell to show a cited source in Materials, from the source
+// preview's "Open in Materials". `session` names
+// the conversation on screen (null for a new one), so the sidebar can mark it.
+const emit = defineEmits<{ changed: []; back: []; "open-source": [source: OpenSource]; session: [skill: string, session: string | null]; tutor: [] }>();
 const data = shallowRef<SkillData | null>(null), selected = ref<StudySession["session"] | "">(""), busy = ref(false), error = ref(""), notice = ref("");
 const noticeBox = ref<HTMLElement | null>(null), errorBox = ref<HTMLElement | null>(null), composerInput = ref<HTMLTextAreaElement | null>(null), heading = ref<HTMLElement | null>(null);
 const confidence = ref(50), freshLesson = ref(false), recording = ref(false), reviewOpen = ref(false), thread = ref<HTMLElement | null>(null), evidenceOpen = ref(false);
@@ -72,7 +75,8 @@ async function act(work: () => Promise<void>, success: string | (() => string) =
     restoreFocus(previous, () => (error.value ? errorBox.value : noticeBox.value) ?? (composerInput.value?.disabled === false ? composerInput.value : heading.value));
   }
 }
-// While the tutor answers, the message leaves the box and waits in the thread as "Sending". A failure puts it back.
+// While the tutor answers, the message leaves the box and waits in the thread as "Sending". The box stays open, so the
+// learner can write the next message meanwhile. A failure puts the message back, before anything written since.
 // `reply` says whether the tutor answers it: a lesson question does, while a practice answer is only saved.
 const pending = ref<{ text: string; files: string[]; reply: boolean } | null>(null);
 // The tutor's place shows how long the learner has waited, in whole seconds. It stops when the answer lands.
@@ -91,12 +95,20 @@ function takeDraft() {
   pending.value = { text, files: sent.map((item) => item.name), reply: !current.value?.task };
   response.value = ""; attachments.value = []; channel.value = "TEXT";
   void scrollToLatest(true);
-  return { text, sent, ch, restore() { response.value = text; attachments.value = sent; channel.value = ch; pending.value = null; } };
+  return { text, sent, ch, restore() {
+    const since = response.value;
+    response.value = since.trim() ? `${text}\n\n${since}` : text; attachments.value = [...sent, ...attachments.value]; channel.value = ch; pending.value = null;
+  } };
 }
 async function startLesson() {
   const draft = takeDraft();
   await act(async () => {
-    try { const result = await timedAnswer(async () => unwrap(await api.learning.lesson({ skill: props.skill, request: draft.text.trim() }))); freshLesson.value = false; selected.value = result.lesson; }
+    try {
+      const result = await timedAnswer(async () => unwrap(await api.learning.lesson({ skill: props.skill, request: draft.text.trim() })));
+      // What the learner wrote while the lesson was being prepared stays in the box of the lesson it now belongs to.
+      if (selected.value !== result.lesson) carryDraft = true;
+      freshLesson.value = false; selected.value = result.lesson;
+    }
     catch (problem) { draft.restore(); throw problem; }
     finally { pending.value = null; }
   });
@@ -239,6 +251,11 @@ const stage = computed(() => stageOf(pct.value));
 const masteryNote = computed(() => [data.value?.estimate?.basis ?? "No estimate yet. Set your starting confidence, then practice.",
   data.value?.explanation?.provisional ? "Provisional: no assessed attempt has counted toward this estimate yet." : "",
   "The mastery estimate is a study aid, not a course grade."].filter(Boolean).join(" "));
+// The message box names the tutor model and thinking level that apply, from the latest settings record, and changes
+// as soon as a new choice is saved.
+const tutorChoice = computed(() => tutorPick(tutorSettings.value));
+// While a message is on its way, the send button is a turning ring that says what it waits for.
+const sendLabel = computed(() => pending.value ? (pending.value.reply ? "Waiting for the tutor's answer" : "Saving your answer") : current.value?.task ? "Save answer" : "Send message");
 const composerNote = computed(() => current.value?.task ? "Review your complete answer before requesting assessment." : "Grounded in your course materials. Check important details.");
 /**
  * Session identities are time-ordered UUIDs (version 7), whose first 48 bits are the start time: the moment the opening
@@ -287,7 +304,9 @@ watch([() => (freshLesson.value || !data.value?.sessions.length ? "new" : select
   ([, count], [, before]) => { void tabLine.place(count > 0 && before > 0); });
 async function toggleRail() { evidenceOpen.value = !evidenceOpen.value; await nextTick(); if (evidenceOpen.value) railClose.value?.focus(); }
 async function closeRail() { evidenceOpen.value = false; await nextTick(); railChip.value?.focus(); }
-function openSource(source: OpenSource) { emit("open-source", source); }
+// A cited source, from a reply's passage or the rail's Taught from list, opens in a preview on this page.
+const sourcePreview = ref<InstanceType<typeof SourcePreview> | null>(null);
+function openSource(source: OpenSource) { void sourcePreview.value?.open(source); }
 /** A draft from elsewhere starts a new conversation with the message box filled in and focused. It is not sent. */
 async function applyDraft(draft: string | undefined) {
   if (!draft) return;
@@ -308,7 +327,7 @@ watch(() => props.initialDraft, (draft) => { void applyDraft(draft); }, { immedi
 // switches to it when the current step finishes, and reads again if the session is newer than what it has.
 watch([() => props.skill, sessionRequest], () => {
   const id = takeSession(props.skill); if (!id) return;
-  const show = () => { freshLesson.value = false; selected.value = id; reviewOpen.value = false; if (data.value && !data.value.sessions.some((session) => session.session === id)) void act(load); };
+  const show = () => { freshLesson.value = false; selected.value = id; reviewOpen.value = false; void scrollToLatest(true); if (data.value && !data.value.sessions.some((session) => session.session === id)) void act(load); };
   if (!data.value || (!busy.value && !recording.value)) { show(); return; }
   const stop = watch([busy, recording], ([working, speaking]) => { if (!working && !speaking) { stop(); show(); } });
 }, { immediate: true });
@@ -319,8 +338,18 @@ async function startPractice() {
   if (refusal) { notice.value = ""; error.value = refusal; await nextTick(); errorBox.value?.focus(); return; }
   await startTask();
 }
-defineExpose({ startPractice });
+/** The sidebar's "+ New conversation": a new conversation here, once the current step finishes, with the box focused. */
+function newConversation() {
+  const start = async () => { newLesson(); await nextTick(); composerInput.value?.focus(); };
+  if (!busy.value && !recording.value) { void start(); return; }
+  const stop = watch([busy, recording], ([working, speaking]) => { if (!working && !speaking) { stop(); void start(); } });
+}
+watch(() => current.value?.session ?? null, (session) => emit("session", props.skill, session), { immediate: true });
+defineExpose({ startPractice, newConversation });
+// Each conversation keeps its own unsent message. A lesson that has just started keeps the box as it is (carryDraft).
+let carryDraft = false;
 watch(selected, (next, previous) => {
+  if (carryDraft) { carryDraft = false; unsent.delete(previous); reviewed.value = false; void scrollToLatest(true); return; }
   unsent.set(previous, { text: response.value, channel: channel.value, attachments: attachments.value });
   const saved = unsent.get(next); response.value = saved?.text ?? ""; channel.value = saved?.channel ?? "TEXT"; attachments.value = saved?.attachments ?? []; reviewed.value = false;
   void scrollToLatest(true);
@@ -470,17 +499,18 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
       <div class="composer-area">
         <div class="composer-inner">
           <template v-if="!current || current.status === 'OPEN'">
-            <div class="composer" :class="{ 'is-recording': recording }">
+            <div class="composer" :class="{ 'is-recording': recording }" :aria-busy="!!pending">
               <ul v-if="attachments.length" ref="attachmentList" class="attachment-list" aria-label="Photos attached to this answer">
                 <li v-for="(item, index) in attachments" :key="item.material" class="attachment-chip"><img v-if="item.preview" :src="item.preview" alt="" class="attachment-thumb" /><span>{{ attachments.length > 1 ? `${index + 1}. ` : '' }}{{ item.name }}</span><button type="button" :aria-label="`Remove photo ${index + 1}, ${item.name}`" :disabled="busy" @click="removeAttachment(index)">×</button></li>
               </ul>
               <label class="sr-only" for="chat-message">{{ current?.task ? 'Your answer and reasoning' : 'Message your tutor' }}</label>
-              <textarea id="chat-message" ref="composerInput" v-model="response" rows="2" :disabled="busy" :placeholder="current?.task ? 'Explain your reasoning. You can type, speak, or attach your work.' : 'Ask a question or tell me what you want to learn…'" @keydown="enterToSend" />
+              <textarea id="chat-message" ref="composerInput" v-model="response" rows="2" :placeholder="current?.task ? 'Explain your reasoning. You can type, speak, or attach your work.' : 'Ask a question or tell me what you want to learn…'" @keydown="enterToSend" />
               <div class="composer-tools"><div class="input-tools"><label class="attach-button tool-pill" :class="{ unavailable: !current || busy || recording }" :title="current ? 'Attach photos of your work' : 'Start a lesson before attaching work'"><span aria-hidden="true">＋ Photo of work</span><span class="sr-only">{{ attachments.length ? 'Add another photo of your work' : 'Add photos of your work' }}</span><input type="file" accept="image/*" capture="environment" multiple :disabled="busy || recording || !current" @change="uploadWork" /></label>
                 <SpeechInput :disabled="busy || !aiAvailable" :active="active !== false" :describedby="aiAvailable ? undefined : 'ai-reason-chat'" compact @recording="recording = $event" @transcript="response = response ? response + '\n' + $event : $event; channel = 'VOICE'" @error="error = $event" />
+                <button type="button" class="tutor-pick" aria-haspopup="dialog" :aria-label="tutorChoice.label" :title="tutorChoice.label" @click="emit('tutor')"><span>{{ tutorChoice.model }}<span v-if="tutorChoice.level" class="tutor-level"> · {{ tutorChoice.level }}</span></span><svg aria-hidden="true" viewBox="0 0 12 12" width="12" height="12"><path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" /></svg></button>
                 <button v-if="current?.task" class="hint-button tool-pill" :disabled="busy || recording || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="requestHint">Ask for a hint</button>
                 <button v-else-if="current?.lesson" type="button" class="tool-pill" :disabled="busy || recording" @click="finishLesson">Finish lesson</button>
-              </div><div class="composer-right"><span class="note-info"><InfoBubble :text="composerNote" label="About this message box" /></span><button class="send-button" :disabled="!canSend" :aria-label="current?.task ? 'Save answer' : 'Send message'" :aria-describedby="aiAvailable || current?.task ? undefined : 'ai-reason-chat'" @click="submitMessage"><span aria-hidden="true">↑</span></button></div></div>
+              </div><div class="composer-right"><span class="note-info"><InfoBubble :text="composerNote" label="About this message box" /></span><button class="send-button" :class="{ waiting: !!pending }" :disabled="!canSend" :aria-label="sendLabel" :aria-describedby="aiAvailable || current?.task || pending ? undefined : 'ai-reason-chat'" @click="submitMessage"><span v-if="pending" class="send-ring" aria-hidden="true" /><span v-else aria-hidden="true">↑</span></button></div></div>
             </div>
             <p v-if="recording" class="composer-note" role="status">Recording. Stop to review your words before sending.</p>
           </template>
@@ -512,6 +542,7 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
         <SourcesUsed :citations="railCitations" :titles="materialTitles" id-prefix="rail-source" variant="rail" @open="openSource" />
       </section>
     </aside>
+    <SourcePreview ref="sourcePreview" :titles="materialTitles" @open-materials="emit('open-source', $event)" @ask="applyDraft($event.question)" />
   </section>
 </template>
 
@@ -648,6 +679,12 @@ button.mastery-chip:hover{border-color:#C9C1F0}
 .note-info :deep(.info-bubble){left:auto;right:0;top:auto;bottom:calc(100% + 6px)}
 .tool-pill{display:flex;align-items:center;gap:6px;margin:0;border:1px solid var(--line);border-radius:999px;background:#FFFFFF;padding:5px 12px;min-height:30px;font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap;cursor:pointer}
 .tool-pill:hover:not(:disabled){border-color:rgba(20,20,20,.35);color:var(--ink)}
+/* The tutor model and thinking level the next answer will use, as a quiet pill among the tools. It opens the Tutor
+   panel in Settings. Phones show the model alone; the level stays in its name and tooltip. */
+.tutor-pick{display:flex;align-items:center;gap:4px;margin:0;border:0;border-radius:999px;background:transparent;padding:5px 8px 5px 10px;min-height:30px;font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap}
+.tutor-pick:hover{background:var(--inset-2);color:var(--ink)}
+.tutor-pick svg{flex:none}
+@media(max-width:650px){.tutor-level{display:none}}
 .attach-button{position:relative}
 .attach-button input{position:absolute;width:1px;height:1px;min-height:0;opacity:0;padding:0;border:0}
 .attach-button:focus-within{outline:2px solid var(--ink);outline-offset:2px}
@@ -655,6 +692,10 @@ button.mastery-chip:hover{border-color:#C9C1F0}
 .send-button{border:0;border-radius:12px;background:var(--dawn);color:var(--dawn-text);box-shadow:0 3px 0 var(--dawn-edge);font-size:20px;font-weight:700;width:38px;height:38px;display:grid;place-items:center;padding:0;margin-bottom:3px}
 .send-button:hover:not(:disabled){background:var(--dawn-hover)}
 .send-button:disabled{background:var(--inset-2);color:var(--faint);box-shadow:0 3px 0 var(--ring);opacity:1;cursor:default}
+/* While a message is on its way the button keeps its dawn colors and shows a ring that turns once a beat on the loop
+   curve: a dawn-text arc on a faint track. With reduced motion the ring stands still. */
+.send-button.waiting:disabled{background:var(--dawn);color:var(--dawn-text);box-shadow:0 3px 0 var(--dawn-edge);cursor:progress}
+.send-ring{width:18px;height:18px;border-radius:50%;border:2.5px solid rgba(33,24,90,.22);border-top-color:var(--dawn-text);animation:sgSpin var(--loop-beat) var(--ease-loop) infinite}
 .composer-note{margin:8px 0 0;text-align:center;font-size:12px;color:var(--coral-text)}
 .is-recording{border-color:var(--coral)}
 .attachment-list{display:flex;flex-wrap:wrap;gap:6px;list-style:none;margin:2px 0 8px;padding:0}
