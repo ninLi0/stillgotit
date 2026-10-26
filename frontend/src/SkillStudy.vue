@@ -8,6 +8,7 @@ import ReplyActions from "./ReplyActions.vue";
 import EstimatePanel from "./EstimatePanel.vue";
 import PixelIcon from "./PixelIcon.vue";
 import MasteryCells from "./MasteryCells.vue";
+import MarkdownText from "./MarkdownText.vue";
 import InfoBubble from "./InfoBubble.vue";
 import { stageOf } from "./pixel-art.ts";
 import type { OpenSource } from "./revamp-types.ts";
@@ -257,18 +258,6 @@ function sessionDate(id: string) {
 function assessed(id: string) { return data.value?.cases.some((item) => item.task === id && !!item.judgment) ?? false; }
 // Every source this skill's conversations were taught from, once each, for the rail's Taught from card.
 const railCitations = computed(() => citedSources(data.value?.sessions ?? []));
-/** Splits a tutor answer into prose and fenced code or $$ maths blocks, so blocks render in the mono font. */
-function blocks(text: string): { code: boolean; text: string }[] {
-  const out: { code: boolean; text: string }[] = [], pattern = /```[^\n]*\n?([\s\S]*?)```|\$\$([\s\S]*?)\$\$/g;
-  let last = 0, match: RegExpExecArray | null;
-  while ((match = pattern.exec(text))) {
-    if (match.index > last) out.push({ code: false, text: text.slice(last, match.index).replace(/^\n+|\n+$/g, "") });
-    out.push({ code: true, text: (match[1] ?? match[2] ?? "").replace(/\n+$/, "") });
-    last = pattern.lastIndex;
-  }
-  if (last < text.length) out.push({ code: false, text: text.slice(last).replace(/^\n+/, "") });
-  return out.filter((part) => part.code || part.text.trim());
-}
 const SUCCESS = new Set(["INDEPENDENT", "SUPPORTED"]);
 /** The estimate before and after an assessed attempt, and the change, from the timeline row whose attempt is that case. */
 function attemptChange(assessment: string) {
@@ -425,10 +414,10 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
             <template v-if="current">
               <!-- The opening: the learner's request, then the lesson or practice task in a card. A divider separates it from the dialogue. -->
               <div class="opening">
-                <div v-if="current.lesson" class="message from-you"><span class="sr-only">You</span><p class="prose">{{ current.lesson.request }}</p></div>
+                <div v-if="current.lesson" class="message from-you"><span class="sr-only">You</span><MarkdownText class="prose" kind="message" :text="current.lesson.request" /></div>
                 <article class="message from-tutor opening-card" :class="{ latest: !current.dialogue.length }" :title="openingTime?.label">
                   <div class="speaker-row"><span class="speaker"><span class="avatar"><PixelIcon name="leaf" :size="16" /></span> StillGotIt<span v-if="openingTime" class="sr-only">, <time :datetime="openingTime.iso">{{ openingTime.label }}</time></span><span v-if="current.task" class="tag task">Practice task</span></span></div>
-                  <div class="prose-blocks"><template v-for="(part, partIndex) in blocks(current.lesson?.explanation || current.task?.question || '')" :key="partIndex"><pre v-if="part.code" class="code-block">{{ part.text }}</pre><p v-else class="prose">{{ part.text }}</p></template></div>
+                  <MarkdownText class="prose" :text="current.lesson?.explanation || current.task?.question || ''" />
                   <SourcesUsed v-if="current.citations.length" :key="current.session" compact :citations="current.citations" :titles="materialTitles" :id-prefix="`passage-${current.session}`" @open="openSource" />
                   <div class="reply-foot"><ReplyMeta :seconds="measured[answerKey('session', current.session)]" :sources="current.citations.length" :tutor="answerLabel('session', current.session)" /><ReplyActions :message-key="`${current.session}:opening`" :text="current.lesson?.explanation || current.task?.question || ''" :what="current.lesson ? 'lesson' : 'practice question'" describedby="listen-reason" /></div>
                 </article>
@@ -437,11 +426,11 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
               <article v-for="(item, position) in current.dialogue" :key="item.turnIndex" class="message" :class="[item.turn.speaker === 'LEARNER' ? 'from-you' : 'from-tutor', { latest: position === current.dialogue.length - 1 }]" :title="messageTime(item.turn.at) || undefined">
                 <template v-if="item.turn.speaker === 'TUTOR'">
                   <div class="speaker-row"><span class="speaker"><span class="avatar"><PixelIcon name="leaf" :size="16" /></span> StillGotIt<span v-if="messageTime(item.turn.at)" class="sr-only">, <time :datetime="item.turn.at">{{ messageTime(item.turn.at) }}</time></span><span v-if="item.turn.purpose === 'HINT'" class="tag hint-tag">Hint</span><span v-else-if="item.turn.purpose === 'CORRECTION'" class="tag">Transcript correction</span></span></div>
-                  <div class="prose-blocks"><template v-for="(part, partIndex) in blocks(item.turn.text)" :key="partIndex"><pre v-if="part.code" class="code-block">{{ part.text }}</pre><p v-else class="prose">{{ part.text }}</p></template></div>
+                  <MarkdownText class="prose" :text="item.turn.text" />
                   <SourcesUsed v-if="item.turn.citations.length" :key="`${current.session}:${item.turnIndex}`" :citations="item.turn.citations" :titles="materialTitles" :id-prefix="`passage-${current.session}-${item.turnIndex}`" compact @open="openSource" />
                 </template>
                 <template v-else><span class="sr-only">You{{ purposeNote(item.turn.purpose) }}</span><span v-if="messageTime(item.turn.at)" class="sr-only">, <time :datetime="item.turn.at">{{ messageTime(item.turn.at) }}</time></span><span v-if="purposeNote(item.turn.purpose)" class="tag you-tag" aria-hidden="true">{{ purposeNote(item.turn.purpose).replace(' · ', '') }}</span>
-                  <p class="prose">{{ item.turn.text }}</p></template>
+                  <MarkdownText class="prose" kind="message" :text="item.turn.text" /></template>
                 <p v-for="(file, fileIndex) in item.turn.media" :key="file.file" class="attachment-label"><span class="attach-thumb" aria-hidden="true" />{{ item.turn.media.length > 1 ? `Attachment ${fileIndex + 1} of ${item.turn.media.length}` : 'Attachment' }} · {{ file.name }}</p>
                 <div v-if="item.turn.speaker === 'TUTOR'" class="reply-foot"><ReplyMeta :seconds="replySeconds(current, item.turnIndex)" :sources="item.turn.citations.length" :tutor="answerLabel('turn', current.session, item.turnIndex)" /><ReplyActions :message-key="`${current.session}:${item.turnIndex}`" :text="item.turn.text" :what="item.turn.purpose === 'HINT' ? 'hint' : 'tutor reply'" describedby="listen-reason" /></div></article>
               <!-- A lesson question without a reply: the retry sits where the tutor's reply would be. -->
@@ -460,17 +449,17 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
                 <template v-if="item.judgment">
                   <div class="result-top"><div><p class="eyebrow">Assessment</p><h3 :class="{ success: SUCCESS.has(item.judgment.result) }">{{ resultLabels[item.judgment.result] }}</h3></div><div v-if="attemptChange(item.case)" class="result-figure"><p class="eyebrow">Mastery</p><p class="result-pct"><span aria-hidden="true">{{ attemptChange(item.case)!.before }} → {{ attemptChange(item.case)!.after }}</span><span class="sr-only">from {{ attemptChange(item.case)!.before }} to {{ attemptChange(item.case)!.after }}</span></p><p class="result-delta">{{ attemptChange(item.case)!.delta }}</p></div>
                     <div v-else-if="ignoredReason(item.case)" class="result-figure unchanged"><p class="eyebrow">Mastery</p><p class="result-same">Did not change the estimate</p><p class="result-delta">{{ ignoredReason(item.case) }}</p></div></div>
-                  <p class="prose rationale">{{ item.judgment.rationale }}</p>
+                  <MarkdownText class="prose rationale" :text="item.judgment.rationale" />
                   <p v-if="answerLabel('judgment', item.judgment.judgment)" class="tutor-label">{{ answerLabel('judgment', item.judgment.judgment) }}</p>
                   <div class="result-actions"><button v-if="current.status === 'CLOSED'" class="secondary dawn" :disabled="busy || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="startTask">Try a fresh check</button></div>
                   <details class="regrade"><summary>This seems wrong? Review or correct this assessment</summary><label>Reason<textarea v-model="reason" rows="3" /></label><p v-if="!reason.trim()" :id="`reason-needed-${item.case}`" class="hint reason">Write a reason to request a regrade or save a correction.</p><button class="message-action" :disabled="busy || !aiAvailable || !reason.trim()" :aria-describedby="describedBy(!reason.trim() && `reason-needed-${item.case}`, !aiAvailable && 'ai-reason-chat')" @click="requestRegrade(item.case, item.judgment.judgment)">Request regrade</button>
-                    <label>Manual correction<select v-model="correction"><option v-for="(label,value) in resultLabels" :key="value" :value="value">{{ label }}</option></select></label><label class="check"><input v-model="fullGate" type="checkbox" /><span class="box" aria-hidden="true" />All requirements were met in fresh independent work.</label><button class="message-action" :disabled="busy || !reason.trim()" :aria-describedby="reason.trim() ? undefined : `reason-needed-${item.case}`" @click="saveCorrection(item.case, item.judgment.judgment)">Save correction</button><ol><li v-for="judgment in item.history" :key="judgment.judgment">{{ resultLabels[judgment.result] }} · {{ judgment.origin === 'AI' ? 'Tutor' : 'Your correction' }}<p>{{ judgment.rationale }}</p></li></ol></details>
+                    <label>Manual correction<select v-model="correction"><option v-for="(label,value) in resultLabels" :key="value" :value="value">{{ label }}</option></select></label><label class="check"><input v-model="fullGate" type="checkbox" /><span class="box" aria-hidden="true" />All requirements were met in fresh independent work.</label><button class="message-action" :disabled="busy || !reason.trim()" :aria-describedby="reason.trim() ? undefined : `reason-needed-${item.case}`" @click="saveCorrection(item.case, item.judgment.judgment)">Save correction</button><ol><li v-for="judgment in item.history" :key="judgment.judgment">{{ resultLabels[judgment.result] }} · {{ judgment.origin === 'AI' ? 'Tutor' : 'Your correction' }}<MarkdownText :text="judgment.rationale" /></li></ol></details>
                 </template><p v-else>Your answer is saved. Assessment is pending.</p>
               </article>
             </template>
             <div role="status"><p v-if="notice && !busy" ref="noticeBox" class="notice" tabindex="-1">{{ notice }}</p></div>
             <div role="alert"><p v-if="error" ref="errorBox" class="error" tabindex="-1">{{ error }}</p></div>
-            <article v-if="pending" class="message from-you pending" aria-live="polite"><span class="sr-only">You</span><p class="prose">{{ pending.text }}</p><p v-for="(name, fileIndex) in pending.files" :key="fileIndex" class="attachment-label"><span class="attach-thumb" aria-hidden="true" />Attachment · {{ name }}</p><p class="sending">Sending…</p></article>
+            <article v-if="pending" class="message from-you pending" aria-live="polite"><span class="sr-only">You</span><MarkdownText class="prose" kind="message" :text="pending.text" /><p v-for="(name, fileIndex) in pending.files" :key="fileIndex" class="attachment-label"><span class="attach-thumb" aria-hidden="true" />Attachment · {{ name }}</p><p class="sending">Sending…</p></article>
             <article v-if="pending?.reply" class="message from-tutor thinking" aria-hidden="true"><div class="speaker-row"><span class="speaker"><span class="avatar"><PixelIcon name="leaf" :size="16" /></span> StillGotIt</span></div><p class="prose dots"><span>·</span><span>·</span><span>·</span></p><span class="waited">{{ waited }}</span></article>
             <!-- While the tutor's dots show, they are the visible sign of work; the sentence stays for screen readers. -->
             <p v-if="busy" class="working" :class="{ 'sr-only': pending?.reply }" role="status"><PixelIcon name="leaf" :size="18" /> Working on it…</p>
@@ -608,10 +597,8 @@ button.mastery-chip:hover{border-color:#C9C1F0}
 .tag.hint-tag{background:var(--dawn-soft);color:var(--dawn-soft-text)}
 .tag.task{background:#4A775A;color:#FFFFFF}
 .you-tag{display:inline-block;margin-bottom:6px;background:#FFFFFF;color:var(--dawn-soft-text)}
-.prose-blocks{display:flex;flex-direction:column;gap:14px}
-.prose{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.8;font-size:15px;margin:0}
+.prose{overflow-wrap:anywhere;line-height:1.8;font-size:15px;margin:0}
 .from-you .prose{line-height:1.6}
-.code-block{margin:0;padding:14px 16px;border-radius:12px;background:var(--inset);border:1px solid var(--line);font:13px/1.7 var(--font-mono);white-space:pre-wrap;overflow-wrap:anywhere;color:var(--ink)}
 .tutor-label{margin:8px 0 0;font-size:11px;color:var(--faint)}
 .attachment-label{display:inline-flex;align-items:center;gap:8px;margin:10px 0 0;padding:4px 10px 4px 4px;border-radius:8px;background:#FFFFFF;font-size:12px;color:var(--soft)}
 .attach-thumb{width:26px;height:26px;border-radius:5px;background:var(--inset);flex:none}

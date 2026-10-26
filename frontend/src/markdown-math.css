@@ -1,0 +1,15 @@
+/* Formulas drawn by KaTeX (frontend/src/markdown-math.ts). This file loads with KaTeX's own stylesheet, after it, and
+   only touches KaTeX's boxes and the block around a displayed formula. KaTeX sets no colors of its own: its text,
+   fraction rules and SVG strokes use the surrounding text color, so formulas follow the page's color tokens. */
+
+/* The app's reset makes every box border-box; KaTeX measures its boxes as content-box, the browser default. KaTeX's
+   own border-box rules (\fbox, \angl) are more specific and still apply. */
+.katex, .katex * { box-sizing: content-box; }
+
+/* KaTeX's 1.21em matches Computer Modern to Times; 1.1em of the surrounding text sits better beside Instrument Sans. */
+span.katex { font-size: 1.1em; }
+
+/* A displayed formula gets a little room above and below, and scrolls sideways when it is wider than the text, as on
+   a phone, instead of overflowing the column. */
+.math-display { max-width: 100%; overflow-x: auto; overflow-y: hidden; padding: 6px 0; }
+.math-display > .katex-display { margin: 0; }

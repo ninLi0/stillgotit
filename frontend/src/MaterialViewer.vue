@@ -9,7 +9,7 @@ import PixelIcon from "./PixelIcon.vue";
 import ViewerPdfCanvas from "./ViewerPdfCanvas.vue";
 import { docIcon } from "./pixel-art.ts";
 import type { AskAboutPage, ViewerSkill } from "./revamp-types.ts";
-import { markdown } from "./ViewerMarkdown.ts";
+import { markdown, mathState, renderMarkdown } from "./markdown.ts";
 import { openPdf, type PDFDocumentProxy } from "./ViewerPdf.ts";
 import {
   askLabel, askQuestion, buildPages, digestKey, fileKey, fileKind, findLocation, gradeNote, isPaged, lineRange, markdownSource,
@@ -90,8 +90,10 @@ const fileState = computed<FileState | undefined>(() => page.value ? files[page.
 const markdownHtml = computed(() => {
   const item = page.value;
   if (!item || item.kind !== "markdown" || !md.value) return "";
-  let html = markdownCache.get(item.key);
-  if (html === undefined) { html = md.value.render(markdownSource(item)); markdownCache.set(item.key, html); }
+  // A note with formulas shows them as source until KaTeX arrives, then renders again, so each rendering is kept per KaTeX state.
+  const key = `${item.key}:${mathState() === "ready"}`;
+  let html = markdownCache.get(key);
+  if (html === undefined) { html = renderMarkdown(md.value, markdownSource(item)).html; markdownCache.set(key, html); }
   return html;
 });
 const slideLines = computed(() => page.value?.kind === "slides" ? page.value.text.split("\n").map((line) => line.trim()).filter(Boolean) : []);
@@ -143,7 +145,7 @@ async function load() {
       void digestKey(original.file).then((key) => { if (key && mine === generation) keys[original.file] = key; });
     }
     if (pages.value.some((item) => item.kind === "markdown")) {
-      markdown().then((parser) => { if (mine === generation) md.value = parser; }).catch(() => { if (mine === generation) markdownFailed.value = true; });
+      markdown("document").then((parser) => { if (mine === generation) md.value = parser; }).catch(() => { if (mine === generation) markdownFailed.value = true; });
     }
     tryJump();
     void loadFiles(mine);

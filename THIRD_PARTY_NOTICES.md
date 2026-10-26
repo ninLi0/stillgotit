@@ -52,3 +52,13 @@ The interface bundles four fonts in `frontend/public/fonts`, and the design hand
 | Newsreader | `Newsreader.ttf` | Copyright 2020 The Newsreader Project Authors (http://github.com/productiontype/Newsreader). Designed by Hugues Gentile for Production Type. | The readable text of a PDF page that the Materials viewer cannot draw. |
 
 The font files also state two trademarks: Pixelify Sans is a trademark of Stefie Justprince, and Newsreader is a registered trademark of Production Systems SAS.
+
+## KaTeX
+
+The lesson and the Materials viewer draw formulas with [KaTeX](https://katex.org) 0.19.0. The build bundles its code and stylesheet into a chunk that loads only when a text holds a formula, unchanged except that the stylesheet's woff and ttf fallbacks for each font are dropped (`frontend/vite.config.ts`). They are used under the MIT License, copyright (c) 2013-2020 Khan Academy and other contributors. The full notice is preserved in [licenses/KaTeX.txt](licenses/KaTeX.txt).
+
+KaTeX's 20 fonts are copied unchanged into the build as woff2 files and load only when a formula uses them. They are used under the SIL Open Font License 1.1, whose text is in [licenses/OFL-1.1.txt](licenses/OFL-1.1.txt) with their copyright notice.
+
+| Fonts | Files | Copyright notice in the font files | Used for |
+| --- | --- | --- | --- |
+| KaTeX_AMS, KaTeX_Caligraphic, KaTeX_Fraktur, KaTeX_Main, KaTeX_Math, KaTeX_SansSerif, KaTeX_Script, KaTeX_Size1 to KaTeX_Size4, and KaTeX_Typewriter | `node_modules/katex/dist/fonts/*.woff2`, copied to `frontend/dist/assets` | Copyright (c) 2009-2010 Design Science, Inc. Copyright (c) 2014-2018 Khan Academy. Each family's name is a Reserved Font Name. | Formulas. |
