@@ -50,7 +50,7 @@ The main colors and the font names are tokens at the top of [frontend/src/style.
 - **Scenes are drawn in whole cells.** Each scene is a canvas of 4 px cells (5 px in the Forest view, and 2 px in the small grove on the sign-in page), scaled by the screen's pixel ratio with smoothing off:
   - Home's scene card has sky bands, hills, and a sand path with one post per day leading to the exam's flag. The sun's position follows today's study minutes.
   - The grove on Home has one seeded tree per topic, of the topic's tree kind, with a plank sign under each tree that names the topic and gives its skill count and average.
-  - The Forest view has mountains, pines, a winding path, and one large tree per topic, of the topic's tree kind, with a signpost, plus a flower at a tree's foot for each mastered skill.
+  - The Forest view has mountains, pines, a winding path, and one large tree per topic, of the topic's tree kind, with a signpost, plus a flower at a tree's foot for each mastered skill. The sun, or the moon by night, keeps its morning place on its arc, and sits higher when a tree would stand in front of it there.
   - The Plan screen's sea calendar is one picture of the week. Each day is a column of the water, with its date on a sand plank, its boat, buoy, or lighthouse at the horizon, and its activities floating on the water. A whale, taken from the handoff, swims from today toward the exam's lighthouse.
   - The sign-in page shows a sample grove with topic signs and a legend of the leaf stages.
 - **Tree kinds.** Each topic grows one of twelve kinds of tree ([frontend/src/tree-kinds.ts](../frontend/src/tree-kinds.ts)): oak, pine, birch, willow, maple, cherry, palm, cypress, baobab, spruce, jacaranda, and bonsai. A topic without a chosen kind grows a default picked from its unit's id, so a topic keeps its kind and a course shows an even mix of kinds. Selecting a tree or its sign on Home, or opening a topic in the Forest view, shows the topic's kind with "Change tree". That opens a small dialog with a drawn preview and the name of each kind, and "Surprise me", which picks a different kind at random. The choice applies at once in both scenes, and the server keeps it, so it follows the learner to every browser ([Choosing a topic's tree](compositions/Courses.md#choosing-a-topics-tree)). The kind is decoration and the leaves are the information: every crown is a pale tint of a palette family, a crown in a warm color or a palm's fronds put a small green pocket behind each leaf, and the leaf sprites keep their own colors, so a leaf's stage reads the same on every kind.
@@ -136,6 +136,7 @@ Text should reach 4.5:1 against its background, and outlines and cells that carr
 | Muted `#5F5F5C` on `#EEEBFF` | A skill's topic and "In 27 days" on a row brought forward | 5.48:1 |
 | White on `#1E6F96` | The exam day's plank on Plan | 5.57:1 |
 | `#A8412F` on `#FBE6DC` | Error messages and the Due today pill | 5.04:1 |
+| `#A8412F` on `#FBE6DC` | The FILE tag under a reply's sources | 5.04:1 |
 | `#8A5A12` on `#FBF0D6` | The New pill | 5.22:1 |
 | `#2A6B85` on `#E3EEF3` | The Review pill | 5.03:1 |
 | Green `#2A7B55` on white | Saved notices, such as "Skill confirmed." | 5.17:1 |
@@ -145,11 +146,14 @@ Text should reach 4.5:1 against its background, and outlines and cells that carr
 | `#A46626` on white | "N to review" in the Materials file list | 4.66:1 |
 | `#777094` on white | Eyebrows in the estimate's evidence, such as "How the estimate got here" | 4.64:1 |
 | `#777094` on white | Eyebrows in the lesson's rail cards: "Your mastery", "Goal", and "To master it" | 4.64:1 |
+| Dim `#767672` on white | The dates in a skill's Assessment history, under the estimate's evidence | 4.56:1 |
+| `#66737A` on white | The footers of the slides the Materials viewer draws | 4.89:1 |
 | Filled cell `#4A775A` against empty `#E6E6E2` | Mastery cells (3:1 needed) | 4.12:1 |
 | `#1E6F96` against `#CFE7F2` | Plan load cells (3:1 needed) | 4.34:1 |
 | Faint `#6F6F6C` on white | Form-field outlines (3:1 needed) | 5.04:1 |
+| `#8C8C88` on white, and on inset `#F5F5F3` | Checkbox outlines, which sit on the grey of the review before assessment and of the exam form (3:1 needed) | 3.38:1, 3.09:1 |
 
-Every text pair now passes. The last two to change were "N to review" in the Materials file list and the eyebrows in the lesson's rail cards, both small text at 11 and 12 px, which moved to `#A46626` and `#777094`, darker colors of the same hues. The green, the coral, and the evidence eyebrows were darkened within their own hues to pass. The success green and the coral changed everywhere the interface uses them as text, outlines, or fills; the pixel art keeps its own palette.
+Every text pair now passes. The last four to change were the dates in Assessment history, the FILE tag, the slide footers, and the checkbox outlines, which were `#8A8A86` (3.47:1), `#B5502B` (4.21:1), `#8E9BA2` (2.85:1), and `#BDBDB8` (1.89:1). Each became a darker color of the same hue, and the FILE tag took the coral of the error messages. The checkbox outline had to pass on the grey inset around it as well as on white, so it went a step darker than white alone needs. Before them, the last two to change were "N to review" in the Materials file list and the eyebrows in the lesson's rail cards, both small text at 11 and 12 px, which moved to `#A46626` and `#777094`, darker colors of the same hues. The green, the coral, and the evidence eyebrows were darkened within their own hues to pass. The success green and the coral changed everywhere the interface uses them as text, outlines, or fills; the pixel art keeps its own palette.
 
 <details>
 <summary>How the ratios were computed</summary>
@@ -175,7 +179,8 @@ For example, ink `#151515` has v = 21 / 255 = 0.0824 in each channel, so each ch
 | `#C3E6F4` | 0.7473 | `#EEEBFF` | 0.8481 | `#E6E6E2` | 0.7891 |
 | `#FADFB5` | 0.7644 | `#3B2F8F` | 0.0495 | `#1E6F96` | 0.1385 |
 | `#7A7397` | 0.1863 | `#DEDAFF` | 0.7289 | `#CFE7F2` | 0.7683 |
-| `#F1F1EE` | 0.8778 | | | | |
+| `#F1F1EE` | 0.8778 | `#767672` | 0.1802 | `#66737A` | 0.1649 |
+| `#8C8C88` | 0.2611 | | | | |
 
 </details>
 
