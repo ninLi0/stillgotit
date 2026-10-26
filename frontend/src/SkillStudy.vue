@@ -20,6 +20,7 @@ import { listenUnavailable, stopSpeaking } from "./speech.ts";
 import type { StillGotItHttp } from "../../generated/wire.ts";
 import { answerKey, newAnswers, takeTutor, tutorLabel, type TutorUsed } from "./tutor-choice.ts";
 import { sessionRequest, takeSession } from "./continue-session.ts";
+import { useSlidingMark } from "./sliding-mark.ts";
 type SkillData = StillGotItHttp["/learning/read"]["output"]["data"];
 type StudySession = SkillData["sessions"][number];
 /** A photo uploaded for the answer being written. `preview` is a local picture of it, so learners can tell photos apart. */
@@ -285,6 +286,16 @@ let narrowQuery: MediaQueryList | null = null;
 const onNarrow = () => { narrow.value = !!narrowQuery?.matches; };
 onMounted(() => { narrowQuery = window.matchMedia("(max-width: 1239px)"); onNarrow(); narrowQuery.addEventListener("change", onNarrow); });
 onBeforeUnmount(() => narrowQuery?.removeEventListener("change", onNarrow));
+// The line under the chosen tab is one mark that slides to the next chosen tab on the move curve. It appears in place
+// when the tabs first load, and slides when the learner switches conversations or starts a new one.
+const tabStrip = ref<HTMLElement | null>(null);
+const tabLine = useSlidingMark(tabStrip, ".chosen");
+const tabLineStyle = computed(() => {
+  const b = tabLine.box.value;
+  return b ? { transform: `translate(${b.x}px, ${b.y + b.h - 3}px)`, width: `${b.w}px` } : { display: "none" };
+});
+watch([() => (freshLesson.value || !data.value?.sessions.length ? "new" : selected.value), () => data.value?.sessions.length ?? 0],
+  ([, count], [, before]) => { void tabLine.place(count > 0 && before > 0); });
 async function toggleRail() { evidenceOpen.value = !evidenceOpen.value; await nextTick(); if (evidenceOpen.value) railClose.value?.focus(); }
 async function closeRail() { evidenceOpen.value = false; await nextTick(); railChip.value?.focus(); }
 function openSource(source: OpenSource) { emit("open-source", source); }
@@ -393,7 +404,8 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
             <div class="heading-action"><button class="primary dawn practice-button" :disabled="busy || recording || !aiAvailable || !data?.track" :aria-describedby="describedBy(!!practiceReason && 'practice-reason', !aiAvailable && 'ai-reason-chat')" @click="startTask">Check my understanding</button><p v-if="practiceReason" id="practice-reason" class="hint reason">{{ practiceReason }}</p></div>
           </div>
         </div>
-        <nav class="tabs" aria-label="Conversations for this skill">
+        <nav ref="tabStrip" class="tabs" aria-label="Conversations for this skill">
+          <span class="tab-line" :class="{ sliding: tabLine.sliding.value }" :style="tabLineStyle" data-mark aria-hidden="true" />
           <button v-for="session in data?.sessions" :key="session.session" type="button" class="tab" :class="{ chosen: !freshLesson && selected === session.session }" :aria-current="!freshLesson && selected === session.session ? 'true' : undefined" :title="session.lesson?.request || (session.status === 'CLOSED' ? 'Submitted work' : 'Independent check')" :disabled="busy || recording" @click="selectSession(session.session)">
             <span class="tab-square" :class="session.lesson ? 'lesson' : 'practice'" aria-hidden="true" />{{ labels[session.session] }}<span class="tab-meta"><span v-if="sessionDate(session.session)" class="tab-date">{{ sessionDate(session.session) }}<span aria-hidden="true"> · </span></span><span class="sr-only">, </span>{{ turnsLabel(session.dialogue.length) }}</span><span v-if="assessed(session.session)" class="tab-done"><span aria-hidden="true">✓</span><span class="sr-only">, assessed</span></span>
           </button>
@@ -490,7 +502,7 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
         </div>
       </div>
     </div>
-    <div v-if="narrow && evidenceOpen" class="rail-backdrop" aria-hidden="true" @click="closeRail" />
+    <div v-if="narrow" class="rail-backdrop" :hidden="!evidenceOpen" aria-hidden="true" @click="closeRail" />
     <aside id="learn-rail" class="rail" aria-label="Mastery, goal, evidence and sources" :hidden="narrow && !evidenceOpen ? true : undefined" @keydown.esc.stop="narrow && closeRail()">
       <div v-if="narrow" class="rail-close"><span class="rail-title">Mastery and evidence</span><button ref="railClose" type="button" class="rail-x" aria-label="Close mastery and evidence" @click="closeRail"><span aria-hidden="true">✕</span></button></div>
       <section class="rail-card">
@@ -538,10 +550,13 @@ button.mastery-chip:hover{border-color:#C9C1F0}
 .chip-top span{font-size:11px;font-weight:600;color:var(--faint)}
 .heading-action .primary{min-height:46px;padding:0 18px;font-size:14px;white-space:nowrap}
 /* Tabs */
-.tabs{display:flex;align-items:flex-end;gap:22px;margin-top:14px;overflow-x:auto}
+.tabs{position:relative;display:flex;align-items:flex-end;gap:22px;margin-top:14px;overflow-x:auto}
 .tab,.new-lesson{display:flex;align-items:center;gap:8px;border:0;background:none;padding:0 2px 12px;font-size:14px;font-weight:500;color:var(--muted);white-space:nowrap;border-radius:0}
 .tab:hover:not(:disabled){color:var(--ink)}
-.tab.chosen{font-weight:700;color:var(--ink);box-shadow:inset 0 -3px 0 #8A7EE0}
+.tab.chosen{font-weight:700;color:var(--ink)}
+/* The 3px line under the chosen tab, or under "+ New conversation" when that is chosen. */
+.tab-line{position:absolute;left:0;top:0;height:3px;background:#8A7EE0;pointer-events:none}
+.tab-line.sliding{transition:transform var(--dur-move) var(--ease-move),width var(--dur-move) var(--ease-move)}
 .tab-square{width:8px;height:8px;flex:none}
 .tab-square.lesson{background:#2F7D9B}
 .tab-square.practice{background:#E3A233}
@@ -549,13 +564,12 @@ button.mastery-chip:hover{border-color:#C9C1F0}
 .tab-done{font-size:11px;font-weight:800;color:var(--strong)}
 .new-lesson{font-weight:700;color:#4B3FA8}
 .new-lesson:hover:not(:disabled){color:var(--dawn-text)}
-.new-lesson.chosen{box-shadow:inset 0 -3px 0 #8A7EE0}
 /* Thread */
 /* The thread scrolls inside thread-wrap, which also holds the "Jump to latest" pill over its bottom edge. */
 .thread-wrap{position:relative;flex:1;min-height:0;display:flex;flex-direction:column}
 .chat-thread{flex:1;min-height:0;overflow-y:auto;background:#FFFFFF}
 .jump-wrap{position:absolute;left:0;right:0;bottom:14px;z-index:5;display:flex;justify-content:center;pointer-events:none}
-.jump-latest{pointer-events:auto;display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:0 14px;border:0;border-radius:999px;background:#FFFFFF;color:var(--dawn-soft-text);font-size:13px;font-weight:700;box-shadow:0 0 0 1px var(--ring),0 8px 24px rgba(20,20,20,.07);animation:sgRise 240ms ease-out both}
+.jump-latest{pointer-events:auto;display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:0 14px;border:0;border-radius:999px;background:#FFFFFF;color:var(--dawn-soft-text);font-size:13px;font-weight:700;box-shadow:0 0 0 1px var(--ring),0 8px 24px rgba(20,20,20,.07);animation:sgRise var(--dur-enter) var(--ease-enter) both}
 .jump-latest:hover{background:var(--dawn-soft)}
 .thread-inner{max-width:760px;margin:0 auto;padding:30px 32px 24px}
 .confidence-note{border:1px solid var(--line);padding:16px 20px;border-radius:16px;margin-bottom:24px;background:var(--inset)}
@@ -571,7 +585,7 @@ button.mastery-chip:hover{border-color:#C9C1F0}
 .prompt-choices{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:24px}
 .prompt-choices button{border:1px solid var(--line);border-radius:999px;background:#FFFFFF;padding:10px 16px;font-size:13px;color:var(--ink)}
 .prompt-choices button:hover:not(:disabled){border-color:rgba(20,20,20,.35)}
-.message{margin:0 0 28px;max-width:100%;font-size:15px;animation:sgRise 240ms ease-out both}
+.message{margin:0 0 28px;max-width:100%;font-size:15px}
 /* The learner's messages are compact bubbles on the right; the tutor's replies run the full width with no bubble. */
 .from-you{margin-left:auto;margin-bottom:24px;width:fit-content;max-width:70%;padding:10px 15px;background:var(--dawn-soft);border-radius:18px 18px 4px 18px}
 .from-tutor{padding:0}
@@ -585,7 +599,7 @@ button.mastery-chip:hover{border-color:#C9C1F0}
 /* Under each tutor answer: the meta line, then Copy and Listen, shown on hover or focus and always under the latest answer. */
 .reply-foot{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;margin-top:12px;min-height:26px}
 .reply-foot .reply-meta{margin:0}
-.reply-foot .reply-actions{margin-left:auto;opacity:0;transition:opacity 120ms}
+.reply-foot .reply-actions{margin-left:auto;opacity:0;transition:opacity var(--dur-quick) var(--ease-enter)}
 .from-tutor:hover .reply-actions,.from-tutor:focus-within .reply-actions,.from-tutor.latest .reply-actions{opacity:1}
 @media (hover:none),(max-width:650px){.reply-foot .reply-actions{opacity:1}}
 .retry-row{display:flex;align-items:center;gap:8px;margin:0 0 28px}
@@ -603,7 +617,7 @@ button.mastery-chip:hover{border-color:#C9C1F0}
 .attach-thumb{width:26px;height:26px;border-radius:5px;background:var(--inset);flex:none}
 .message-action{border:0;background:transparent;color:var(--muted);padding:5px 0;font-size:12px;text-decoration:underline;text-underline-offset:4px}
 .review-step{margin:6px 0 20px}
-.attempt-review,.assessment{margin:14px 0 20px;padding:20px 22px;border-radius:16px;border:1px solid var(--line);animation:sgRise 240ms ease-out both}
+.attempt-review,.assessment{margin:14px 0 20px;padding:20px 22px;border-radius:16px;border:1px solid var(--line)}
 .attempt-review{background:var(--inset)}
 .assessment{background:#FFFFFF;box-shadow:0 8px 24px rgba(20,20,20,.07)}
 .review-title{display:flex;align-items:center;gap:6px;margin:0 0 8px}
@@ -666,9 +680,14 @@ button.mastery-chip:hover{border-color:#C9C1F0}
 .finished-message .secondary{min-height:38px;font-size:13px}
 /* Rail */
 .rail{border-left:1px solid #EEEAF7;background:#FAF9FE;overflow-y:auto;overflow-x:hidden;padding:16px 14px;display:flex;flex-direction:column;gap:10px;min-height:0}
-.narrow .rail{position:absolute;top:0;right:0;bottom:0;width:312px;max-width:100%;z-index:20;box-shadow:-12px 0 32px rgba(20,20,20,.12);animation:railIn 200ms ease-out}
+/* On narrow screens the rail slides in over the lesson on the move curve and its backdrop fades in. Where the browser
+   can keep a hidden element drawn while it transitions (transition-behavior: allow-discrete), both also leave the same
+   way; elsewhere they disappear at once. */
+.narrow .rail{position:absolute;top:0;right:0;bottom:0;width:312px;max-width:100%;z-index:20;box-shadow:-12px 0 32px rgba(20,20,20,.12);animation:sgSlide var(--dur-move) var(--ease-move);transition:transform var(--dur-move) var(--ease-move),opacity var(--dur-move) var(--ease-move),display var(--dur-move) allow-discrete}
 .rail[hidden]{display:none}
-.rail-backdrop{position:absolute;inset:0;z-index:19;background:rgba(21,21,21,.28)}
+.narrow .rail[hidden]{transform:translateX(24px);opacity:0}
+.rail-backdrop{position:absolute;inset:0;z-index:19;background:rgba(21,21,21,.28);animation:sgFade var(--dur-move) var(--ease-move);transition:opacity var(--dur-move) var(--ease-move),display var(--dur-move) allow-discrete}
+.rail-backdrop[hidden]{display:none;opacity:0;pointer-events:none}
 .rail-close{position:sticky;top:-16px;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:8px;margin:-16px -14px 0;padding:12px 12px 8px 16px;background:#FAF9FE}
 .rail-title{font:400 15px var(--font-display);color:var(--ink)}
 .rail-x{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;padding:0;border:0;border-radius:10px;background:#EEEAF7;color:var(--ink);font-size:15px;line-height:1}
@@ -677,9 +696,9 @@ button.mastery-chip:hover{border-color:#C9C1F0}
 .sending{margin:4px 0 0;font-size:11px;font-weight:600;color:var(--muted)}
 .thinking .dots{display:inline-flex;gap:3px;font-size:22px;line-height:1;color:var(--muted)}
 .waited{margin-left:10px;font-size:12px;font-weight:600;color:var(--faint);font-variant-numeric:tabular-nums}
-.thinking .dots span{animation:sgDot 1.2s ease-in-out infinite}.thinking .dots span:nth-child(2){animation-delay:.2s}.thinking .dots span:nth-child(3){animation-delay:.4s}
-@keyframes sgDot{0%,80%,100%{opacity:.25;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
-@media (prefers-reduced-motion:reduce){.thinking .dots span{animation:none;opacity:.6}}
+/* The three dots rise and brighten one after another, a sixth of a beat apart. */
+.thinking .dots span{animation:sgDot var(--loop-beat) var(--ease-loop) infinite}.thinking .dots span:nth-child(2){animation-delay:calc(var(--loop-beat) / 6)}.thinking .dots span:nth-child(3){animation-delay:calc(var(--loop-beat) / 3)}
+@media (prefers-reduced-motion:reduce){.thinking .dots span{opacity:.6}}
 .rail-card{background:#FFFFFF;border-radius:18px;padding:16px;box-shadow:0 0 0 1px #ECE9F5;flex:none}
 .rail-card.goal{display:flex;flex-direction:column;gap:6px}
 .rail-eyebrow{color:#777094;white-space:nowrap}
@@ -693,8 +712,6 @@ button.mastery-chip:hover{border-color:#C9C1F0}
 .gate-text{margin:0;font-size:13px;line-height:1.55;color:var(--soft)}
 .divider{height:1px;background:#EEEBF5;margin:8px 0}
 .rail-empty{margin:8px 0 0;font-size:12px}
-@keyframes sgRise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-@keyframes railIn{from{transform:translateX(24px);opacity:0}to{transform:none;opacity:1}}
 @media(max-width:900px){.learn-head{padding:14px 18px 0}.thread-inner{padding:22px 18px 18px}.composer-area{padding:10px 18px 14px}}
 @media(max-width:650px){.learn{height:calc(100dvh - 20px);min-height:520px}.head-title{min-width:0}.learn-head h1{font-size:22px}.sprite-tile{width:44px;height:44px}.heading-action .primary{min-height:42px;padding:0 12px;font-size:13px;white-space:normal}.from-you{max-width:85%}.opening-card{padding:16px 16px 12px}.prose{font-size:14px}.confidence{flex-wrap:wrap}.chat-welcome h2{font-size:29px}}
 </style>

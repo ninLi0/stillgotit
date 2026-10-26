@@ -17,7 +17,9 @@ export type ChartPoint = {
   /** What happened, as the learner reads it, such as "Assessed attempt · Practice 2 · Independent success". */
   label: string;
 };
-export type ChartMarker = { index: number; point: ChartPoint; x: number; y: number; hit: number };
+/** `reach` is the share of the line's length, from 0 to 1, at which the line arrives at the marker, so the marker can
+ * appear as the line draws itself to it. */
+export type ChartMarker = { index: number; point: ChartPoint; x: number; y: number; hit: number; reach: number };
 export type ChartLayout = {
   width: number; height: number;
   plot: { left: number; right: number; top: number; bottom: number };
@@ -74,20 +76,25 @@ export function layoutChart(points: readonly ChartPoint[], width: number): Chart
   const plot = { left: CHART.left, right: w - CHART.right, top: CHART.top, bottom: valueY(0) };
   const inner = { left: plot.left + CHART.inset, right: plot.right - CHART.inset };
   const xs = spread(points.map((p) => Date.parse(p.at)), inner.left, inner.right, CHART.gap);
-  let path = "", level = points[0]?.after ?? 0;
-  points.forEach((p, i) => {
-    if (i === 0) { path = `M ${xs[0]} ${valueY(p.after)}`; return; }
+  // The path, and its length up to each point. Every segment is horizontal or vertical, so a run's length is how far it
+  // goes across plus how far it goes down or up.
+  let path = "", level = points[0]?.after ?? 0, length = 0;
+  const lengths = points.map((p, i) => {
+    if (i === 0) { path = `M ${xs[0]} ${valueY(p.after)}`; return 0; }
     // Before an attempt or an adjustment, time had lowered the estimate to `before`; a time row ends at `after`.
     const lowered = p.kind === "TIME" ? p.after : p.before ?? level;
-    path += stairs(xs[i - 1]!, valueY(level), xs[i]!, valueY(lowered)) + ` V ${valueY(p.after)}`;
+    const y0 = valueY(level), drop = valueY(lowered) - y0, held = drop > 0 ? y0 + drop : y0;
+    path += stairs(xs[i - 1]!, y0, xs[i]!, valueY(lowered)) + ` V ${valueY(p.after)}`;
+    length += xs[i]! - xs[i - 1]! + Math.max(0, drop) + Math.abs(valueY(p.after) - held);
     level = p.after;
+    return length;
   });
-  if (points.length === 1) path += ` H ${inner.right}`;
+  if (points.length === 1) { path += ` H ${inner.right}`; length += inner.right - xs[0]!; }
   const last = points.length - 1;
   const end = { x: points.length > 1 ? xs[last]! : inner.right, y: valueY(level), value: level };
   // Markers for the starting point, each attempt and each adjustment. A marker's hit area is 24px, narrowed only so
   // it never covers its neighbour's.
-  const marked = points.flatMap((point, index) => (point.kind === "TIME" ? [] : [{ index, point, x: xs[index]!, y: valueY(point.after) }]));
+  const marked = points.flatMap((point, index) => (point.kind === "TIME" ? [] : [{ index, point, x: xs[index]!, y: valueY(point.after), reach: length > 0 ? lengths[index]! / length : 0 }]));
   const markers = marked.map((m, i) => {
     const near = Math.min(i > 0 ? m.x - marked[i - 1]!.x : Infinity, i < marked.length - 1 ? marked[i + 1]!.x - m.x : Infinity);
     const hit = Math.max(12, Math.min(CHART.hit, near));

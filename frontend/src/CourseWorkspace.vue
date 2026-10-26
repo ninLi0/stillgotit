@@ -666,7 +666,7 @@ watch(view, (now) => { if (now === "setup" && material.value && !preview.value) 
 @media (max-width: 1180px) { .tree-grid { grid-template-columns: minmax(0, 1fr); } }
 .tree-stage { position: relative; min-width: 0; }
 .empty-import { display: flex; margin: 4px auto 8px; }
-.skill-card { overflow: hidden; animation: sgRise 240ms ease-out both; }
+.skill-card { overflow: hidden; animation: sgRise var(--dur-enter) var(--ease-enter) both; }
 .skill-band { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 12px; padding: 16px; background: #F1F8F2; }
 .sprite-tile { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 12px; background: #fff; }
 .band-text { min-width: 0; }
@@ -746,7 +746,7 @@ select, textarea { width: 100%; font: inherit; padding: 10px 12px; border: 1px s
 textarea { resize: vertical; }
 .add-panel, .suggest-panel, .section-block { margin: 0 0 18px; }
 .add-panel h2, .suggest-panel h2, .section-block h2 { margin: 0 0 10px; font-size: 22px; }
-.review-card { margin: 0 0 18px; padding: 18px; max-width: 760px; animation: sgRise 240ms ease-out both; }
+.review-card { margin: 0 0 18px; padding: 18px; max-width: 760px; animation: sgRise var(--dur-enter) var(--ease-enter) both; }
 .review-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; }
 .review-head h2 { margin: 0; font-size: 22px; }
 .review-dots { display: inline-flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }

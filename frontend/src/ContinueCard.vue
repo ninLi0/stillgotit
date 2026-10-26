@@ -33,7 +33,7 @@ function open(row: OpenSession) { requestSession(row.skill, row.studySession); e
 </template>
 
 <style scoped>
-.continue { margin-top: 18px; padding: 16px 18px; animation: sgRise 240ms ease-out both; }
+.continue { margin-top: 18px; padding: 16px 18px; animation: sgRise var(--dur-enter) var(--ease-enter) both; }
 .continue-title { margin: 0 0 10px; font-size: 21px; }
 .continue-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .continue-row { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto 14px; gap: 12px; align-items: center; width: 100%; padding: 12px 14px; border: 0; border-radius: 14px; background: #FFFFFF; box-shadow: 0 0 0 1px var(--ring); color: var(--ink); text-align: left; }

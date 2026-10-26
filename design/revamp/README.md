@@ -111,7 +111,7 @@ The file pages inside the viewer (PDF, slides, photos, markdown) are typeset moc
      - drifting clouds
      - far hills `#BFDCC8` and near hills `#A3D6B4`
      - grass `#7CC497` / `#6DB892`
-   - A dotted sand path `#E9D6A8` runs from "You · today" (a leaf sprite on a mound) past one wooden post per day to a hill carrying a coral flag that waves every 450ms.
+   - A dotted sand path `#E9D6A8` runs from "You · today" (a leaf sprite on a mound) past one wooden post per day to a hill carrying a coral flag whose cloth ripples on an eased loop.
    - A wooden plank sign sits over the flag: "Midterm / Thu · in 6 days". Its style is `#E9D6A8` with inset `0 -2px 0 #CDB884` and outline `0 0 0 2px #C08324`.
    - The sun's arc position follows today's minutes against the budget.
    - A white panel sits on the scene: 16px margin, max-width 52% (66% when the card is under 760px), radius 18. It contains:
@@ -197,8 +197,8 @@ The file pages inside the viewer (PDF, slides, photos, markdown) are typeset moc
   - the 7 day columns align with the grid below
   - day 0 is a sailboat labelled "You · today"
   - days 1–5 are bobbing red and white buoys
-  - the exam day is a rock island with a striped lighthouse, a blinking lamp and a beam
-  - the whale swims from today toward the lighthouse and spouts every ~6 seconds
+  - the exam day is a rock island with a striped lighthouse, a lamp that breathes from deep to pale yellow, and a beam that fades in as it brightens
+  - the whale swims from today toward the lighthouse, dives a little every 7 seconds and spouts as it surfaces
   - a plank sign reads "Midterm / Thu, Oct 29"
 - **Proposal card:** `#EEF8FC`, 1px `#C7E5F2`.
   - Eyebrow "YOUR PLAN NEEDS A DECISION" in `#1F6E92`.
@@ -224,9 +224,9 @@ The file pages inside the viewer (PDF, slides, photos, markdown) are typeset moc
 - Right side: a sky card `#D7E8F1` with a large pixel tree and the caption "Understanding takes root".
 
 ## Interactions and state
-- **Animation:** a 450ms tick drives clouds, waves, the boat, the whale, the flag and the lighthouse.
-  - Respect `prefers-reduced-motion`: draw once and don't run the tick.
-  - Messages and cards rise in over 240ms (`translateY(8px)` → 0).
+- **Animation:** each scene draws what stays still once, and its moving sprites (clouds, wave glints, the boat, the buoys, the whale, the flag and the lighthouse) move on eased Bézier loops, with each offset rounded to a whole device pixel so the edges stay crisp. This replaced an earlier 450ms tick that moved them in steps. The curves and durations are in `design/visual-design.md`, "Motion".
+  - Respect `prefers-reduced-motion`: draw once and leave every sprite at rest.
+  - Messages and cards rise in over 240ms (`translateY(8px)` → 0) on the entrance curve.
   - Toasts appear at bottom centre for about 2.6s, using `#1F3A2B` or dark.
 - **Canvas sizing:** canvases measure their wrapper with ResizeObserver and redraw at integer cells × devicePixelRatio.
 - **Hit-testing:** grove and forest hits are tested in cell space (nearest leaf within about 5 cells).

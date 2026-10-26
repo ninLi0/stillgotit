@@ -285,5 +285,5 @@ onBeforeUnmount(reset);
 .time{border:0;background:none;padding:0;color:var(--sand-soft-text);font-size:12px;font-weight:600;text-decoration:underline;text-underline-offset:3px}.unavailable p{margin:0 0 8px}
 .viewer-error{margin:6px 0;padding:8px 10px;border-left:3px solid var(--error);background:#FFFFFF;font-size:13px}.viewer-problem .small-button{margin-bottom:4px}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
-@media (prefers-reduced-motion:no-preference){.chevron{transition:transform 120ms}}
+.chevron{transition:transform var(--dur-quick) var(--ease-move)}
 </style>

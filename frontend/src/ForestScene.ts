@@ -1,8 +1,8 @@
 // The Forest view's pixel scene (design/revamp/README.md, "Forest view"): the layout in cell units, hit-testing, and
-// three drawing layers. The sky and sun never move; the clouds drift on the animation tick; the land holds the
-// mountains, pines, grass, path, topic trees and bushes, and changes only when the selection, hover or topic changes.
-// The caller owns the canvases and passes the device-pixel size of one cell, so every cell lands on whole device
-// pixels and stays crisp.
+// three layers. The sky and sun never move; the clouds are sprites between the sky and the land that drift on an eased
+// loop (ForestView.vue, scene-motion.ts); the land holds the mountains, pines, grass, path, topic trees and bushes,
+// and changes only when the selection, hover or topic changes. The caller owns the canvases and passes the
+// device-pixel size of one cell, so every cell lands on whole device pixels and stays crisp.
 import { PAL, SPRITES, genTree, hash, rng, stageOf, type Segment } from "./pixel-art.ts";
 import type { ViewSkill, ViewUnit } from "./revamp-types.ts";
 
@@ -117,13 +117,14 @@ export function drawSky(ctx: CanvasRenderingContext2D, layout: ForestLayout, px:
   disc(sx, sy, 8, "#F9E3A8"); disc(sx, sy, 6, "#F3CD7A"); disc(sx, sy, 4, "#E3A233"); cell(sx - 2, sy - 2, "#F9E3A8");
 }
 
-/** Clouds drifting right at a few speeds; `tick` advances every 450ms. */
-export function drawClouds(ctx: CanvasRenderingContext2D, layout: ForestLayout, px: number, tick: number) {
-  const { rect } = painter(ctx, px), { Wc, G } = layout, R = rng(11);
+/** Where each cloud sits, in cells, and how wide it is, from a fixed seed so the clouds keep their places. */
+export function cloudPlaces(layout: ForestLayout): { x: number; y: number; w: number }[] {
+  const { Wc, G } = layout, R = rng(11), out: { x: number; y: number; w: number }[] = [];
   for (let i = 0; i < Math.max(4, Math.floor(Wc / 45)); i++) {
-    const cw = 10 + Math.floor(R() * 12), cx = Math.floor((R() * Wc + tick * (0.25 + (i % 3) * 0.12)) % (Wc + 40)) - 20, cy = 4 + Math.floor(R() * G * 0.3);
-    rect(cx, cy, cw, 2, "#FFFFFF"); rect(cx + 3, cy - 1, Math.max(3, cw - 7), 1, "#FFFFFF"); rect(cx + 1, cy + 2, cw - 2, 1, "#EEF5F9");
+    const w = 10 + Math.floor(R() * 12), x = Math.floor(R() * Wc) - 20, y = 4 + Math.floor(R() * G * 0.3);
+    out.push({ x, y, w });
   }
+  return out;
 }
 
 /** Everything in front of the clouds: two mountain layers, ambient pines, grass, the path, the topic trees and the

@@ -4,9 +4,10 @@ import CourseProgress from "./CourseProgress.vue";
 import InfoBubble from "./InfoBubble.vue";
 import MasteryCells from "./MasteryCells.vue";
 import PixelIcon from "./PixelIcon.vue";
-import { drawClouds, drawLand, drawSky, hitForest, layoutForest, plotX, type ForestLayout, type ForestLeaf } from "./ForestScene.ts";
+import { cloudPlaces, drawLand, drawSky, hitForest, layoutForest, plotX, type ForestLayout, type ForestLeaf } from "./ForestScene.ts";
 import { focusedControl } from "./focus.ts";
-import { stageOf, type Stage } from "./pixel-art.ts";
+import { rng, stageOf, type Stage } from "./pixel-art.ts";
+import { cloudDrift, cloudRects, snapStyle, sprite, type Sprite } from "./scene-motion.ts";
 import type { ForestProps, ViewSkill, ViewUnit } from "./revamp-types.ts";
 
 // The course forest (design/revamp/README.md, "Forest view"): a full-screen overlay with one pixel tree per topic.
@@ -113,8 +114,16 @@ const canvasLabel = computed(() => (empty.value
   ? "An empty meadow. No topics have skills yet."
   : `Course forest with ${plural(units.value.length, "topic")} and ${plural(skills.value.length, "skill")}. Every skill is also listed under Topics.`));
 
-// Three layers: the sky and sun (static), the clouds (drawn straight onto the visible canvas each tick), and the land.
-let skyLayer: HTMLCanvasElement | null = null, landLayer: HTMLCanvasElement | null = null, tick = 0;
+// Three layers, back to front: the sky and sun on their own canvas, the clouds as SVG sprites that drift on an eased
+// loop (scene-motion.ts), and the land on the canvas that takes the pointer. Only the land is drawn again when the
+// selection, hover or topic changes. Under prefers-reduced-motion the clouds stay where they are drawn.
+const sky = ref<HTMLCanvasElement | null>(null);
+const clouds = computed<Sprite[]>(() => {
+  const L = layout.value;
+  if (!L) return [];
+  const M = rng(111), c = cell.value;
+  return cloudPlaces(L).map((p, i) => { const { drift, shift } = cloudDrift(M, c); return sprite(`cloud-${i}`, p.x - shift, p.y, c, cloudRects(p.w, "#EEF5F9", 3, 7), drift); });
+});
 function prepare(target: HTMLCanvasElement, L: ForestLayout): CanvasRenderingContext2D | null {
   const w = L.Wc * cellPx.value, h = L.Hc * cellPx.value;
   if (target.width !== w || target.height !== h) { target.width = w; target.height = h; }
@@ -126,30 +135,18 @@ function prepare(target: HTMLCanvasElement, L: ForestLayout): CanvasRenderingCon
   return ctx;
 }
 function paintSky() {
-  const L = layout.value;
-  if (!L) return;
-  skyLayer ??= document.createElement("canvas");
-  const ctx = prepare(skyLayer, L);
+  const L = layout.value, target = sky.value;
+  if (!L || !target) return;
+  const ctx = prepare(target, L);
   if (ctx) drawSky(ctx, L, cellPx.value);
 }
 function paintLand() {
-  const L = layout.value;
-  if (!L) return;
-  landLayer ??= document.createElement("canvas");
-  const ctx = prepare(landLayer, L);
+  const L = layout.value, target = canvas.value;
+  if (!L || !target) return;
+  const ctx = prepare(target, L);
   if (ctx) drawLand(ctx, L, cellPx.value, { design: props.design, selected: props.selected ?? null, hover: hover.value, topic: topic.value });
 }
-function compose() {
-  const L = layout.value, target = canvas.value;
-  if (!L || !target || !skyLayer || !landLayer) return;
-  const ctx = prepare(target, L);
-  if (!ctx) return;
-  ctx.drawImage(skyLayer, 0, 0);
-  drawClouds(ctx, L, cellPx.value, tick);
-  ctx.drawImage(landLayer, 0, 0);
-}
-function paintAll() { paintSky(); paintLand(); compose(); }
-function repaintLand() { paintLand(); compose(); }
+function paintAll() { paintSky(); paintLand(); }
 
 let revealed = false;
 watch(layout, () => {
@@ -159,7 +156,7 @@ watch(layout, () => {
 }, { flush: "post" });
 // A changed estimate or due flag keeps the same layout but changes the sprites.
 watch(() => props.units, paintAll, { deep: true, flush: "post" });
-watch([() => props.selected, hover, topic], repaintLand, { flush: "post" });
+watch([() => props.selected, hover, topic], paintLand, { flush: "post" });
 
 function measure() {
   const el = scroller.value;
@@ -227,29 +224,20 @@ function onTrap(event: KeyboardEvent) {
   else if (!event.shiftKey && active === last) { event.preventDefault(); first.focus(); }
 }
 
-let observer: ResizeObserver | null = null, timer: ReturnType<typeof setInterval> | undefined;
+let observer: ResizeObserver | null = null;
+// Reduced motion also makes scrolling to a leaf jump instead of glide.
 const motion = typeof window !== "undefined" && window.matchMedia ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
-function startTick() {
-  if (timer !== undefined) { clearInterval(timer); timer = undefined; }
-  // With reduced motion the scene is drawn once and the clouds stay put.
-  if (motion?.matches) return;
-  timer = setInterval(() => { tick++; compose(); }, 450);
-}
 
 onMounted(() => {
   measure();
   if (scroller.value) { observer = new ResizeObserver(measure); observer.observe(scroller.value); }
   window.addEventListener("resize", measure);
-  startTick();
-  motion?.addEventListener("change", startTick);
   document.addEventListener("keydown", onKey, true);
   nextTick(() => title.value?.focus());
 });
 onBeforeUnmount(() => {
   observer?.disconnect();
   window.removeEventListener("resize", measure);
-  if (timer !== undefined) clearInterval(timer);
-  motion?.removeEventListener("change", startTick);
   document.removeEventListener("keydown", onKey, true);
 });
 onUnmounted(() => {
@@ -278,7 +266,11 @@ onUnmounted(() => {
     <div class="forest-body">
       <div class="forest-scene">
         <div ref="scroller" class="forest-scroll">
-          <div class="forest-stage" :style="stageStyle">
+          <div class="forest-stage" :style="[stageStyle, snapStyle(view.dpr)]">
+            <canvas ref="sky" class="forest-sky" :style="canvasStyle" aria-hidden="true" />
+            <svg v-if="layout" class="forest-clouds" :width="layout.Wc * cell" :height="layout.Hc * cell" shape-rendering="crispEdges" aria-hidden="true" focusable="false">
+              <g v-for="s in clouds" :key="s.key" :transform="s.at"><g class="drift" :style="s.motion"><rect v-for="(r, i) in s.rects" :key="i" v-bind="r" /></g></g>
+            </svg>
             <canvas ref="canvas" class="forest-canvas" :class="{ pointing }" :style="canvasStyle" role="img" :aria-label="canvasLabel"
               @click="onClick" @mousemove="onMove" @mouseleave="onLeave" />
             <button v-for="s in signs" :key="s.unit" type="button" class="forest-sign" :class="{ on: topic === s.unit }" :style="s.style"
@@ -362,7 +354,8 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.forest { position: fixed; inset: 0; z-index: 55; display: flex; flex-direction: column; gap: 12px; padding: 14px; background: #FFFFFF; color: var(--ink); font-family: var(--font-body); overflow-y: auto; overscroll-behavior: contain; }
+/* The forest opens like the app's dialogs, with a short scale and fade. */
+.forest { position: fixed; inset: 0; z-index: 55; display: flex; flex-direction: column; gap: 12px; padding: 14px; background: #FFFFFF; color: var(--ink); font-family: var(--font-body); overflow-y: auto; overscroll-behavior: contain; animation: sgOpen var(--dur-enter) var(--ease-enter); }
 .forest:focus { outline: none; }
 
 /* Header */
@@ -382,7 +375,9 @@ onUnmounted(() => {
 .forest-scene { position: relative; min-height: 0; border-radius: 24px; overflow: hidden; background: #CFE3EE; box-shadow: 0 18px 25px rgba(20, 20, 20, .08); }
 .forest-scroll { position: absolute; inset: 0; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; }
 .forest-stage { position: relative; overflow: hidden; }
-.forest-canvas { position: absolute; left: 0; top: 0; display: block; image-rendering: pixelated; }
+.forest-sky, .forest-canvas { position: absolute; left: 0; top: 0; display: block; image-rendering: pixelated; }
+.forest-sky, .forest-clouds { pointer-events: none; }
+.forest-clouds { position: absolute; left: 0; top: 0; overflow: hidden; }
 .forest-canvas.pointing { cursor: pointer; }
 .forest-sign { position: absolute; z-index: 2; width: max-content; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 5px 12px 6px; border: 0; border-radius: 0; background: #E9D6A8; box-shadow: inset 0 -2px 0 #CDB884, 0 0 0 2px #C08324, 0 6px 0 -1px rgba(20, 20, 20, .12); text-align: center; }
 .forest-sign:hover { background: #F3E3BC; }
@@ -396,7 +391,7 @@ onUnmounted(() => {
 .forest-aside { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 20px; border-radius: 24px; background: #FFFFFF; box-shadow: 0 18px 25px rgba(20, 20, 20, .07); }
 
 /* Selected skill */
-.forest-card { margin: -4px -4px 18px; padding: 16px; border-radius: 18px; background: var(--inset-2); animation: forestRise .24s ease-out; }
+.forest-card { margin: -4px -4px 18px; padding: 16px; border-radius: 18px; background: var(--inset-2); animation: sgRise var(--dur-enter) var(--ease-enter); }
 .card-top { display: flex; align-items: center; gap: 12px; }
 .card-sprite { flex: none; display: grid; place-items: center; width: 48px; height: 48px; border-radius: 14px; background: #FFFFFF; }
 .card-names { min-width: 0; }
@@ -439,7 +434,6 @@ onUnmounted(() => {
 .forest-plant:hover { background: var(--inset); }
 
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
-@keyframes forestRise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
 @media (max-width: 1099px) {
   .forest-body { grid-template-columns: minmax(0, 1fr) 280px; }
@@ -450,8 +444,5 @@ onUnmounted(() => {
   .forest-body { flex: none; display: flex; flex-direction: column; min-height: 0; }
   .forest-scene { flex: none; height: 420px; }
   .forest-aside { overflow: visible; padding: 16px; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .forest-card { animation: none; }
 }
 </style>

@@ -3,13 +3,22 @@ import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import PixelIcon from "./PixelIcon.vue";
 import { CHART, KIND_MARKS, KIND_NAMES, layoutChart, type ChartPoint } from "./estimate-chart.ts";
 import { planDay } from "./labels.ts";
+import { readCurve, timeToReach } from "./motion.ts";
 import { MARKS, PAL, iconRects, ringOf, type MarkName } from "./pixel-art.ts";
 
 // The estimate over time (design/visual-design.md, "Charts and summaries"). A stepped line in the mastery green runs
 // from the starting point through every change to now; time without practice lowers it in falling stairs. Markers
 // show the starting point, each assessed attempt and each adjustment. Each marker is a button whose label says what
 // its tooltip shows, and a visually hidden table lists every row, so nothing is reachable only by pointing.
+// When the chart appears (the evidence opening), the line draws itself from the starting point to today on the
+// entrance curve, and each marker and the value now appear as the line reaches them (design/visual-design.md,
+// "Motion"). Nothing in the chart moves after that.
 const props = defineProps<{ points: ChartPoint[]; provisional: boolean; labelledby?: string }>();
+
+// When, as a share of the draw duration, the line arrives at a marker. The line's last few pixels land so softly that
+// a marker waiting for them would look late, so a marker at the very end appears when 98% of the line is drawn.
+const entrance = readCurve("--ease-enter");
+function arrives(reach: number) { return { "--arrive": timeToReach(entrance, Math.min(reach, 0.98)).toFixed(3) }; }
 
 const box = ref<HTMLElement | null>(null);
 const width = ref(260);
@@ -96,12 +105,14 @@ onBeforeUnmount(() => { observer?.disconnect(); document.removeEventListener("po
         <rect v-for="t in layout.ticks" :key="`line-${t.value}`" class="rule" :x="layout.plot.left" :y="t.y" :width="layout.plot.right - layout.plot.left" height="1" />
         <rect class="rule" :x="layout.plot.left" :y="layout.plot.bottom" :width="layout.plot.right - layout.plot.left" height="1" />
         <text v-for="t in layout.ticks" :key="`label-${t.value}`" class="tick" :x="layout.plot.left - 6" :y="t.y + 4" text-anchor="end">{{ t.value }}%</text>
-        <path class="line" :d="layout.path" :stroke="PAL.m" />
+        <path class="line" :d="layout.path" :stroke="PAL.m" pathLength="1" />
         <g v-for="m in layout.markers" :key="m.index" class="marker" :class="{ on: active === m.index }" :transform="`translate(${m.x - 5} ${m.y - 5})`">
-          <g class="ring" transform="translate(-2 -2)"><rect v-for="(r, i) in glyphs[KIND_MARKS[m.point.kind]].ring" :key="i" :x="r.x" :y="r.y" :width="r.w" height="1" :fill="r.fill" /></g>
-          <rect v-for="(r, i) in glyphs[KIND_MARKS[m.point.kind]].mark" :key="`m${i}`" :x="r.x" :y="r.y" :width="r.w" height="1" :fill="r.fill" />
+          <g class="arrive" :style="arrives(m.reach)">
+            <g class="ring" transform="translate(-2 -2)"><rect v-for="(r, i) in glyphs[KIND_MARKS[m.point.kind]].ring" :key="i" :x="r.x" :y="r.y" :width="r.w" height="1" :fill="r.fill" /></g>
+            <rect v-for="(r, i) in glyphs[KIND_MARKS[m.point.kind]].mark" :key="`m${i}`" :x="r.x" :y="r.y" :width="r.w" height="1" :fill="r.fill" />
+          </g>
         </g>
-        <text class="now" :x="layout.end.x + 10" :y="layout.end.y + 4">{{ percent(layout.end.value) }}</text>
+        <text class="now arrive" :style="arrives(1)" :x="layout.end.x + 10" :y="layout.end.y + 4">{{ percent(layout.end.value) }}</text>
         <text class="day" :x="layout.plot.left + CHART.inset - 4" :y="layout.axisY">{{ dates.first }}</text>
         <text v-if="dates.last" class="day" :x="layout.end.x + 4" :y="layout.axisY" text-anchor="end">{{ dates.last }}</text>
       </svg>
@@ -135,7 +146,9 @@ onBeforeUnmount(() => { observer?.disconnect(); document.removeEventListener("po
 .rule{fill:var(--ring)}
 .tick,.day{font-size:11px;fill:var(--muted)}
 .now{font-size:12px;font-weight:700;fill:var(--ink)}
-.line{fill:none;stroke-width:2;stroke-linecap:square;stroke-linejoin:miter}
+.line{fill:none;stroke-width:2;stroke-linecap:square;stroke-linejoin:miter;animation:sgDraw var(--dur-draw) var(--ease-enter)}
+/* Markers and the value now fade in as the line reaches them; --arrive is that moment as a share of the draw. */
+.arrive{animation:sgFade var(--dur-quick) var(--ease-enter) calc(var(--dur-draw) * var(--arrive, 0)) both}
 .marker.on .ring rect{fill:var(--dawn-soft)}
 .hit{position:absolute;padding:0;border:0;border-radius:4px;background:transparent;cursor:default}
 .tip{position:absolute;z-index:3;display:flex;flex-direction:column;gap:1px;width:max-content;max-width:180px;padding:7px 10px;border-radius:10px;background:#1C1C1D;color:#FFFFFF;font-size:12px;line-height:1.35;transform:translate(-50%,-100%);pointer-events:none;box-shadow:0 10px 24px rgba(0,0,0,.22)}

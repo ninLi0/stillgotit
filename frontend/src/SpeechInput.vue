@@ -46,6 +46,6 @@ watch(() => props.active, (active) => { if (active === false && recorder?.state 
 .compact .record-button:hover:not(:disabled){border-color:rgba(20,20,20,.35);color:var(--ink)}
 .speak-square{width:8px;height:8px;flex:none;background:#C0503C}
 .compact .record-button.recording{background:var(--coral-wash);border-color:var(--coral);color:var(--coral-text)}
-.compact .record-button.recording .speak-square{animation:sgBlink .9s steps(2,start) infinite}
-@keyframes sgBlink{to{visibility:hidden}}
+/* While recording, the square pulses on the loop curve. */
+.compact .record-button.recording .speak-square{animation:sgPulse var(--loop-beat) var(--ease-loop) infinite}
 </style>

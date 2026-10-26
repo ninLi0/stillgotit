@@ -43,8 +43,6 @@ onBeforeUnmount(() => { document.removeEventListener("click", onDocumentClick, t
 .info-wrap { position: relative; display: inline-flex; align-items: center; }
 .info-button { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 8px; background: transparent; }
 .info-button:hover { background: #F1F1EE; }
-.info-bubble { position: absolute; top: calc(100% + 6px); left: 0; z-index: 40; width: 260px; padding: 10px 12px; border-radius: 12px; background: #1C1C1D; color: #fff; font-size: 12px; line-height: 1.5; box-shadow: 0 10px 24px rgba(0, 0, 0, .22); animation: sgRise .24s ease-out; }
+.info-bubble { position: absolute; top: calc(100% + 6px); left: 0; z-index: 40; width: 260px; padding: 10px 12px; border-radius: 12px; background: #1C1C1D; color: #fff; font-size: 12px; line-height: 1.5; box-shadow: 0 10px 24px rgba(0, 0, 0, .22); animation: sgRise var(--dur-enter) var(--ease-enter); }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
-@keyframes sgRise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-@media (prefers-reduced-motion: reduce) { .info-bubble { animation: none; } }
 </style>

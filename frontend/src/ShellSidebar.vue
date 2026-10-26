@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 import PixelIcon from "./PixelIcon.vue";
 import type { IconName } from "./pixel-art.ts";
+import { useSlidingMark } from "./sliding-mark.ts";
 
 // The app's sidebar (design/revamp/README.md): brand, course switcher (the slot, owned by App.vue), the nav rows with
 // their biome capsules and badges, and at the bottom the Today card, the tutor model row and Settings. Under 760px it
@@ -24,6 +25,18 @@ function isCurrent(row: Row) {
   return row.view === "home" ? props.view === "home" || props.view === "chat" : props.view === row.view;
 }
 function go(row: Row) { if (row.view === "forest") emit("forest"); else emit("navigate", row.view); }
+// The current row's capsule is one element that slides to the next current row on the move curve and takes on its
+// biome's tint on the way, instead of each row painting its own background.
+const nav = ref<HTMLElement | null>(null);
+const current = computed(() => rows.value.find(isCurrent) ?? null);
+const capsule = useSlidingMark(nav, ".nav-row.current");
+const capsuleStyle = computed(() => {
+  const b = capsule.box.value;
+  return b ? { transform: `translate(${b.x}px, ${b.y}px)`, width: `${b.w}px`, height: `${b.h}px` } : { display: "none" };
+});
+watch(() => current.value?.view, (now, before) => { void capsule.place(!!now && !!before); });
+// A lesson row appearing or leaving moves the rows under it, and the capsule with them.
+watch(() => props.lessonTitle, () => { void capsule.place(true); });
 const cells = computed(() => {
   const t = props.today; const on = t && t.total > 0 ? Math.round(Math.min(1, t.spent / t.total) * 15) : 0;
   return Array.from({ length: 15 }, (_, i) => i < on);
@@ -34,7 +47,8 @@ const cells = computed(() => {
   <aside class="shell-sidebar">
     <div class="brand"><PixelIcon name="leaf" :size="24" /><span class="brand-name">StillGotIt</span></div>
     <slot name="switcher" />
-    <nav class="nav" aria-label="Study views">
+    <nav ref="nav" class="nav" aria-label="Study views">
+      <span class="nav-capsule" :class="[current?.biome, { sliding: capsule.sliding.value }]" :style="capsuleStyle" data-mark aria-hidden="true" />
       <template v-for="row in rows" :key="row.view">
         <button type="button" class="nav-row" :class="[row.biome, { current: isCurrent(row) }]" :aria-current="isCurrent(row) ? 'page' : undefined" @click="go(row)">
           <PixelIcon :name="row.icon" :size="24" /><span class="nav-label">{{ row.label }}</span>
@@ -62,13 +76,16 @@ const cells = computed(() => {
 .shell-sidebar { display: flex; flex-direction: column; gap: 14px; padding: 20px 12px 14px 14px; min-width: 0; position: sticky; top: 0; height: 100dvh; overflow-y: auto; }
 .brand { display: flex; align-items: center; gap: 8px; padding: 0 6px; }
 .brand-name { font: 500 20px var(--font-display); color: var(--ink); }
-.nav { display: flex; flex-direction: column; gap: 4px; }
-.nav-row { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 42px; padding: 0 12px 0 10px; border: 0; border-radius: 999px; background: transparent; color: var(--soft); font-size: 15px; font-weight: 600; text-align: left; }
+.nav { position: relative; display: flex; flex-direction: column; gap: 4px; }
+.nav-row { position: relative; display: flex; align-items: center; gap: 10px; width: 100%; min-height: 42px; padding: 0 12px 0 10px; border: 0; border-radius: 999px; background: transparent; color: var(--soft); font-size: 15px; font-weight: 600; text-align: left; }
 .nav-row:hover { background: var(--inset-2); color: var(--ink); }
-.nav-row.current { color: var(--ink); font-weight: 700; }
-.nav-row.current.meadow { background: var(--meadow-nav); }
-.nav-row.current.ocean { background: var(--ocean-nav); }
-.nav-row.current.sand { background: var(--sand-nav); }
+/* The current row shows the capsule behind it, so it paints no background of its own, even under the pointer. */
+.nav-row.current, .nav-row.current:hover { background: transparent; color: var(--ink); font-weight: 700; }
+.nav-capsule { position: absolute; left: 0; top: 0; border-radius: 999px; pointer-events: none; }
+.nav-capsule.sliding { transition: transform var(--dur-move) var(--ease-move), width var(--dur-move) var(--ease-move), height var(--dur-move) var(--ease-move), background-color var(--dur-move) var(--ease-move); }
+.nav-capsule.meadow { background: var(--meadow-nav); }
+.nav-capsule.ocean { background: var(--ocean-nav); }
+.nav-capsule.sand { background: var(--sand-nav); }
 .nav-label { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .badge { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--coral); color: #fff; font-size: 12px; font-weight: 700; }
 .nav-row.current .badge { background: #fff; color: var(--coral); }
