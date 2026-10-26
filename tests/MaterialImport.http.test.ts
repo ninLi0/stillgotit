@@ -226,7 +226,7 @@ describe("Uploading", () => {
   });
 
   test("an upload that runs out of time answers UPLOAD_TIMEOUT, and a retry continues from saved progress", async () => {
-    const app = await setup({ limits: { uploadBudgetMs: 300 } }), learner = app.browser(), { course } = await learner.signIn("maya");
+    const app = await setup({ limits: { uploadBudgetMs: 1500 } }), learner = app.browser(), { course } = await learner.signIn("maya");
     const gate = Promise.withResolvers<void>(), requestId = randomUUID();
     app.store.gate = gate.promise;
     expect(await learner.post("/courses/materials/add", form(course, [notes()], { requestId }))).toEqual({ status: 400, body: { error: "UPLOAD_TIMEOUT", detail: UPLOAD_TIMEOUT } });
