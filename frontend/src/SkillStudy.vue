@@ -682,10 +682,11 @@ button.mastery-chip:hover{border-color:#C9C1F0}
 .rail{border-left:1px solid #EEEAF7;background:#FAF9FE;overflow-y:auto;overflow-x:hidden;padding:16px 14px;display:flex;flex-direction:column;gap:10px;min-height:0}
 /* On narrow screens the rail slides in over the lesson on the move curve and its backdrop fades in. Where the browser
    can keep a hidden element drawn while it transitions (transition-behavior: allow-discrete), both also leave the same
-   way; elsewhere they disappear at once. */
-.narrow .rail{position:absolute;top:0;right:0;bottom:0;width:312px;max-width:100%;z-index:20;box-shadow:-12px 0 32px rgba(20,20,20,.12);animation:sgSlide var(--dur-move) var(--ease-move);transition:transform var(--dur-move) var(--ease-move),opacity var(--dur-move) var(--ease-move),display var(--dur-move) allow-discrete}
+   way; elsewhere they disappear at once. These rules name the rail as the lesson's own child (.narrow > .rail): the
+   Taught from list's root also has the class "rail" and this component's scope, and must not become a second overlay. */
+.narrow>.rail{position:absolute;top:0;right:0;bottom:0;width:312px;max-width:100%;z-index:20;box-shadow:-12px 0 32px rgba(20,20,20,.12);animation:sgSlide var(--dur-move) var(--ease-move);transition:transform var(--dur-move) var(--ease-move),opacity var(--dur-move) var(--ease-move),display var(--dur-move) allow-discrete}
 .rail[hidden]{display:none}
-.narrow .rail[hidden]{transform:translateX(24px);opacity:0}
+.narrow>.rail[hidden]{transform:translateX(24px);opacity:0}
 .rail-backdrop{position:absolute;inset:0;z-index:19;background:rgba(21,21,21,.28);animation:sgFade var(--dur-move) var(--ease-move);transition:opacity var(--dur-move) var(--ease-move),display var(--dur-move) allow-discrete}
 .rail-backdrop[hidden]{display:none;opacity:0;pointer-events:none}
 .rail-close{position:sticky;top:-16px;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:8px;margin:-16px -14px 0;padding:12px 12px 8px 16px;background:#FAF9FE}
