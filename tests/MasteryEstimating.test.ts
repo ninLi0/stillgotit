@@ -116,6 +116,28 @@ describe("MasteryEstimating", () => {
       .toEqual([{ id: track, inputs: 3, adjustments: [{ adjustment: adjusted, value: 60, reason: reviewed, at: at(62) }], value: 95, ready: true }]);
   });
 
+  test("_policy reports the policy's settings and _withoutPractice gives the decay a track's estimate follows between events", async () => {
+    const { mastery, estimate, setDay } = setup();
+    expect(await mastery._policy()).toEqual({ policy: "prototype-1", halfLifeDays: 60, readinessMinimum: 70, readinessDays: 14 });
+    // The same decay as a track left alone, from any starting value, with no track and no stored state.
+    await mastery.initialize({ ...sam, confidence: 90, basis: "SELF_REPORTED" });
+    for (const days of [0, 1, 3, 7, 14, 30, 60, 90, 180]) {
+      const { value } = await mastery._withoutPractice({ confidence: 90, days });
+      expect(value).toBeCloseTo((await estimate(days)).value, 9);
+      expect(value).toBeCloseTo(decay(90, days), 9);
+    }
+    expect(await mastery._withoutPractice({ confidence: 100, days: 60 })).toEqual({ value: 50 });
+    // Out-of-range input is clamped, and input that is not a number answers 0.
+    expect(await mastery._withoutPractice({ confidence: 140, days: -5 })).toEqual({ value: 100 });
+    expect(await mastery._withoutPractice({ confidence: -3, days: 10 })).toEqual({ value: 0 });
+    expect(await mastery._withoutPractice({ confidence: Number.NaN, days: 10 })).toEqual({ value: 0 });
+    expect(await mastery._withoutPractice({ confidence: 80, days: Number.POSITIVE_INFINITY })).toEqual({ value: 0 });
+    // Both queries read no state: the track's estimate is unchanged, and a later day changes neither answer.
+    setDay(30);
+    expect(await mastery._withoutPractice({ confidence: 90, days: 0 })).toEqual({ value: 90 });
+    expect((await mastery._policy()).halfLifeDays).toBe(60);
+  });
+
   test("work done before setup calibrates the estimate from the attempt's date", async () => {
     const { mastery, estimate, setDay } = setup();
     setDay(10);

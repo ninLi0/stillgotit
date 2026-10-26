@@ -230,6 +230,20 @@ export type StillGotItWire = {
     output: Record<string, never>;
     error: { error: AppWideError | "COURSE_RESTORE_UNAVAILABLE" | "COURSE_UNAVAILABLE" | "DEADLINE_TRADEOFF_CONFIRMATION_REQUIRED" | "INVALID_INPUT" | "INVALID_PLAN_INPUT" | "NOT_SIGNED_IN" | "PLAN_PREFERENCES_UNAVAILABLE" | "PLAN_SESSION_IN_PROGRESS" | "ROUTINE_PLAN_OUTDATED" | "ROUTINE_PLAN_UNAVAILABLE" | "ROUTINE_SESSION_IN_PROGRESS" };
   };
+  "/courses/scores": {
+    input: {
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+    };
+    output: {
+      "courses": {
+        "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_map"]>[0], ["course"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_courses"]>>>, ["course"]>]>>;
+        "estimated": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["courseScore"]["fn"]>>, ["estimated"]>>;
+        "score": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["courseScore"]["fn"]>>, ["score"]>>;
+        "skills": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["courseScore"]["fn"]>>, ["skills"]>>;
+      }[];
+    };
+    error: { error: AppWideError | "INVALID_INPUT" | "NOT_SIGNED_IN" };
+  };
   "/courses/skills/archive": {
     input: {
       "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
@@ -514,6 +528,36 @@ export type StillGotItWire = {
       };
     };
     error: { error: AppWideError | "GENERATION_FAILED" | "INVALID_INPUT" | "INVALID_LESSON_CONTENT" | "INVALID_LESSON_SOURCES" | "NOT_SIGNED_IN" | "SKILL_CHANGED" | "SKILL_UNAVAILABLE" };
+  };
+  "/learning/memory": {
+    input: {
+      "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_units"]>[0], ["course"]>]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+    };
+    output: {
+      "asOf": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["memoryInstants"]["fn"]>>, ["d0"]>>;
+      "policy": {
+        "halfLifeDays": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_policy"]>>>, ["halfLifeDays"]>>;
+        "policy": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_policy"]>>>, ["policy"]>>;
+        "readinessDays": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_policy"]>>>, ["readinessDays"]>>;
+        "reference": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["referenceCurve"]["fn"]>>, []>>;
+        "reviewThreshold": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_policy"]>>>, ["readinessMinimum"]>>;
+      };
+      "skills": ({
+        "belowNow": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["memoryCurve"]["fn"]>>, ["belowNow"]>> | null;
+        "estimate": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["memoryCurve"]["fn"]>>, ["estimate"]>> | null;
+        "leftAlone": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["leftAlonePath"]["fn"]>>, []>> | null;
+        "projection": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["memoryCurve"]["fn"]>>, ["projection"]>> | null;
+        "reviewBy": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["memoryCurve"]["fn"]>>, ["reviewBy"]>> | null;
+        "skill": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_estimate"]>[0], ["subject"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_explanation"]>[0], ["subject"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_track"]>[0], ["subject"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_skills"]>>>, ["skill"]>]>>;
+        "startedAt": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_track"]>>>, ["initializedAt"]>> | null;
+        "startingConfidence": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_withoutPractice"]>[0], ["confidence"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_track"]>>>, ["initialConfidence"]>]>> | null;
+        "title": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_skills"]>>>, ["title"]>>;
+        "unit": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_skills"]>[0], ["unit"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_units"]>>>, ["unit"]>]>>;
+        "unitTitle": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_units"]>>>, ["title"]>>;
+      })[];
+    };
+    error: { error: AppWideError | "COURSE_UNAVAILABLE" | "INVALID_INPUT" | "NOT_SIGNED_IN" };
   };
   "/learning/progress": {
     input: {
@@ -1093,6 +1137,18 @@ export type StillGotItHttp = {
     output: Record<string, never>;
     error: { error: HttpAppWideError | "CONFLICT" | "FORBIDDEN" | "INVALID_REQUEST" | "UNAUTHORIZED" };
   };
+  "/courses/scores": {
+    input: Record<string, never>;
+    output: {
+      "courses": {
+        "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_map"]>[0], ["course"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_courses"]>>>, ["course"]>]>>;
+        "estimated": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["courseScore"]["fn"]>>, ["estimated"]>>;
+        "score": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["courseScore"]["fn"]>>, ["score"]>>;
+        "skills": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["courseScore"]["fn"]>>, ["skills"]>>;
+      }[];
+    };
+    error: { error: HttpAppWideError | "INVALID_REQUEST" | "UNAUTHORIZED" };
+  };
   "/courses/skills/archive": {
     input: {
       "skill": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["archive"]>[0], ["skill"]>>;
@@ -1355,6 +1411,35 @@ export type StillGotItHttp = {
       };
     };
     error: { error: HttpAppWideError | "CONFLICT" | "INVALID_REQUEST" | "UNAUTHORIZED" };
+  };
+  "/learning/memory": {
+    input: {
+      "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_units"]>[0], ["course"]>]>>;
+    };
+    output: {
+      "asOf": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["memoryInstants"]["fn"]>>, ["d0"]>>;
+      "policy": {
+        "halfLifeDays": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_policy"]>>>, ["halfLifeDays"]>>;
+        "policy": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_policy"]>>>, ["policy"]>>;
+        "readinessDays": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_policy"]>>>, ["readinessDays"]>>;
+        "reference": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["referenceCurve"]["fn"]>>, []>>;
+        "reviewThreshold": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_policy"]>>>, ["readinessMinimum"]>>;
+      };
+      "skills": ({
+        "belowNow": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["memoryCurve"]["fn"]>>, ["belowNow"]>> | null;
+        "estimate": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["memoryCurve"]["fn"]>>, ["estimate"]>> | null;
+        "leftAlone": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["leftAlonePath"]["fn"]>>, []>> | null;
+        "projection": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["memoryCurve"]["fn"]>>, ["projection"]>> | null;
+        "reviewBy": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["memoryCurve"]["fn"]>>, ["reviewBy"]>> | null;
+        "skill": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_estimate"]>[0], ["subject"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_explanation"]>[0], ["subject"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_track"]>[0], ["subject"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_skills"]>>>, ["skill"]>]>>;
+        "startedAt": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_track"]>>>, ["initializedAt"]>> | null;
+        "startingConfidence": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_withoutPractice"]>[0], ["confidence"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_track"]>>>, ["initialConfidence"]>]>> | null;
+        "title": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_skills"]>>>, ["title"]>>;
+        "unit": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_skills"]>[0], ["unit"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_units"]>>>, ["unit"]>]>>;
+        "unitTitle": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_units"]>>>, ["title"]>>;
+      })[];
+    };
+    error: { error: HttpAppWideError | "FORBIDDEN" | "INVALID_REQUEST" | "UNAUTHORIZED" };
   };
   "/learning/progress": {
     input: {

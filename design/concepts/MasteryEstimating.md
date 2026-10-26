@@ -163,4 +163,10 @@ _explanation(learner: Learner, subject: Subject, definition: Definition, at: Dat
 
 _progress(learner: Learner) : one (tracks: ProgressRows)
   Returns only this learner's tracks, each with its effective inputs, its manual adjustments in append order with their identity, value, reason, and at, and its estimate at the live concept clock, or an empty list. Reads no other concept.
+
+_policy() : one (policy: String, halfLifeDays: Number, readinessMinimum: Number, readinessDays: Number)
+  Returns the policy every estimate uses, prototype-1, with its halfLifeDays, readinessMinimum, and readinessDays, so a reader can show the settings without restating them. Reads no state.
+
+_withoutPractice(confidence: Number, days: Number) : one (value: Number)
+  Returns the value an estimate of confidence reaches after days days with no informative input and no adjustment: confidence * 2^(-days / halfLifeDays), the decay that replay applies between events. It belongs to no track, so a reader can draw the policy's curve from any starting value. Confidence is clamped to 0 through 100 and days below zero count as zero; a non-finite confidence or days answers 0. Reads no state.
 ```
