@@ -13,7 +13,7 @@
   --strong: #2A7B55; --strong-wash: #EEF7F1; --review-wash: #E3EEF3; --review-text: #2A6B85; --error: #A8412F;
   /* Grounds: the page, the cards on it, text fields, text and marks on a strong fill, and the dark tooltips. */
   --ground: #FFFFFF; --card: #FFFFFF; --field: #FFFFFF; --on-fill: #FFFFFF; --tip: #1C1C1D; --tip-text: #FFFFFF;
-  --inset-3: #ECECE9; --dim: #8A8A86; --disabled: #BDBDB8; --check-line: #BDBDB8; --branch: #DDDDD8; --focus: #151515;
+  --inset-3: #ECECE9; --dim: #767672; --disabled: #BDBDB8; --check-line: #8C8C88; --branch: #DDDDD8; --focus: #151515;
   --line-strong: rgba(20,20,20,.35); --line-faint: rgba(20,20,20,.05); --dash: rgba(20,20,20,.25);
   --backdrop: rgba(21,21,21,.35); --rail-shade: rgba(21,21,21,.28);
   /* The shadow color as three channels, so each shadow keeps its own strength: rgb(var(--shadow) / .08). */
@@ -32,14 +32,14 @@
   --estimate-eyebrow: #777094; --estimate-track: #E3DEF7; --estimate-imported: #A79CEE; --evidence-slate: #5C6B73; --evidence-violet: #5546B0;
   /* Marks: each kind of activity, the sun-yellow of practice and today, mastery cells and the plan's load cells */
   --mark-lesson: #2F7D9B; --mark-practice: #E3A233; --mark-review: #2F8A5F; --mark-prep: #D9663A; --mark-done: #BDBDB8;
-  --sun: #E3A233; --sun-off: #F1EBDA; --task-tag: #4A775A; --record: #C0503C; --file-tag: #B5502B; --link: #2A6B85;
+  --sun: #E3A233; --sun-off: #F1EBDA; --task-tag: #4A775A; --record: #C0503C; --file-tag: #A8412F; --link: #2A6B85;
   --mastery-on: #4A775A; --mastery-off: #E6E6E2; --mastery-off-soft: #F1F1EE; --load-on: #1E6F96; --load-off: #CFE7F2;
   /* The plan's items, load and exam marks, which float on the week's sea */
   --plan-review: #F4F4F1; --plan-done: #F4F4F2; --plan-item-line: rgba(13,63,88,.14); --plan-item-drop: rgba(13,63,88,.22); --plan-deferring: rgba(20,20,20,.4);
   --load-ground: rgba(255,255,255,.88); --load-text: #1E5B78; --exam: #1E6F96; --exam-edge: #15516E; --exam-ring: #0D3F58;
   /* The Materials viewer: its chrome, the pages the app draws, and PDF pages, which stay white */
   --viewer: #F3F3F0; --viewer-rail: #FAFAF8; --thumb-ring: #E2E2DE; --thumb-bar: #D9D9D4; --page: #FFFFFF; --page-ink: #1C1C1A; --pdf-page: #FFFFFF;
-  --slide-accent: #2F7D9B; --slide-title: #12333F; --slide-text: #2F3B40; --slide-foot: #8E9BA2; --stamp: #C0503C; --stamp-ground: rgba(255,255,255,.85);
+  --slide-accent: #2F7D9B; --slide-title: #12333F; --slide-text: #2F3B40; --slide-foot: #66737A; --stamp: #C0503C; --stamp-ground: rgba(255,255,255,.85);
   /* Scenes: the grounds behind each canvas, the plank signs, and the labels and chips laid over the art */
   --sky: #CFE3EE; --home-sky: #DDEFF3; --home-line: #DCEBE1; --sea: #9BD7EC; --sea-line: #CFE7F2; --lamp: #E3A233;
   --plank: #E9D6A8; --plank-edge: #CDB884; --plank-ring: #C08324; --plank-hover: #F3E3BC; --plank-today: #FFF1C9; --plank-today-edge: #E7C676; --plank-ink: #151515; --plank-soft: #4A4A48;

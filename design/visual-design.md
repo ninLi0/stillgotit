@@ -136,6 +136,7 @@ Text should reach 4.5:1 against its background, and outlines and cells that carr
 | Muted `#5F5F5C` on `#EEEBFF` | A skill's topic and "In 27 days" on a row brought forward | 5.48:1 |
 | White on `#1E6F96` | The exam day's plank on Plan | 5.57:1 |
 | `#A8412F` on `#FBE6DC` | Error messages and the Due today pill | 5.04:1 |
+| `#A8412F` on `#FBE6DC` | The FILE tag under a reply's sources | 5.04:1 |
 | `#8A5A12` on `#FBF0D6` | The New pill | 5.22:1 |
 | `#2A6B85` on `#E3EEF3` | The Review pill | 5.03:1 |
 | Green `#2A7B55` on white | Saved notices, such as "Skill confirmed." | 5.17:1 |
@@ -145,11 +146,14 @@ Text should reach 4.5:1 against its background, and outlines and cells that carr
 | `#A46626` on white | "N to review" in the Materials file list | 4.66:1 |
 | `#777094` on white | Eyebrows in the estimate's evidence, such as "How the estimate got here" | 4.64:1 |
 | `#777094` on white | Eyebrows in the lesson's rail cards: "Your mastery", "Goal", and "To master it" | 4.64:1 |
+| Dim `#767672` on white | The dates in a skill's Assessment history, under the estimate's evidence | 4.56:1 |
+| `#66737A` on white | The footers of the slides the Materials viewer draws | 4.89:1 |
 | Filled cell `#4A775A` against empty `#E6E6E2` | Mastery cells (3:1 needed) | 4.12:1 |
 | `#1E6F96` against `#CFE7F2` | Plan load cells (3:1 needed) | 4.34:1 |
 | Faint `#6F6F6C` on white | Form-field outlines (3:1 needed) | 5.04:1 |
+| `#8C8C88` on white, and on inset `#F5F5F3` | Checkbox outlines, which sit on the grey of the review before assessment and of the exam form (3:1 needed) | 3.38:1, 3.09:1 |
 
-Every text pair now passes. The last two to change were "N to review" in the Materials file list and the eyebrows in the lesson's rail cards, both small text at 11 and 12 px, which moved to `#A46626` and `#777094`, darker colors of the same hues. The green, the coral, and the evidence eyebrows were darkened within their own hues to pass. The success green and the coral changed everywhere the interface uses them as text, outlines, or fills; the pixel art keeps its own palette.
+Every text pair now passes. The last four to change were the dates in Assessment history, the FILE tag, the slide footers, and the checkbox outlines, which were `#8A8A86` (3.47:1), `#B5502B` (4.21:1), `#8E9BA2` (2.85:1), and `#BDBDB8` (1.89:1). Each became a darker color of the same hue, and the FILE tag took the coral of the error messages. The checkbox outline had to pass on the grey inset around it as well as on white, so it went a step darker than white alone needs. Before them, the last two to change were "N to review" in the Materials file list and the eyebrows in the lesson's rail cards, both small text at 11 and 12 px, which moved to `#A46626` and `#777094`, darker colors of the same hues. The green, the coral, and the evidence eyebrows were darkened within their own hues to pass. The success green and the coral changed everywhere the interface uses them as text, outlines, or fills; the pixel art keeps its own palette.
 
 <details>
 <summary>How the ratios were computed</summary>
@@ -175,7 +179,8 @@ For example, ink `#151515` has v = 21 / 255 = 0.0824 in each channel, so each ch
 | `#C3E6F4` | 0.7473 | `#EEEBFF` | 0.8481 | `#E6E6E2` | 0.7891 |
 | `#FADFB5` | 0.7644 | `#3B2F8F` | 0.0495 | `#1E6F96` | 0.1385 |
 | `#7A7397` | 0.1863 | `#DEDAFF` | 0.7289 | `#CFE7F2` | 0.7683 |
-| `#F1F1EE` | 0.8778 | | | | |
+| `#F1F1EE` | 0.8778 | `#767672` | 0.1802 | `#66737A` | 0.1649 |
+| `#8C8C88` | 0.2611 | | | | |
 
 </details>
 
