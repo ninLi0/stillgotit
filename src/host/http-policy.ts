@@ -216,9 +216,12 @@ export const refusalDetails: Readonly<Record<string, string>> = {
   MATERIAL_UNAVAILABLE: "This material is not available in this course. Reload the page to see its materials.",
   // Courses.md: ArchiveCourse's refusal while an activity is in progress in the course.
   COURSE_ACTIVITY_IN_PROGRESS: "Finish or stop the current activity in this course before archiving it.",
+  // Courses.md, "Course and skill refusals": the general sentences, on every endpoint without a more specific one below.
+  COURSE_UNAVAILABLE: "This course is not available. Reload the page to see your courses.",
+  SKILL_UNAVAILABLE: "This skill is not available. Reload the page to see your skills.",
 };
 
-/** Codes whose design gives a sentence only on some endpoints. Other endpoints answer the same code without one. */
+/** Codes whose design gives a more specific sentence on some endpoints. Elsewhere they take their general sentence above. */
 export const scopedRefusalDetails: Readonly<Record<string, { readonly applies: (path: string) => boolean; readonly detail: string }>> = {
   // Planning.md: every planning endpoint answers a course that is not the learner's with this sentence.
   COURSE_UNAVAILABLE: { applies: (path) => path.startsWith("/planning/"), detail: "Choose one of your own courses." },
@@ -226,9 +229,12 @@ export const scopedRefusalDetails: Readonly<Record<string, { readonly applies: (
   SKILL_UNAVAILABLE: { applies: (path) => path === "/learning/adjust", detail: "Choose one of your confirmed skills before adjusting its estimate." },
 };
 
-/** The sentence for refusal `code` from the endpoint at `path` (without `/api`), or undefined when its design gives none. */
+/**
+ * The sentence for refusal `code` from the endpoint at `path` (without `/api`): the endpoint's more specific sentence when
+ * its design gives one, otherwise the code's general sentence, or undefined for a code with no sentence.
+ */
 export function refusalDetail(path: string, code: string): string | undefined {
   const scoped = Object.hasOwn(scopedRefusalDetails, code) ? scopedRefusalDetails[code] : undefined;
-  if (scoped) return scoped.applies(path) ? scoped.detail : undefined;
+  if (scoped?.applies(path)) return scoped.detail;
   return Object.hasOwn(refusalDetails, code) ? refusalDetails[code] : undefined;
 }

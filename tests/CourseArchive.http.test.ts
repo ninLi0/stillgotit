@@ -16,6 +16,8 @@ afterAll(async () => { for (const cleanup of cleanups.reverse()) await cleanup()
 const NOW = new Date("2026-11-02T16:00:00Z"), DAY = 86_400_000;
 const ARCHIVE_UNAVAILABLE = "Choose one of your active courses.", RESTORE_UNAVAILABLE = "Choose one of your archived courses.";
 const IN_PROGRESS = "Finish or stop the current activity in this course before archiving it.";
+// Courses.md, "Course and skill refusals": a course that is unknown or another learner's.
+const COURSE_UNAVAILABLE = "This course is not available. Reload the page to see your courses.";
 
 async function setup(clock: () => Date = () => NOW) {
   const connection = await connectMongo({ uri: process.env.MONGODB_TEST_URI ?? localMongoUri, database: `stillgotit_test_${crypto.randomUUID().replaceAll("-", "")}` });
@@ -127,13 +129,13 @@ test("another learner's course and an unknown course get COURSE_UNAVAILABLE, and
 
   const requests: [string, string][] = [["/courses/archive", active.course], ["/courses/restore", archived.course], ["/courses/archive", archived.course], ["/courses/restore", active.course]];
   for (const [path, course] of requests) {
-    expect(await outsider.post(path, { course }), path).toEqual({ status: 403, body: { error: "FORBIDDEN" } });
-    expect(await outsider.native(path, { course }), path).toEqual({ ok: false, error: { kind: "domain", value: "COURSE_UNAVAILABLE" } });
+    expect(await outsider.post(path, { course }), path).toEqual({ status: 403, body: { error: "FORBIDDEN", detail: COURSE_UNAVAILABLE } });
+    expect(await outsider.native(path, { course }), path).toEqual({ ok: false, error: { kind: "domain", value: "COURSE_UNAVAILABLE", detail: COURSE_UNAVAILABLE } });
     // No request field names an owner: a forged owner field never acts as the course's owner.
     expect((await outsider.post(path, { course, owner: owner.user })).status, path).toBeGreaterThanOrEqual(400);
     // An unknown course gets the same answer as another learner's course.
-    expect(await owner.post(path, { course: crypto.randomUUID() }), path).toEqual({ status: 403, body: { error: "FORBIDDEN" } });
-    expect(await owner.native(path, { course: crypto.randomUUID() }), path).toEqual({ ok: false, error: { kind: "domain", value: "COURSE_UNAVAILABLE" } });
+    expect(await owner.post(path, { course: crypto.randomUUID() }), path).toEqual({ status: 403, body: { error: "FORBIDDEN", detail: COURSE_UNAVAILABLE } });
+    expect(await owner.native(path, { course: crypto.randomUUID() }), path).toEqual({ ok: false, error: { kind: "domain", value: "COURSE_UNAVAILABLE", detail: COURSE_UNAVAILABLE } });
   }
   expect({ courses: await owner.courses(), reads: await Promise.all([active, archived].map(({ course }) => owner.ok("/courses/read", { course }))) }).toEqual(before);
   expect(await outsider.courses()).toEqual(outsiderCourses);

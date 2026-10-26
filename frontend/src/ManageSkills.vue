@@ -17,7 +17,9 @@ const emit = defineEmits<{ changed: [] }>();
 
 /**
  * The sentence for each refusal these controls can receive. The SkillMapping sentences are the actions' own
- * (design/concepts/SkillMapping.md). The design gives no sentence for the two course-level codes, so these two are ours.
+ * (design/concepts/SkillMapping.md). The two course-level sentences are the design's too: COURSE_UNAVAILABLE's in
+ * design/compositions/Courses.md, "Course and skill refusals", and MATERIAL_UNAVAILABLE's in
+ * design/compositions/Learning.md, "Refusal sentences".
  */
 const refusals = {
   COURSE_UNAVAILABLE: "This course is not available. Reload the page to see your courses.",
@@ -40,8 +42,9 @@ const refusals = {
 type Refusal = keyof typeof refusals;
 
 /**
- * Over HTTP a refusal arrives as its kind only, without its code or sentence. Each action names the code that the kind
- * means for its request, judged from what the page shows. A `detail` sentence from the server is shown as it is.
+ * Over HTTP a refusal arrives as its kind, without its code. The server adds the code's sentence as `detail`, which is
+ * shown as it is. For a refusal without one, each action names the code that the kind means for its request, judged
+ * from what the page shows.
  */
 type Kind = "FORBIDDEN" | "CONFLICT" | "INVALID_REQUEST";
 const declaredKinds = new Set<string>(["FORBIDDEN", "CONFLICT", "INVALID_REQUEST"]);

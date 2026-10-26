@@ -21,8 +21,8 @@ import { refusalDetail } from "../../src/host/http-policy.ts";
 
 const ORIGIN = "http://localhost:5173", DAY = 86_400_000, ZONE = "America/New_York", LIMIT = 60_000;
 const SENTENCE = "Choose graded work that you imported into one of your courses.";
-/** Every concept or endpoint refusal reaches the browser as this, without its code; the native gateway keeps the code. */
-const BARE = { status: 400, body: { error: "INVALID_REQUEST" } };
+/** The skill read's answer for another learner's skill (Courses.md, "Course and skill refusals"). */
+const SKILL_UNAVAILABLE = { status: 400, body: { error: "INVALID_REQUEST", detail: "This skill is not available. Reload the page to see your skills." } };
 // A refusal whose design gives a sentence now carries it to the browser (host pass, D31).
 const declined = (code: string) => ({ status: 400, body: { error: "INVALID_REQUEST", detail: refusalDetail("/courses/graded/confirm", code) } });
 const FORBIDDEN = { status: 403, body: { error: "FORBIDDEN", detail: SENTENCE } };
@@ -419,7 +419,7 @@ describe("Import graded coursework as evidence", () => {
     const before = await saved();
     expect(await classmate.post("/courses/graded/read", { material: graded })).toEqual(FORBIDDEN);
     // Nor are they visible through the skill page's read of this learner's skill.
-    expect(await classmate.post("/learning/read", { skill: products })).toEqual(BARE);
+    expect(await classmate.post("/learning/read", { skill: products })).toEqual(SKILL_UNAVAILABLE);
     expect(await saved()).toEqual(before);
     expect(before.imports).toHaveLength(2);
   }, LIMIT);

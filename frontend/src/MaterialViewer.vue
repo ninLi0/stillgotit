@@ -108,7 +108,10 @@ function thumbLabel(item: ViewerPage) { return `${item.unit ? `${item.unit} ${it
 function bars(kind: FileKind) { return kind === "slides" ? ["70%", "50%", "60%"] : ["80%", "95%", "60%", "90%", "70%", "85%"]; }
 function extensionOf(name: string) { const dot = name.lastIndexOf("."); return dot < 0 ? "" : name.slice(dot + 1).toUpperCase(); }
 
-/** The read reports a material that is not the learner's as a bare FORBIDDEN, without the concept's reason. */
+/**
+ * The read refuses a material that is not the learner's as FORBIDDEN with the refusal's sentence. A FORBIDDEN without a
+ * sentence gets this viewer's own text.
+ */
 function readFailure(result: { error: unknown; detail?: unknown }) {
   const detail = typeof result.detail === "string" && result.detail.trim();
   return result.error === "FORBIDDEN" && !detail ? "This file is not available in your courses." : failureText(result);

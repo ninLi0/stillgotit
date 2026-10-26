@@ -27,7 +27,10 @@ function imageKey(citation: Citation, file: string) { return `${citation.materia
 function matching(citation: Citation, data: MaterialData): Rendition[] {
   return data.originals.flatMap((file) => file.renditions.filter((part) => part.location === citation.location));
 }
-/** The read reports a material or course that is not the learner's as a bare FORBIDDEN, without the concept's reason. */
+/**
+ * The read refuses a material or course that is not the learner's as FORBIDDEN with the refusal's sentence. A FORBIDDEN
+ * without a sentence gets this panel's own text.
+ */
 function readFailure(result: { error: unknown; detail?: unknown }) {
   const detail = typeof result.detail === "string" && result.detail.trim();
   return result.error === "FORBIDDEN" && !detail ? "This source is not available in your courses." : failureText(result);

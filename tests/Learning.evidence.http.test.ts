@@ -13,6 +13,9 @@ const ORIGIN = "http://localhost:5173", DAY = 86_400_000, cleanups: (() => Promi
 afterAll(async () => { for (const cleanup of cleanups.reverse()) await cleanup(); });
 
 const UNAVAILABLE_SKILL = "Choose one of your confirmed skills before adjusting its estimate.";
+// Courses.md, "Course and skill refusals": the general sentences for a course or skill that is not the learner's.
+const COURSE_UNAVAILABLE = "This course is not available. Reload the page to see your courses.";
+const SKILL_UNAVAILABLE = "This skill is not available. Reload the page to see your skills.";
 const RESPOND_DECLINED = "Choose an open session, check the latest dialogue, and attach only your own work from this course, each file once.";
 const QUESTION_DECLINED = "Choose an open lesson, check the latest dialogue, and attach only your own work from this course, each file once.";
 // A concept refusal reaches HTTP and the native gateway with the concept's message as `detail`.
@@ -408,10 +411,10 @@ test("another learner's real skill, draft, sessions, case, and material are refu
     ["/learning/correct", { case: assessment, basedOn, result: "SLIP", gateMet: false, reason: "A forged correction" }, "REVISION_CASE_UNAVAILABLE"],
   ];
   // Over HTTP, admission declines a guarded command with its detail. The course commands answer FORBIDDEN, and Read and
-  // Confidence, which have no admission entry, answer their own refusal.
+  // Confidence, which have no admission entry, answer their own refusal, each with its general sentence.
   const guarded = admissions as unknown as Record<string, readonly { detail: string }[]>;
   const declined = (path: string) => guarded[path] ? { status: 400, body: { error: "INVALID_REQUEST", detail: guarded[path].at(-1)!.detail } }
-    : path.startsWith("/courses/") ? { status: 403, body: { error: "FORBIDDEN" } } : { status: 400, body: { error: "INVALID_REQUEST" } };
+    : path.startsWith("/courses/") ? { status: 403, body: { error: "FORBIDDEN", detail: COURSE_UNAVAILABLE } } : { status: 400, body: { error: "INVALID_REQUEST", detail: SKILL_UNAVAILABLE } };
   const foreign = await app.native(outsider.user);
   for (const [path, input, code] of requests) {
     expect(await other.post(path, input), path).toEqual(declined(path));

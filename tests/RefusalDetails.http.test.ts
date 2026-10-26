@@ -27,6 +27,10 @@ afterAll(async () => { for (const cleanup of cleanups.reverse()) await cleanup()
 
 const message = (Refusal: new () => Error) => new Refusal().message;
 const OWN_COURSE = "Choose one of your own courses.";
+const ADJUST_SKILL = "Choose one of your confirmed skills before adjusting its estimate.";
+// Courses.md, "Course and skill refusals": the general sentences on every endpoint without a more specific one.
+const COURSE_UNAVAILABLE = "This course is not available. Reload the page to see your courses.";
+const SKILL_UNAVAILABLE = "This skill is not available. Reload the page to see your skills.";
 const SIGNED_OUT = "Your session has ended. Sign in again.";
 // What TutorFailures records when the tutor fails without a provider error, and Generating's own general sentence.
 const TUTOR_REASON = "The tutor could not produce a usable answer. Try again. Your saved work is still available.";
@@ -51,13 +55,15 @@ test("the host's sentences are the ones the concepts and compositions state, as 
   for (const [code, sentence] of composed) expect(scopedRefusalDetails[code]?.detail ?? refusalDetails[code], code).toBe(sentence);
 });
 
-test("a composition's sentence applies only where its design gives it, and every public code has a sentence", () => {
-  expect(refusalDetail("/planning/read", "COURSE_UNAVAILABLE")).toBe(OWN_COURSE);
-  expect(refusalDetail("/planning/tradeoffs/decline", "COURSE_UNAVAILABLE")).toBe(OWN_COURSE);
-  expect(refusalDetail("/courses/skills/details", "COURSE_UNAVAILABLE")).toBeUndefined();
-  expect(refusalDetail("/learning/progress", "COURSE_UNAVAILABLE")).toBeUndefined();
-  expect(refusalDetail("/learning/adjust", "SKILL_UNAVAILABLE")).toBe("Choose one of your confirmed skills before adjusting its estimate.");
-  expect(refusalDetail("/learning/read", "SKILL_UNAVAILABLE")).toBeUndefined();
+test("a more specific sentence applies only where its design gives it, the general one everywhere else, and every public code has a sentence", () => {
+  // Planning.md and Learning.md: the planning endpoints and Adjust keep their more specific sentences.
+  for (const path of ["/planning/read", "/planning/configure", "/planning/tradeoffs/decline"]) expect(refusalDetail(path, "COURSE_UNAVAILABLE"), path).toBe(OWN_COURSE);
+  expect(refusalDetail("/learning/adjust", "SKILL_UNAVAILABLE")).toBe(ADJUST_SKILL);
+  // Courses.md, "Course and skill refusals": every other endpoint gives the general sentence.
+  for (const path of ["/courses/read", "/courses/archive", "/courses/skills/details", "/learning/progress", "/learning/continue"]) {
+    expect(refusalDetail(path, "COURSE_UNAVAILABLE"), path).toBe(COURSE_UNAVAILABLE);
+  }
+  for (const path of ["/learning/read", "/learning/confidence", "/learning/lesson", "/learning/task"]) expect(refusalDetail(path, "SKILL_UNAVAILABLE"), path).toBe(SKILL_UNAVAILABLE);
   // A concept's sentence applies on every endpoint.
   expect(refusalDetail("/courses/units/add", "UNIT_COURSE_UNAVAILABLE")).toBe(message(UnitCourseUnavailableError));
   // Learning.md, "Refusal sentences": the four codes that once reached the browser as their category alone.
@@ -137,11 +143,22 @@ test("a refusal reaches the browser and native callers with its sentence, and an
   expect(await sam.native("/courses/units/add", { course: maya.course, title: "Taken" }))
     .toEqual({ ok: false, error: { kind: "domain", value: "UNIT_COURSE_UNAVAILABLE", detail: unitCourse } });
 
-  // A composition's sentence where its design gives one (every planning endpoint), and none where it does not.
+  // The planning endpoints keep their more specific course sentence. On /planning/configure, admission declines another
+  // learner's course first with its own sentence, which wins as on every admitted command.
   expect(await sam.post("/planning/read", { course: maya.course })).toEqual({ status: 403, body: { error: "FORBIDDEN", detail: OWN_COURSE } });
   expect(await sam.native("/planning/read", { course: maya.course })).toEqual({ ok: false, error: { kind: "domain", value: "COURSE_UNAVAILABLE", detail: OWN_COURSE } });
-  expect(await sam.post("/learning/progress", { course: maya.course })).toEqual({ status: 403, body: { error: "FORBIDDEN" } });
-  expect(await sam.native("/learning/progress", { course: maya.course })).toEqual({ ok: false, error: { kind: "domain", value: "COURSE_UNAVAILABLE" } });
+  expect(await sam.post("/planning/configure", { course: maya.course, dailyMinutes: 20, focusNote: "" }))
+    .toEqual({ status: 400, body: { error: "INVALID_REQUEST", detail: "Choose your own course before setting its study budget." } });
+  // Adjust keeps its more specific skill sentence.
+  const adjust = { skill: maya.skill, adjustmentKey: crypto.randomUUID(), value: 90, reason: "I know this." };
+  expect(await sam.post("/learning/adjust", adjust)).toEqual({ status: 400, body: { error: "INVALID_REQUEST", detail: ADJUST_SKILL } });
+  // A course endpoint and the learning reads give the general sentences, over HTTP and to native callers.
+  expect(await sam.post("/courses/read", { course: maya.course })).toEqual({ status: 403, body: { error: "FORBIDDEN", detail: COURSE_UNAVAILABLE } });
+  expect(await sam.native("/courses/read", { course: maya.course })).toEqual({ ok: false, error: { kind: "domain", value: "COURSE_UNAVAILABLE", detail: COURSE_UNAVAILABLE } });
+  expect(await sam.post("/learning/progress", { course: maya.course })).toEqual({ status: 403, body: { error: "FORBIDDEN", detail: COURSE_UNAVAILABLE } });
+  expect(await sam.native("/learning/progress", { course: maya.course })).toEqual({ ok: false, error: { kind: "domain", value: "COURSE_UNAVAILABLE", detail: COURSE_UNAVAILABLE } });
+  expect(await sam.post("/learning/read", { skill: maya.skill })).toEqual({ status: 400, body: { error: "INVALID_REQUEST", detail: SKILL_UNAVAILABLE } });
+  expect(await sam.native("/learning/read", { skill: maya.skill })).toEqual({ ok: false, error: { kind: "domain", value: "SKILL_UNAVAILABLE", detail: SKILL_UNAVAILABLE } });
 
   // An ended session: Sessioning's sentence, while the adapter still clears the session cookie and forbids caching.
   const signedOut = await app.send("/courses", {}, `${SESSION_COOKIE}=ended-session`);

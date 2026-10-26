@@ -13,6 +13,8 @@ import { connectMongo, localMongoUri } from "../src/storage/mongo.ts";
 const ORIGIN = "http://localhost:5173", DAY = 86_400_000, cleanups: (() => Promise<void>)[] = [];
 // Learning.md, "Refusal sentences": a material that is not the learner's own in this course.
 const MATERIAL_UNAVAILABLE = "This material is not available in this course. Reload the page to see its materials.";
+// Courses.md, "Course and skill refusals": a course, unit, or skill that is unknown or another learner's.
+const COURSE_UNAVAILABLE = "This course is not available. Reload the page to see your courses.";
 afterAll(async () => { for (const cleanup of cleanups.reverse()) await cleanup(); });
 
 // The sentences SkillMapping states for each refusal these endpoints pass through.
@@ -172,11 +174,11 @@ test("each new endpoint refuses an unknown or another learner's record with COUR
   ];
   for (const [path, input] of requests) {
     // Another learner's record and an unknown record get the same answer.
-    expect(await outsider.post(path, input), path).toMatchObject({ status: 403, body: { error: "FORBIDDEN" } });
-    expect(await outsider.invoke(path, input), path).toEqual({ ok: false, error: { kind: "domain", value: "COURSE_UNAVAILABLE" } });
+    expect(await outsider.post(path, input), path).toEqual({ status: 403, body: { error: "FORBIDDEN", detail: COURSE_UNAVAILABLE } });
+    expect(await outsider.invoke(path, input), path).toEqual({ ok: false, error: { kind: "domain", value: "COURSE_UNAVAILABLE", detail: COURSE_UNAVAILABLE } });
     const unknown = { ...input, ...("skill" in input ? { skill: crypto.randomUUID() } : { unit: crypto.randomUUID() }) };
-    expect(await learner.post(path, unknown), path).toMatchObject({ status: 403, body: { error: "FORBIDDEN" } });
-    expect(await learner.invoke(path, unknown), path).toEqual({ ok: false, error: { kind: "domain", value: "COURSE_UNAVAILABLE" } });
+    expect(await learner.post(path, unknown), path).toEqual({ status: 403, body: { error: "FORBIDDEN", detail: COURSE_UNAVAILABLE } });
+    expect(await learner.invoke(path, unknown), path).toEqual({ ok: false, error: { kind: "domain", value: "COURSE_UNAVAILABLE", detail: COURSE_UNAVAILABLE } });
     // No request field names an owner: a forged owner field never acts as the record's owner.
     expect((await outsider.post(path, { ...input, owner: learner.user })).status, path).toBeGreaterThanOrEqual(400);
   }
@@ -208,16 +210,16 @@ test("DiscardDraft removes a saved draft with its versions and refuses any other
   expect((await mapping._skills({ unit })).map((row) => row.skill)).not.toContain(draft);
   for (const version of versions) expect(await mapping._version({ version })).toEqual([]);
   // Repeating the request finds no skill, so it gets the answer for an unknown record.
-  expect(await learner.post("/courses/skills/discard", { skill: draft })).toEqual({ status: 403, body: { error: "FORBIDDEN" } });
-  expect(await learner.invoke("/courses/skills/discard", { skill: draft })).toEqual({ ok: false, error: { kind: "domain", value: "COURSE_UNAVAILABLE" } });
+  expect(await learner.post("/courses/skills/discard", { skill: draft })).toEqual({ status: 403, body: { error: "FORBIDDEN", detail: COURSE_UNAVAILABLE } });
+  expect(await learner.invoke("/courses/skills/discard", { skill: draft })).toEqual({ ok: false, error: { kind: "domain", value: "COURSE_UNAVAILABLE", detail: COURSE_UNAVAILABLE } });
 
   // A confirmed skill and an archived skill are refused with the concept's code and sentence, and nothing changes.
   await expectActionRefusal(app, learner, "/courses/skills/discard", { skill }, "DRAFT_DISCARD_UNAVAILABLE");
   await expectActionRefusal(app, learner, "/courses/skills/discard", { skill: archived }, "DRAFT_DISCARD_UNAVAILABLE");
   // Another learner is refused as for an unknown skill, and nothing changes.
   const outsider = app.browser(); await outsider.signIn("discard-outsider");
-  expect(await outsider.post("/courses/skills/discard", { skill: other })).toEqual({ status: 403, body: { error: "FORBIDDEN" } });
-  expect(await outsider.invoke("/courses/skills/discard", { skill: other })).toEqual({ ok: false, error: { kind: "domain", value: "COURSE_UNAVAILABLE" } });
+  expect(await outsider.post("/courses/skills/discard", { skill: other })).toEqual({ status: 403, body: { error: "FORBIDDEN", detail: COURSE_UNAVAILABLE } });
+  expect(await outsider.invoke("/courses/skills/discard", { skill: other })).toEqual({ ok: false, error: { kind: "domain", value: "COURSE_UNAVAILABLE", detail: COURSE_UNAVAILABLE } });
   expect(await learner.ok("/courses/read", { course })).toEqual(after);
 
   // The native gateway discards a draft the same way.
