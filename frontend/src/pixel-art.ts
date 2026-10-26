@@ -1,7 +1,6 @@
 // Pixel-art data and helpers for the "Pixel Nature" look (design/revamp/README.md).
 // Icons are 12×12 letter grids and sprites are 7×7; each letter names a colour in PAL. iconRects turns a grid into
-// horizontal runs for crisp SVG or canvas drawing. genTree draws the seeded topic tree: the same id and design give the
-// same tree, and bumping the design regrows it. It deepens until it has at least `need` tips (one per skill plus spare buds).
+// horizontal runs for crisp SVG or canvas drawing. The topic trees are grown and painted in tree-draw.ts.
 
 export const PAL: Record<string, string> = {
   B: "#2F7D9B", b: "#2A6B85", s: "#63A7C1", w: "#D6E4EC", k: "#12333F", R: "#D9663A", r: "#B5502B", o: "#EE9C78", Y: "#E3A233",
@@ -126,38 +125,4 @@ export function hash(s: string): number {
   let h = 2166136261;
   for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
   return h >>> 0;
-}
-
-export type Segment = [number, number, number, number, number];
-export type Tree = { segs: Segment[]; tips: [number, number][]; w: number };
-/**
- * A seeded tree in cell units. Segments are [x1, y1, x2, y2, thickness] with the trunk base at (0, 0) and y growing
- * upward as negative values before scaling; tips are branch ends, in the same space. The result fits `maxW` × `maxH`.
- */
-export function genTree(id: string, design: number, need: number, maxW: number, maxH: number, cap = 2.4): Tree {
-  let last: Tree | undefined;
-  for (let depth = 2; depth <= 7; depth++) {
-    const R = rng(hash(id + ":" + design));
-    const sp = { spread: 0.42 + R() * 0.5, decay: 0.66 + R() * 0.14, fork3: R() * 0.65, lean: (R() - 0.5) * 0.22, trunk: 0.85 + R() * 0.6, droop: R() < 0.3 ? 0.35 : 0 };
-    const segs: Segment[] = [], tips: [number, number][] = [];
-    const grow = (x: number, y: number, a: number, len: number, th: number, d: number) => {
-      const x2 = x + Math.sin(a) * len, y2 = y - Math.cos(a) * len;
-      segs.push([x, y, x2, y2, th]);
-      if (d === 0) { tips.push([x2, y2]); return; }
-      const k = R() < sp.fork3 ? 3 : 2;
-      for (let i = 0; i < k; i++) {
-        const off = (i - (k - 1) / 2) * sp.spread * (k === 3 ? 0.95 : 1.25);
-        grow(x2, y2, a + off + (R() - 0.5) * 0.3 + sp.droop * Math.sign(off) * (depth - d) / depth, len * (sp.decay + (R() - 0.5) * 0.1), Math.max(1, th - 1), d - 1);
-      }
-    };
-    grow(0, 0, sp.lean, 22 * sp.trunk, 4, depth);
-    let minX = 0, maxX = 0, minY = 0;
-    for (const s of segs) { minX = Math.min(minX, s[0], s[2]); maxX = Math.max(maxX, s[0], s[2]); minY = Math.min(minY, s[1], s[3]); }
-    const pad = 7, bw = maxX - minX + pad * 2, bh = -minY + pad;
-    const sc = Math.min(maxW / bw, maxH / bh, cap);
-    const X = (v: number) => (v - minX + pad) * sc;
-    last = { segs: segs.map((s) => [X(s[0]), s[1] * sc, X(s[2]), s[3] * sc, s[4]] as Segment), tips: tips.map((t) => [X(t[0]), t[1] * sc] as [number, number]), w: Math.ceil(bw * sc) };
-    if (tips.length >= need) return last;
-  }
-  return last!;
 }

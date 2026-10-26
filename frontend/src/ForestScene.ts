@@ -2,9 +2,12 @@
 // three layers. The sky and sun never move; the clouds are sprites between the sky and the land that drift on an eased
 // loop (ForestView.vue, scene-motion.ts); the land holds the mountains, pines, grass, path, topic trees and bushes,
 // and changes only when the selection, hover or topic changes. The caller owns the canvases and passes the
-// device-pixel size of one cell, so every cell lands on whole device pixels and stays crisp.
-import { PAL, SPRITES, genTree, hash, rng, stageOf, type Segment } from "./pixel-art.ts";
+// device-pixel size of one cell, so every cell lands on whole device pixels and stays crisp. Each topic's tree is the
+// kind the learner chose for it, or the unit's default kind (tree-kinds.ts).
+import { PAL, SPRITES, hash, rng, stageOf } from "./pixel-art.ts";
 import type { ViewSkill, ViewUnit } from "./revamp-types.ts";
+import { growTree, moveTree, paintTree, type CrownPart, type Segment } from "./tree-draw.ts";
+import { kindFor, type TreeKind } from "./tree-kinds.ts";
 
 export type ForestLeaf = { skill: ViewSkill; unit: string; x: number; y: number };
 export type ForestTree = {
@@ -14,10 +17,10 @@ export type ForestTree = {
   /** The trunk's foot, where the mound and the flowers go. */
   trunk: number;
   /** The ground line of this tree: back trees stand a little higher, behind the front row. */
-  base: number; back: boolean; seed: number;
+  base: number; back: boolean; seed: number; kind: TreeKind;
   /** The highest tip, for hit-testing the tree as a whole. */
   top: number;
-  segs: Segment[]; tips: [number, number][]; leaves: ForestLeaf[]; buds: { x: number; y: number }[];
+  segs: Segment[]; tips: [number, number][]; crown: CrownPart[]; leaves: ForestLeaf[]; buds: { x: number; y: number }[];
 };
 export type ForestLayout = {
   /** CSS px per cell. */
@@ -48,10 +51,11 @@ export function layoutForest(units: readonly ViewUnit[], design: number, viewW: 
   const Wc = n ? Math.max(Wv, Math.ceil(slot * (n + 0.5))) : Wv;
   const trees = shown.map((u, i): ForestTree => {
     const back = n > 2 && i % 2 === 1, base = back ? G - 4 : G + 2, cx = Math.round(slot * (i + 0.75));
-    const t = genTree(u.unit, design, u.skills.length + 2, Math.min(slot * 1.2, 130), G * (back ? 0.66 : 0.6), 3.2);
-    const x0 = Math.round(cx - t.w / 2);
-    const tips = t.tips.slice().sort((a, b) => a[0] - b[0]).map(([x, y]) => [x0 + x, base + y] as [number, number]);
-    // Spread the skills evenly across the tips, left to right; the spare tips stay buds. genTree deepens until there
+    const kind = kindFor(u.unit, u.kind);
+    const grown = growTree(kind, u.unit, design, u.skills.length + 2, Math.min(slot * 1.2, 130), G * (back ? 0.66 : 0.6), 3.2, 1.25);
+    const t = moveTree(grown, Math.round(cx - grown.w / 2), base);
+    const tips = t.tips.slice().sort((a, b) => a[0] - b[0]);
+    // Spread the skills evenly across the tips, left to right; the spare tips stay buds. growTree grows until there
     // are enough tips, so every skill gets one in practice; a skill without a tip is still listed in the aside.
     const count = Math.min(u.skills.length, tips.length), used = new Set<number>(), pick: number[] = [];
     for (let j = 0; j < count; j++) {
@@ -65,10 +69,10 @@ export function layoutForest(units: readonly ViewUnit[], design: number, viewW: 
       return { skill: u.skills[j]!, unit: u.unit, x: Math.round(tip[0]), y: Math.round(tip[1]) };
     });
     const buds = tips.filter((_, k) => !used.has(k)).map(([x, y]) => ({ x: Math.round(x), y: Math.round(y) }));
-    const segs = t.segs.map(([x1, y1, x2, y2, th]) => [x1 + x0, y1 + base, x2 + x0, y2 + base, th] as Segment);
-    const trunk = Math.round(segs[0]?.[0] ?? cx);
+    const trunk = Math.round(t.segs[0]?.[0] ?? cx);
     const top = tips.reduce((m, p) => Math.min(m, p[1]), base);
-    return { unit: u.unit, title: u.title, skills: u.skills, cx, trunk, base, back, seed: hash(`${u.unit}:forest:${design}`), top, segs, tips, leaves, buds };
+    return { unit: u.unit, title: u.title, skills: u.skills, cx, trunk, base, back, seed: hash(`${u.unit}:forest:${design}`), kind, top,
+      segs: t.segs, tips, crown: t.crown, leaves, buds };
   });
   trees.sort((a, b) => Number(b.back) - Number(a.back));
   return { cell, Wv, Wc, Hc, G, slot, trees };
@@ -167,29 +171,15 @@ export function drawLand(ctx: CanvasRenderingContext2D, layout: ForestLayout, px
   }
 }
 
-function drawTree({ rect, cell }: Paint, t: ForestTree, state: LandState) {
-  const RT = rng(t.seed), dim = !!state.topic && state.topic !== t.unit, shade = (bright: string, light: string) => (dim ? light : bright);
+function drawTree(paint: Paint, t: ForestTree, state: LandState) {
+  const { rect, cell } = paint, RT = rng(t.seed), dim = !!state.topic && state.topic !== t.unit;
   for (let dx = -14; dx <= 14; dx++) {
     const hh = Math.round(Math.sqrt(Math.max(0, 1 - (dx / 14) ** 2)) * 2);
     rect(t.trunk + dx, t.base, 1, hh, state.topic === t.unit ? "#E3C46A" : "#5A9F7A");
   }
-  const blob = (cx: number, cy: number, r: number) => {
-    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
-      const q = dx * dx + dy * dy;
-      if (q > r * r + 1 || (q > r * r - 2 && RT() < 0.35)) continue;
-      cell(cx + dx, cy + dy, dy > r / 3 ? shade("#7DBB95", "#9CC6AD") : dx + dy < -r / 2 ? shade("#C4E4CF", "#D3E7DA") : RT() < 0.12 ? shade("#93C9A8", "#B4D6C1") : shade("#A6D4B6", "#C0DECB"));
-    }
-  };
-  for (const [, , x2, y2, th] of t.segs) if (th === 2) blob(Math.round(x2), Math.round(y2), 4);
-  for (const [x, y] of t.tips) blob(Math.round(x), Math.round(y), 5 + Math.floor(RT() * 2));
-  for (const [x1, y1, x2, y2, th] of t.segs) {
-    const steps = Math.ceil(Math.hypot(x2 - x1, y2 - y1) * 1.4) + 1, w = th + (th > 2 ? 1 : 0);
-    for (let i = 0; i <= steps; i++) {
-      const bx = Math.round(x1 + (x2 - x1) * i / steps), by = Math.round(y1 + (y2 - y1) * i / steps);
-      for (let k = 0; k < w; k++) cell(bx + k - Math.floor(w / 2), by, shade(w === 1 ? "#A8742A" : k === w - 1 ? "#9C6A1F" : "#C08324", "#C9A877"));
-    }
-  }
-  for (const b of t.buds) { cell(b.x, b.y, "#6DB892"); cell(b.x + 1, b.y - 1, "#6DB892"); }
+  // The other topics' trees are drawn paler while one topic is picked out.
+  paintTree(paint, { segs: t.segs, crown: t.crown, buds: t.buds.map((b) => [b.x, b.y] as const), leaves: t.leaves.map((lf) => [lf.x, lf.y] as const) },
+    t.kind, RT, { tone: dim ? paler : undefined, widen: true });
   for (const lf of t.leaves) {
     SPRITES[stageOf(lf.skill.mastery)].forEach((row, ry) => {
       for (let rx = 0; rx < row.length; rx++) { const ch = row.charAt(rx); if (ch !== ".") cell(lf.x - 3 + rx, lf.y - 3 + ry, PAL[ch] ?? "#000000"); }
@@ -206,6 +196,13 @@ function drawTree({ rect, cell }: Paint, t: ForestTree, state: LandState) {
       cell(fx, fy, "#256F4C"); cell(fx, fy - 1, "#256F4C"); cell(fx - 1, fy - 2, petal); cell(fx + 1, fy - 2, petal); cell(fx, fy - 3, petal); cell(fx, fy - 2, "#F3CD7A");
     }
   }
+}
+
+/** A color mixed 40% of the way toward the forest's pale morning sky, for the trees of the topics not picked out. */
+function paler(color: string): string {
+  const value = Number.parseInt(color.slice(1), 16), toward = [0xF1, 0xF5, 0xEF];
+  const channel = (shift: number, i: number) => Math.round(((value >> shift) & 255) * 0.6 + toward[i]! * 0.4);
+  return `#${[channel(16, 0), channel(8, 1), channel(0, 2)].map((v) => v.toString(16).padStart(2, "0")).join("")}`;
 }
 
 /** The empty meadow's planting plot: a mound of soil with one sprout, above the "Plant a topic" sign. */

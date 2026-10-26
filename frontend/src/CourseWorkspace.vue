@@ -22,6 +22,7 @@ import ForestView from "./ForestView.vue";
 import MaterialViewer from "./MaterialViewer.vue";
 import { useHomePlan } from "./HomePlan.ts";
 import { docIcon, stageOf } from "./pixel-art.ts";
+import { chosenKind } from "./tree-looks.ts";
 import type { AskAboutPage, HomeView, OpenSource, ViewerSkill, ViewSkill, ViewUnit } from "./revamp-types.ts";
 
 // The shell (sidebar + app card) lives here because the views do; App.vue fills the course switcher slot and owns
@@ -256,7 +257,9 @@ function viewSkill(skill: CourseData["skills"][number]): ViewSkill {
   return { skill: skill.skill, title: skill.title, outcome: skill.outcome, mastery, dueToday: !!day && !!today && day <= today,
     reviewDay: day && today && day > today ? shortDow.format(dayDate(day)) : undefined, isNew: mastery === null };
 }
-const viewUnits = computed<ViewUnit[]>(() => data.value.units.map((item) => ({ unit: item.unit, title: item.title,
+// Each topic carries the tree kind the learner chose for it, which the grove and the forest both draw.
+const groveUnits = computed(() => data.value.units.map((item) => ({ unit: item.unit, title: item.title, kind: chosenKind(item.unit) })));
+const viewUnits = computed<ViewUnit[]>(() => data.value.units.map((item) => ({ unit: item.unit, title: item.title, kind: chosenKind(item.unit),
   skills: data.value.skills.filter((skill) => skill.unit === item.unit && skill.status === "CONFIRMED").map(viewSkill) })).filter((group) => group.skills.length));
 function average(skills: ViewSkill[]) { const known = skills.filter((s) => s.mastery !== null); return known.length ? Math.round(known.reduce((sum, s) => sum + s.mastery!, 0) / known.length) : null; }
 function pillFor(skill: ViewSkill) {
@@ -460,7 +463,7 @@ watch(view, (now) => { if (now === "setup" && material.value && !preview.value) 
       </div>
 
       <div v-if="homeView === 'tree'" class="tree-grid">
-        <div class="tree-stage"><SkillTree :key="`grove-${groveVersion}`" :skills="treeSkills" :selected="selectedSkill" :units="data.units" :due="dueIds" :course-id="course.course" @select="selectedSkill = $event" @plant="plant"><template #empty><button class="primary sand empty-import" @click="navigate('setup')">Import your first lesson</button></template></SkillTree></div>
+        <div class="tree-stage"><SkillTree :key="`grove-${groveVersion}`" :skills="treeSkills" :selected="selectedSkill" :units="groveUnits" :due="dueIds" :course-id="course.course" @select="selectedSkill = $event" @plant="plant"><template #empty><button class="primary sand empty-import" @click="navigate('setup')">Import your first lesson</button></template></SkillTree></div>
         <aside class="skill-card card">
           <template v-if="current?.status === 'CONFIRMED'">
             <div class="skill-band">

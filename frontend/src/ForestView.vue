@@ -4,6 +4,7 @@ import CourseProgress from "./CourseProgress.vue";
 import InfoBubble from "./InfoBubble.vue";
 import MasteryCells from "./MasteryCells.vue";
 import PixelIcon from "./PixelIcon.vue";
+import TopicTree from "./TopicTree.vue";
 import { cloudPlaces, drawLand, drawSky, hitForest, layoutForest, plotX, type ForestLayout, type ForestLeaf } from "./ForestScene.ts";
 import { focusedControl } from "./focus.ts";
 import { rng, stageOf, type Stage } from "./pixel-art.ts";
@@ -27,7 +28,7 @@ const hover = ref<string | null>(null);
 const pointing = ref(false);
 const view = ref({ w: 0, h: 0, dpr: 1 });
 
-const INFO = "Each tree is a topic and each leaf on it is one of its skills, drawn as a sprite that shows your estimate, from a bud (no estimate yet) to a bloom (80% and up).";
+const INFO = "Each tree is a topic and each leaf on it is one of its skills, drawn as a sprite that shows your estimate, from a bud (no estimate yet) to a bloom (80% and up). Open a topic to change what kind of tree it is.";
 
 function hasEstimate(s: ViewSkill): s is ViewSkill & { mastery: number } { return typeof s.mastery === "number"; }
 function average(skills: readonly ViewSkill[]): number | null {
@@ -59,7 +60,7 @@ const courseNote = computed(() => {
   if (!estimated.value) return `No estimates yet across ${plural(total, "skill")}`;
   return estimated.value === total ? `across ${plural(total, "skill")}` : `across the ${estimated.value} of ${plural(total, "skill")} with an estimate`;
 });
-const topics = computed(() => units.value.map((u) => ({ unit: u.unit, title: u.title, skills: u.skills, avg: average(u.skills), open: topic.value === u.unit })));
+const topics = computed(() => units.value.map((u) => ({ unit: u.unit, title: u.title, kind: u.kind ?? null, skills: u.skills, avg: average(u.skills), open: topic.value === u.unit })));
 const current = computed<{ skill: ViewSkill; unit: ViewUnit } | null>(() => {
   if (!props.selected) return null;
   for (const u of props.units) for (const s of u.skills) if (s.skill === props.selected) return { skill: s, unit: u };
@@ -207,6 +208,8 @@ function chooseSkill(id: string) {
 const opener = focusedControl();
 function onKey(event: KeyboardEvent) {
   if (event.key !== "Escape" || event.defaultPrevented) return;
+  // Escape inside a dialog opened from the forest, such as the tree picker, closes only that dialog.
+  if (event.target instanceof Element && event.target.closest("dialog[open]")) return;
   // An open ⓘ bubble takes the first Escape (InfoBubble closes it); the next one closes the forest.
   if ((globalThis as { __sgInfo?: { value: string | null } }).__sgInfo?.value) return;
   event.preventDefault();
@@ -333,6 +336,7 @@ onUnmounted(() => {
                   <span class="topic-pct">{{ t.avg === null ? "New" : `${t.avg}%` }}</span><span class="topic-count">{{ plural(t.skills.length, "skill") }}</span>
                 </span>
               </button>
+              <div v-if="t.open" class="topic-tree-row"><TopicTree :unit="t.unit" :topic="t.title" :chosen="t.kind" label="Tree" /></div>
               <ul v-show="t.open" :id="`${titleId}-topic-${i}`" class="skill-list" :aria-label="`Skills in ${t.title}`">
                 <li v-for="s in t.skills" :key="s.skill">
                   <button type="button" class="skill-row" :class="{ on: s.skill === selected }" :aria-current="s.skill === selected ? 'true' : undefined"
@@ -422,6 +426,7 @@ onUnmounted(() => {
 .topic-pct { font-size: 13px; font-weight: 700; line-height: 1.3; }
 .topic-count { font-size: 11px; line-height: 1.3; color: var(--muted); }
 .skill-list { display: flex; flex-direction: column; gap: 2px; margin: 2px 0 8px 20px; padding-left: 12px; border-left: 2px solid #DDDDD8; }
+.topic-tree-row { margin: 4px 0 6px 20px; padding: 8px 10px; border-radius: 14px; background: var(--inset); }
 .skill-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 8px; border: 0; border-radius: 10px; background: transparent; text-align: left; }
 .skill-row:hover { background: var(--inset); }
 .skill-row.on { background: var(--meadow-soft); }
