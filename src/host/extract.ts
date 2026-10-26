@@ -391,14 +391,16 @@ export function transcriptText(text: string): string | null {
       return out;
     });
     const written = pieces.filter((line) => lineText(line));
-    if (written.length) {
-      // Automatic captions roll: each cue repeats the previous cue's last line before adding its own. The repeat is left out.
-      const lastLine = lineText(written.at(-1)!);
-      if (lineText(written[0]!) === previousLine) for (const piece of written[0]!) piece.text = "";
-      previousLine = lastLine;
-    }
-    return { start, end, shown: written.length > 0, pieces: pieces.flat() };
+    const repeat = written.length && lineText(written[0]!) === previousLine ? written[0]! : null;
+    if (written.length) previousLine = lineText(written.at(-1)!);
+    return { start, end, shown: written.length > 0, repeat, pieces: pieces.flat() };
   });
+  // Automatic captions roll: each cue repeats the previous cue's last line before adding its own. When at least a quarter of
+  // the cues with text open with such a repeat, the file rolls, and the repeats are left out. Otherwise every line stays.
+  const repeating = spoken.filter((cue) => cue.repeat);
+  if (repeating.length && 4 * repeating.length >= spoken.filter((cue) => cue.shown).length) {
+    for (const cue of repeating) for (const piece of cue.repeat!) piece.text = "";
+  }
   // Zoom and other tools write the speaker as text, "Eric Ni: Okay.", instead of a voice tag. When no cue has a voice tag,
   // more than half of the cues with text start with a short name and a colon, and some name starts two or more cues,
   // each such name is read as a voice tag.
@@ -441,24 +443,26 @@ export function transcriptText(text: string): string | null {
 type Paragraph = { speaker: string; said: { cue: number; start: number; end: number; text: string }[] };
 
 /**
- * Splits a paragraph that runs long. Once it has run a minute, from the start of its first cue to the end of a cue, it ends
- * at the next cue that ends a sentence. When no cue ends a sentence in that next minute, it ends instead at the longest
- * pause between cues in that minute (the first of equal pauses) that leaves at least half a minute of the paragraph after
- * it. Failing both, it ends at the first cue after that minute that leaves half a minute. The rest is split the same way.
+ * Splits a paragraph that runs long. Every cut must leave at least half a minute of the paragraph after it. Once the
+ * paragraph has run a minute, from the start of its first cue to the end of a cue, it ends at the next cue in the minute
+ * after that which ends a sentence. When no cue ends a sentence in that minute, it ends instead at the longest pause
+ * between cues in it (the first of equal pauses). Failing both, it ends at the first cue after that minute. The rest is
+ * split the same way.
  */
 function splitLong({ speaker, said }: Paragraph): Paragraph[] {
   const out: Paragraph[] = [];
   for (;;) {
     const start = said[0]!.start, finish = said.at(-1)!.end;
-    let sentence = -1, pause = -1, later = -1;
+    let sentence = -1, ended = false, pause = -1, later = -1;
     for (let i = 0; i + 1 < said.length && sentence < 0; i++) {
-      const piece = said[i]!, next = said[i + 1]!, ran = piece.end - start;
+      const piece = said[i]!, next = said[i + 1]!, ran = piece.end - start, room = finish - piece.end >= LONG_SECONDS / 2;
       if (piece.cue === next.cue || ran < LONG_SECONDS) continue;
-      if (ran > 2 * LONG_SECONDS) { if (finish - piece.end >= LONG_SECONDS / 2) later = i; break; }
-      if (SENTENCE_END.test(piece.text)) sentence = i;
-      else if (finish - piece.end >= LONG_SECONDS / 2 && (pause < 0 || next.start - piece.end > said[pause + 1]!.start - said[pause]!.end)) pause = i;
+      if (ran > 2 * LONG_SECONDS) { if (room) later = i; break; }
+      if (SENTENCE_END.test(piece.text)) { ended = true; if (room) sentence = i; }
+      else if (room && (pause < 0 || next.start - piece.end > said[pause + 1]!.start - said[pause]!.end)) pause = i;
     }
-    const cut = sentence >= 0 ? sentence : pause >= 0 ? pause : later;
+    // A sentence that ends too near the paragraph's end still keeps a pause from cutting the minute mid-sentence.
+    const cut = sentence >= 0 ? sentence : !ended && pause >= 0 ? pause : later;
     if (cut < 0) break;
     out.push({ speaker, said: said.slice(0, cut + 1) });
     said = said.slice(cut + 1);

@@ -287,6 +287,10 @@ describe("Caption files", () => {
     // Only a repeat at the top of the next cue is left out; the same words said again later stay.
     expect(transcriptText("WEBVTT\n\n00:01.000 --> 00:02.000\nYes.\n\n00:02.000 --> 00:03.000\nNo.\n\n00:03.000 --> 00:04.000\nYes.\nYes."))
       .toBe("Yes. No. Yes. Yes.");
+    // Repeats count only when the file rolls: at least a quarter of the cues with text open with one.
+    const said = (...texts: string[]) => `WEBVTT\n\n${texts.map((text, i) => `00:0${i}.000 --> 00:0${i}.900\n${text}`).join("\n\n")}`;
+    expect(transcriptText(said("No.", "No.", "Fine.", "Okay.", "Done."))).toBe("No. No. Fine. Okay. Done.");
+    expect(transcriptText(said("No.", "No.", "Fine.", "Okay."))).toBe("No. Fine. Okay.");
   });
 
   test("a short name and a colon that start most cues are read as the speaker, as in Zoom transcripts", () => {
@@ -308,11 +312,14 @@ describe("Caption files", () => {
     const srt = (count: number, text: (i: number) => string, end = (i: number) => 5 * i + 4.5) =>
       Array.from({ length: count }, (_, i) => `${i + 1}\n${stamp(5 * i)} --> ${stamp(end(i))}\n${text(i)}`).join("\n\n");
     const joined = (from: number, to: number, text: (i: number) => string) => Array.from({ length: to - from + 1 }, (_, i) => text(from + i)).join(" ");
-    // Punctuated: each paragraph ends with the first sentence that ends after it has run a minute (64.5 seconds here).
-    const sentence = (i: number) => `Sentence ${i}.`;
-    expect(transcriptText(srt(30, sentence))).toBe([joined(0, 12, sentence), joined(13, 25, sentence), joined(26, 29, sentence)].join("\n\n"));
+    // Punctuated: a paragraph ends with the first sentence that ends after it has run a minute (64.5 seconds here), unless
+    // less than half a minute would follow: the second paragraph would end at 129.5 seconds with only 20 seconds left.
+    const sentence = (i: number) => `Sentence ${i}.`, word = (i: number) => `word ${i}`;
+    expect(transcriptText(srt(30, sentence))).toBe([joined(0, 12, sentence), joined(13, 29, sentence)].join("\n\n"));
+    // A sentence that ends too near the end also keeps an earlier pause from cutting the paragraph mid-sentence.
+    const late = (i: number) => i === 14 ? "word 14." : word(i);
+    expect(transcriptText(srt(20, late))).toBe(joined(0, 19, late));
     // Unpunctuated: in the paragraph's second minute it ends at the longest pause (after cue 15), then at the first of equal pauses.
-    const word = (i: number) => `word ${i}`;
     expect(transcriptText(srt(40, word, (i) => i === 15 ? 78 : 5 * i + 4.5))).toBe([joined(0, 15, word), joined(16, 28, word), joined(29, 39, word)].join("\n\n"));
     // A pause that would leave less than half a minute after it does not split the paragraph.
     expect(transcriptText(srt(16, word))).toBe(joined(0, 15, word));
