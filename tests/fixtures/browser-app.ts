@@ -39,11 +39,11 @@ const fixtureTutor: Pick<CourseTutor, "suggest" | "generate"> = {
         { label: "Question 3", mark: "3/10", feedback: "The dimensions were not checked before multiplying.", excerpt: "", skill: "", result: "GAP", rationale: "The approach did not fit the problem." },
       ] };
     }
-    if (properties.explanation) return { explanation: "A matrix product combines rows from the first matrix with columns from the second.\n\nFor example, the row [1, 2] and column [3, 4] produce 1 × 3 + 2 × 4 = 11. Each output entry uses one row and one column.\n\nThe inner dimensions must match. A 2 × 3 matrix times a 3 × 4 matrix produces a 2 × 4 matrix.\n\nWhy would changing the order change the result?", citations };
+    if (properties.explanation) return { explanation: "A matrix product combines rows from the first matrix with columns from the second.\n\nFor example, the row [1, 2] and column [3, 4] produce $1 \\cdot 3 + 2 \\cdot 4 = 11$. Each output entry uses one row and one column:\n\n$$\n(AB)_{ij} = \\sum_k A_{ik} B_{kj}\n$$\n\nThe inner dimensions must match. A 2 × 3 matrix times a 3 × 4 matrix produces a 2 × 4 matrix.\n\nWhy would changing the order change the result?", citations };
     if (properties.question) return { question: "1. Multiply A = [[1, 2], [3, 4]] by B = [[2, 0], [1, 2]].\n\n2. Multiply C = [[2, 1], [0, 3]] by D = [[1, 2], [4, 0]].\n\nShow how you form each entry. Explain why changing the order can change the answer.", citations };
     if (properties.rationale) return { result: (context as { help: string }).help === "NONE" ? "INDEPENDENT" : "SUPPORTED", gateMet: (context as { help: string }).help === "NONE",
       rationale: "Fixture assessment: both products and the explanation meet the stated requirements. This canned result tests the interface and persistence; it does not test AI grading." };
-    return { text: "The order selects different rows and columns. The resulting sums can change, and one order might not be defined.", citations };
+    return { text: "The order selects different rows and columns, so in general $AB \\neq BA$. The resulting sums can change, and one order might not be defined.", citations };
   },
 };
 // STILLGOTIT_LIVE_AI=1 uses the real Gemini key from .env. All learning state still belongs to the test database.

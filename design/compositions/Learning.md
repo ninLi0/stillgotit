@@ -147,6 +147,8 @@ Failures follow one path for every kind. For a provider failure, the host record
 - **GRADE** answers with one of the five results, a gateMet flag, and a nonblank rationale. INDEPENDENT requires saved help NONE. gateMet requires INDEPENDENT and fresh work.
 - **EXTRACT** reads one graded upload for the [graded import](Importing.md), as described below.
 
+The text of a LESSON, TASK, REPLY, HINT, or GRADE answer may carry LaTeX. Its instruction asks for mathematics between dollar signs, `$…$` inline and `$$…$$` on its own lines for a displayed equation or matrix, never as Unicode approximations or in code fences, and for no other Markdown. The lesson page renders the text as Markdown and draws each formula with KaTeX, which it loads only when a text holds a formula; a formula KaTeX cannot read shows as its source. The learner's own messages get the same formulas, and the rest of a message shows as typed. EXTRACT rows stay plain text with Unicode symbols, because the graded import shows them as written.
+
 An EXTRACT request has exactly one source, the graded material, and no separate learner work. Graded work may be a PDF, with or without a text layer, or photos of the pages. The host sends every original of the material inline and in full, so the tutor can read handwriting and marks. Unlike the other kinds, EXTRACT never falls back to extracted text. When an original cannot be sent in full, the host refuses the request before contacting the tutor and records one of these reasons:
 
 - A PDF larger than the inline limit (15 MB today): "This PDF is larger than 15 MB, so the tutor cannot see its marks. Upload photos of its pages instead."
