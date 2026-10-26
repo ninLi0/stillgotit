@@ -37,6 +37,10 @@ export interface EstimateExplanation {
   changes: { at: Date; source: string; before: number; decayed: number; after: number }[];
   value: number; ready: boolean; basis: string;
 }
+/** Policy prototype-1's time decay and readiness settings, read by the replay and reported by _policy. */
+const POLICY = { policy: "prototype-1", halfLifeDays: 60, readinessMinimum: 70, readinessDays: 14 } as const;
+/** The estimate m becomes after `elapsed` days without practice. */
+const decay = (m: number, elapsed: number) => m * 2 ** (-elapsed / POLICY.halfLifeDays);
 const score = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 100;
 const informative = (input: InputDocument) => input.signal === "SLIP" || input.signal === "GAP" ||
   (input.fresh && (input.signal === "INDEPENDENT" || input.signal === "SUPPORTED"));
@@ -167,6 +171,14 @@ export class MasteryEstimating {
     const explanation = await this.#explain(input);
     return explanation ? [{ explanation }] : [];
   }
+  async _policy(): Promise<{ policy: string; halfLifeDays: number; readinessMinimum: number; readinessDays: number }> {
+    return { ...POLICY };
+  }
+  /** The decay replay applies between events, for a value that belongs to no track. It reads no state. */
+  async _withoutPractice({ confidence, days }: { confidence: number; days: number }): Promise<{ value: number }> {
+    if (typeof confidence !== "number" || !Number.isFinite(confidence) || typeof days !== "number" || !Number.isFinite(days)) return { value: 0 };
+    return { value: decay(Math.max(0, Math.min(100, confidence)), Math.max(0, days)) };
+  }
   async #explain({ learner, subject, definition, at }: Identity & { at: Date }): Promise<EstimateExplanation | undefined> {
     const track = await this.tracks.findOne({ learner, subject, definition });
     return track ? this.#explainTrack(track, at) : undefined;
@@ -191,7 +203,7 @@ function replay(track: TrackDocument, inputs: InputDocument[], at: Date): Estima
   const changes: EstimateExplanation["changes"] = [];
   for (const event of events) {
     const before = m;
-    m *= 2 ** (-days(event.at, previous) / 60);
+    m = decay(m, days(event.at, previous));
     const decayed = m;
     if (event.adjustment) { m = r = event.adjustment.value; cap = undefined; }
     else if (event.input) {
@@ -207,14 +219,14 @@ function replay(track: TrackDocument, inputs: InputDocument[], at: Date): Estima
     previous = event.at;
   }
   const before = m;
-  m *= 2 ** (-days(at, previous) / 60);
+  m = decay(m, days(at, previous));
   if (at > previous) changes.push({ at, source: "time", before, decayed: m, after: m });
-  const latest = included.at(-1), ready = m >= 70 && latest?.signal === "INDEPENDENT" && latest.fresh && days(at, latest.performedAt) <= 14;
+  const latest = included.at(-1), ready = m >= POLICY.readinessMinimum && latest?.signal === "INDEPENDENT" && latest.fresh && days(at, latest.performedAt) <= POLICY.readinessDays;
   const start = track.startingBasis === "SELF_REPORTED" ? "Started from your reported confidence." : "Started from an earlier definition; these requirements need a new check.";
   const basis = `${start} ${included.length ? `${included.length} assessed attempt(s) affect this estimate.` : "No scored evidence yet; this estimate is provisional."} ` +
     `${adjustments.length ? "Your manual adjustments are included. " : ""}Time without practice lowers the estimate. ` +
     (ready ? "Recent independent work supports readiness." : "Fresh independent work is needed to establish readiness.");
-  return { policy: "prototype-1", initialConfidence: track.initialConfidence, startingBasis: track.startingBasis, replayStart,
+  return { policy: POLICY.policy, initialConfidence: track.initialConfidence, startingBasis: track.startingBasis, replayStart,
     evidence: inputs.map(({ evidence, revision }) => ({ evidence, revision })),
     ignored: inputs.filter((input) => !informative(input)).map((input) => ({ evidence: input.evidence,
       reason: input.signal === "UNCERTAIN" ? "Too little evidence to change the score." : "Reused successful work gives no new gain." })),

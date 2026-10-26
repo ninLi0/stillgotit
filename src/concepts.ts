@@ -25,6 +25,7 @@ const tutorPreferring = registerConcept({ class: TutorPreferring, spec: preferri
 export class ViewPreferring extends Preferring<User, HomeView> {}
 const viewPreferring = registerConcept({ class: ViewPreferring, spec: preferringSpec, refusals: {} });
 import { extractRequest, gradedImport, gradedKey, gradedReview, gradedSource, gradedTitle, gradedToday, hasConfirmedSkill, hasGradedRows } from "./computations/importing.ts";
+import { courseScore, leftAloneDays, leftAlonePath, memoryCurve, memoryInstants, referenceCurve, reviewNarrow, reviewProbe, reviewSearch } from "./computations/memory.ts";
 
 export const applicationConceptSet = conceptSet({
   Registering: registering,
@@ -42,5 +43,6 @@ export const applicationConceptSet = conceptSet({
 }, { singleMaterial, evidenceAttribution, carriedEstimate, prerequisiteSet, prerequisiteToPractice, sessionSubject, attemptIsReady, beginAllowed, correctionNote, coveredSkillsConfirmed, cutKey, dialogueIsCurrent, evidenceUpdate, generationDefinition, generationFields, gradeRequest, hasLessonQuestion, itemOrder, itemSubject, lessonRequest, planDetail, planRequest, prerequisitesReady, progressRows, responseInput, reviewApproved, selectSkill, selectSkillMaterials, selectSources, sessionActivity, recentSession, studyTopics, sessionMaterials, sessionRequest, studyDetail, submissionInput, suggestRequest, taskRequest, urgentExamItem, estimateTimeline,
   tutorCatalog, defaultChoice, modelOffered, levelSupported, offeredChoice, choiceOffered, withChoice, requestChoice, tutorStatus,
   homeViewOffered, offeredHomeView, defaultHomeView,
-  gradedTitle, hasConfirmedSkill, extractRequest, hasGradedRows, gradedToday, gradedReview, gradedKey, gradedImport, gradedSource });
+  gradedTitle, hasConfirmedSkill, extractRequest, hasGradedRows, gradedToday, gradedReview, gradedKey, gradedImport, gradedSource,
+  memoryInstants, reviewSearch, reviewProbe, reviewNarrow, memoryCurve, leftAloneDays, leftAlonePath, referenceCurve, courseScore });
 export const { concepts, computations } = applicationConceptSet;

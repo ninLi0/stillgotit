@@ -9,6 +9,7 @@ import { focusedControl } from "./focus.ts";
 import { rng, stageOf, type Stage } from "./pixel-art.ts";
 import { cloudDrift, cloudRects, snapStyle, sprite, type Sprite } from "./scene-motion.ts";
 import type { ForestProps, ViewSkill, ViewUnit } from "./revamp-types.ts";
+import { averageEstimate } from "../../src/computations/course-score.ts";
 
 // The course forest (design/revamp/README.md, "Forest view"): a full-screen overlay with one pixel tree per topic.
 // Each leaf is a skill drawn as its mastery sprite. The canvas is for looking and pointing; every skill is also a
@@ -30,10 +31,8 @@ const view = ref({ w: 0, h: 0, dpr: 1 });
 const INFO = "Each tree is a topic and each leaf on it is one of its skills, drawn as a sprite that shows your estimate, from a bud (no estimate yet) to a bloom (80% and up).";
 
 function hasEstimate(s: ViewSkill): s is ViewSkill & { mastery: number } { return typeof s.mastery === "number"; }
-function average(skills: readonly ViewSkill[]): number | null {
-  const known = skills.filter(hasEstimate);
-  return known.length ? Math.round(known.reduce((sum, s) => sum + s.mastery, 0) / known.length) : null;
-}
+// The same average as the course confidence in the course menu (src/computations/course-score.ts).
+function average(skills: readonly ViewSkill[]): number | null { return averageEstimate(skills.map((s) => s.mastery)); }
 function plural(n: number, word: string) { return `${n} ${word}${n === 1 ? "" : "s"}`; }
 function statusText(s: ViewSkill) { return s.dueToday ? "Due today" : hasEstimate(s) ? `${Math.round(s.mastery)}%` : "New"; }
 function statusClass(s: ViewSkill) { return s.dueToday ? "due" : hasEstimate(s) ? "" : "new"; }

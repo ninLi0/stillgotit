@@ -19,19 +19,21 @@ import PixelIcon from "./PixelIcon.vue";
 import MasteryCells from "./MasteryCells.vue";
 import InfoBubble from "./InfoBubble.vue";
 import ForestView from "./ForestView.vue";
+import MemoryView from "./MemoryView.vue";
 import MaterialViewer from "./MaterialViewer.vue";
 import SidebarConversations from "./SidebarConversations.vue";
 import { requestSession } from "./continue-session.ts";
 import type { RecentSession } from "./recent-groups.ts";
 import { useHomePlan } from "./HomePlan.ts";
 import { docIcon, stageOf } from "./pixel-art.ts";
+import { averageEstimate } from "../../src/computations/course-score.ts";
 import type { AskAboutPage, HomeView, OpenSource, ViewerSkill, ViewSkill, ViewUnit } from "./revamp-types.ts";
 
 // The shell (sidebar + app card) lives here because the views do; App.vue fills the course switcher slot and owns
 // Settings, the tutor panel and the Home view preference.
 const props = defineProps<{ course: Course; username: string; homeView: HomeView }>();
-const emit = defineEmits<{ settings: []; tutor: []; "update:homeView": [view: HomeView] }>();
-const view = ref<"home" | "setup" | "chat" | "plan">("home");
+const emit = defineEmits<{ settings: []; tutor: []; "update:homeView": [view: HomeView]; progress: [] }>();
+const view = ref<"home" | "setup" | "chat" | "plan" | "memory">("home");
 const viewKey = `stillgotit-view:${props.course.course}`;
 const sourceSelectionKey = `stillgotit-source:${props.course.course}`;
 const draftSaves = new DraftSaveQueue(sessionStorage, `stillgotit-draft-saves:${props.course.course}`);
@@ -78,7 +80,7 @@ watch(view, async () => {
   await nextTick();
   const active = document.activeElement;
   if (!active || active === document.body || !active.getClientRects().length) {
-    document.querySelector<HTMLElement>(view.value === "home" ? "#home-title" : view.value === "setup" ? "#setup-title" : view.value === "plan" ? "#plan-title" : ".lesson-view h1, .lesson-view h2")?.focus();
+    document.querySelector<HTMLElement>(view.value === "home" ? "#home-title" : view.value === "setup" ? "#setup-title" : view.value === "plan" ? "#plan-title" : view.value === "memory" ? "#memory-title" : ".lesson-view h1, .lesson-view h2")?.focus();
   }
 });
 
@@ -109,6 +111,8 @@ async function refreshProgress() {
   const result = unwrap(await api.learning.progress({ course: props.course.course })).data;
   progress.value = Object.fromEntries(result.estimates.filter((item) => typeof item.estimate?.value === "number").map((item) => [item.skill, item.estimate!.value]));
   revision.value++;
+  // The course menu's confidence score reads the same estimates, so App.vue reads it again.
+  emit("progress");
 }
 // Lesson changes update the tree's shading in the background. This must not clear the message from the learner's last action.
 function progressChanged() {
@@ -215,7 +219,7 @@ async function confirm(skill: string) {
   });
 }
 onMounted(() => task(async () => {
-  try { const saved = JSON.parse(sessionStorage.getItem(viewKey) ?? "null"); if (saved && ["home", "setup", "chat", "plan"].includes(saved.view)) { view.value = saved.view; selectedSkill.value = typeof saved.skill === "string" ? saved.skill : null; } } catch { /* Open Home if there is no saved view. */ }
+  try { const saved = JSON.parse(sessionStorage.getItem(viewKey) ?? "null"); if (saved && ["home", "setup", "chat", "plan", "memory"].includes(saved.view)) { view.value = saved.view; selectedSkill.value = typeof saved.skill === "string" ? saved.skill : null; } } catch { /* Open Home if there is no saved view. */ }
   await nextTick(); viewRestored = true;
   pendingDraftCount.value = draftSaves.read().length; await refresh(); await refreshAI();
 }));
@@ -231,7 +235,7 @@ function readNumber(key: string) { try { const saved = Number.parseInt(localStor
 const groveVersion = ref(0);
 function openForest() { design.value = readNumber(groveKey); forestOpen.value = true; }
 function regrow() { design.value++; groveVersion.value++; try { localStorage.setItem(groveKey, String(design.value)); } catch { /* The new seed applies until reload. */ } }
-function navigate(next: "home" | "plan" | "setup" | "chat") { forestOpen.value = false; view.value = next; }
+function navigate(next: "home" | "plan" | "setup" | "chat" | "memory") { forestOpen.value = false; view.value = next; }
 // The Learn and Plan screens expose these; optional so the page works before they do.
 const study = ref<{ startPractice?: () => unknown; newConversation?: () => unknown } | null>(null), planner = ref<{ openBudget?: () => unknown } | null>(null);
 async function practise(skill: string) { openSkill(skill); await nextTick(); await study.value?.startPractice?.(); }
@@ -284,7 +288,7 @@ function viewSkill(skill: CourseData["skills"][number]): ViewSkill {
 }
 const viewUnits = computed<ViewUnit[]>(() => data.value.units.map((item) => ({ unit: item.unit, title: item.title,
   skills: data.value.skills.filter((skill) => skill.unit === item.unit && skill.status === "CONFIRMED").map(viewSkill) })).filter((group) => group.skills.length));
-function average(skills: ViewSkill[]) { const known = skills.filter((s) => s.mastery !== null); return known.length ? Math.round(known.reduce((sum, s) => sum + s.mastery!, 0) / known.length) : null; }
+function average(skills: ViewSkill[]) { return averageEstimate(skills.map((s) => s.mastery)); }
 function pillFor(skill: ViewSkill) {
   if (skill.dueToday) return { cls: "coral", text: "Due today" };
   if (skill.mastery === null) return { cls: "new", text: "New" };
@@ -656,6 +660,8 @@ watch(view, (now) => { if (now === "setup" && material.value && !preview.value) 
         <ManageSkills :course="course.course" :data="data" @changed="task(refresh)" />
       </div>
     </section>
+    <!-- Mounted each time it opens, so its curves draw once on the way in and are read fresh. -->
+    <MemoryView v-if="view === 'memory'" :course="course.course" @open="openSkill" @navigate="navigate" />
     <div v-show="view === 'chat'" class="lesson-view">
       <KeepAlive :max="12"><SkillStudy v-if="current?.status === 'CONFIRMED'" ref="study" :key="current.skill" :skill="current.skill" :course="course.course" :materials="data.materials" :ai-available="ai.available" :ai-reason="ai.reason" :active="view === 'chat'" :initial-draft="lessonDraft?.skill === current.skill ? lessonDraft.text : undefined" @changed="progressChanged" @back="showOnTree(current.skill)" @open-source="openSource" @session="sessionShown" @tutor="emit('tutor')" /></KeepAlive>
       <div v-if="current?.status !== 'CONFIRMED'" class="no-lesson"><h2 class="display" tabindex="-1">Choose a leaf to begin.</h2><button class="primary meadow" @click="view = 'home'">Go to your tree</button></div>

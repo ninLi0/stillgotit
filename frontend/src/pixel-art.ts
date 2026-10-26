@@ -44,6 +44,8 @@ export const ICONS = {
   tree: ["....GGGG....", "...GhGGGG...", "..GhGGGGGG..", ".GGGGGGGGGG.", ".GGGGGGGGGG.", ".GGGGGGGGgg.", "..GGGGGggg..", "...ggyygg...", ".....yy.....", ".....yy.....", "....yyyy....", "............"],
   calendar: ["..S......S..", ".BSBBBBBBSB.", ".BsBBBBBBBB.", ".bbbbbbbbbb.", ".wwwwwwwwww.", ".wBBwBBwBBw.", ".wBBwBBwBBw.", ".wwwwwwwwww.", ".wBBwRRwwww.", ".wBBwRRwwww.", ".wwwwwwwwww.", ".eeeeeeeeee."],
   school: ["............", ".....PP.....", "...PPvPPP...", ".PPvPPPPPPP.", "PPPPPPPPPPPP", ".PPPPPPPPPY.", "...PPPPPP.Y.", "..ppppppppY.", "..ppppppppY.", "...pppppp.YY", "..........YY", "............"],
+  // The Memory view: a curve falling past a dashed coral threshold, on slate axes.
+  memory: ["............", ".d..........", ".dPP........", ".d.pP.......", ".d..pP......", ".dR.RpPR.R..", ".d....pPP...", ".d.....ppPPP", ".d.......ppp", ".d..........", ".ddddddddddd", "............"],
 } as const;
 export type IconName = keyof typeof ICONS;
 
