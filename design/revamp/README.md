@@ -123,7 +123,7 @@ The file pages inside the viewer (PDF, slides, photos, markdown) are typeset moc
    - Under the card are a Tree/Tasks segmented control (`#F2F2EF` track, white thumb) and a "Forest view" outline button (`#CFE6D7` ring, tree icon).
 2. **Tree view.** Grid `minmax(0,1fr) minmax(290px,340px)`, stacked under 1180px.
    - **Grove** (canvas, 4px cells, height 112 cells):
-     - one seeded pixel tree per topic (unit), each sized by its skill count
+     - one seeded pixel tree per topic (unit), each sized by its skill count and drawn in the topic's tree kind (see "Tree kinds" in [visual-design.md](../visual-design.md))
      - leaves at branch tips are the mastery sprites; spare tips are open buds
      - a wooden plank under each tree shows the topic name and "N skills · avg%"
      - a dashed "+ Plant a topic" plot at the end opens Materials

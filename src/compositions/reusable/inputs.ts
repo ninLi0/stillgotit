@@ -119,6 +119,16 @@ export const homeViewInput: EndpointValidator = (value) => {
   return ok ? { ok: true } : { ok: false, detail: "Choose the skill tree or the task list." };
 };
 
+/** A tree kind choice names one unit and one kind, each a string of at most 100 characters. The flow checks the kind against the offered kinds. */
+export const lookInput: EndpointValidator = (value) => {
+  if (!structuredInput(value).ok) return { ok: false };
+  const record = value as Record<string, unknown>;
+  const ok = Object.entries(record).every(([key, field]) => key === "session" ? field === null || typeof field === "string"
+    : (key === "unit" || key === "kind") && typeof field === "string" && field.length <= 100) &&
+    typeof record.unit === "string" && typeof record.kind === "string";
+  return ok ? { ok: true } : { ok: false, detail: "Choose one of your topics and one of the offered tree kinds." };
+};
+
 /** JSON commands carry learner input only. Definitions and provider output are server-owned. */
 export const learningInput: EndpointValidator = (value) => {
   if (!structuredInput(value).ok) return { ok: false };

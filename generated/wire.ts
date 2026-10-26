@@ -181,10 +181,14 @@ export type StillGotItWire = {
   };
   "/courses/read": {
     input: {
-      "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["_materials"]>[0], ["scope"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_units"]>[0], ["course"]>]>>;
+      "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["_materials"]>[0], ["scope"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_units"]>[0], ["course"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_unit"]>>>, ["course"]>]>>;
       "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
     };
     output: {
+      "looks": {
+        "kind": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["treeKindOffered"]["fn"]>[0], ["kind"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TreeStyling"]["_styles"]>>>, ["style"]>]>>;
+        "unit": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_unit"]>[0], ["unit"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TreeStyling"]["_styles"]>>>, ["item"]>]>>;
+      }[];
       "materials": {
         "locator": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Library"]["_materials"]>>>, ["locator"]>>;
         "material": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Library"]["_materials"]>>>, ["material"]>>;
@@ -378,6 +382,25 @@ export type StillGotItWire = {
     };
     output: Record<string, never>;
     error: { error: AppWideError | "COURSE_UNAVAILABLE" | "INVALID_INPUT" | "NOT_SIGNED_IN" | "UNIT_EMPHASIS_UNAVAILABLE" };
+  };
+  "/courses/units/look": {
+    input: {
+      "kind": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["treeKindOffered"]["fn"]>[0], ["kind"]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+      "unit": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TreeStyling"]["choose"]>[0], ["item"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_unit"]>[0], ["unit"]>]>>;
+    };
+    output: {
+      "kind": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TreeStyling"]["choose"]>[0], ["style"]>>;
+    };
+    error: { error: AppWideError | "COURSE_UNAVAILABLE" | "INVALID_INPUT" | "NOT_SIGNED_IN" | "UNKNOWN_TREE_KIND" };
+  };
+  "/courses/units/look/clear": {
+    input: {
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+      "unit": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TreeStyling"]["clear"]>[0], ["item"]>>;
+    };
+    output: Record<string, never>;
+    error: { error: AppWideError | "COURSE_UNAVAILABLE" | "INVALID_INPUT" | "NOT_SIGNED_IN" };
   };
   "/internal/materials/add": {
     input: {
@@ -1109,9 +1132,13 @@ export type StillGotItHttp = {
   };
   "/courses/read": {
     input: {
-      "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["_materials"]>[0], ["scope"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_units"]>[0], ["course"]>]>>;
+      "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["_materials"]>[0], ["scope"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_units"]>[0], ["course"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_unit"]>>>, ["course"]>]>>;
     };
     output: {
+      "looks": {
+        "kind": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["treeKindOffered"]["fn"]>[0], ["kind"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TreeStyling"]["_styles"]>>>, ["style"]>]>>;
+        "unit": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_unit"]>[0], ["unit"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TreeStyling"]["_styles"]>>>, ["item"]>]>>;
+      }[];
       "materials": {
         "locator": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Library"]["_materials"]>>>, ["locator"]>>;
         "material": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Library"]["_materials"]>>>, ["material"]>>;
@@ -1286,6 +1313,23 @@ export type StillGotItHttp = {
     input: {
       "emphasized": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["setEmphasis"]>[0], ["emphasized"]>>;
       "unit": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["setEmphasis"]>[0], ["unit"]>>;
+    };
+    output: Record<string, never>;
+    error: { error: HttpAppWideError | "FORBIDDEN" | "INVALID_REQUEST" | "UNAUTHORIZED" };
+  };
+  "/courses/units/look": {
+    input: {
+      "kind": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["treeKindOffered"]["fn"]>[0], ["kind"]>>;
+      "unit": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TreeStyling"]["choose"]>[0], ["item"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_unit"]>[0], ["unit"]>]>>;
+    };
+    output: {
+      "kind": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TreeStyling"]["choose"]>[0], ["style"]>>;
+    };
+    error: { error: HttpAppWideError | "FORBIDDEN" | "INVALID_REQUEST" | "UNAUTHORIZED" };
+  };
+  "/courses/units/look/clear": {
+    input: {
+      "unit": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["TreeStyling"]["clear"]>[0], ["item"]>>;
     };
     output: Record<string, never>;
     error: { error: HttpAppWideError | "FORBIDDEN" | "INVALID_REQUEST" | "UNAUTHORIZED" };

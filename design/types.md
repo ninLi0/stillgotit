@@ -44,7 +44,7 @@ instantiate Budgeting as StudyPlanning with
   Definition is SkillMapping.Version
 ```
 
-This domain inventory has nine application instances: six learning concepts and three account concepts. Learners and courses are records in their state; creating a course does not create another engine instance. The current inventory is in stages/materials.md. It binds twelve instances: these nine, the stateless TutorGenerating provider adapter, TutorPreferring, which keeps each learner's tutor choice, and ViewPreferring, which keeps each learner's home view.
+This domain inventory has nine application instances: six learning concepts and three account concepts. Learners and courses are records in their state; creating a course does not create another engine instance. The current inventory is in stages/materials.md. It binds thirteen instances: these nine, the stateless TutorGenerating provider adapter, TutorPreferring, which keeps each learner's tutor choice, ViewPreferring, which keeps each learner's home view, and TreeStyling, which keeps the kind of tree each learner chose for each topic.
 
 The practice-task binding requires membership in `GroundedTutoring.PracticeSessions`. Its actions take the parent `Session` type, so the application must check task membership before submitting an assessment. A lesson cannot serve as an assessed task.
 

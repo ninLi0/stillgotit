@@ -8,6 +8,7 @@ import { randomUUID } from "node:crypto";
 import { Collection, type Db, type Document, type Filter } from "mongodb";
 import type { ActionRefusal } from "@mit-sdg/sync-engine/assembly";
 import { assembleApplication } from "../src/assembly.ts";
+import { TreeStyling } from "../src/concepts.ts";
 import { type Attempt, FederatingConcept } from "../src/concepts/Federating/Federating.ts";
 import { type Identity, MemoryProvider } from "../src/concepts/Federating/provider.ts";
 import { RegisteringConcept, type User } from "../src/concepts/Registering/Registering.ts";
@@ -71,6 +72,7 @@ async function setup() {
     StudyPlanning: new Budgeting(db, "StudyPlanning"),
     Library: new MaterialKeeping(db, name),
     GroundedTutoring: new GroundedTutoring(db, name),
+    TreeStyling: new TreeStyling(db, "TreeStyling"),
   });
   const application = await assembleFor(connection!.db);
   applications.push(application);
@@ -178,7 +180,7 @@ describe("CommonsFederating framework registration", () => {
       expect(await second.concepts.SkillMapping._course({ course }))
         .toEqual([{ owner: user, title: "Linear Algebra" }]);
       expect(Object.keys(second.concepts).sort())
-        .toEqual(["AssessmentReviewing", "CommonsFederating", "GroundedTutoring", "Library", "MasteryEstimating", "Registering", "Sessioning", "SkillMapping", "StudyPlanning", "TutorGenerating", "TutorPreferring", "ViewPreferring"]);
+        .toEqual(["AssessmentReviewing", "CommonsFederating", "GroundedTutoring", "Library", "MasteryEstimating", "Registering", "Sessioning", "SkillMapping", "StudyPlanning", "TreeStyling", "TutorGenerating", "TutorPreferring", "ViewPreferring"]);
       expect(Object.keys(second.publicInterface.routes)).toContain("/courses");
       expect(await links.countDocuments()).toBe(1);
     } finally {

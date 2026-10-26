@@ -27,6 +27,7 @@ import type { RecentSession } from "./recent-groups.ts";
 import { useHomePlan } from "./HomePlan.ts";
 import { docIcon, stageOf } from "./pixel-art.ts";
 import { averageEstimate } from "../../src/computations/course-score.ts";
+import { chosenKind, receiveLooks } from "./tree-looks.ts";
 import type { AskAboutPage, HomeView, OpenSource, ViewerSkill, ViewSkill, ViewUnit } from "./revamp-types.ts";
 
 // The shell (sidebar + app card) lives here because the views do; App.vue fills the course switcher slot and owns
@@ -42,7 +43,7 @@ type CourseData = StillGotItHttp["/courses/read"]["output"];
 type MaterialId = CourseData["materials"][number]["material"];
 type Suggestion = { title: string; outcome: string; gate: string };
 type Original = { file: string; name: string; mediaType?: string; limitations: string[] };
-const data = ref<CourseData>({ materials: [], units: [], skills: [], prerequisites: [], skillSources: [], versions: [] });
+const data = ref<CourseData>({ materials: [], units: [], skills: [], prerequisites: [], skillSources: [], versions: [], looks: [] });
 const busy = ref(false), message = ref(""), error = ref(""), justConfirmed = ref<string | null>(null);
 const notice = ref<HTMLElement | null>(null), setupError = ref<HTMLElement | null>(null);
 // announcement names materials an import listing saved; it stays until the learner leaves Materials or starts
@@ -98,6 +99,7 @@ async function task(work: () => Promise<void>) {
 async function refresh() {
   const result = unwrap(await api.courses.read({ course: props.course.course }));
   data.value = result;
+  void receiveLooks(result.units.map((item) => item.unit), result.looks);
   if (!material.value && result.materials.length) {
     const previous = sessionStorage.getItem(sourceSelectionKey);
     material.value = result.materials.find((source) => source.material === previous)?.material ?? result.materials[0]!.material;
@@ -286,7 +288,9 @@ function viewSkill(skill: CourseData["skills"][number]): ViewSkill {
   return { skill: skill.skill, title: skill.title, outcome: skill.outcome, mastery, dueToday: !!day && !!today && day <= today,
     reviewDay: day && today && day > today ? shortDow.format(dayDate(day)) : undefined, isNew: mastery === null };
 }
-const viewUnits = computed<ViewUnit[]>(() => data.value.units.map((item) => ({ unit: item.unit, title: item.title,
+// Each topic carries the tree kind the learner chose for it, which the grove and the forest both draw.
+const groveUnits = computed(() => data.value.units.map((item) => ({ unit: item.unit, title: item.title, kind: chosenKind(item.unit) })));
+const viewUnits = computed<ViewUnit[]>(() => data.value.units.map((item) => ({ unit: item.unit, title: item.title, kind: chosenKind(item.unit),
   skills: data.value.skills.filter((skill) => skill.unit === item.unit && skill.status === "CONFIRMED").map(viewSkill) })).filter((group) => group.skills.length));
 function average(skills: ViewSkill[]) { return averageEstimate(skills.map((s) => s.mastery)); }
 function pillFor(skill: ViewSkill) {
@@ -491,7 +495,7 @@ watch(view, (now) => { if (now === "setup" && material.value && !preview.value) 
       </div>
 
       <div v-if="homeView === 'tree'" class="tree-grid">
-        <div class="tree-stage"><SkillTree :key="`grove-${groveVersion}`" :skills="treeSkills" :selected="selectedSkill" :units="data.units" :due="dueIds" :course-id="course.course" @select="selectedSkill = $event" @plant="plant"><template #empty><button class="primary sand empty-import" @click="navigate('setup')">Import your first lesson</button></template></SkillTree></div>
+        <div class="tree-stage"><SkillTree :key="`grove-${groveVersion}`" :skills="treeSkills" :selected="selectedSkill" :units="groveUnits" :due="dueIds" :course-id="course.course" @select="selectedSkill = $event" @plant="plant"><template #empty><button class="primary sand empty-import" @click="navigate('setup')">Import your first lesson</button></template></SkillTree></div>
         <aside class="skill-card card">
           <template v-if="current?.status === 'CONFIRMED'">
             <div class="skill-band">

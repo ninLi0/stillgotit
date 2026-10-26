@@ -16,8 +16,8 @@ export type ViewSkill = {
   isNew?: boolean;
 };
 
-/** One topic (unit) with its confirmed skills. */
-export type ViewUnit = { unit: string; title: string; emphasized?: boolean; skills: ViewSkill[] };
+/** One topic (unit) with its confirmed skills. `kind` is the id of the tree kind the learner chose for it, if any. */
+export type ViewUnit = { unit: string; title: string; emphasized?: boolean; kind?: string | null; skills: ViewSkill[] };
 
 /** What the Forest view needs from the course page. */
 export type ForestProps = { courseTitle: string; units: ViewUnit[]; design: number; selected?: string | null };

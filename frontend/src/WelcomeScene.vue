@@ -8,20 +8,20 @@ import PixelIcon from "./PixelIcon.vue";
 // code as the Home screen (design/revamp/README.md), at half size so three topic trees fit the panel. Each tree is a
 // topic from an example course; each leaf is a skill at its own stage of growth. Nothing here is live data.
 const SAMPLE: GroveTopic[] = [
-  { id: "vectors", title: "Vectors", skills: [
+  { id: "vectors", title: "Vectors", kind: "oak", skills: [
     { skill: "v1", title: "Add and scale vectors", mastery: 92, due: false },
     { skill: "v2", title: "Dot products", mastery: 74, due: false },
     { skill: "v3", title: "Span and linear independence", mastery: 58, due: true },
     { skill: "v4", title: "Projections", mastery: 31, due: false },
   ] },
-  { id: "matrices", title: "Matrices", skills: [
+  { id: "matrices", title: "Matrices", kind: "cherry", skills: [
     { skill: "m1", title: "Multiply two matrices", mastery: 86, due: false },
     { skill: "m2", title: "Row reduce to echelon form", mastery: 67, due: false },
     { skill: "m3", title: "Find an inverse", mastery: 44, due: false },
     { skill: "m4", title: "Determinants", mastery: 22, due: true },
     { skill: "m5", title: "Partitioned matrices", due: false },
   ] },
-  { id: "eigen", title: "Eigenvalues", skills: [
+  { id: "eigen", title: "Eigenvalues", kind: "pine", skills: [
     { skill: "e1", title: "Characteristic polynomial", mastery: 48, due: false },
     { skill: "e2", title: "Diagonalise a matrix", mastery: 12, due: false },
     { skill: "e3", title: "Powers of a matrix", due: false },

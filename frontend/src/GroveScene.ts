@@ -1,7 +1,10 @@
 // The grove on Home (design/revamp/README.md, "Tree view"): one seeded pixel tree per topic, standing on a strip of
 // grass and soil, with a dashed plot at the end for planting a new topic. Everything here is in cells (4 CSS px each)
-// so layout, drawing and hit-testing share one grid. Trees are deterministic from the topic id plus the design seed.
-import { PAL, SPRITES, genTree, hash, rng, stageOf, type Segment } from "./pixel-art.ts";
+// so layout, drawing and hit-testing share one grid. Each topic grows its tree kind (tree-kinds.ts): the one the
+// learner chose, or the unit's default. Trees are deterministic from the topic id, the kind and the design seed.
+import { PAL, SPRITES, hash, rng, stageOf } from "./pixel-art.ts";
+import { growTree, moveTree, paintTree, type CrownPart, type Segment } from "./tree-draw.ts";
+import { kindFor, type TreeKind } from "./tree-kinds.ts";
 
 /** CSS pixels per cell. */
 export const CELL = 4;
@@ -13,11 +16,14 @@ export const PLOT = 30;
 const GAP = 8, MARGIN = 6, PER_TREE = 60;
 
 export type GroveSkill = { skill: string; title: string; mastery?: number; due: boolean };
-export type GroveTopic = { id: string; title: string; skills: GroveSkill[] };
+/** One topic; `kind` is the id of the tree kind the learner chose for it, when they chose one. */
+export type GroveTopic = { id: string; title: string; skills: GroveSkill[]; kind?: string | null };
 export type GroveLeaf = { skill: GroveSkill; x: number; y: number };
 export type GroveTree = {
   key: string; title: string; meta: string; x0: number; w: number; cx: number; seed: number;
-  segs: Segment[]; tips: [number, number][]; leaves: GroveLeaf[]; buds: [number, number][];
+  /** The topic's id, shared by every tree of a topic with more skills than one tree carries. */
+  unit: string; kind: TreeKind;
+  segs: Segment[]; tips: [number, number][]; crown: CrownPart[]; leaves: GroveLeaf[]; buds: [number, number][];
 };
 /** Trees placed left to right; `plot` is the plot's left edge and `width` the whole row, both in cells. */
 export type Grove = { trees: GroveTree[]; plot: number; width: number };
@@ -41,20 +47,21 @@ export function growGrove(topics: readonly GroveTopic[], design: number, plankCe
   const trees: GroveTree[] = [];
   let x = MARGIN;
   for (const topic of topics) {
+    const kind = kindFor(topic.id, topic.kind);
     for (let start = 0, part = 1; start < topic.skills.length; start += PER_TREE, part++) {
       const key = part === 1 ? topic.id : `${topic.id}:${part}`, title = part === 1 ? topic.title : `${topic.title} (${part})`;
       const need = Math.min(PER_TREE, topic.skills.length - start);
       const spare = need + 2 + Math.floor(need / 3);
-      const tree = genTree(key, design, spare, Math.max(44, Math.min(170, 26 + spare * 5.5)), Math.min(GROUND - 14, 44 + spare * 4));
+      const tree = growTree(kind, key, design, spare, Math.max(44, Math.min(170, 26 + spare * 5.5)), Math.min(GROUND - 14, 44 + spare * 4));
       const tips = [...tree.tips].sort((a, b) => a[0] - b[0]);
-      // genTree always returns at least `spare` tips, so every skill gets one; the slice is only a guard.
+      // growTree always returns at least `spare` tips, so every skill gets one; the slice is only a guard.
       const skills = topic.skills.slice(start, start + Math.min(need, tips.length));
       const pick = spreadTips(tips, skills.length), used = new Set(pick);
       const meta = topicMeta(skills), slot = Math.max(tree.w, plankCells(title, meta)), x0 = x + Math.floor((slot - tree.w) / 2);
+      const placed = moveTree({ ...tree, tips }, x0, GROUND);
       trees.push({
-        key, title, meta, x0, w: tree.w, cx: x0 + tree.w / 2, seed: hash(key + ":" + design),
-        segs: tree.segs.map((s) => [s[0] + x0, s[1] + GROUND, s[2] + x0, s[3] + GROUND, s[4]] as Segment),
-        tips: tips.map((tip) => [x0 + tip[0], GROUND + tip[1]] as [number, number]),
+        key, title, meta, x0, w: tree.w, cx: x0 + tree.w / 2, seed: hash(key + ":" + design), unit: topic.id, kind,
+        segs: placed.segs, tips: placed.tips, crown: placed.crown,
         leaves: skills.map((skill, i) => { const tip = tips[pick[i]!]!; return { skill, x: Math.round(x0 + tip[0]), y: Math.round(GROUND + tip[1]) }; }),
         buds: tips.filter((_, i) => !used.has(i)).map((tip) => [Math.round(x0 + tip[0]), Math.round(GROUND + tip[1])] as [number, number]),
       });
@@ -89,13 +96,23 @@ export function shiftGrove(grove: Grove, by: number): Grove {
   return {
     plot: grove.plot + by, width: grove.width + by,
     trees: grove.trees.map((t) => ({
-      ...t, x0: t.x0 + by, cx: t.cx + by,
-      segs: t.segs.map((s) => [s[0] + by, s[1], s[2] + by, s[3], s[4]] as Segment),
-      tips: t.tips.map(([tx, ty]) => [tx + by, ty] as [number, number]),
+      ...moveTree(t, by, 0), x0: t.x0 + by, cx: t.cx + by,
       leaves: t.leaves.map((leaf) => ({ ...leaf, x: leaf.x + by })),
       buds: t.buds.map(([bx, by2]) => [bx + by, by2] as [number, number]),
     })),
   };
+}
+
+/** The tree whose trunk or crown is at a point given in cells, the nearest when crowns overlap; null when there is none. */
+export function treeAt(grove: Grove, mx: number, my: number): GroveTree | null {
+  let best: GroveTree | null = null, distance = Infinity;
+  for (const tree of grove.trees) {
+    const top = tree.tips.reduce((highest, [, y]) => Math.min(highest, y), GROUND) - 6;
+    if (mx < tree.x0 || mx > tree.x0 + tree.w || my < top || my > GROUND + 1) continue;
+    const d = Math.abs(tree.cx - mx);
+    if (d < distance) { distance = d; best = tree; }
+  }
+  return best;
 }
 
 /** The leaf nearest a point given in cells, within about five cells; null when none is that close. */
@@ -147,29 +164,10 @@ export function drawGrove(canvas: HTMLCanvasElement, grove: Grove, cssWidth: num
   }
 
   for (const tree of grove.trees) {
-    const RT = rng(tree.seed);
-    // Soft foliage behind the forks and the tips.
-    const blob = (cx: number, cy: number, r: number) => {
-      for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
-        const q = dx * dx + dy * dy;
-        if (q <= r * r + 1 && !(q > r * r - 2 && RT() < 0.35))
-          cell(cx + dx, cy + dy, dy > r / 3 ? "#8CC3A1" : dx + dy < -r / 2 ? "#BFE0CC" : RT() < 0.12 ? "#9CCDB0" : "#A9D4B9");
-      }
-    };
-    for (const [, , x2, y2, th] of tree.segs) if (th === 2) blob(Math.round(x2), Math.round(y2), 3);
-    for (const [tx, ty] of tree.tips) blob(Math.round(tx), Math.round(ty), 4 + Math.floor(RT() * 2));
-    // Trunk and branches as runs of cells in trunk browns; the right edge of thick limbs is darker.
-    for (const [x1, y1, x2, y2, th] of tree.segs) {
-      const n = Math.ceil(Math.hypot(x2 - x1, y2 - y1) * 1.4) + 1;
-      for (let i = 0; i <= n; i++) {
-        const px = Math.round(x1 + ((x2 - x1) * i) / n), py = Math.round(y1 + ((y2 - y1) * i) / n);
-        for (let k = 0; k < th; k++) cell(px + k - Math.floor(th / 2), py, th === 1 ? "#A8742A" : k === th - 1 ? "#9C6A1F" : "#C08324");
-      }
-    }
-    const base = tree.segs[0] ? Math.round(tree.segs[0][0]) : Math.round(tree.cx);
-    rect(base - 3, G, 7, 1, "#9C6A1F"); rect(base - 2, G, 5, 1, "#C08324");
-    // Spare tips are open buds.
-    for (const [bx, by] of tree.buds) { cell(bx, by, "#6DB892"); cell(bx + 1, by - 1, "#6DB892"); }
+    paintTree({ cell, rect }, { ...tree, leaves: tree.leaves.map((leaf) => [leaf.x, leaf.y] as const) }, tree.kind, rng(tree.seed));
+    // The soil at the trunk's foot, a little wider than the trunk.
+    const base = tree.segs[0] ? Math.round(tree.segs[0][0]) : Math.round(tree.cx), foot = Math.max(5, (tree.segs[0]?.[4] ?? 1) + 1);
+    rect(base - Math.floor(foot / 2) - 1, G, foot + 2, 1, "#9C6A1F"); rect(base - Math.floor(foot / 2), G, foot, 1, "#C08324");
     for (const leaf of tree.leaves) {
       const { x, y, skill } = leaf;
       SPRITES[stageOf(skill.mastery)].forEach((row, ry) => {

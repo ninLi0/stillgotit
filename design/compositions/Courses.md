@@ -6,7 +6,7 @@ These flows describe the current application. The [application stage](../stages/
 
 [ListCourses](reaction:Courses.ListCourses) returns [CourseList](former:Courses.CourseList) for the signed-in learner: every course, active or archived, with its title and its status from `SkillMapping._courses`, so the page can list archived courses apart from current ones. [OwnedCourse](view:Courses.OwnedCourse) relates a course to its owner. [OwnedUnit](view:Courses.OwnedUnit) and [OwnedSkill](view:Courses.OwnedSkill) check ownership through the course.
 
-[ReadCourse](reaction:Courses.ReadCourse) requires an owned course. It returns [Materials](former:Courses.Materials), [Units](former:Courses.Units), [Skills](former:Courses.Skills), [Prerequisites](former:Courses.Prerequisites), [SkillSources](former:Courses.SkillSources), and [Versions](former:Courses.Versions). Units include whether the learner marked each one as emphasized by the professor. Skills include every status with their current requirements, so the page can list archived skills apart from active ones. Prerequisites has one row for each skill and direct prerequisite. SkillSources has one row for each skill and attached material. Versions has one row for each skill and requirements version, with its outcome and gate, from `SkillMapping._versions`. A skill's rows run newest first: the first is its current version, and the page labels the others “Previous definition”. A list is empty when the course has no such records. CourseList, Materials, Units, and Skills sort by each record's unique identity. The two link lists sort by skill identity, then by the linked identity. Versions sorts by skill identity and, within each skill, keeps the newest-first order that `SkillMapping._versions` returns. The read answers only after [RepairRevisedTrack](reaction:Courses.RepairRevisedTrack), described below, has finished. [ReadMaterial](reaction:Courses.ReadMaterial) returns source content, original-file references, and extraction limits after checking material and course ownership.
+[ReadCourse](reaction:Courses.ReadCourse) requires an owned course. It returns [Materials](former:Courses.Materials), [Units](former:Courses.Units), [Skills](former:Courses.Skills), [Prerequisites](former:Courses.Prerequisites), [SkillSources](former:Courses.SkillSources), [Versions](former:Courses.Versions), and [Looks](former:Courses.Looks). Units include whether the learner marked each one as emphasized by the professor. Skills include every status with their current requirements, so the page can list archived skills apart from active ones. Prerequisites has one row for each skill and direct prerequisite. SkillSources has one row for each skill and attached material. Versions has one row for each skill and requirements version, with its outcome and gate, from `SkillMapping._versions`. A skill's rows run newest first: the first is its current version, and the page labels the others “Previous definition”. A list is empty when the course has no such records. CourseList, Materials, Units, and Skills sort by each record's unique identity. The two link lists sort by skill identity, then by the linked identity. Versions sorts by skill identity and, within each skill, keeps the newest-first order that `SkillMapping._versions` returns. Looks has one row for each unit of the course whose tree kind the learner chose, as [Choosing a topic's tree](#choosing-a-topics-tree) describes, and sorts by unit identity. The read answers only after [RepairRevisedTrack](reaction:Courses.RepairRevisedTrack), described below, has finished. [ReadMaterial](reaction:Courses.ReadMaterial) returns source content, original-file references, and extraction limits after checking material and course ownership.
 
 ## Saving courses and materials
 
@@ -74,6 +74,35 @@ prerequisiteSet(prerequisites: SkillList) : SkillMapping.SkillSet
 
 [SetUnitEmphasis](reaction:Courses.SetUnitEmphasis) takes `unit` and `emphasized`, which is true or false, and calls `SkillMapping.setEmphasis`. Setting the saved value again succeeds and changes nothing. The answer has no fields. Only the course read and the course page use the flag; planning does not use it yet.
 
+## Choosing a topic's tree
+
+The grove on Home and the Forest view draw each topic as a tree of one of twelve kinds, as the [visual design study](../visual-design.md) describes under "Tree kinds". The kind only changes how the topic looks; the leaves still show the skills. A learner can choose a kind for each unit, and TreeStyling, the application's instance of [Styling](../concepts/Styling.md), keeps that choice on the server, so it follows the learner to every browser. A unit without a chosen kind is drawn with a default kind that the page picks from the unit's identity. The kinds are fixed in the server's code, so they do not change while the server runs, and the page's catalogue lists the same ids.
+
+```computations
+treeKindOffered(kind: String) : Flag
+  Holds when the kind is exactly one of the offered tree kinds, including case: oak, pine, birch, willow, maple, cherry, palm, cypress, baobab, spruce, jacaranda, or bonsai.
+
+offeredTreeKind(kind: String) : TreeKind
+  Names an offered tree kind. Flows use it only after treeKindOffered holds.
+```
+
+[Looks](former:Courses.Looks) reads `TreeStyling._styles` for the signed-in learner and keeps each row whose unit `SkillMapping._unit` places in the requested course and whose kind [treeKindOffered](computation:treeKindOffered) holds for. Styling leaves it to the application to check a remembered style again before using it, so a kind that a later version of the code removes never reaches the browser, and the page draws that unit's default kind instead.
+
+Both endpoints below take the session and `unit`; no request field names an owner. Each first requires [OwnedUnit](view:Courses.OwnedUnit), so an unknown unit and another learner's unit both get `COURSE_UNAVAILABLE` and change nothing.
+
+[ChooseUnitLook](reaction:Courses.ChooseUnitLook) takes `unit` and `kind`. The boundary first checks that each is a string of at most 100 characters and that no other field is sent, and refuses any other input as invalid before the flow starts. For an owned unit, exactly one case applies:
+
+- When treeKindOffered holds, [offeredTreeKind](computation:offeredTreeKind) names the kind, `TreeStyling.choose` saves it for the learner and the unit, replacing an earlier kind, and the endpoint responds with `kind`, the kind it saved.
+- When treeKindOffered does not hold, the endpoint refuses with `UNKNOWN_TREE_KIND`: "Choose one of the offered tree kinds."
+
+[ClearUnitLook](reaction:Courses.ClearUnitLook) takes `unit` and calls `TreeStyling.clear`, so the unit's default kind applies again. Clearing a unit that has no saved kind succeeds and changes nothing. The answer has no fields. The page clears the saved kind when the learner chooses the unit's default kind in the picker.
+
+A refusal saves nothing. Each save is one write keyed by the learner and the unit, and the endpoint responds only after that write is saved. Choosing the same kind again, or clearing again, succeeds and changes nothing, so a browser whose reply was lost can send it again. Across devices the later write wins. Like saving the home view, these two endpoints do not take the learner's lock, so they never wait behind a running lesson; this is safe because no learning, progress, or planning flow reads the kind.
+
+The page draws a new kind in both scenes as soon as the learner chooses it. When the server refuses the choice or cannot be reached, the page draws the saved kind again and shows the reason under the topic's tree. When the learner chooses again before an answer arrives, only the latest choice counts: an earlier answer, whenever it arrives, does not change what the page draws.
+
+Before the kind was kept on the server, the page kept it in the browser's local storage. When a course read shows no saved kind for a unit and the browser still holds one, the page sends that kind with ChooseUnitLook once and then forgets its local copy, so a learner's earlier choices carry over. A refusal for the unit or the kind also forgets the local copy. A request that does not reach the server, or that finds the session ended, keeps it for the next read. When the server already has a kind for the unit, the page forgets its local copy without sending it, because the server's kind is the later choice.
+
 ## Course and skill refusals
 
 The course endpoints answer `COURSE_UNAVAILABLE` for a course, unit, or skill that is unknown or another learner's, and so do other endpoints that take a course, such as the progress read. The skill endpoints of the [learning flows](Learning.md) answer `SKILL_UNAVAILABLE` for a skill that is not one of the learner's, or that is not confirmed where the endpoint needs a confirmed skill. Unless the endpoint's design gives a more specific sentence, the host adds one of these as `detail`, as the [runtime contract](../runtime.md) describes:
@@ -107,4 +136,6 @@ Courses.RestoreSkill at /courses/skills/restore
 Courses.SetUnitEmphasis at /courses/units/emphasis
 Courses.ArchiveCourse at /courses/archive
 Courses.RestoreCourse at /courses/restore
+Courses.ChooseUnitLook at /courses/units/look
+Courses.ClearUnitLook at /courses/units/look/clear
 ```
