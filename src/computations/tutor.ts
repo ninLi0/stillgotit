@@ -12,7 +12,7 @@ const row = (entry: TutorModel): TutorModel => Object.freeze({ ...entry, levels:
 
 /**
  * The tutor catalog from design/compositions/Settings.md. Every model listed returns JSON matching a schema and reads PDFs and images.
- * Only Pro at High is marked "may not finish in time" until large-document timings are measured.
+ * Only Pro at High and Argon at High are marked "may not finish in time" until large-document timings are measured.
  */
 export const TUTOR_MODELS: readonly TutorModel[] = Object.freeze([
   row({ model: "gemini-3.5-flash-lite", name: "Gemini 3.5 Flash-Lite", description: "The fastest and lowest-cost model offered.",
@@ -21,9 +21,12 @@ export const TUTOR_MODELS: readonly TutorModel[] = Object.freeze([
   row({ model: "gemini-3.8-flash", name: "Gemini 3.8 Flash", description: "A fast general model for lessons, practice, and feedback.",
     levels: ["LOW", "MEDIUM", "HIGH"], defaultLevel: "MEDIUM", slowLevels: [],
     tradeoff: "It balances speed, cost, and care; raise the level for harder problems." }),
-  row({ model: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro (preview)", description: "The most careful model offered, for difficult material and grading.",
+  row({ model: "gemini-3.1-pro-preview", name: "Gemini 3.1 Pro (preview)", description: "A careful model for difficult material and grading.",
     levels: ["LOW", "MEDIUM", "HIGH"], defaultLevel: "HIGH", slowLevels: ["HIGH"],
     tradeoff: "It is slower and costs more, and as a preview Google may change or withdraw it." }),
+  row({ model: "gemini-4-argon", name: "Gemini 4 Argon", description: "Google's flagship reasoning model, for the hardest material and grading.",
+    levels: ["LOW", "MEDIUM", "HIGH"], defaultLevel: "MEDIUM", slowLevels: ["HIGH"],
+    tradeoff: "It is the most capable model offered and the most expensive, and at High a long request may not finish in time." }),
 ]);
 
 /** GEMINI_MODEL after trimming and removing a leading `models/`, or the built-in default when it is unset or blank. */

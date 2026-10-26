@@ -1,4 +1,5 @@
 import { afterAll, expect, test } from "bun:test";
+import { resolve } from "node:path";
 import { createRuntime } from "../src/host/runtime.ts";
 import { MemoryProvider } from "../src/concepts/Federating/provider.ts";
 import { connectMongo, localMongoUri } from "../src/storage/mongo.ts";
@@ -86,7 +87,7 @@ async function setup() {
 test("the settings endpoints read, choose, and clear the signed-in learner's choice", async () => {
   const app = await setup(), laptop = await app.browser(), phone = await app.browser(laptop.user);
   expect(await laptop.ok("/settings/tutor")).toEqual(settings(DEFAULT, "DEFAULT"));
-  expect(tutorCatalog({}).map((entry) => entry.model)).toEqual(["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-3.1-pro-preview"]);
+  expect(tutorCatalog({}).map((entry) => entry.model)).toEqual(["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-3.1-pro-preview", "gemini-4-argon"]);
 
   // Saving answers the saved state, a repeated save changes nothing, and a second device sees the same choice.
   expect(await laptop.ok("/settings/tutor/choose", PRO_LOW)).toEqual(settings(PRO_LOW, "SAVED"));
@@ -132,6 +133,43 @@ test("the settings endpoints read, choose, and clear the signed-in learner's cho
   expect(await app.runtime.gateway.invoke("/settings/tutor/choose", { session: laptop.session, model: "gemini-3.8-flash", level: "MINIMAL" }))
     .toEqual({ ok: false, error: { kind: "domain", value: "UNSUPPORTED_THINKING_LEVEL", detail: UNSUPPORTED_LEVEL } });
   expect(await app.runtime.gateway.invoke("/settings/tutor", { session: laptop.session })).toEqual({ ok: true, value: settings(DEFAULT, "SAVED") });
+}, 30_000);
+
+test("Gemini 4 Argon is offered at Low, Medium, and High, refuses Minimal, and is withdrawn when Gemini's model list lacks it", async () => {
+  const ARGON = "gemini-4-argon";
+  expect(tutorCatalog({}).find((entry) => entry.model === ARGON)).toMatchObject({ name: "Gemini 4 Argon", levels: ["LOW", "MEDIUM", "HIGH"],
+    defaultLevel: "MEDIUM", slowLevels: ["HIGH"] });
+
+  // Each listed level can be saved, and a tutor request then carries Argon at that level.
+  const app = await setup(), learner = await app.learner();
+  for (const level of ["LOW", "MEDIUM", "HIGH"] as const) {
+    const choice: TutorChoice = { model: ARGON, level };
+    expect(await learner.ok("/settings/tutor/choose", choice)).toEqual(settings(choice, "SAVED"));
+    expect(await learner.ok("/learning/lesson", { skill: learner.skill, request: "Explain products." })).toEqual({ lesson: expect.any(String), tutor: choice });
+    expect(app.sent.at(-1)).toEqual({ kind: "LESSON", choice });
+  }
+  // Minimal is not one of Argon's levels: it is refused with the design's sentence, and the earlier choice stays.
+  expect(await learner.post("/settings/tutor/choose", { model: ARGON, level: "MINIMAL" })).toEqual({ status: 400, body: { error: "INVALID_REQUEST", detail: UNSUPPORTED_LEVEL } });
+  expect(await learner.ok("/settings/tutor")).toEqual(settings({ model: ARGON, level: "HIGH" }, "SAVED"));
+
+  // A key without access to Argon: the startup check, in a fresh process because the catalog is fixed once per process,
+  // reads a model list that has the other three models and withdraws Argon alone.
+  const root = resolve(import.meta.dir, "..");
+  const script = `const at = (path) => ${JSON.stringify(root)} + "/" + path;
+    const { Gemini } = await import(at("src/host/gemini.ts"));
+    const { checkModelList } = await import(at("src/host/tutor-catalog.ts"));
+    const T = await import(at("src/computations/tutor.ts"));
+    const listed = ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-3.1-pro-preview"];
+    const fetch = async () => Response.json({ models: listed.map((name) => ({ name: "models/" + name, supportedGenerationMethods: ["generateContent"] })) });
+    const lines = [], log = { log: (line) => lines.push(line), warn: (line) => lines.push(line) };
+    const withdrawn = await checkModelList({ gemini: new Gemini({ key: "test-key-not-real", fetch }), defaultModel: T.configuredModelName(process.env.GEMINI_MODEL), log });
+    T.withdrawTutorModels(withdrawn);
+    console.log(JSON.stringify({ withdrawn, lines, models: T.tutorCatalog({}).map((entry) => entry.model), offered: T.modelOffered({ model: ${JSON.stringify(ARGON)} }),
+      saved: T.choiceOffered({ choice: { model: ${JSON.stringify(ARGON)}, level: "HIGH" } }) }));`;
+  const result = Bun.spawnSync(["bun", "-e", script], { cwd: root, env: { ...process.env, GEMINI_MODEL: "", GEMINI_API_KEY: "" } });
+  expect(result.exitCode, result.stderr.toString()).toBe(0);
+  expect(JSON.parse(result.stdout.toString())).toEqual({ withdrawn: [ARGON], lines: [`Tutor models withdrawn because Gemini's model list lacks them: ${ARGON}.`],
+    models: ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-3.1-pro-preview"], offered: false, saved: false });
 }, 30_000);
 
 test("another learner can neither read nor change the learner's choice", async () => {

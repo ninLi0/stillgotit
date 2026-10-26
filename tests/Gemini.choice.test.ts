@@ -181,7 +181,7 @@ describe("startup checks", () => {
   const log = () => { const lines: string[] = []; return { lines, log: { log: (line: string) => lines.push(line), warn: (line: string) => lines.push(line) } }; };
 
   test("the model-list check withdraws a missing or non-generating model, reads one page with the key in a header, and never withdraws the default", async () => {
-    const { calls, gemini } = fake(listed(["gemini-3.5-flash-lite"], ["gemini-3.8-flash"], ["gemini-2.0-embedding", ["embedContent"]]));
+    const { calls, gemini } = fake(listed(["gemini-3.5-flash-lite"], ["gemini-3.8-flash"], ["gemini-4-argon"], ["gemini-2.0-embedding", ["embedContent"]]));
     const output = log();
     expect(await checkModelList({ gemini: gemini(), defaultModel: "gemini-3.8-flash", log: output.log })).toEqual(["gemini-3.1-pro-preview"]);
     expect(calls[0]!.url).toBe(`${API}?pageSize=200`);
@@ -189,11 +189,11 @@ describe("startup checks", () => {
     expect(calls[0]!.init.headers).toEqual({ "x-goog-api-key": KEY });
     expect(output.lines).toEqual(["Tutor models withdrawn because Gemini's model list lacks them: gemini-3.1-pro-preview."]);
 
-    const noGenerate = fake(listed(["gemini-3.5-flash-lite"], ["gemini-3.8-flash"], ["gemini-3.1-pro-preview", ["countTokens"]]));
+    const noGenerate = fake(listed(["gemini-3.5-flash-lite"], ["gemini-3.8-flash"], ["gemini-3.1-pro-preview", ["countTokens"]], ["gemini-4-argon"]));
     expect(await checkModelList({ gemini: noGenerate.gemini(), defaultModel: "gemini-3.8-flash", log: log().log })).toEqual(["gemini-3.1-pro-preview"]);
 
     // A list without the default keeps it offered and warns; requests that use it meet the provider refusal.
-    const noDefault = fake(listed(["gemini-3.5-flash-lite"], ["gemini-3.1-pro-preview"])), warned = log();
+    const noDefault = fake(listed(["gemini-3.5-flash-lite"], ["gemini-3.1-pro-preview"], ["gemini-4-argon"])), warned = log();
     expect(await checkModelList({ gemini: noDefault.gemini(), defaultModel: "gemini-3.8-flash", log: warned.log })).toEqual([]);
     expect(warned.lines).toEqual([expect.stringContaining("lacks the default tutor model gemini-3.8-flash")]);
   });
@@ -232,7 +232,7 @@ describe("startup checks", () => {
         saved: T.choiceOffered({ choice: { model: "gemini-3.1-pro-preview", level: "HIGH" } }), fallback: T.defaultChoice({}), fixed }));`;
     const result = Bun.spawnSync(["bun", "-e", script], { cwd: resolve(import.meta.dir, ".."), env: { ...process.env, GEMINI_MODEL: "" } });
     expect(result.exitCode).toBe(0);
-    expect(JSON.parse(result.stdout.toString())).toEqual({ models: ["gemini-3.5-flash-lite", "gemini-3.8-flash"], pro: false, saved: false,
+    expect(JSON.parse(result.stdout.toString())).toEqual({ models: ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-4-argon"], pro: false, saved: false,
       fallback: { model: "gemini-3.8-flash", level: "MEDIUM" }, fixed: true });
   });
 });
