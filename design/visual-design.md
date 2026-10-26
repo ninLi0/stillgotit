@@ -39,8 +39,8 @@ The main colors and the font names are tokens at the top of [frontend/src/style.
   | Sand | Materials | `#F5C98E` | `#4A2A08` | `#D5964B` | `#FCEFD9` | + Add material, Confirm · add a leaf, Find skills, Import graded work, the buttons in Manage skills |
   | Dawn | The lesson | `#B9B0F5` | `#21185A` | `#8A7EE0` | `#EEEBFF` | Check my understanding, Assess, Save adjustment, the learner's own messages |
 
-- **Coral marks what needs attention now.** Coral (`#D9663A`) fills the sidebar's badge on Materials, which counts the suggested skills waiting for review, and the flag planted beside a leaf that is due today. Its wash and text (`#FBE6DC` and `#A8412F`) form the Due today pill in the Tasks list and every error message, and the wash marks exam preparation in the Plan calendar.
-- **Three more colors mark states.** Green (`#2F8A5F`) marks success: saved notices, the Strong pill, and finished items. A sun-yellow wash marks the New pill and practice items in the plan, and a sky wash marks the Review pill and lessons in the plan.
+- **Coral marks what needs attention now.** Coral (`#C35124`) fills the sidebar's badge on Materials, which counts the suggested skills waiting for review. The pixel flag planted beside a leaf that is due today keeps the lighter coral `#D9663A`, because it is art, not text. Coral's wash and text (`#FBE6DC` and `#A8412F`) form the Due today pill in the Tasks list and every error message, and the wash marks exam preparation in the Plan calendar.
+- **Three more colors mark states.** Green (`#2A7B55`) marks success: saved notices, the Strong pill, and finished items. A sun-yellow wash marks the New pill and practice items in the plan, and a sky wash marks the Review pill and lessons in the plan.
 - **Mastery is cells and a number, never a smooth bar.** `MasteryCells.vue` draws square cells with 2 px gaps, `#4A775A` when filled and `#E6E6E2` when empty, always beside a number. Home's skill card and the lesson's rail use 10 cells, each row of the Tasks list uses 10 short cells, and the Forest view uses 20 for the whole course. The Plan calendar uses 6 cells in its own blue (`#1E6F96` on `#CFE7F2`) for the minutes planned each day, and the sidebar's Today card uses 15 sun-yellow cells for the minutes studied today.
 
 ### Pixel art
@@ -89,17 +89,18 @@ Text should reach 4.5:1 against its background, and outlines and cells that carr
 | `#A8412F` on `#FBE6DC` | Error messages and the Due today pill | 5.04:1 |
 | `#8A5A12` on `#FBF0D6` | The New pill | 5.22:1 |
 | `#2A6B85` on `#E3EEF3` | The Review pill | 5.03:1 |
-| Green `#2F8A5F` on white | Saved notices, such as "Skill confirmed." | 4.27:1 |
-| Green `#2F8A5F` on `#EEF7F1` | The Strong pill | 3.90:1 |
-| Green `#2F8A5F` on `#E7F6EC` | The "App default" tag in Settings | 3.82:1 |
-| White on coral `#D9663A`, and coral on white | The sidebar's Materials badge, on an unselected and a selected row | 3.55:1 |
+| Green `#2A7B55` on white | Saved notices, such as "Skill confirmed." | 5.17:1 |
+| Green `#2A7B55` on `#EEF7F1` | The Strong pill | 4.73:1 |
+| Green `#2A7B55` on `#E7F6EC` | The "App default" tag in Settings | 4.63:1 |
+| White on coral `#C35124`, and coral on white | The sidebar's Materials badge, on an unselected and a selected row | 4.64:1 |
 | `#B5702A` on white | "N to review" in the Materials file list | 3.95:1 |
-| `#7A7397` on white | Eyebrows in the lesson's rail | 4.44:1 |
+| `#777094` on white | Eyebrows in the estimate's evidence, such as "How the estimate got here" | 4.64:1 |
+| `#7A7397` on white | Eyebrows in the lesson's rail cards: "Your mastery", "Goal", and "To master it" | 4.44:1 |
 | Filled cell `#4A775A` against empty `#E6E6E2` | Mastery cells (3:1 needed) | 4.12:1 |
 | `#1E6F96` against `#CFE7F2` | Plan load cells (3:1 needed) | 4.34:1 |
 | Faint `#6F6F6C` on white | Form-field outlines (3:1 needed) | 5.04:1 |
 
-Every text pair passes except the six rows from the green on white to the eyebrows in the lesson's rail. All six are small text, from 11 to 14 px, so they need 4.5:1.
+Every text pair passes except two: "N to review" in the Materials file list and the eyebrows in the lesson's rail cards. Both are small text, 11 and 12 px, so they need 4.5:1; `#A46626` and `#777094`, darker colors of the same hues, would reach it. The green, the coral, and the evidence eyebrows were darkened within their own hues to pass. The success green and the coral changed everywhere the interface uses them as text, outlines, or fills; the pixel art keeps its own palette.
 
 <details>
 <summary>How the ratios were computed</summary>
@@ -116,15 +117,15 @@ For example, ink `#151515` has v = 21 / 255 = 0.0824 in each channel, so each ch
 | `#5F5F5C` | 0.1139 | `#4A2A08` | 0.0313 | `#8A5A12` | 0.1276 |
 | `#6F6F6C` | 0.1583 | `#B9B0F5` | 0.4796 | `#E3EEF3` | 0.8395 |
 | `#F5F5F3` | 0.9119 | `#21185A` | 0.0171 | `#2A6B85` | 0.1270 |
-| `#3F7A55` | 0.1563 | `#E7F6EC` | 0.8896 | `#2F8A5F` | 0.1961 |
+| `#3F7A55` | 0.1563 | `#E7F6EC` | 0.8896 | `#2A7B55` | 0.1531 |
 | `#E9D6A8` | 0.6824 | `#1C5A37` | 0.0784 | `#EEF7F1` | 0.9105 |
-| `#1C1C1D` | 0.0117 | `#E2F3FA` | 0.8717 | `#D9663A` | 0.2456 |
+| `#1C1C1D` | 0.0117 | `#E2F3FA` | 0.8717 | `#C35124` | 0.1761 |
 | `#8FD3A6` | 0.5518 | `#0D4F70` | 0.0685 | `#B5702A` | 0.2158 |
-| `#0E3A22` | 0.0323 | `#FCEFD9` | 0.8744 | `#7A7397` | 0.1863 |
+| `#0E3A22` | 0.0323 | `#FCEFD9` | 0.8744 | `#777094` | 0.1765 |
 | `#C6EAD1` | 0.7545 | `#7A4A12` | 0.0908 | `#4A775A` | 0.1539 |
 | `#C3E6F4` | 0.7473 | `#EEEBFF` | 0.8481 | `#E6E6E2` | 0.7891 |
 | `#FADFB5` | 0.7644 | `#3B2F8F` | 0.0495 | `#1E6F96` | 0.1385 |
-| | | | | `#CFE7F2` | 0.7683 |
+| `#7A7397` | 0.1863 | | | `#CFE7F2` | 0.7683 |
 
 </details>
 
