@@ -701,7 +701,7 @@ watch(view, (now) => { if (now === "setup" && material.value && !preview.value) 
 .file-text { display: flex; flex-direction: column; min-width: 0; }
 .file-text strong { font-size: 13px; font-weight: 650; overflow-wrap: anywhere; }
 .file-text small { font-size: 12px; color: var(--muted); }
-.file-text small.waiting { color: #B5702A; font-weight: 600; }
+.file-text small.waiting { color: #A46626; font-weight: 600; }
 .detail { min-width: 0; }
 .detail-title { margin: 0 0 6px; font-size: 28px; overflow-wrap: anywhere; }
 .detail-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 14px; }

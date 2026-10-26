@@ -671,7 +671,7 @@ button.mastery-chip:hover{border-color:#C9C1F0}
 @media (prefers-reduced-motion:reduce){.thinking .dots span{animation:none;opacity:.6}}
 .rail-card{background:#FFFFFF;border-radius:18px;padding:16px;box-shadow:0 0 0 1px #ECE9F5;flex:none}
 .rail-card.goal{display:flex;flex-direction:column;gap:6px}
-.rail-eyebrow{color:#7A7397;white-space:nowrap}
+.rail-eyebrow{color:#777094;white-space:nowrap}
 .rail-head{display:flex;align-items:center;justify-content:space-between}
 .rail-head :deep(.info-bubble){left:auto;right:0}
 .mastery-row{display:flex;align-items:center;gap:12px;margin-top:10px}
