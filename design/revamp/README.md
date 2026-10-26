@@ -139,7 +139,8 @@ The file pages inside the viewer (PDF, slides, photos, markdown) are typeset moc
    - A "Later today" side card.
 
 ### Forest view (full-screen overlay; opened from the nav or the Home button; Esc closes)
-- A header with a pixel tree tile, an eyebrow showing the course, a "Course forest" title, count chips (sprite, number, label: mastered, growing, new, due today), Regrow, and "Back to desk".
+- A header with a pixel tree tile, an eyebrow showing the course, a "Course forest" title, Regrow, and "Back to desk".
+- A "Course progress" summary in the aside (under the canvas on phones): the course average as a number with 20 mastery cells, four count tiles (sprite, number, label: mastered, growing, new, due today), and one row per topic with its average cells and skill count; selecting a row opens that topic.
 - **Canvas** (5px cells, 4px when small):
   - sky, sun arc, clouds
   - two mountain layers `#AFC6D1` and `#97C2A6`
