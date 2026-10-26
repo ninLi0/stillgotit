@@ -116,7 +116,7 @@ The 80-second limit for one Gemini call stays, and it cannot grow for higher lev
 
 ## The Tutor panel
 
-A button in the lesson's message box, among its tools, names the choice that applies, for example "Gemini 3.8 Flash · Medium". On phones it shows only the model, and its tooltip and spoken name keep the level. It opens Settings at the Tutor panel. The page reads TutorSettings after sign-in and again each time the panel opens, so a second browser shows the same saved choice. The button shows the latest TutorSettings record the page received. Another browser's button keeps its last record until its panel opens or the page reloads, while the server always uses the newest saved choice. When the status is RETIRED, the button reads "Tutor: choose again" instead of naming the choice, and the panel opens on the RETIRED status line, which says the choice is no longer offered and asks the learner to choose again.
+A button in the lesson's message box, among its tools, names the choice that applies, for example "Gemini 3.8 Flash · Medium". On phones it shows only the model, and its tooltip and spoken name keep the level. It opens the Tutor panel in a small dialog of its own, titled "Model and thinking" under the eyebrow "Tutor", which closes once a change is saved; Cancel, the ✕, and Escape close it without saving. Settings shows the same panel as its Tutor section. The page reads TutorSettings after sign-in and again each time the panel opens, so a second browser shows the same saved choice. The button shows the latest TutorSettings record the page received. Another browser's button keeps its last record until its panel opens or the page reloads, while the server always uses the newest saved choice. When the status is RETIRED, the button reads "Tutor: choose again" instead of naming the choice, and the panel opens on the RETIRED status line, which says the choice is no longer offered and asks the learner to choose again.
 
 The panel contains, in order:
 
@@ -126,11 +126,11 @@ The panel contains, in order:
 - A "Model" group with one option per offered model, in table order. Each shows its name, description, and trade-off, and the default entry adds "App default".
 - A "Thinking level" group with only the levels the selected model lists. The model's default level adds "Model default". A level the model does not list is never shown, and changing the model selects that model's default level. The help text reads "More thinking can give more careful answers, but it takes longer and costs more. Less thinking is faster."
 - A warning, shown only when the selected level may not finish in time for the selected model: "{level} thinking on {model} can take longer than the tutor's 80-second limit on long materials. If a request times out, choose a lower level or a Flash model."
-- The actions "Save", which calls ChooseTutor; "Use app default", shown only when a choice is saved, which calls ClearTutor; and "Close".
+- The actions "Save", which calls ChooseTutor; "Use app default", shown only when a choice is saved, which calls ClearTutor; and, in the dialog, "Cancel".
 - After a save, the status message "Saved. Your next tutor request will use {model} with {level} thinking.", with the model and level taken from the returned record rather than from the form. After a refusal, the server's sentence.
 - The privacy line from the settings dialog: "Your files and answers are sent to Google to create lessons and feedback."
 
-Both groups are radio groups with visible labels. The warning, the status message, and refusals are announced to screen readers. The Settings dialog's "AI tutor" section has a "Choose the model" button that opens the Tutor panel. When the server has no Gemini key, the panel still opens and saves a choice, and the reason beside the AI buttons still explains why the tutor is off.
+Both groups are radio groups with visible labels. The warning, the status message, and refusals are announced to screen readers. The Settings dialog shows the panel as its Tutor section, which opens on the latest record each time Settings opens. When the server has no Gemini key, the panel still opens and saves a choice, and the reason beside the AI buttons still explains why the tutor is off.
 
 Each answer produced while the page is open shows the label "{model} · {level} thinking" in the secondary text style, below the answer. This covers a lesson explanation, a lesson reply, a practice task, a hint, an assessment judgment, and the heading of the suggested-skills panel.
 

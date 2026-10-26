@@ -1,12 +1,24 @@
+<script lang="ts">
+// Settings and the Tutor dialog each hold a panel, and every panel shows the same record (`tutorSettings`). Requests
+// from all panels share one count, so an older reply never replaces a newer one, whichever panel sent it. The record is
+// read when the first panel mounts, after sign-in, and cleared when the last one unmounts.
+let issued = 0, shown = 0, panels = 0;
+</script>
+
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId } from "vue";
 import { api, failureText } from "./api.ts";
 import { focusedControl, restoreFocus } from "./focus.ts";
 import InfoBubble from "./InfoBubble.vue";
-import { levelName, modelName, orderedLevels, tutorSettings, type TutorModel, type TutorSettings } from "./tutor-choice.ts";
+import { TUTOR_ABOUT, levelName, modelName, orderedLevels, tutorSettings, type TutorModel, type TutorSettings } from "./tutor-choice.ts";
 
-// `inline` renders the same form as a section inside the Settings modal instead of its own dialog.
-const props = defineProps<{ inline?: boolean }>();
+// `inline` renders the same form as a section inside a host dialog (Settings or the Tutor dialog) instead of its own
+// dialog. `untitled` leaves out the panel's own title, for a host that shows its own.
+const props = defineProps<{ inline?: boolean; untitled?: boolean }>();
+// "saved" follows a successful Save or "Use app default".
+const emit = defineEmits<{ saved: [] }>();
+// Two panels can be in the page at once, so ids and radio group names are made unique to each.
+const id = useId();
 const dialog = ref<HTMLDialogElement | null>(null), heading = ref<HTMLElement | null>(null), statusLine = ref<HTMLElement | null>(null);
 const noticeBox = ref<HTMLElement | null>(null), errorBox = ref<HTMLElement | null>(null);
 const reading = ref(false), working = ref<"" | "save" | "clear">(""), error = ref(""), notice = ref("");
@@ -32,7 +44,7 @@ const statusText = computed(() => {
 });
 
 // Replies can arrive out of order. A record is shown only when no later request's reply has been shown already.
-let issued = 0, shown = 0, pendingReads = 0, mounted = true;
+let pendingReads = 0, mounted = true;
 function show(ticket: number, record: TutorSettings) {
   if (!mounted || ticket <= shown) return false;
   shown = ticket;
@@ -65,21 +77,36 @@ async function read(): Promise<string> {
   }
 }
 
-/** Opens the panel on the latest record, then reads it again so a choice saved in another browser shows here. */
-async function open() {
+/**
+ * Where focus starts: a choice that is no longer offered starts on the status line that asks the learner to choose
+ * again. Otherwise it starts on the panel's title, or, when the host shows the title, on the chosen model.
+ */
+function startFocus(): HTMLElement | null {
+  if (settings.value?.status === "RETIRED") return statusLine.value;
+  if (!props.untitled) return heading.value;
+  const radios = dialog.value?.querySelectorAll<HTMLInputElement>(`input[name="${id}-model"]`) ?? [];
+  return [...radios].find((radio) => radio.checked) ?? radios[0] ?? null;
+}
+
+/**
+ * Opens the panel on the latest record, then reads it again so a choice saved in another browser shows here. With
+ * `focus` false the panel only refreshes and leaves focus where the host put it.
+ */
+async function open(focus = true) {
   const element = dialog.value;
   if (!element) return;
   error.value = ""; notice.value = "";
   if (settings.value) selectFrom(settings.value);
   if (!props.inline && !element.open) element.showModal();
   await nextTick();
-  // A choice that is no longer offered opens on the status line that asks the learner to choose again.
-  (settings.value?.status === "RETIRED" ? statusLine.value : heading.value)?.focus();
+  if (focus) startFocus()?.focus();
+  const focused = document.activeElement;
   const problem = await read();
   if (!props.inline && !element.open) return;
   if (problem) { error.value = problem; return; }
   await nextTick();
-  if (settings.value?.status === "RETIRED" && document.activeElement === heading.value) statusLine.value?.focus();
+  // The reply can change where focus should start, for example to the status line of a choice no longer offered.
+  if (focus && document.activeElement === focused) startFocus()?.focus();
 }
 
 function chooseModel(offer: TutorModel) {
@@ -102,6 +129,7 @@ async function change(action: "save" | "clear") {
       selectFrom(result.settings);
       const choice = result.settings.choice;
       notice.value = `Saved. Your next tutor request will use ${modelName(choice.model, result.settings)} with ${levelName(choice.level)} thinking.`;
+      emit("saved");
     }
   } catch {
     error.value = failureText({ error: "NETWORK_ERROR" });
@@ -116,45 +144,47 @@ async function change(action: "save" | "clear") {
 function cancel(event: Event) { if (busy.value) event.preventDefault(); }
 function close() { if (!busy.value && !props.inline) dialog.value?.close(); }
 
-// The panel exists only while someone is signed in, so mounting it is the read after sign-in.
-onMounted(() => { void read(); });
-onBeforeUnmount(() => { mounted = false; tutorSettings.value = null; });
-defineExpose({ open });
+// The panels exist only while someone is signed in, so mounting the first one is the read after sign-in.
+onMounted(() => { if (panels++ === 0) void read(); });
+onBeforeUnmount(() => { mounted = false; if (--panels === 0) tutorSettings.value = null; });
+defineExpose({ open, busy });
 </script>
 
 <template>
-  <component :is="inline ? 'section' : 'dialog'" ref="dialog" class="tutor-panel" :class="{ inline }" aria-labelledby="tutor-title" @cancel="cancel">
-    <div class="tutor-head"><h2 id="tutor-title" ref="heading" tabindex="-1">Tutor</h2><InfoBubble label="About the tutor" text="Choose which Gemini model writes your lessons, practice tasks, feedback, and skill suggestions, and how much it thinks before answering. Your choice is saved to your account and applies on every device. Your files and answers are sent to Google to create lessons and feedback." /></div>
+  <component :is="inline ? 'section' : 'dialog'" ref="dialog" class="tutor-panel" :class="{ inline }" :aria-labelledby="untitled ? undefined : `${id}-title`" @cancel="cancel">
+    <div v-if="!untitled" class="tutor-head"><h2 :id="`${id}-title`" ref="heading" tabindex="-1">Tutor</h2><InfoBubble label="About the tutor" :text="TUTOR_ABOUT" /></div>
     <p v-if="settings" ref="statusLine" class="tutor-status" :class="{ retired: settings.status === 'RETIRED' }" tabindex="-1">{{ statusText }}</p>
     <div role="status"><p v-if="!settings && reading" class="tutor-status">Loading your tutor choice…</p></div>
     <template v-if="settings">
       <fieldset class="tutor-group" :disabled="busy">
         <legend>Model</legend>
         <label v-for="offer in settings.models" :key="offer.model" class="model-option" :class="{ chosen: model === offer.model }">
-          <input type="radio" name="tutor-model" :value="offer.model" :checked="model === offer.model" :aria-labelledby="`tutor-name-${offer.model}`" :aria-describedby="`tutor-about-${offer.model} tutor-tradeoff-${offer.model}`" @change="chooseModel(offer)" />
+          <input type="radio" :name="`${id}-model`" :value="offer.model" :checked="model === offer.model" :aria-labelledby="`${id}-name-${offer.model}`" :aria-describedby="`${id}-about-${offer.model} ${id}-tradeoff-${offer.model}`" @change="chooseModel(offer)" />
           <span class="option-text">
-            <span :id="`tutor-name-${offer.model}`" class="option-name">{{ offer.name }}<span v-if="offer.appDefault" class="option-tag"><span class="sr-only">, </span>App default</span></span>
-            <span :id="`tutor-about-${offer.model}`" class="option-about">{{ offer.description }}</span>
-            <span :id="`tutor-tradeoff-${offer.model}`" class="option-tradeoff">{{ offer.tradeoff }}</span>
+            <span :id="`${id}-name-${offer.model}`" class="option-name">{{ offer.name }}<span v-if="offer.appDefault" class="option-tag"><span class="sr-only">, </span>App default</span></span>
+            <span :id="`${id}-about-${offer.model}`" class="option-about">{{ offer.description }}</span>
+            <span :id="`${id}-tradeoff-${offer.model}`" class="option-tradeoff">{{ offer.tradeoff }}</span>
           </span>
         </label>
       </fieldset>
-      <fieldset class="tutor-group" :disabled="busy" aria-describedby="tutor-level-help">
+      <fieldset class="tutor-group" :disabled="busy" :aria-describedby="`${id}-level-help`">
         <legend>Thinking level</legend>
         <div v-if="selected" class="level-options">
           <label v-for="item in levels" :key="item" class="level-option" :class="{ chosen: level === item }">
-            <input v-model="level" type="radio" name="tutor-level" :value="item" @change="chooseLevel" />{{ levelName(item) }}<span v-if="item === selected.defaultLevel" class="option-tag"><span class="sr-only">, </span>Model default</span>
+            <input v-model="level" type="radio" :name="`${id}-level`" :value="item" @change="chooseLevel" />{{ levelName(item) }}<span v-if="item === selected.defaultLevel" class="option-tag"><span class="sr-only">, </span>Model default</span>
           </label>
         </div>
         <p v-else class="hint">Choose a model to see its thinking levels.</p>
-        <p id="tutor-level-help" class="hint">More thinking can give more careful answers, but it takes longer and costs more. Less thinking is faster.</p>
+        <p :id="`${id}-level-help`" class="hint">More thinking can give more careful answers, but it takes longer and costs more. Less thinking is faster.</p>
       </fieldset>
       <div role="status"><p v-if="slow && selected" class="tutor-warning">{{ levelName(level) }} thinking on {{ selected.name }} can take longer than the tutor's 80-second limit on long materials. If a request times out, choose a lower level or a Flash model.</p></div>
     </template>
     <div class="tutor-actions">
-      <span v-if="settings" class="save-action"><button class="primary meadow" type="button" :disabled="busy || !canSave" :aria-describedby="canSave ? undefined : 'tutor-save-reason'" @click="change('save')">{{ working === 'save' ? 'Saving…' : 'Save' }}</button><p v-if="!canSave" id="tutor-save-reason" class="hint reason">Choose a model and a thinking level first.</p></span>
+      <span v-if="settings" class="save-action"><button class="primary meadow" type="button" :disabled="busy || !canSave" :aria-describedby="canSave ? undefined : `${id}-save-reason`" @click="change('save')">{{ working === 'save' ? 'Saving…' : 'Save' }}</button><p v-if="!canSave" :id="`${id}-save-reason`" class="hint reason">Choose a model and a thinking level first.</p></span>
       <button v-if="hasSaved" class="secondary meadow" type="button" :disabled="busy" @click="change('clear')">{{ working === 'clear' ? 'Saving…' : 'Use app default' }}</button>
       <button v-if="!inline" class="secondary meadow" type="button" :disabled="busy" @click="close">Close</button>
+      <!-- A host dialog adds its own actions here, such as Cancel. -->
+      <slot name="actions" />
     </div>
     <div role="status"><p v-if="notice" ref="noticeBox" class="notice" tabindex="-1">{{ notice }}</p></div>
     <div role="alert"><p v-if="error" ref="errorBox" class="error" tabindex="-1">{{ error }}</p></div>

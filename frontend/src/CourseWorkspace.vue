@@ -31,7 +31,7 @@ import { chosenKind, receiveLooks } from "./tree-looks.ts";
 import type { AskAboutPage, HomeView, OpenSource, ViewerSkill, ViewSkill, ViewUnit } from "./revamp-types.ts";
 
 // The shell (sidebar + app card) lives here because the views do; App.vue fills the course switcher slot and owns
-// Settings, the tutor panel and the Home view preference.
+// Settings, the Tutor dialog and the Home view preference.
 const props = defineProps<{ course: Course; username: string; homeView: HomeView }>();
 const emit = defineEmits<{ settings: []; tutor: []; "update:homeView": [view: HomeView]; progress: [] }>();
 const view = ref<"home" | "setup" | "chat" | "plan" | "memory">("home");
