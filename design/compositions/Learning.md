@@ -28,6 +28,15 @@ Respond answers after the turn is saved. Question then requests the tutor's answ
 
 [Correct](reaction:Learning.Correct) appends a manual revision based on the judgment the learner saw. It accepts a practice case or an [imported case](Importing.md). An imported case keeps gateMet false. When [OwnedAnyCase](view:Reads.OwnedAnyCase) shows that the case is the learner's own imported case and the correction sets gateMet true, Correct answers `IMPORTED_GATE_UNAVAILABLE` and changes nothing: imported coursework cannot show the complete demonstration gate. A correction of the learner's own imported case with gateMet false, or of the learner's own practice case, goes to `AssessmentReviewing.revise` with origin MANUAL, which still refuses an outdated judgment. When OwnedAnyCase does not hold, because the case is unknown or belongs to another learner, Correct answers `REVISION_CASE_UNAVAILABLE` with the concept's sentence and does not call `revise`.
 
+## Refusal sentences
+
+Each of these refusals reaches the learner with one sentence, which the host adds as `detail`, as the [runtime contract](../runtime.md) describes:
+
+- `SESSION_UNAVAILABLE`, from Respond, Question, Reply, Hint, Transcript, Assess, and RetryAssessment: "This session is closed or is not one of yours. Choose one of your open sessions."
+- `SESSION_CHANGED`, from Question, Reply, and Hint when the session closes while the tutor answers: "This session closed before the tutor's answer could be saved. Your own work in it is still saved."
+- `SKILL_CHANGED`, from Lesson and Task when the skill's requirements change, or the skill stops being one of the learner's confirmed skills, while the tutor answers: "This skill changed while the tutor was answering, so nothing was saved. Try again."
+- `MATERIAL_UNAVAILABLE`, from Suggest, and from the material read and the skill endpoints of the [course composition](Courses.md): "This material is not available in this course. Reload the page to see its materials."
+
 ## Adjusting the estimate
 
 [Adjust](reaction:Learning.Adjust) lets the learner set the estimate by hand with a reason. The skill page offers it beside the estimate as "Adjust estimate", apart from "Review or correct this assessment". The request carries `skill`, `adjustmentKey`, `value`, and `reason`. The page makes a new key, such as a random UUID, for each new adjustment. It keeps that key with the value and reason in the browser's session storage until it gets an answer, as the draft queue in the [course composition](Courses.md) does, so a retry sends the same key and input even after a reload. Changing the value or reason starts a new adjustment with a new key.

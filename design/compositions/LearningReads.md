@@ -20,6 +20,27 @@ When the current definition has no track, or the track starts after `at`, `_expl
 
 Each entry in `cases` passes through exactly as `AssessmentReviewing._history` reports it, with the original mark and feedback inside its `work`; an imported case has no task, which is how the page tells it apart. The study detail passes cases through unchanged. Practice cases have a task and an empty original mark and feedback. Imported cases have no practice task, so the page lists them in the skill's assessment history rather than under a conversation. It shows them as "Imported · original mark 8/10" with the grader's feedback, separate from the app's judgment.
 
+## Sessions to continue
+
+Home shows a Continue card that lists the learner's lessons and practice tasks that are still open in the course, so the learner can pick one up again. [Continue](reaction:Reads.Continue) answers that list.
+
+- When the request arrives with a course, `Sessioning.use` turns the session into the acting learner. No request field can name another learner.
+- Where [OwnedCourse](view:Courses.OwnedCourse) holds for that learner and course, the endpoint answers `sessions` with [OpenStudy](former:Reads.OpenStudy).
+- Where OwnedCourse does not hold, because the course is unknown or belongs to another learner, the endpoint answers `COURSE_UNAVAILABLE` and reads no session.
+
+OpenStudy has one row for each session of a confirmed skill in the course that OpenSession admits for the learner. It reads each skill's sessions with `GroundedTutoring._sessions`, keeps the OPEN ones, and then requires OpenSession, so a task with submitted work is left out, as it is for every endpoint that changes a session. Each row gives the session, its skill and the skill's title, its kind, and `lastActive`. [sessionActivity](computation:sessionActivity) reads the kind and `lastActive` from the session's record from `GroundedTutoring._sessionData`. Rows are ordered by session identity, as `_sessions` orders them. A draft or archived skill has no study page, so its sessions are not listed. The list is empty when nothing is open.
+
+The concept records a time only on dialogue turns, so `lastActive` is the time of the session's latest turn, and it is null for a session that has no turn yet. The card lists sessions with a turn first, latest first, and then the others, most recently started first. Selecting a row opens that skill's study page on that session.
+
+```computations
+sessionActivity(data: GroundedTutoring.StudyRecord) : SessionActivity
+  Names the session's kind, LESSON for a lesson and PRACTICE for a practice task, and gives lastActive, the server time of its latest dialogue turn. lastActive is null when the session has no dialogue turn yet.
+```
+
+```endpoints
+Reads.Continue at /learning/continue
+```
+
 ## Planning reads
 
 [PlanContext](view:Reads.PlanContext) computes candidate reviews, exam preparation, and a context fingerprint from the course map, learner progress, and planning schedule, which includes the course's active exams. [CanReplan](view:Reads.CanReplan) requires course ownership, saved preferences, and no activity in progress. [NeedsEvidence](view:Reads.NeedsEvidence) requires an effective judgment, a matching mastery track, and an absent or older contribution. Reading it has no side effects.

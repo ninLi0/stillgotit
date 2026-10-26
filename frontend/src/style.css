@@ -9,8 +9,8 @@
   --sand: #F5C98E; --sand-text: #4A2A08; --sand-edge: #D5964B; --sand-hover: #F8D6A8; --sand-soft: #FCEFD9; --sand-soft-text: #7A4A12; --sand-nav: #FADFB5;
   --dawn: #B9B0F5; --dawn-text: #21185A; --dawn-edge: #8A7EE0; --dawn-hover: #C7C0F7; --dawn-soft: #EEEBFF; --dawn-soft-text: #3B2F8F;
   /* Semantic */
-  --coral: #D9663A; --coral-wash: #FBE6DC; --coral-text: #A8412F; --new-wash: #FBF0D6; --new-text: #8A5A12;
-  --strong: #2F8A5F; --strong-wash: #EEF7F1; --review-wash: #E3EEF3; --review-text: #2A6B85; --error: #A8412F;
+  --coral: #C35124; --coral-wash: #FBE6DC; --coral-text: #A8412F; --new-wash: #FBF0D6; --new-text: #8A5A12;
+  --strong: #2A7B55; --strong-wash: #EEF7F1; --review-wash: #E3EEF3; --review-text: #2A6B85; --error: #A8412F;
   /* Type */
   --font-display: "Pixelify Sans", monospace;
   --font-body: "Instrument Sans", -apple-system, "Helvetica Neue", sans-serif;

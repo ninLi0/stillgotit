@@ -51,7 +51,7 @@ test("the host's sentences are the ones the concepts and compositions state, as 
   for (const [code, sentence] of composed) expect(scopedRefusalDetails[code]?.detail ?? refusalDetails[code], code).toBe(sentence);
 });
 
-test("a composition's sentence applies only where its design gives it; four refusal codes still have none", () => {
+test("a composition's sentence applies only where its design gives it, and every public code has a sentence", () => {
   expect(refusalDetail("/planning/read", "COURSE_UNAVAILABLE")).toBe(OWN_COURSE);
   expect(refusalDetail("/planning/tradeoffs/decline", "COURSE_UNAVAILABLE")).toBe(OWN_COURSE);
   expect(refusalDetail("/courses/skills/details", "COURSE_UNAVAILABLE")).toBeUndefined();
@@ -60,10 +60,17 @@ test("a composition's sentence applies only where its design gives it; four refu
   expect(refusalDetail("/learning/read", "SKILL_UNAVAILABLE")).toBeUndefined();
   // A concept's sentence applies on every endpoint.
   expect(refusalDetail("/courses/units/add", "UNIT_COURSE_UNAVAILABLE")).toBe(message(UnitCourseUnavailableError));
-  // No design states a sentence for these, so they still reach the browser as their category alone.
+  // Learning.md, "Refusal sentences": the four codes that once reached the browser as their category alone.
+  const openSession = "This session is closed or is not one of yours. Choose one of your open sessions.";
+  for (const path of ["/learning/respond", "/learning/transcript", "/learning/assess", "/learning/retry"]) expect(refusalDetail(path, "SESSION_UNAVAILABLE"), path).toBe(openSession);
+  expect(refusalDetail("/learning/hint", "SESSION_CHANGED")).toBe("This session closed before the tutor's answer could be saved. Your own work in it is still saved.");
+  expect(refusalDetail("/learning/task", "SKILL_CHANGED")).toBe("This skill changed while the tutor was answering, so nothing was saved. Try again.");
+  expect(refusalDetail("/courses/skills/suggest", "MATERIAL_UNAVAILABLE")).toBe("This material is not available in this course. Reload the page to see its materials.");
+  // Every code in the policy's table has a non-empty sentence: on every endpoint, or on the endpoints its design names.
   const publicCodes = Object.keys(stillGotItPolicy(ORIGIN).publicErrors ?? {});
-  expect(publicCodes.filter((code) => !Object.hasOwn(refusalDetails, code) && !Object.hasOwn(scopedRefusalDetails, code)).sort())
-    .toEqual(["MATERIAL_UNAVAILABLE", "SESSION_CHANGED", "SESSION_UNAVAILABLE", "SKILL_CHANGED"]);
+  const sentence = (code: string) => Object.hasOwn(refusalDetails, code) ? refusalDetails[code] : scopedRefusalDetails[code]?.detail;
+  expect(publicCodes.length).toBeGreaterThan(100);
+  expect(publicCodes.filter((code) => !sentence(code)?.trim())).toEqual([]);
 });
 
 async function setup() {

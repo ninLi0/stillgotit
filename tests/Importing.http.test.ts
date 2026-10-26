@@ -18,6 +18,8 @@ import { admissions, composition as Access } from "../src/compositions/access.ts
 
 const ORIGIN = "http://localhost:5173", DAY = 86_400_000, MB = 1024 * 1024, ZONE = "America/New_York", cleanups: (() => Promise<void>)[] = [];
 const SENTENCE = "Choose graded work that you imported into one of your courses.";
+// Learning.md, "Refusal sentences": a material that is not the learner's own in this course.
+const MATERIAL_UNAVAILABLE = "This material is not available in this course. Reload the page to see its materials.";
 afterAll(async () => { for (const cleanup of cleanups.reverse()) await cleanup(); });
 
 /** The HTTP harness from Learning.http.test.ts, with a fake tutor unless the test supplies one. */
@@ -233,8 +235,8 @@ test("graded work cannot become a skill source, but other materials keep their o
   const draft = { title: "From graded work", outcome: "Multiply", gate: "Two products" };
   const propose = (input: Record<string, unknown>) => app.runtime.gateway.invoke("/courses/skills/propose", { session, proposalKey: crypto.randomUUID(), ...draft, ...input }, { timeoutMs: 5000 });
   expect(await propose({ unit, material: graded })).toEqual({ ok: false, error: { kind: "domain", value: "GRADED_MATERIAL_NOT_SOURCE", detail: "Graded work is evidence, not a teaching source." } });
-  expect(await propose({ unit, material: elsewhere })).toEqual({ ok: false, error: { kind: "domain", value: "MATERIAL_UNAVAILABLE" } });
-  expect(await propose({ unit, material: foreign })).toEqual({ ok: false, error: { kind: "domain", value: "MATERIAL_UNAVAILABLE" } });
+  expect(await propose({ unit, material: elsewhere })).toEqual({ ok: false, error: { kind: "domain", value: "MATERIAL_UNAVAILABLE", detail: MATERIAL_UNAVAILABLE } });
+  expect(await propose({ unit, material: foreign })).toEqual({ ok: false, error: { kind: "domain", value: "MATERIAL_UNAVAILABLE", detail: MATERIAL_UNAVAILABLE } });
   expect(await propose({ unit: foreignUnit, material: graded })).toEqual({ ok: false, error: { kind: "domain", value: "COURSE_UNAVAILABLE" } });
   expect(await learner.post("/courses/skills/propose", { proposalKey: crypto.randomUUID(), unit, material: graded, ...draft })).toEqual({ status: 400, body: { error: "INVALID_REQUEST", detail: "Graded work is evidence, not a teaching source." } });
 
@@ -242,7 +244,7 @@ test("graded work cannot become a skill source, but other materials keep their o
   const edit = (input: Record<string, unknown>) => app.runtime.gateway.invoke("/courses/skills/edit", { session, skill, unit, ...draft, title: "Edited", ...input }, { timeoutMs: 5000 });
   expect(await edit({ material: graded })).toEqual({ ok: false, error: { kind: "domain", value: "GRADED_MATERIAL_NOT_SOURCE", detail: "Graded work is evidence, not a teaching source." } });
   expect(await learner.post("/courses/skills/edit", { skill, unit, ...draft, title: "Edited", material: graded })).toEqual({ status: 400, body: { error: "INVALID_REQUEST", detail: "Graded work is evidence, not a teaching source." } });
-  expect(await edit({ material: foreign })).toEqual({ ok: false, error: { kind: "domain", value: "MATERIAL_UNAVAILABLE" } });
+  expect(await edit({ material: foreign })).toEqual({ ok: false, error: { kind: "domain", value: "MATERIAL_UNAVAILABLE", detail: MATERIAL_UNAVAILABLE } });
   expect(await edit({ unit: foreignUnit, material: graded })).toEqual({ ok: false, error: { kind: "domain", value: "COURSE_UNAVAILABLE" } });
   expect(await edit({ material: fixture.material })).toEqual({ ok: true, value: {} });
   const skills = (await learner.ok("/courses/read", { course })).skills as { skill: string; title: string }[];

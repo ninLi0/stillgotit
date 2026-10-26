@@ -1,12 +1,14 @@
 import { computed, ref, shallowRef } from "vue";
-import { api } from "./api.ts";
+import { api, unwrap } from "./api.ts";
+import type { OpenSession } from "./continue-session.ts";
 import { planDay } from "./labels.ts";
 import { beginRefusal, daysUntil, failureMessage, PlanningFailure, settle, type PlanRead } from "./planning.ts";
 
 /**
  * The plan as Home shows it: the next activity in the hero panel, today's minutes in the sidebar, the nearest exam on
  * the scene's sign, and each skill's status pill. Start and Skip use the same planning actions and refusal sentences as
- * the planner (StudyPlanner.vue), so a refused start still explains which rule applied.
+ * the planner (StudyPlanner.vue), so a refused start still explains which rule applied. Home also lists the open lessons
+ * and practice tasks the learner can continue; they are read whenever the plan is.
  */
 export function useHomePlan(course: string) {
   const plan = shallowRef<PlanRead | null>(null), busy = ref(false), error = ref(""), notice = ref("");
@@ -15,8 +17,16 @@ export function useHomePlan(course: string) {
   const today = computed(() => data.value?.today ?? "");
 
   async function read() { plan.value = settle(await api.planning.read({ course })); }
-  /** A background read. A failure shows its sentence but keeps the last plan on screen. */
-  async function load() { try { await read(); } catch (problem) { error.value = failureMessage(problem); } }
+  /** The open lessons and practice tasks for the Continue card. */
+  const sessions = shallowRef<readonly OpenSession[]>([]);
+  async function readSessions() { sessions.value = unwrap(await api.learning.continue({ course })).sessions; }
+  /**
+   * A background read of the plan and the open sessions. A plan failure shows its sentence but keeps the last plan on
+   * screen. A failed sessions read keeps the last list; the plan's message already reports a lost connection.
+   */
+  async function load() {
+    await Promise.all([read().catch((problem) => { error.value = failureMessage(problem); }), readSessions().catch(() => undefined)]);
+  }
 
   // Why Start is unavailable, in the planner's words. Empty when it is available.
   const startReason = computed(() => {
@@ -83,5 +93,5 @@ export function useHomePlan(course: string) {
     return out;
   });
 
-  return { plan, data, next, today, busy, error, notice, startReason, minutes, exam, days, nextBySkill, load, start, miss };
+  return { plan, data, next, today, busy, error, notice, startReason, minutes, exam, days, nextBySkill, sessions, load, start, miss };
 }
