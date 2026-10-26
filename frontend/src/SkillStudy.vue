@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onDeactivated, onMounted, ref, shallowRef, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onDeactivated, onMounted, reactive, ref, shallowRef, watch } from "vue";
 import { useAttachUpload } from "./attach-upload.ts";
 import SpeechInput from "./SpeechInput.vue";
 import SourcesUsed from "./SourcesUsed.vue";
@@ -13,7 +13,7 @@ import { stageOf } from "./pixel-art.ts";
 import type { OpenSource } from "./revamp-types.ts";
 import { api, unwrap } from "./api.ts";
 import { messageTime, resultLabels, secondsLabel, sessionLabels, turnsLabel } from "./labels.ts";
-import { answerSeconds } from "./reply-stats.ts";
+import { UnansweredQuestions, answerSeconds, localStore } from "./reply-stats.ts";
 import { focusedControl, restoreFocus } from "./focus.ts";
 import { PendingAdjustment, sessionStore } from "./pending-adjustment.ts";
 import { listenUnavailable, stopSpeaking } from "./speech.ts";
@@ -93,7 +93,7 @@ function takeDraft() {
 async function startLesson() {
   const draft = takeDraft();
   await act(async () => {
-    try { const result = unwrap(await api.learning.lesson({ skill: props.skill, request: draft.text.trim() })); freshLesson.value = false; selected.value = result.lesson; }
+    try { const result = await timedAnswer(async () => unwrap(await api.learning.lesson({ skill: props.skill, request: draft.text.trim() }))); freshLesson.value = false; selected.value = result.lesson; }
     catch (problem) { draft.restore(); throw problem; }
     finally { pending.value = null; }
   });
@@ -134,7 +134,7 @@ function fitComposer() {
 watch(response, () => { void nextTick(fitComposer); });
 onMounted(() => window.addEventListener("resize", fitComposer));
 onBeforeUnmount(() => window.removeEventListener("resize", fitComposer));
-async function startTask() { await act(async () => { const result = unwrap(await api.learning.task({ skill: props.skill })); freshLesson.value = false; selected.value = result.task; reviewOpen.value = false; reviewed.value = false; unseen.value = true; outsideHelp.value = false; }); }
+async function startTask() { await act(async () => { const result = await timedAnswer(async () => unwrap(await api.learning.task({ skill: props.skill }))); freshLesson.value = false; selected.value = result.task; reviewOpen.value = false; reviewed.value = false; unseen.value = true; outsideHelp.value = false; }); }
 async function send() {
   const session = current.value; if (!session) return;
   const draft = takeDraft();
@@ -143,8 +143,8 @@ async function send() {
     // Photos go in the order the learner attached them.
     const input = { studySession: session.session, text: draft.text, channel: draft.ch, attachments: draft.sent.map((item) => item.material), dialogueLength: session.dialogue.length };
     try {
-      const result = session.lesson ? await api.learning.question(input) : await api.learning.respond(input);
-      unwrap(result);
+      if (session.lesson) await timedAnswer(async () => unwrap(await api.learning.question(input)));
+      else unwrap(await api.learning.respond(input));
       reviewed.value = false;
       draft.sent.forEach(forgetPreview);
     } catch (problem) {
@@ -211,8 +211,8 @@ async function assess() {
   }, "Assessment saved. Your result is shown above.");
 }
 async function saveConfidence() { await act(async () => { unwrap(await api.learning.confidence({ skill: props.skill, confidence: confidence.value })); }, "Starting point saved. You can now check your understanding."); }
-async function requestHint() { const active = current.value; if (active) await act(async () => { unwrap(await api.learning.hint({ studySession: active.session })); }); }
-async function retryReply() { const active = current.value; if (active) await act(async () => { unwrap(await api.learning.reply({ studySession: active.session })); }); }
+async function requestHint() { const active = current.value; if (active) await act(async () => { await timedAnswer(async () => unwrap(await api.learning.hint({ studySession: active.session }))); }); }
+async function retryReply() { const active = current.value; if (active) await act(async () => { await timedAnswer(async () => unwrap(await api.learning.reply({ studySession: active.session }))); }); }
 async function correctTranscript(turnIndex: number) { const active = current.value; if (!active) return; await act(async () => { unwrap(await api.learning.transcript({ studySession: active.session, turnIndex, text: speechEdits.value[turnIndex] ?? "" })); reviewed.value = false; }, "Transcript correction saved. Review your answer again before assessment."); }
 async function requestRegrade(assessment: string, basedOn: string) {
   await act(async () => { unwrap(await api.learning.regrade({ case: assessment, basedOn, reason: reason.value })); reason.value = ""; }, "Regrade saved. The assessment above shows the new result.");
@@ -319,7 +319,42 @@ watch(current, (session) => { speechEdits.value = Object.fromEntries(session?.vo
 // Each tutor answer names the model and thinking level that wrote it. The read after it shows which answers are new, and they get that label.
 const answeredBy = ref<Record<string, TutorUsed>>({});
 function answerLabel(...key: Parameters<typeof answerKey>) { const tutor = answeredBy.value[answerKey(...key)]; return tutor ? tutorLabel(tutor) : ""; }
-watch(data, (next, previous) => { const tutor = takeTutor(); if (tutor && next && previous) for (const key of newAnswers(previous, next)) answeredBy.value[key] = tutor; }, { flush: "sync" });
+// Each answer that arrives while the page is open also gets the time the page measured: from sending the request to the
+// reply's arrival. The read after it shows which answers are new. Measurements last until the page reloads.
+const measured = ref<Record<string, number>>({});
+let lastAnswerSeconds: number | null = null;
+/** Runs one request that brings a tutor answer and notes how long it took, for the read that follows. A failure notes nothing. */
+async function timedAnswer<T>(request: () => Promise<T>): Promise<T> {
+  const started = performance.now();
+  lastAnswerSeconds = null;
+  const result = await request();
+  lastAnswerSeconds = Math.round((performance.now() - started) / 1000);
+  return result;
+}
+watch(data, (next, previous) => {
+  const tutor = takeTutor(), seconds = lastAnswerSeconds;
+  lastAnswerSeconds = null;
+  if (!next || !previous) return;
+  for (const key of newAnswers(previous, next)) {
+    if (tutor) answeredBy.value[key] = tutor;
+    if (seconds !== null && !key.startsWith("judgment:")) measured.value[key] = seconds;
+  }
+}, { flush: "sync" });
+// A lesson question seen waiting without a reply gets its answer from a retry, whose saved times include the wait.
+// The browser remembers such questions, so after a reload their replies show no answer time rather than a wrong one.
+const unansweredStore = new UnansweredQuestions(localStore());
+const unanswered = reactive(new Set(unansweredStore.list()));
+watch([current, pending], ([session, waiting]) => {
+  const last = session?.dialogue.at(-1);
+  if (!session?.lesson || waiting || last?.turn.speaker !== "LEARNER") return;
+  const mark = `${session.session}:${last.turnIndex}`;
+  if (!unanswered.has(mark)) { unanswered.add(mark); unansweredStore.add(mark); }
+}, { immediate: true });
+/** A reply's answer time: the page's own measurement, else the saved times for a lesson reply that was not retried. */
+function replySeconds(session: StudySession, turnIndex: number) {
+  return measured.value[answerKey("turn", session.session, turnIndex)]
+    ?? answerSeconds(session.dialogue, turnIndex, (question) => unanswered.has(`${session.session}:${question}`));
+}
 // Reading aloud stops when the learner leaves this page: another view, another skill, or closing it.
 watch(() => props.active, (active) => { if (active === false) stopSpeaking(); });
 onDeactivated(stopSpeaking);
@@ -372,7 +407,7 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
                   <div class="speaker-row"><span class="speaker"><span class="avatar"><PixelIcon name="leaf" :size="16" /></span> StillGotIt<span v-if="openingTime" class="sr-only">, <time :datetime="openingTime.iso">{{ openingTime.label }}</time></span><span v-if="current.task" class="tag task">Practice task</span></span></div>
                   <div class="prose-blocks"><template v-for="(part, partIndex) in blocks(current.lesson?.explanation || current.task?.question || '')" :key="partIndex"><pre v-if="part.code" class="code-block">{{ part.text }}</pre><p v-else class="prose">{{ part.text }}</p></template></div>
                   <SourcesUsed v-if="current.citations.length" :key="current.session" :citations="current.citations" :titles="materialTitles" :id-prefix="`passage-${current.session}`" @open="openSource" />
-                  <div class="reply-foot"><ReplyMeta :sources="current.citations.length" :tutor="answerLabel('session', current.session)" /><ReplyActions :message-key="`${current.session}:opening`" :text="current.lesson?.explanation || current.task?.question || ''" :what="current.lesson ? 'lesson' : 'practice question'" describedby="listen-reason" /></div>
+                  <div class="reply-foot"><ReplyMeta :seconds="measured[answerKey('session', current.session)]" :sources="current.citations.length" :tutor="answerLabel('session', current.session)" /><ReplyActions :message-key="`${current.session}:opening`" :text="current.lesson?.explanation || current.task?.question || ''" :what="current.lesson ? 'lesson' : 'practice question'" describedby="listen-reason" /></div>
                 </article>
               </div>
               <div v-if="current.dialogue.length || pending" class="thread-divider" role="separator" aria-label="Conversation"><span aria-hidden="true">Conversation</span></div>
@@ -384,7 +419,7 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
                 <template v-else><span class="sr-only">You{{ purposeNote(item.turn.purpose) }}</span><span v-if="messageTime(item.turn.at)" class="sr-only">, <time :datetime="item.turn.at">{{ messageTime(item.turn.at) }}</time></span><span v-if="purposeNote(item.turn.purpose)" class="tag you-tag" aria-hidden="true">{{ purposeNote(item.turn.purpose).replace(' · ', '') }}</span>
                   <p class="prose">{{ item.turn.text }}</p></template>
                 <p v-for="(file, fileIndex) in item.turn.media" :key="file.file" class="attachment-label"><span class="attach-thumb" aria-hidden="true" />{{ item.turn.media.length > 1 ? `Attachment ${fileIndex + 1} of ${item.turn.media.length}` : 'Attachment' }} · {{ file.name }}</p>
-                <div v-if="item.turn.speaker === 'TUTOR'" class="reply-foot"><ReplyMeta :seconds="answerSeconds(current.dialogue, item.turnIndex)" :sources="item.turn.citations.length" :tutor="answerLabel('turn', current.session, item.turnIndex)" /><ReplyActions :message-key="`${current.session}:${item.turnIndex}`" :text="item.turn.text" :what="item.turn.purpose === 'HINT' ? 'hint' : 'tutor reply'" describedby="listen-reason" /></div></article>
+                <div v-if="item.turn.speaker === 'TUTOR'" class="reply-foot"><ReplyMeta :seconds="replySeconds(current, item.turnIndex)" :sources="item.turn.citations.length" :tutor="answerLabel('turn', current.session, item.turnIndex)" /><ReplyActions :message-key="`${current.session}:${item.turnIndex}`" :text="item.turn.text" :what="item.turn.purpose === 'HINT' ? 'hint' : 'tutor reply'" describedby="listen-reason" /></div></article>
               <!-- A lesson question without a reply: the retry sits where the tutor's reply would be. -->
               <div v-if="current.lesson && current.dialogue.at(-1)?.turn.speaker === 'LEARNER' && !pending" class="retry-row"><span class="avatar"><PixelIcon name="leaf" :size="16" /></span><button class="secondary dawn reply-retry" :disabled="busy || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="retryReply"><span aria-hidden="true">↻</span>Retry tutor reply</button></div>
               <div v-if="current.task && current.status === 'OPEN' && current.dialogue.some(item => item.turn.speaker === 'LEARNER' && item.turn.purpose === 'RESPONSE')" class="review-step">

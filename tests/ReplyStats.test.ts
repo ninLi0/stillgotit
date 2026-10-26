@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { messageTime, secondsLabel, sourcesLabel, turnsLabel } from "../frontend/src/labels.ts";
-import { answerSeconds } from "../frontend/src/reply-stats.ts";
+import { UnansweredQuestions, answerSeconds } from "../frontend/src/reply-stats.ts";
 
 const turn = (turnIndex: number, speaker: "LEARNER" | "TUTOR", purpose: string, at: string) =>
   ({ turnIndex, turn: { speaker, purpose, at } });
@@ -31,9 +31,49 @@ describe("Answer time", () => {
     expect(answerSeconds(dialogue, 9)).toBeNull();
   });
 
+  test("a reply to a question that had to be retried has no answer time from the saved times", () => {
+    const dialogue = [
+      turn(0, "LEARNER", "RESPONSE", "2026-10-25T15:00:00.000Z"),
+      turn(1, "TUTOR", "EXPLANATION", "2026-10-25T15:00:21.000Z"),
+      turn(2, "LEARNER", "RESPONSE", "2026-10-25T15:01:00.000Z"),
+      turn(3, "TUTOR", "EXPLANATION", "2026-10-25T15:01:04.000Z"),
+    ];
+    const retried = (question: number) => question === 0;
+    expect(answerSeconds(dialogue, 1, retried)).toBeNull();
+    expect(answerSeconds(dialogue, 3, retried)).toBe(4);
+  });
+
   test("an unreadable or backwards time gives no answer time", () => {
     expect(answerSeconds([turn(0, "LEARNER", "RESPONSE", "not a time"), turn(1, "TUTOR", "EXPLANATION", "2026-10-25T15:00:05.000Z")], 1)).toBeNull();
     expect(answerSeconds([turn(0, "LEARNER", "RESPONSE", "2026-10-25T15:00:05.000Z"), turn(1, "TUTOR", "EXPLANATION", "2026-10-25T15:00:00.000Z")], 1)).toBeNull();
+  });
+});
+
+describe("Questions seen without a reply", () => {
+  const memory = () => {
+    const values = new Map<string, string>();
+    return { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value); }, values };
+  };
+
+  test("marks survive a reload, once each, keeping only the newest", () => {
+    const storage = memory();
+    const first = new UnansweredQuestions(storage, 3);
+    for (const mark of ["a:0", "a:2", "a:0", "b:1", "c:4"]) first.add(mark);
+    expect(first.list()).toEqual(["a:2", "b:1", "c:4"]);
+    expect(new UnansweredQuestions(storage, 3).list()).toEqual(["a:2", "b:1", "c:4"]);
+  });
+
+  test("blocked or unreadable storage starts empty and still keeps marks until reload", () => {
+    const blocked = { getItem: () => { throw new Error("blocked"); }, setItem: () => { throw new Error("blocked"); } };
+    const page = new UnansweredQuestions(blocked);
+    page.add("a:0");
+    expect(page.list()).toEqual(["a:0"]);
+    const storage = memory();
+    storage.setItem("stillgotit-unanswered-questions", "not json");
+    expect(new UnansweredQuestions(storage).list()).toEqual([]);
+    storage.setItem("stillgotit-unanswered-questions", JSON.stringify(["a:0", 7, null]));
+    expect(new UnansweredQuestions(storage).list()).toEqual(["a:0"]);
+    expect(new UnansweredQuestions(null).list()).toEqual([]);
   });
 });
 
