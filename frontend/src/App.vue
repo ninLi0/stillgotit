@@ -5,6 +5,7 @@ import PixelIcon from "./PixelIcon.vue";
 import MasteryCells from "./MasteryCells.vue";
 import CourseWorkspace from "./CourseWorkspace.vue";
 import TutorPanel from "./TutorPanel.vue";
+import TutorDialog from "./TutorDialog.vue";
 import AppearanceChoice from "./AppearanceChoice.vue";
 import WelcomeScene from "./WelcomeScene.vue";
 import { HOME_VIEW_KEY, type HomeView } from "./revamp-types.ts";
@@ -185,12 +186,15 @@ async function restoreCourse(course: Course) {
 }
 
 const settingsDialog = ref<HTMLDialogElement | null>(null);
-const tutorPanel = ref<InstanceType<typeof TutorPanel> | null>(null);
-// The tutor button in the lesson's message box opens Settings at its Tutor section.
-async function openSettings(atTutor = false) {
+const tutorPanel = ref<InstanceType<typeof TutorPanel> | null>(null), tutorDialog = ref<InstanceType<typeof TutorDialog> | null>(null);
+// Settings opens with its Tutor section on the latest choice, which the Tutor dialog may have changed, and focus stays
+// at the top of Settings.
+function openSettings() {
   settingsDialog.value?.showModal();
-  if (atTutor) { await nextTick(); await tutorPanel.value?.open(); }
+  void tutorPanel.value?.open(false);
 }
+// The tutor button in the lesson's message box opens the Tutor dialog, which holds only the model and thinking level.
+function openTutor() { void tutorDialog.value?.open(); }
 async function signOut() {
   busy.value = true; error.value = "";
   const result = await api.auth.logout({});
@@ -227,7 +231,7 @@ onMounted(async () => {
   <p v-if="loading" class="loading boot" role="status">Opening your study space…</p>
   <template v-else-if="inCourse">
     <CourseWorkspace :key="selected!.course" :course="selected!" :username="username!" :home-view="homeView"
-      @update:home-view="saveHomeView" @settings="openSettings()" @tutor="openSettings(true)" @progress="loadScores">
+      @update:home-view="saveHomeView" @settings="openSettings()" @tutor="openTutor()" @progress="loadScores">
       <template #switcher>
         <div ref="switcher" class="switcher" @keydown.esc="closeMenu(true)">
           <button class="switch card" type="button" :aria-expanded="menuOpen" aria-controls="course-menu" :disabled="busy" @click="toggleMenu">
@@ -348,6 +352,7 @@ onMounted(async () => {
       <button class="secondary meadow" :disabled="busy" @click="settingsDialog?.close(); signOut()">Sign out</button>
     </section>
   </dialog>
+  <TutorDialog v-if="username" ref="tutorDialog" />
 </template>
 
 <style scoped>

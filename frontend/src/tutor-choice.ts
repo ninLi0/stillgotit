@@ -15,6 +15,9 @@ type SkillData = StillGotItHttp["/learning/read"]["output"]["data"];
  */
 export const tutorSettings = shallowRef<TutorSettings | null>(null);
 
+/** What the tutor choice does and where the learner's work goes, behind the ⓘ beside the tutor's title. */
+export const TUTOR_ABOUT = "Choose which Gemini model writes your lessons, practice tasks, feedback, and skill suggestions, and how much it thinks before answering. Your choice is saved to your account and applies on every device. Your files and answers are sent to Google to create lessons and feedback.";
+
 const levelOrder: readonly string[] = ["MINIMAL", "LOW", "MEDIUM", "HIGH"];
 const levelNames: Record<string, string> = { MINIMAL: "Minimal", LOW: "Low", MEDIUM: "Medium", HIGH: "High" };
 
