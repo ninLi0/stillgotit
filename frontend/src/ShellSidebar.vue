@@ -7,7 +7,7 @@ import { useSlidingMark } from "./sliding-mark.ts";
 // The app's sidebar (design/revamp/README.md): brand, course switcher (the slot, owned by App.vue), the nav rows with
 // their biome capsules and badges, and at the bottom the Today card, the tutor model row and Settings. Under 760px it
 // becomes a top bar with the nav rows as a horizontal strip.
-export type ShellView = "home" | "plan" | "setup" | "chat";
+export type ShellView = "home" | "plan" | "setup" | "chat" | "memory";
 const props = defineProps<{ view: ShellView; forestOpen: boolean; lessonTitle?: string; materialsBadge: number; homeBadge?: number;
   today: { spent: number; total: number } | null; tutorLabel: string; username: string }>();
 const emit = defineEmits<{ navigate: [view: ShellView]; forest: []; lesson: []; tutor: []; settings: [] }>();
@@ -18,6 +18,7 @@ const rows = computed<Row[]>(() => [
   { view: "plan", label: "Plan", icon: "calendar", biome: "ocean" },
   { view: "setup", label: "Materials", icon: "school", biome: "sand", badge: props.materialsBadge },
   { view: "forest", label: "Forest view", icon: "tree", biome: "meadow" },
+  { view: "memory", label: "Memory", icon: "memory", biome: "dawn" },
 ]);
 function isCurrent(row: Row) {
   if (row.view === "forest") return props.forestOpen;
@@ -86,6 +87,7 @@ const cells = computed(() => {
 .nav-capsule.meadow { background: var(--meadow-nav); }
 .nav-capsule.ocean { background: var(--ocean-nav); }
 .nav-capsule.sand { background: var(--sand-nav); }
+.nav-capsule.dawn { background: var(--dawn-nav); }
 .nav-label { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .badge { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--coral); color: #fff; font-size: 12px; font-weight: 700; }
 .nav-row.current .badge { background: #fff; color: var(--coral); }

@@ -99,7 +99,7 @@ Reads.Memory at /learning/memory
 
 ## Course confidence
 
-The course menu and the course card show each course's overall confidence. [Scores](reaction:Reads.Scores) answers it for every course at once, so one request serves the menu.
+The course switcher shows the open course's overall confidence, and the course menu shows each course's. [Scores](reaction:Reads.Scores) answers it for every course at once, so one request serves the menu.
 
 - When the request arrives, `Sessioning.use` turns the session into the acting learner. The request has no other field, so no field can name another learner.
 - The endpoint answers `courses` with [CourseScores](former:Reads.CourseScores): one row for each of the learner's active courses, ordered by course identity, with `course`, `score`, `skills`, and `estimated`. Archived courses are left out.

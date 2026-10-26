@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import { api, failureText, type Course } from "./api.ts";
 import PixelIcon from "./PixelIcon.vue";
+import MasteryCells from "./MasteryCells.vue";
 import CourseWorkspace from "./CourseWorkspace.vue";
 import TutorPanel from "./TutorPanel.vue";
 import WelcomeScene from "./WelcomeScene.vue";
@@ -52,6 +53,22 @@ function closeMenu(refocus = false) {
   if (refocus) switcher.value?.querySelector<HTMLElement>(".switch")?.focus();
 }
 function outside(event: PointerEvent) { if (!switcher.value?.contains(event.target as Node)) closeMenu(); }
+function toggleMenu() { menuOpen.value = !menuOpen.value; courseNote.value = ""; if (menuOpen.value) void loadScores(); }
+
+// Each active course's confidence: the average estimate of its confirmed skills, as the Forest view shows it
+// (design/compositions/LearningReads.md, "Course confidence"). It is read again when the menu opens and whenever the
+// open course's estimates change. A failed read leaves the scores out; the courses still open.
+type Score = { score: number | null; skills: number; estimated: number };
+const scores = ref<Record<string, Score>>({});
+let scoreRead = 0;
+async function loadScores() {
+  const token = ++scoreRead;
+  try {
+    const result = await api.courses.scores({});
+    if (token === scoreRead && !("error" in result)) scores.value = Object.fromEntries(result.courses.map((row) => [row.course, row]));
+  } catch { /* The scores stay as they were. */ }
+}
+const scoreOf = (course: string) => scores.value[course]?.score ?? null;
 
 async function loadAccount() {
   const me = await api.auth.me({});
@@ -65,6 +82,7 @@ async function loadAccount() {
   const [result] = await Promise.all([api.courses({}), fetchHomeView()]);
   if ("error" in result) { error.value = failureText(result); return true; }
   courses.value = result.courses;
+  void loadScores();
   return true;
 }
 
@@ -215,15 +233,19 @@ onMounted(async () => {
   <p v-if="loading" class="loading boot" role="status">Opening your study space…</p>
   <template v-else-if="inCourse">
     <CourseWorkspace :key="selected!.course" :course="selected!" :username="username!" :tutor-choice="tutorChoice" :home-view="homeView"
-      @update:home-view="saveHomeView" @settings="openSettings()" @tutor="openSettings(true)">
+      @update:home-view="saveHomeView" @settings="openSettings()" @tutor="openSettings(true)" @progress="loadScores">
       <template #switcher>
         <div ref="switcher" class="switcher" @keydown.esc="closeMenu(true)">
-          <button class="switch card" type="button" :aria-expanded="menuOpen" aria-controls="course-menu" :disabled="busy" @click="menuOpen = !menuOpen; courseNote = ''">
-            <span class="switch-text"><span class="eyebrow">Course</span><span class="switch-title">{{ selected!.title }}</span></span><svg aria-hidden="true" viewBox="0 0 12 12" width="12" height="12"><path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" /></svg>
+          <button class="switch card" type="button" :aria-expanded="menuOpen" aria-controls="course-menu" :disabled="busy" @click="toggleMenu">
+            <span class="switch-text"><span class="eyebrow">Course</span><span class="switch-title">{{ selected!.title }}</span><span v-if="scoreOf(selected!.course) !== null" class="switch-score">Course confidence {{ scoreOf(selected!.course) }}%</span></span><svg aria-hidden="true" viewBox="0 0 12 12" width="12" height="12"><path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" /></svg>
           </button>
           <div v-if="menuOpen" id="course-menu" class="menu">
             <p class="menu-heading eyebrow">Courses</p>
-            <button v-for="c in activeCourses" :key="c.course" type="button" class="row" :class="{ current: c.course === selected!.course && !creating }" :aria-current="c.course === selected!.course && !creating ? 'true' : undefined" @click="selectCourse(c.course)">{{ c.title }}</button>
+            <button v-for="c in activeCourses" :key="c.course" type="button" class="row course-row" :class="{ current: c.course === selected!.course && !creating }" :aria-current="c.course === selected!.course && !creating ? 'true' : undefined" @click="selectCourse(c.course)">
+              <span class="course-name">{{ c.title }}</span>
+              <span v-if="scores[c.course]" class="course-score" aria-hidden="true"><MasteryCells class="score-cells" :value="scoreOf(c.course)" :cells="5" :height="5" /><span class="score-value">{{ scoreOf(c.course) === null ? "–" : `${scoreOf(c.course)}%` }}</span></span>
+              <span v-if="scores[c.course]" class="sr-only">, {{ scoreOf(c.course) === null ? "no course confidence yet" : `course confidence ${scoreOf(c.course)}%` }}</span>
+            </button>
             <button type="button" class="row" @click="startCourse">+ New course</button>
             <button type="button" class="row" aria-haspopup="dialog" @click="askArchive">Archive this course…</button>
             <template v-if="archivedCourses.length">
@@ -342,10 +364,17 @@ onMounted(async () => {
 .switch svg { flex: none; color: var(--muted); }
 .switch-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
 .switch-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 650; }
+.switch-score { font-size: 12px; color: var(--muted); }
 .menu { position: absolute; z-index: 20; top: calc(100% + 6px); left: 0; display: flex; flex-direction: column; gap: 2px; width: 100%; min-width: 220px; max-width: min(360px, calc(100vw - 32px)); max-height: 60vh; overflow-y: auto; padding: 6px; border-radius: 14px; background: #fff; box-shadow: 0 10px 30px rgb(0 0 0 / .12), 0 0 0 1px var(--ring); }
 .menu-heading { padding: 6px 10px 4px; }
 .row { padding: 8px 10px; border: 0; border-radius: 10px; background: transparent; color: var(--ink); font-size: 14px; text-align: left; overflow-wrap: anywhere; }
 .row:hover, .row.current { background: var(--meadow-soft); }
+.course-row { display: flex; align-items: center; gap: 10px; }
+.course-name { flex: 1; min-width: 0; }
+.course-score { display: inline-flex; align-items: center; gap: 6px; flex: none; }
+.score-cells { width: 36px; }
+.score-value { min-width: 30px; font-size: 12px; font-weight: 700; color: var(--soft); text-align: right; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .row.fold { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; border-top: 1px solid var(--line); border-radius: 0 0 10px 10px; color: var(--muted); }
 .row.fold svg { flex: none; }
 .archived-list { list-style: none; margin: 0; padding: 0 0 2px; display: flex; flex-direction: column; gap: 2px; }

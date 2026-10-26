@@ -6,12 +6,9 @@ import { api, errorMessage, failureText } from "./api.ts";
 import { KIND_MARKS, KIND_NAMES, type ChartPoint } from "./estimate-chart.ts";
 import { MARKS } from "./pixel-art.ts";
 import { focusedControl, restoreFocus } from "./focus.ts";
-import { planDay, resultLabels } from "./labels.ts";
+import { planDay } from "./labels.ts";
+import { isImported, caseName as nameOf, resultName, changeText as sentence, kindLabel as markLabel, type Case, type Change, type SkillData } from "./evidence-text.ts";
 import { PendingAdjustment, sessionStore, type AdjustmentInput } from "./pending-adjustment.ts";
-import type { StillGotItHttp } from "../../generated/wire.ts";
-type SkillData = StillGotItHttp["/learning/read"]["output"]["data"];
-type Change = NonNullable<SkillData["explanation"]>["changes"][number];
-type Case = SkillData["cases"][number];
 // `sessionLabels` names conversations, such as "Practice 2". `reload` reads the skill again and rejects when that read fails.
 const props = defineProps<{ skill: string; data: SkillData; sessionLabels: Record<string, string>; busy: boolean; reload: () => Promise<void> }>();
 const emit = defineEmits<{ changed: []; openSession: [session: string] }>();
@@ -102,23 +99,12 @@ async function sendAdjustment() {
 }
 
 const casesById = computed(() => new Map(props.data.cases.map((item) => [item.case, item])));
-/** Imported graded work has no practice task and keeps its original mark. */
-function isImported(item: Case) { return item.task === null && item.work.originalMark.trim() !== ""; }
-function caseName(item: Case | undefined) {
-  if (!item) return "";
-  if (isImported(item)) return `Imported · original mark ${item.work.originalMark.trim()}`;
-  return item.task ? props.sessionLabels[item.task] ?? "Practice" : "Assessment";
-}
-function result(item: Case | undefined) { return item?.judgment ? resultLabels[item.judgment.result] ?? "" : ""; }
+// The wording is shared with the Memory view (evidence-text.ts).
+function caseName(item: Case | undefined) { return nameOf(item, props.sessionLabels); }
+function result(item: Case | undefined) { return resultName(item); }
 function percent(value: number) { return `${Math.round(value)}%`; }
 function points(amount: number) { const whole = Math.round(amount); return whole < 1 ? "less than 1 point" : whole === 1 ? "1 point" : `${whole} points`; }
-function kindLabel(change: Change) {
-  if (change.kind === "ATTEMPT") {
-    const item = casesById.value.get(change.source);
-    return ["Assessed attempt", caseName(item), result(item)].filter(Boolean).join(" · ");
-  }
-  return change.kind === "ADJUSTMENT" ? "Your adjustment" : "Time without practice";
-}
+function kindLabel(change: Change) { return markLabel(change, casesById.value, props.sessionLabels); }
 /** Days since the previous row and the decay folded into this row. Small same-day decay is left out. */
 function timing(change: Change, index: number) {
   const since = index === 0 ? "the starting point" : "the previous change";
@@ -136,29 +122,7 @@ function dateParts(at: string) {
   const [weekday, day] = planDay(at).split(", ");
   return day ? { day, weekday } : { day: weekday ?? "", weekday: "" };
 }
-/** How a change moved the estimate, in whole percents as the values column shows them. */
-function moved(before: number, after: number) {
-  const from = Math.round(before), to = Math.round(after);
-  return to > from ? `raised it from ${from}% to ${to}%` : to < from ? `lowered it from ${from}% to ${to}%` : `left it at ${to}%`;
-}
-/** Each judgment as the subject of a sentence ("A small execution error lowered it …"). */
-const RESULT_SUBJECT: Record<string, string> = {
-  INDEPENDENT: "Independent success", SUPPORTED: "Success with help", SLIP: "A small execution error", GAP: "A gap in understanding", UNCERTAIN: "An uncertain result",
-};
-function attemptPlace(item: Case | undefined) {
-  if (!item) return "";
-  if (isImported(item)) return ` on imported work (original mark ${item.work.originalMark.trim()})`;
-  return item.task ? ` in ${props.sessionLabels[item.task] ?? "practice"}` : " in an assessment";
-}
-function changeText(change: Change) {
-  if (change.kind === "ATTEMPT") {
-    const item = casesById.value.get(change.source), judged = item?.judgment?.result;
-    const subject = judged ? RESULT_SUBJECT[judged] ?? resultLabels[judged] ?? "An assessed attempt" : "An assessed attempt";
-    const fresh = judged === "INDEPENDENT" && item?.fresh ? " on fresh work" : "";
-    return `${subject}${fresh}${attemptPlace(item)} ${moved(change.before, change.after)}.`;
-  }
-  return `${change.kind === "ADJUSTMENT" ? "Your adjustment" : "Time without practice"} ${moved(change.before, change.after)}.`;
-}
+function changeText(change: Change) { return sentence(change, casesById.value, props.sessionLabels); }
 /** The starting point's date and one row per change, in the concept's order. */
 const startDate = computed(() => dateParts(props.data.explanation?.start.at ?? ""));
 const changeRows = computed(() => (props.data.explanation?.changes ?? []).map((change, index) => ({

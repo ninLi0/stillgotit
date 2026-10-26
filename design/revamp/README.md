@@ -7,6 +7,7 @@ It covers every screen:
 - Sign-in
 - Home, with Tree and Tasks views
 - Forest view, a course overview
+- Memory, each skill's estimate curve and the day to review it by
 - Learn (lesson and tutor chat)
 - Materials, with an in-app file viewer
 - Plan
@@ -46,6 +47,7 @@ The file pages inside the viewer (PDF, slides, photos, markdown) are typeset moc
 | Home (meadow) | #8FD3A6 | #0E3A22 | #55AE77 | #A2DBB5 | #E7F6EC / #1C5A37 | #C6EAD1 |
 | Plan (ocean) | #86CDE9 | #08344D | #43A2CB | #9AD6EE | #E2F3FA / #0D4F70 | #C3E6F4 |
 | Materials (sand) | #F5C98E | #4A2A08 | #D5964B | #F8D6A8 | #FCEFD9 / #7A4A12 | #FADFB5 |
+| Memory (dawn) | #B9B0F5 | #21185A | #8A7EE0 | #C7C0F7 | #EEEBFF / #3B2F8F | #D9D4FA |
 | Learn (dawn) | #B9B0F5 | #21185A | #8A7EE0 | #C7C0F7 | #EEEBFF / #3B2F8F | — |
 
 - **Semantic colours:**
@@ -93,8 +95,8 @@ The file pages inside the viewer (PDF, slides, photos, markdown) are typeset moc
 ### Sidebar (all in-app screens)
 - **Width:** 252px (216px under 1100px). Transparent, padding 20/12/14/14.
 - **Brand:** leaf icon plus "StillGotIt" in Pixelify 20px.
-- **Course switcher card:** white, radius 18, 1px ring `#E6E6E2`. Eyebrow "COURSE", course name 14/650 with ellipsis, chevron. The dropdown lists courses and "+ New course".
-- **Nav items:** pill rows, 15px, with a 24px pixel icon. The rows are Home, Plan, Materials and Forest view.
+- **Course switcher card:** white, radius 18, 1px ring `#E6E6E2`. Eyebrow "COURSE", course name 14/650 with ellipsis, chevron, and "Course confidence 62%" in muted 12px once a skill has an estimate. The dropdown lists courses, each with its confidence as 5 mastery cells and a number ("–" before any estimate), and "+ New course".
+- **Nav items:** pill rows, 15px, with a 24px pixel icon. The rows are Home, Plan, Materials, Forest view and Memory.
   - The selected row is a solid capsule in its biome colour (table above) with ink text.
   - Badges are 20px pills: coral `#D9663A` with white text when unselected, and inverted when selected.
   - When a lesson is open, Home gets a sub-row: a lavender `#F1EEFF` chip with a `#8B7FE0` square and the skill name.
