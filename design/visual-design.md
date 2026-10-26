@@ -115,14 +115,14 @@ Text should reach 4.5:1 against its background, and outlines and cells that carr
 | Green `#2A7B55` on `#EEF7F1` | The Strong pill | 4.73:1 |
 | Green `#2A7B55` on `#E7F6EC` | The "App default" tag in Settings | 4.63:1 |
 | White on coral `#C35124`, and coral on white | The sidebar's Materials badge, on an unselected and a selected row | 4.64:1 |
-| `#B5702A` on white | "N to review" in the Materials file list | 3.95:1 |
+| `#A46626` on white | "N to review" in the Materials file list | 4.66:1 |
 | `#777094` on white | Eyebrows in the estimate's evidence, such as "How the estimate got here" | 4.64:1 |
-| `#7A7397` on white | Eyebrows in the lesson's rail cards: "Your mastery", "Goal", and "To master it" | 4.44:1 |
+| `#777094` on white | Eyebrows in the lesson's rail cards: "Your mastery", "Goal", and "To master it" | 4.64:1 |
 | Filled cell `#4A775A` against empty `#E6E6E2` | Mastery cells (3:1 needed) | 4.12:1 |
 | `#1E6F96` against `#CFE7F2` | Plan load cells (3:1 needed) | 4.34:1 |
 | Faint `#6F6F6C` on white | Form-field outlines (3:1 needed) | 5.04:1 |
 
-Every text pair passes except two: "N to review" in the Materials file list and the eyebrows in the lesson's rail cards. Both are small text, 11 and 12 px, so they need 4.5:1; `#A46626` and `#777094`, darker colors of the same hues, would reach it. The green, the coral, and the evidence eyebrows were darkened within their own hues to pass. The success green and the coral changed everywhere the interface uses them as text, outlines, or fills; the pixel art keeps its own palette.
+Every text pair now passes. The last two to change were "N to review" in the Materials file list and the eyebrows in the lesson's rail cards, both small text at 11 and 12 px, which moved to `#A46626` and `#777094`, darker colors of the same hues. The green, the coral, and the evidence eyebrows were darkened within their own hues to pass. The success green and the coral changed everywhere the interface uses them as text, outlines, or fills; the pixel art keeps its own palette.
 
 <details>
 <summary>How the ratios were computed</summary>
