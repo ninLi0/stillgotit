@@ -327,7 +327,7 @@ onUnmounted(() => {
                 <PixelIcon name="tree" :size="24" />
                 <span class="topic-main">
                   <strong class="topic-name">{{ t.title }}</strong>
-                  <MasteryCells class="topic-cells" :value="t.avg" :cells="14" :height="5" off="#F1F1EE" />
+                  <MasteryCells class="topic-cells" :value="t.avg" :cells="14" :height="5" off="var(--mastery-off-soft)" />
                 </span>
                 <span class="topic-figures">
                   <span class="topic-pct">{{ t.avg === null ? "New" : `${t.avg}%` }}</span><span class="topic-count">{{ plural(t.skills.length, "skill") }}</span>
@@ -382,8 +382,8 @@ onUnmounted(() => {
 .forest-sign { position: absolute; z-index: 2; width: max-content; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 5px 12px 6px; border: 0; border-radius: 0; background: var(--plank); box-shadow: inset 0 -2px 0 var(--plank-edge), 0 0 0 2px var(--plank-ring), 0 6px 0 -1px rgb(var(--shadow) / .12); text-align: center; }
 .forest-sign:hover { background: var(--plank-hover); }
 .forest-sign.on { box-shadow: inset 0 -2px 0 var(--plank-edge), 0 0 0 2px var(--sun), 0 6px 0 -1px rgb(var(--shadow) / .12); }
-.sign-title { display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; font-family: var(--font-display); font-size: 15px; font-weight: 500; line-height: 1.2; color: var(--ink); }
-.sign-meta { font-size: 11px; font-weight: 600; color: var(--soft); white-space: nowrap; }
+.sign-title { display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; font-family: var(--font-display); font-size: 15px; font-weight: 500; line-height: 1.2; color: var(--plank-ink); }
+.sign-meta { font-size: 11px; font-weight: 600; color: var(--plank-soft); white-space: nowrap; }
 .forest-tag { position: absolute; z-index: 4; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 10px; background: var(--forest-tag); color: var(--tip-text); font-size: 12px; font-weight: 600; white-space: nowrap; pointer-events: none; box-shadow: 0 6px 14px rgb(var(--shadow) / .2); }
 .tag-pct { color: var(--tag-accent); }
 .forest-info { position: absolute; left: 12px; top: 10px; z-index: 5; display: inline-flex; border-radius: 10px; background: var(--scene-chip); }

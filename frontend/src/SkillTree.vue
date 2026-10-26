@@ -198,8 +198,8 @@ onBeforeUnmount(() => {
 .grove-stage canvas { display: block; image-rendering: pixelated; }
 .plank { position: absolute; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; padding: 4px 10px 5px; background: var(--plank);
   box-shadow: inset 0 -2px 0 var(--plank-edge), 0 0 0 2px var(--plank-ring); white-space: nowrap; pointer-events: none; }
-.plank-title { max-width: 100%; overflow: hidden; text-overflow: ellipsis; font: 400 13px/16px var(--font-display); color: var(--ink); }
-.plank-meta { font: 600 12px/15px var(--font-body); color: var(--soft); font-variant-numeric: tabular-nums; }
+.plank-title { max-width: 100%; overflow: hidden; text-overflow: ellipsis; font: 400 13px/16px var(--font-display); color: var(--plank-ink); }
+.plank-meta { font: 600 12px/15px var(--font-body); color: var(--plank-soft); font-variant-numeric: tabular-nums; }
 /* Leaf buttons sit over their leaves for keyboard and screen-reader use; the pointer goes through to the canvas. */
 .leaf-button { position: absolute; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 6px; background: transparent; pointer-events: none; }
 .leaf-tag { position: absolute; z-index: 2; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 8px; background: var(--tip); color: var(--tip-text);

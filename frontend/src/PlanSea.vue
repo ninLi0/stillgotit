@@ -178,7 +178,7 @@ canvas{position:absolute;left:0;top:0;image-rendering:pixelated}
 .dive{transform:translateY(round(var(--drift-y),var(--snap,1px)));animation:sgDive var(--period-y) var(--ease-loop) var(--delay-y) infinite alternate}
 .spout{animation:sgSpout calc(var(--period-y) * 2) var(--ease-loop) var(--delay-y) infinite}
 .sea-sign{position:absolute;transform:translate(-50%,-100%);display:flex;flex-direction:column;align-items:center;padding:3px 9px 4px;background:var(--plank);box-shadow:inset 0 -2px 0 var(--plank-edge),0 0 0 2px var(--plank-ring);white-space:nowrap;pointer-events:none}
-.sign-title{font-family:var(--font-display);font-size:13px;color:var(--ink)}
-.sign-date{font-size:11px;font-weight:700;color:var(--soft)}
+.sign-title{font-family:var(--font-display);font-size:13px;color:var(--plank-ink)}
+.sign-date{font-size:11px;font-weight:700;color:var(--plank-soft)}
 .sea-you{position:absolute;transform:translateX(-50%);font-family:var(--font-display);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--sea-label);background:var(--scene-label);padding:2px 6px;white-space:nowrap;pointer-events:none}
 </style>

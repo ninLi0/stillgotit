@@ -16,7 +16,7 @@ defineProps<{ headingId: string; average: number | null; note: string; counts: {
       <span class="average-pct">{{ average === null ? "–" : `${average}%` }}</span>
       <span class="average-note"><template v-if="average !== null">average mastery<br /></template>{{ note }}</span>
     </div>
-    <MasteryCells class="average-cells" :value="average" :cells="20" :height="10" off="#F1F1EE" />
+    <MasteryCells class="average-cells" :value="average" :cells="20" :height="10" off="var(--mastery-off-soft)" />
     <ul class="counts" aria-label="Skills by stage">
       <li v-for="c in counts" :key="c.key" class="count" :class="{ none: c.n === 0 }">
         <span class="count-figure"><PixelIcon :sprite="c.sprite" :size="21" /><strong>{{ c.n }}</strong></span>

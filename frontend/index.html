@@ -4,8 +4,21 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="referrer" content="no-referrer" />
+    <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" content="#ffffff" />
     <title>StillGotIt</title>
+    <script>
+      // Applies a saved Light or Dark choice before the first paint, so a reload never flashes the other theme.
+      // frontend/src/theme.ts keeps the page in step afterwards; the two grounds below are its GROUNDS.
+      (function () {
+        var choice = null;
+        try { choice = localStorage.getItem("stillgotit.theme"); } catch (error) { /* Blocked storage: follow the device. */ }
+        var dark = choice === "dark" || (choice !== "light" && !!window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        if (choice === "light" || choice === "dark") document.documentElement.setAttribute("data-theme", choice);
+        var toolbar = document.querySelector('meta[name="theme-color"]');
+        if (toolbar) toolbar.setAttribute("content", dark ? "#121311" : "#FFFFFF");
+      })();
+    </script>
   </head>
   <body>
     <div id="app"></div>

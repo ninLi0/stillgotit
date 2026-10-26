@@ -89,7 +89,7 @@ const cells = computed(() => {
 .nav-label { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .badge { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--coral); color: var(--on-fill); font-size: 12px; font-weight: 700; }
 .nav-row.current .badge { background: var(--on-fill); color: var(--coral); }
-.sub-row { display: flex; align-items: center; gap: 8px; margin: 0 4px 2px 34px; padding: 6px 10px; border: 0; border-radius: 10px; background: var(--dawn-wash); color: var(--dawn-text); font-size: 13px; font-weight: 600; text-align: left; min-width: 0; }
+.sub-row { display: flex; align-items: center; gap: 8px; margin: 0 4px 2px 34px; padding: 6px 10px; border: 0; border-radius: 10px; background: var(--dawn-wash); color: var(--dawn-wash-text); font-size: 13px; font-weight: 600; text-align: left; min-width: 0; }
 .sub-row.current { box-shadow: 0 0 0 1px var(--dawn-edge); }
 .sub-square { width: 8px; height: 8px; flex: none; background: var(--dawn-edge); }
 .sub-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

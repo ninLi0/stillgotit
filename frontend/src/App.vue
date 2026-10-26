@@ -4,6 +4,7 @@ import { api, failureText, type Course } from "./api.ts";
 import PixelIcon from "./PixelIcon.vue";
 import CourseWorkspace from "./CourseWorkspace.vue";
 import TutorPanel from "./TutorPanel.vue";
+import AppearanceChoice from "./AppearanceChoice.vue";
 import WelcomeScene from "./WelcomeScene.vue";
 import { levelName, modelName, tutorSettings } from "./tutor-choice.ts";
 import { HOME_VIEW_KEY, type HomeView } from "./revamp-types.ts";
@@ -324,6 +325,7 @@ onMounted(async () => {
       </div>
       <p v-if="viewNote" class="view-note" role="status">{{ viewNote }}</p>
     </section>
+    <section class="settings-section"><AppearanceChoice /></section>
     <section class="settings-section"><TutorPanel ref="tutorPanel" inline /></section>
     <section class="settings-section">
       <h3 class="eyebrow">Account</h3>

@@ -563,7 +563,7 @@ button.mastery-chip:hover{border-color:var(--lesson-chip-hover)}
 .tab-meta{font-size:12px;font-weight:500;color:var(--faint)}
 .tab-done{font-size:11px;font-weight:800;color:var(--strong)}
 .new-lesson{font-weight:700;color:var(--lesson-new)}
-.new-lesson:hover:not(:disabled){color:var(--dawn-text)}
+.new-lesson:hover:not(:disabled){color:var(--lesson-new-hover)}
 /* Thread */
 /* The thread scrolls inside thread-wrap, which also holds the "Jump to latest" pill over its bottom edge. */
 .thread-wrap{position:relative;flex:1;min-height:0;display:flex;flex-direction:column}

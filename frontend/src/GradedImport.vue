@@ -527,7 +527,7 @@ defineExpose({ startUpload });
 .check{display:flex;align-items:flex-start;gap:10px;font-size:13px;font-weight:400;margin:14px 0 0}.check input{width:16px;min-height:16px;height:16px;margin:3px 0 0;padding:0;flex:none;accent-color:var(--sand-soft-text)}
 .graded-rows{list-style:none;margin:18px 0 0;padding:0;border:1px solid var(--line);border-radius:14px;overflow:hidden}.graded-row{padding:14px 16px}.graded-row+.graded-row{border-top:1px solid var(--line)}.graded-row.done{background:var(--inset)}
 .row-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.row-check{margin:0;flex:1;min-width:0}.row-check strong{font-size:15px;overflow-wrap:anywhere}
-.mark{background:var(--sand-soft);color:var(--sand-text);border-radius:999px;padding:2px 10px;font-size:13px;font-weight:600;white-space:nowrap}.imported-tag{color:var(--strong);font-size:13px;font-weight:600}
+.mark{background:var(--sand-soft);color:var(--sand-mark-text);border-radius:999px;padding:2px 10px;font-size:13px;font-weight:600;white-space:nowrap}.imported-tag{color:var(--strong);font-size:13px;font-weight:600}
 .row-facts{margin:10px 0 0;display:grid;gap:6px}.row-facts div{display:grid;grid-template-columns:140px minmax(0,1fr);gap:10px;font-size:13px}.row-facts dt{color:var(--muted)}.row-facts dd{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
 .row-choices{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;margin-top:10px}.row-choices label{font-size:12px;margin:0 0 5px}
 select{width:100%;font:inherit;font-size:14px;padding:9px 12px;border:1px solid var(--faint);border-radius:7px;background:var(--field);color:var(--ink)}select:disabled{opacity:.7}

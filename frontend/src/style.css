@@ -22,10 +22,14 @@
   --meadow-wash: #F1F8F2; --meadow-tile: #EAF7EE; --meadow-line: #CFE6D7; --meadow-soft-hover: #D6EFDF; --meadow-eyebrow: #3F7A55;
   --ocean-wash: #EEF8FC; --ocean-line: #C7E5F2; --ocean-rule: #D7ECF5; --ocean-eyebrow: #1F6E92;
   --sand-wash: #FFF6E6; --sand-line: #F3D7A8; --sand-note: #A46626; --dawn-nav: #DEDAFF; --dawn-wash: #F1EEFF;
+  /* Text on a biome's soft tint, where the primary button's dark text would vanish in the dark theme */
+  --sand-mark-text: #4A2A08; --dawn-wash-text: #21185A; --lesson-new-hover: #21185A;
+  /* The edge of a dialog, which only the dark theme draws, and the ground behind a video */
+  --raised-edge: transparent; --video-ground: #151515;
   /* The lesson's lavender greys, and the estimate's evidence */
   --lesson-rail: #FAF9FE; --lesson-rail-edge: #EEEAF7; --lesson-head-line: #ECEAF3; --lesson-card-ring: #ECE9F5; --lesson-divider: #EEEBF5;
   --lesson-chip-line: #E6E3F2; --lesson-chip-hover: #C9C1F0; --lesson-tile-edge: #E2DEF6; --lesson-source: #F7F5FD; --lesson-back: #6B6490; --lesson-new: #4B3FA8;
-  --estimate-eyebrow: #777094; --estimate-track: #E3DEF7; --estimate-imported: #A79CEE;
+  --estimate-eyebrow: #777094; --estimate-track: #E3DEF7; --estimate-imported: #A79CEE; --evidence-slate: #5C6B73; --evidence-violet: #5546B0;
   /* Marks: each kind of activity, the sun-yellow of practice and today, mastery cells and the plan's load cells */
   --mark-lesson: #2F7D9B; --mark-practice: #E3A233; --mark-review: #2F8A5F; --mark-prep: #D9663A; --mark-done: #BDBDB8;
   --sun: #E3A233; --sun-off: #F1EBDA; --task-tag: #4A775A; --record: #C0503C; --file-tag: #B5502B; --link: #2A6B85;
@@ -42,6 +46,8 @@
   --scene-label: rgba(255,255,255,.85); --meadow-label: #1F4A30; --sea-label: #08344D; --scene-card: rgba(255,255,255,.94); --scene-chip: rgba(255,255,255,.9);
   --today-column: rgba(255,255,255,.26); --today-ring: rgba(255,255,255,.85); --plot: rgba(255,255,255,.35); --plot-hover: rgba(255,255,255,.6);
   --forest-tag: #263B2E; --tag-accent: #86D6AC;
+  /* The Appearance tiles in Settings show the day and the night sky in either theme */
+  --preview-day: #CFE3EE; --preview-night: #1B2440;
   /* Type */
   --font-display: "Pixelify Sans", monospace;
   --font-body: "Instrument Sans", -apple-system, "Helvetica Neue", sans-serif;
@@ -58,8 +64,84 @@
   --loop-beat: 1.2s; /* One beat of a waiting sign: the tutor's dots, the star beside an import's progress and the recording square. */
 
   font-family: var(--font-body); color: var(--ink); background: var(--ground); font-synthesis: none; line-height: 1.5;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums; color-scheme: light dark;
 }
+/* Dark mode (design/visual-design.md, "Dark mode"). With no choice saved, the page follows the device. Choosing Light or
+   Dark in Settings sets data-theme on <html> (theme.ts), which wins over the device. The dark set is written twice, once
+   for the choice and once for the device; tests/Theme.test.ts checks that the two copies match. */
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ink: #ECECE7; --soft: #C4C4BE; --muted: #A5A59F; --faint: #94948E; --line: rgba(255,255,255,.1);
+  --inset: #242522; --inset-2: #2A2B28; --card-border: #2D2E2A; --ring: #3A3B36;
+  --meadow: #7CC094; --meadow-text: #0B2A18; --meadow-edge: #4D9065; --meadow-hover: #8DCCA2; --meadow-soft: #1E3327; --meadow-soft-text: #A3DBB5; --meadow-nav: #2A4A36;
+  --ocean: #7BBCD8; --ocean-text: #06283A; --ocean-edge: #3F87A9; --ocean-hover: #8FC8E1; --ocean-soft: #172E3A; --ocean-soft-text: #9CD0E7; --ocean-nav: #1F4456;
+  --sand: #E0B67D; --sand-text: #3A2006; --sand-edge: #A97536; --sand-hover: #E8C595; --sand-soft: #342716; --sand-soft-text: #E9C38C; --sand-nav: #4A3820;
+  --dawn: #A69CE8; --dawn-text: #18104A; --dawn-edge: #7467CB; --dawn-hover: #B5ACEE; --dawn-soft: #25213E; --dawn-soft-text: #C7BFF8;
+  --coral-wash: #3B2119; --coral-text: #F3A588; --new-wash: #382E17; --new-text: #EAC57B;
+  --strong: #6CC495; --strong-wash: #1B3326; --review-wash: #18303B; --review-text: #8FCAE2; --error: #F3A588;
+  --ground: #121311; --card: #1B1C1A; --field: #151614; --tip: #33352F; --tip-text: #F4F4F0;
+  --inset-3: #32332F; --dim: #8E8E88; --disabled: #62635D; --check-line: #8C8D87; --branch: #3A3B36; --focus: #ECECE7;
+  --line-strong: rgba(255,255,255,.34); --line-faint: rgba(255,255,255,.08); --dash: rgba(255,255,255,.26);
+  --backdrop: rgba(0,0,0,.6); --rail-shade: rgba(0,0,0,.5); --shadow: 0 0 0;
+  --meadow-wash: #19271E; --meadow-tile: #1E3327; --meadow-line: #2F4E3B; --meadow-soft-hover: #24402F; --meadow-eyebrow: #8DCDA3;
+  --ocean-wash: #132833; --ocean-line: #24485A; --ocean-rule: #21404F; --ocean-eyebrow: #8DC9E5;
+  --sand-wash: #2D2314; --sand-line: #5A4524; --sand-note: #E3AE6C; --dawn-nav: #35305C; --dawn-wash: #221F38;
+  --sand-mark-text: #F0CF9C; --dawn-wash-text: #D2CCFA; --lesson-new-hover: #DCD7FF; --raised-edge: rgba(255,255,255,.12);
+  --lesson-rail: #17161E; --lesson-rail-edge: #2A2838; --lesson-head-line: #292734; --lesson-card-ring: #2D2B3B; --lesson-divider: #2A2836;
+  --lesson-chip-line: #34314A; --lesson-chip-hover: #5D5592; --lesson-tile-edge: #3A3554; --lesson-source: #221F33; --lesson-back: #ABA4D4; --lesson-new: #BDB4F7;
+  --estimate-eyebrow: #ABA5C9; --estimate-track: #36314F; --estimate-imported: #8E80E0; --evidence-slate: #8E9BA2; --evidence-violet: #8F82E8;
+  --mark-lesson: #4FA3C7; --mark-review: #4DB282; --mark-prep: #E0754B; --mark-done: #6C6D67;
+  --sun-off: #39321F; --record: #E06A52; --file-tag: #F2A07F; --link: #8FCAE2;
+  --mastery-on: #6DB487; --mastery-off: #363832; --mastery-off-soft: #2D2E2A; --load-on: #5AAAD3; --load-off: #22394A;
+  --plan-review: #262724; --plan-done: #222320; --plan-item-line: rgba(255,255,255,.1); --plan-item-drop: rgba(0,0,0,.45); --plan-deferring: rgba(255,255,255,.45);
+  --load-ground: rgba(27,28,26,.9); --load-text: #9CCFE7;
+  /* Cards and the planting plot over a scene take the dark card, so their light text stays readable. */
+  --scene-card: rgba(27,28,26,.94); --plot: rgba(27,28,26,.78); --plot-hover: rgba(27,28,26,.9);
+  --viewer: #161715; --viewer-rail: #191A18; --thumb-ring: #34352F; --thumb-bar: #45463F; --page: #1F201D; --page-ink: #E6E6E0;
+  --slide-accent: #4F9BBE; --slide-title: #D3E8F1; --slide-text: #C3CCD0; --slide-foot: #929FA5;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ink: #ECECE7; --soft: #C4C4BE; --muted: #A5A59F; --faint: #94948E; --line: rgba(255,255,255,.1);
+    --inset: #242522; --inset-2: #2A2B28; --card-border: #2D2E2A; --ring: #3A3B36;
+    --meadow: #7CC094; --meadow-text: #0B2A18; --meadow-edge: #4D9065; --meadow-hover: #8DCCA2; --meadow-soft: #1E3327; --meadow-soft-text: #A3DBB5; --meadow-nav: #2A4A36;
+    --ocean: #7BBCD8; --ocean-text: #06283A; --ocean-edge: #3F87A9; --ocean-hover: #8FC8E1; --ocean-soft: #172E3A; --ocean-soft-text: #9CD0E7; --ocean-nav: #1F4456;
+    --sand: #E0B67D; --sand-text: #3A2006; --sand-edge: #A97536; --sand-hover: #E8C595; --sand-soft: #342716; --sand-soft-text: #E9C38C; --sand-nav: #4A3820;
+    --dawn: #A69CE8; --dawn-text: #18104A; --dawn-edge: #7467CB; --dawn-hover: #B5ACEE; --dawn-soft: #25213E; --dawn-soft-text: #C7BFF8;
+    --coral-wash: #3B2119; --coral-text: #F3A588; --new-wash: #382E17; --new-text: #EAC57B;
+    --strong: #6CC495; --strong-wash: #1B3326; --review-wash: #18303B; --review-text: #8FCAE2; --error: #F3A588;
+    --ground: #121311; --card: #1B1C1A; --field: #151614; --tip: #33352F; --tip-text: #F4F4F0;
+    --inset-3: #32332F; --dim: #8E8E88; --disabled: #62635D; --check-line: #8C8D87; --branch: #3A3B36; --focus: #ECECE7;
+    --line-strong: rgba(255,255,255,.34); --line-faint: rgba(255,255,255,.08); --dash: rgba(255,255,255,.26);
+    --backdrop: rgba(0,0,0,.6); --rail-shade: rgba(0,0,0,.5); --shadow: 0 0 0;
+    --meadow-wash: #19271E; --meadow-tile: #1E3327; --meadow-line: #2F4E3B; --meadow-soft-hover: #24402F; --meadow-eyebrow: #8DCDA3;
+    --ocean-wash: #132833; --ocean-line: #24485A; --ocean-rule: #21404F; --ocean-eyebrow: #8DC9E5;
+    --sand-wash: #2D2314; --sand-line: #5A4524; --sand-note: #E3AE6C; --dawn-nav: #35305C; --dawn-wash: #221F38;
+    --sand-mark-text: #F0CF9C; --dawn-wash-text: #D2CCFA; --lesson-new-hover: #DCD7FF; --raised-edge: rgba(255,255,255,.12);
+    --lesson-rail: #17161E; --lesson-rail-edge: #2A2838; --lesson-head-line: #292734; --lesson-card-ring: #2D2B3B; --lesson-divider: #2A2836;
+    --lesson-chip-line: #34314A; --lesson-chip-hover: #5D5592; --lesson-tile-edge: #3A3554; --lesson-source: #221F33; --lesson-back: #ABA4D4; --lesson-new: #BDB4F7;
+    --estimate-eyebrow: #ABA5C9; --estimate-track: #36314F; --estimate-imported: #8E80E0; --evidence-slate: #8E9BA2; --evidence-violet: #8F82E8;
+    --mark-lesson: #4FA3C7; --mark-review: #4DB282; --mark-prep: #E0754B; --mark-done: #6C6D67;
+    --sun-off: #39321F; --record: #E06A52; --file-tag: #F2A07F; --link: #8FCAE2;
+    --mastery-on: #6DB487; --mastery-off: #363832; --mastery-off-soft: #2D2E2A; --load-on: #5AAAD3; --load-off: #22394A;
+    --plan-review: #262724; --plan-done: #222320; --plan-item-line: rgba(255,255,255,.1); --plan-item-drop: rgba(0,0,0,.45); --plan-deferring: rgba(255,255,255,.45);
+    --load-ground: rgba(27,28,26,.9); --load-text: #9CCFE7;
+    /* Cards and the planting plot over a scene take the dark card, so their light text stays readable. */
+    --scene-card: rgba(27,28,26,.94); --plot: rgba(27,28,26,.78); --plot-hover: rgba(27,28,26,.9);
+    --viewer: #161715; --viewer-rail: #191A18; --thumb-ring: #34352F; --thumb-bar: #45463F; --page: #1F201D; --page-ink: #E6E6E0;
+    --slide-accent: #4F9BBE; --slide-title: #D3E8F1; --slide-text: #C3CCD0; --slide-foot: #929FA5;
+  }
+}
+/* A dialog's shadow disappears on the dark ground, so the dark theme draws its edge instead. */
+dialog { outline: 1px solid var(--raised-edge); outline-offset: -1px; }
+/* The evidence marks (pixel-art.ts, MARKS) are drawn in the pixel palette, whose slate, violet and green are too dark to
+   read on the dark theme's cards. These rules swap in tokens that match the palette in the light theme and are lighter
+   in the dark one. */
+:is(.estimate-chart, .row-mark) rect[fill="#5C6B73"] { fill: var(--evidence-slate); }
+:is(.estimate-chart, .row-mark) rect[fill="#5546B0"] { fill: var(--evidence-violet); }
+:is(.estimate-chart, .row-mark) rect[fill="#4A775A"] { fill: var(--mastery-on); }
 /* Pixelify turns "fi" into a glyph that reads as "A", so ligatures are off everywhere. */
 * { box-sizing: border-box; font-variant-ligatures: none !important; font-feature-settings: "liga" 0, "clig" 0 !important; }
 body { margin: 0; background: var(--ground); color: var(--ink); font-family: var(--font-body); font-size: 15px; font-variant-numeric: tabular-nums; }
