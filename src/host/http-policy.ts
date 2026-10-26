@@ -1,5 +1,6 @@
 import { httpPolicy } from "@mit-sdg/sync-engine-http/policy";
 import { homeViewRefusals, tutorRefusals } from "../compositions/settings.ts";
+import { treeKindRefusals } from "../compositions/courses.ts";
 import { assessmentReviewing } from "../concepts/AssessmentReviewing/registry.ts";
 import { commonsFederating } from "../concepts/Federating/registry.ts";
 import { generating } from "../concepts/Generating/registry.ts";
@@ -115,6 +116,8 @@ export function stillGotItPolicy(publicOrigin: string, requestBodyBytes = BODY_L
       UNSUPPORTED_THINKING_LEVEL: "INVALID_REQUEST",
       // The SetHomeView refusal. Nothing is saved; the learner chooses the skill tree or the task list.
       UNKNOWN_HOME_VIEW: "INVALID_REQUEST",
+      // The ChooseUnitLook refusal. Nothing is saved; the learner chooses one of the offered tree kinds.
+      UNKNOWN_TREE_KIND: "INVALID_REQUEST",
 
       NOT_SIGNED_IN: "UNAUTHORIZED",
       SIGN_IN_EXPIRED: "FORBIDDEN",
@@ -214,6 +217,8 @@ export const refusalDetails: Readonly<Record<string, string>> = {
   SESSION_CHANGED: "This session closed before the tutor's answer could be saved. Your own work in it is still saved.",
   SKILL_CHANGED: "This skill changed while the tutor was answering, so nothing was saved. Try again.",
   MATERIAL_UNAVAILABLE: "This material is not available in this course. Reload the page to see its materials.",
+  // Courses.md: the ChooseUnitLook refusal for a tree kind that is not offered.
+  ...treeKindRefusals,
   // Courses.md: ArchiveCourse's refusal while an activity is in progress in the course.
   COURSE_ACTIVITY_IN_PROGRESS: "Finish or stop the current activity in this course before archiving it.",
   // Courses.md, "Course and skill refusals": the general sentences, on every endpoint without a more specific one below.

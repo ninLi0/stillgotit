@@ -11,6 +11,8 @@ concrete TutorChoice
   One offered tutor model name and one thinking level that model supports, validated on the server against the tutor catalog.
 concrete HomeView
   The view Home shows: `tree` for the skill tree or `tasks` for the task list, validated on the server.
+concrete TreeKind
+  The id of one offered kind of tree for a topic, such as `oak` or `willow`, validated on the server against the fixed list of kinds.
 ```
 
 ```instances
@@ -67,6 +69,11 @@ instantiate Preferring as ViewPreferring with
   User is Registering.User
   Option is HomeView
 
+instantiate Styling as TreeStyling with
+  User is Registering.User
+  Item is SkillMapping.Unit
+  Style is TreeKind
+
 ```
 
 ## Accounts
@@ -106,7 +113,7 @@ The [course composition](../compositions/Courses.md) declares the course endpoin
 
 The API uses the reference HTTP adapter at `/api`. Cookies own `attempt` and `session`. The continuation wrapper also owns `recoveryKey`; the browser client omits that field from the generated input type. Input and result validation, exact request-origin checks, size limits, no-store responses, and no-referrer pages apply to the flow. Callback parameters are removed from the address before posting them. Session creation has no public endpoint accepting a local user ID.
 
-The [visual design study](../visual-design.md) describes the interface's colors and typography and where each is used. Home centers on a grove of pixel-art trees, one for each topic in the kind of tree the learner chose for it (or the topic's default kind), where each skill is a leaf whose stage of growth shows its estimated mastery, or on a task list when the learner chooses it; the [settings](../compositions/Settings.md) keep that choice on the server as `ViewPreferring`. Selecting a leaf shows its outcome, estimate, and an Open lesson action. Materials and Plan are their own screens in the sidebar: Materials for importing sources and reviewing skills, and Plan for the study plan. Home's scene card shows the next planned activity.
+The [visual design study](../visual-design.md) describes the interface's colors and typography and where each is used. Home centers on a grove of pixel-art trees, one for each topic in the kind of tree the learner chose for it, which the [course composition](../compositions/Courses.md) keeps on the server as `TreeStyling`, or in the topic's default kind, where each skill is a leaf whose stage of growth shows its estimated mastery, or on a task list when the learner chooses it; the [settings](../compositions/Settings.md) keep that choice on the server as `ViewPreferring`. Selecting a leaf shows its outcome, estimate, and an Open lesson action. Materials and Plan are their own screens in the sidebar: Materials for importing sources and reviewing skills, and Plan for the study plan. Home's scene card shows the next planned activity.
 
 Learn opens a dedicated chat. Tabs above the thread hold the selected skill's conversations; each shows its kind, start date, and number of turns, and "+ New conversation" starts another. The thread opens with the lesson or practice task in a card. The dialogue follows: the learner's messages as bubbles on the right, and the tutor's replies across the full width with the sources they cite, their answer time, and Copy and Listen actions. Assessments appear in the thread as result cards. The composer below combines text, photo attachments, voice transcription, a hint request in practice, and Send; it grows with its text, and Enter sends. In a lesson, "Finish lesson" closes it: its tab and thread stay readable, the composer gives way to "This lesson is finished. Start a new conversation to keep going.", and Home's Continue card no longer lists it. Speech remains editable before sending. A rail on the right shows mastery, the goal, the evidence, and the sources the skill is taught from; on narrow screens it slides over the thread from the mastery chip. Learning and independent practice are visibly distinct; assessment still requires explicit review of the complete attempt. Switching Home and Learn preserves the open conversation and unsent work. Keyboard focus remains visible.
 

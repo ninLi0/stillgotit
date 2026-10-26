@@ -8,6 +8,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import type { ActionRefusal } from "@mit-sdg/sync-engine/assembly";
 import { assembleApplication } from "../src/assembly.ts";
+import { TreeStyling } from "../src/concepts.ts";
 import { FederatingConcept } from "../src/concepts/Federating/Federating.ts";
 import { MemoryProvider } from "../src/concepts/Federating/provider.ts";
 import {
@@ -153,6 +154,7 @@ describe("Registering", () => {
       StudyPlanning: new Budgeting(connection!.db, "StudyPlanning"),
       Library: new MaterialKeeping(connection!.db, "Library"),
       GroundedTutoring: new GroundedTutoring(connection!.db),
+      TreeStyling: new TreeStyling(connection!.db, "TreeStyling"),
     });
     try {
       const { Registering: accounts, SkillMapping: skills } = application.concepts;

@@ -575,7 +575,7 @@ test("SetUnitEmphasis sets the flag, repeats without change, and refuses a value
 test("ReadCourse lists prerequisites, sources, and versions in the designed order, unchanged by database row order", async () => {
   const app = await setup(), { learner, course, unit, other, source, skills } = await app.course("read-order", ["One", "Two", "Three", "Four"]);
   const empty = await learner.ok("/courses/create", { title: "Empty course" });
-  expect(await learner.ok("/courses/read", { course: empty.course })).toEqual({ materials: [], units: [], skills: [], prerequisites: [], skillSources: [], versions: [] });
+  expect(await learner.ok("/courses/read", { course: empty.course })).toEqual({ materials: [], units: [], skills: [], prerequisites: [], skillSources: [], versions: [], looks: [] });
   const second = await app.material(learner, course, "Second notes");
   const [one, two, three, four] = skills as [string, string, string, string];
   // Spread the skills over both units so unit order and skill order disagree.

@@ -22,7 +22,7 @@ import ForestView from "./ForestView.vue";
 import MaterialViewer from "./MaterialViewer.vue";
 import { useHomePlan } from "./HomePlan.ts";
 import { docIcon, stageOf } from "./pixel-art.ts";
-import { chosenKind } from "./tree-looks.ts";
+import { chosenKind, receiveLooks } from "./tree-looks.ts";
 import type { AskAboutPage, HomeView, OpenSource, ViewerSkill, ViewSkill, ViewUnit } from "./revamp-types.ts";
 
 // The shell (sidebar + app card) lives here because the views do; App.vue fills the course switcher slot and owns
@@ -38,7 +38,7 @@ type CourseData = StillGotItHttp["/courses/read"]["output"];
 type MaterialId = CourseData["materials"][number]["material"];
 type Suggestion = { title: string; outcome: string; gate: string };
 type Original = { file: string; name: string; mediaType?: string; limitations: string[] };
-const data = ref<CourseData>({ materials: [], units: [], skills: [], prerequisites: [], skillSources: [], versions: [] });
+const data = ref<CourseData>({ materials: [], units: [], skills: [], prerequisites: [], skillSources: [], versions: [], looks: [] });
 const busy = ref(false), message = ref(""), error = ref(""), justConfirmed = ref<string | null>(null);
 const notice = ref<HTMLElement | null>(null), setupError = ref<HTMLElement | null>(null);
 // announcement names materials an import listing saved; it stays until the learner leaves Materials or starts
@@ -94,6 +94,7 @@ async function task(work: () => Promise<void>) {
 async function refresh() {
   const result = unwrap(await api.courses.read({ course: props.course.course }));
   data.value = result;
+  void receiveLooks(result.units.map((item) => item.unit), result.looks);
   if (!material.value && result.materials.length) {
     const previous = sessionStorage.getItem(sourceSelectionKey);
     material.value = result.materials.find((source) => source.material === previous)?.material ?? result.materials[0]!.material;

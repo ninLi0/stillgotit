@@ -5,6 +5,7 @@ import { GROUND, growGrove, type GroveTopic } from "../frontend/src/GroveScene.t
 import { layoutForest } from "../frontend/src/ForestScene.ts";
 import { PAL, rng } from "../frontend/src/pixel-art.ts";
 import type { ViewUnit } from "../frontend/src/revamp-types.ts";
+import { TREE_KINDS as OFFERED_KINDS, treeKindOffered } from "../src/computations/tree-kinds.ts";
 
 // Unit ids are UUIDs (SkillMapping). These are made from a seeded generator, so the test reads the same each run.
 function uuids(count: number, seed = 7): string[] {
@@ -33,6 +34,14 @@ describe("The catalogue of tree kinds", () => {
       expect(kind.name.length).toBeGreaterThan(0);
       expect(kind.description).toMatch(/^[A-Z][^.]*\.$/);
     }
+  });
+
+  test("lists exactly the kinds the server accepts, in the same order", () => {
+    // The server saves only the kinds it offers (design/compositions/Courses.md, "Choosing a topic's tree"), so a kind
+    // the page draws but the server refuses could never be saved, and a kind the server saves but the page lacks would
+    // be drawn as the default.
+    expect(TREE_KIND_IDS).toEqual([...OFFERED_KINDS]);
+    for (const id of TREE_KIND_IDS) expect(treeKindOffered({ kind: id })).toBe(true);
   });
 
   test("a unit's default kind depends only on its id, and the defaults spread evenly across the catalogue", () => {

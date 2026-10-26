@@ -1,9 +1,9 @@
 import { endpoint, receive, respond } from "@mit-sdg/sync-engine/boundary";
 import { compute, each, former, is, no, now, reaction, returned, view, when, where } from "@mit-sdg/sync-engine/language";
 import { concepts, computations } from "../concepts.ts";
-import { courseInput, courseListOutput, emphasisInput, prerequisitesInput, recordOutput, skillTextInput, validators, materialInput, proposalInput, proposalSaveInput, structuredOutput } from "./reusable/inputs.ts";
+import { courseInput, courseListOutput, emphasisInput, lookInput, prerequisitesInput, recordOutput, skillTextInput, validators, materialInput, proposalInput, proposalSaveInput, structuredOutput } from "./reusable/inputs.ts";
 
-const { Sessioning, SkillMapping, Library, MasteryEstimating, StudyPlanning } = concepts;
+const { Sessioning, SkillMapping, Library, MasteryEstimating, StudyPlanning, TreeStyling } = concepts;
 
 const OwnedCourse = view("(owner) owns (course) with (title)", ({ owner, course }, { title }) =>
   where(SkillMapping._course({ course }).is({ owner, title })),
@@ -82,11 +82,20 @@ const Versions = former("the requirements versions in (course)", ({ course }, { 
     .form({ skill, version, outcome, gate }),
 );
 
+// The tree kind the learner chose for each unit of the course. A remembered kind that is no longer offered is left out,
+// so the page draws that unit's default kind.
+const Looks = former("the tree kinds (owner) chose for the units in (course)", ({ owner, course }, { unit, kind, offered }) =>
+  each(TreeStyling._styles({ owner }).is({ item: unit, style: kind }))
+    .where(SkillMapping._unit({ unit }).is({ course }), compute(computations.treeKindOffered, { kind }, offered), is.among(offered, [true]))
+    .arranged(unit)
+    .form({ unit, kind }),
+);
+
 // The read answers at the settlement frontier, after RepairRevisedTrack has finished.
 const ReadCourse = endpoint("/courses/read", ({ session, course, owner }) =>
   receive({ session, course }).then(Sessioning.use({ session }).responds({ subject: owner })).afterFlowSettles().then(
     where(OwnedCourse({ owner, course })).then(respond({ materials: Materials({ owner, course }), units: Units({ course }), skills: Skills({ course }),
-      prerequisites: Prerequisites({ course }), skillSources: SkillSources({ course }), versions: Versions({ course }) })).named("owned"),
+      prerequisites: Prerequisites({ course }), skillSources: SkillSources({ course }), versions: Versions({ course }), looks: Looks({ owner, course }) })).named("owned"),
     where(no(OwnedCourse({ owner, course }))).then(respond({ error: "COURSE_UNAVAILABLE" })).named("missing"),
   ), { validators: { ...validators, output: structuredOutput } },
 );
@@ -271,7 +280,32 @@ const SetUnitEmphasis = endpoint("/courses/units/emphasis", ({ session, unit, em
   ), { validators: { ...validators, input: emphasisInput } },
 );
 
+/** The design's sentence for the ChooseUnitLook refusal. The HTTP adapter reports only a category, so the host adds it as `detail`. */
+export const treeKindRefusals = {
+  UNKNOWN_TREE_KIND: "Choose one of the offered tree kinds.",
+} as const;
+
+// A unit's tree kind. Both endpoints require an owned unit, so an unknown unit and another learner's unit both get
+// COURSE_UNAVAILABLE and change nothing. The kind is checked against the offered kinds before anything is saved.
+const ChooseUnitLook = endpoint("/courses/units/look", ({ session, unit, kind, owner, offered, chosen }) =>
+  receive({ session, unit, kind }).then(Sessioning.use({ session }).responds({ subject: owner })).then(
+    where(OwnedUnit({ owner, unit }), compute(computations.treeKindOffered, { kind }, offered), is.among(offered, [true]),
+      compute(computations.offeredTreeKind, { kind }, chosen))
+      .then(TreeStyling.choose({ owner, item: unit, style: chosen }).responds({})).then(respond({ kind: chosen })).named("owned"),
+    where(no(OwnedUnit({ owner, unit }))).then(respond({ error: "COURSE_UNAVAILABLE" })).named("missing"),
+    where(OwnedUnit({ owner, unit }), compute(computations.treeKindOffered, { kind }, offered), is.among(offered, [false]))
+      .then(respond({ error: "UNKNOWN_TREE_KIND" })).named("unknown"),
+  ), { validators: { ...validators, input: lookInput, output: recordOutput(["kind"]) } },
+);
+
+const ClearUnitLook = endpoint("/courses/units/look/clear", ({ session, unit, owner }) =>
+  receive({ session, unit }).then(Sessioning.use({ session }).responds({ subject: owner })).then(
+    where(OwnedUnit({ owner, unit })).then(TreeStyling.clear({ owner, item: unit }).responds({})).then(respond({})).named("owned"),
+    where(no(OwnedUnit({ owner, unit }))).then(respond({ error: "COURSE_UNAVAILABLE" })).named("missing"),
+  ), { validators },
+);
+
 export const composition = { OwnedCourse, OwnedUnit, OwnedSkill, CourseList, ListCourses, CreateCourse,
-  UnavailableSkillMaterial, Materials, Units, Skills, Prerequisites, SkillSources, Versions, ReadCourse, ReadMaterial, AddUnit, AddMaterial, ProposeSkill, ConfirmSkill, DiscardDraft, EditDraft,
+  UnavailableSkillMaterial, Materials, Units, Skills, Prerequisites, SkillSources, Versions, Looks, ReadCourse, ChooseUnitLook, ClearUnitLook, ReadMaterial, AddUnit, AddMaterial, ProposeSkill, ConfirmSkill, DiscardDraft, EditDraft,
   EditSkillDetails, ReviseSkill, RevisedTrack, RepairRevisedTrack, AddSkillSource, SetSkillPrerequisites, ArchiveSkill, RestoreSkill, SetUnitEmphasis,
   CourseActivityInProgress, ArchiveCourse, RestoreCourse };

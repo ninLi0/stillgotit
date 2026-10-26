@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, spyOn, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import { Collection, type Document, type Filter } from "mongodb";
 import { assembleApplication } from "../src/assembly.ts";
+import { TreeStyling } from "../src/concepts.ts";
 import { FederatingConcept } from "../src/concepts/Federating/Federating.ts";
 import { MemoryProvider } from "../src/concepts/Federating/provider.ts";
 import {
@@ -302,6 +303,7 @@ describe("Registering recovery", () => {
       StudyPlanning: new Budgeting(connection!.db, "StudyPlanning"),
       Library: new MaterialKeeping(connection!.db, name),
       GroundedTutoring: new GroundedTutoring(connection!.db, name),
+      TreeStyling: new TreeStyling(connection!.db, "TreeStyling"),
     });
     try {
       const accounts = application.concepts.Registering;

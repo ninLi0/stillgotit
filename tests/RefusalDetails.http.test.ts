@@ -72,6 +72,8 @@ test("a more specific sentence applies only where its design gives it, the gener
   expect(refusalDetail("/learning/hint", "SESSION_CHANGED")).toBe("This session closed before the tutor's answer could be saved. Your own work in it is still saved.");
   expect(refusalDetail("/learning/task", "SKILL_CHANGED")).toBe("This skill changed while the tutor was answering, so nothing was saved. Try again.");
   expect(refusalDetail("/courses/skills/suggest", "MATERIAL_UNAVAILABLE")).toBe("This material is not available in this course. Reload the page to see its materials.");
+  // Courses.md, "Choosing a topic's tree": the refusal for a tree kind that is not offered.
+  expect(refusalDetail("/courses/units/look", "UNKNOWN_TREE_KIND")).toBe("Choose one of the offered tree kinds.");
   // Every code in the policy's table has a non-empty sentence: on every endpoint, or on the endpoints its design names.
   const publicCodes = Object.keys(stillGotItPolicy(ORIGIN).publicErrors ?? {});
   const sentence = (code: string) => Object.hasOwn(refusalDetails, code) ? refusalDetails[code] : scopedRefusalDetails[code]?.detail;

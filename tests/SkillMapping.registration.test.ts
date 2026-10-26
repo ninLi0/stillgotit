@@ -7,6 +7,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:tes
 import { randomUUID } from "node:crypto";
 import type { ActionRefusal } from "@mit-sdg/sync-engine/assembly";
 import { assembleApplication } from "../src/assembly.ts";
+import { TreeStyling } from "../src/concepts.ts";
 import { FederatingConcept } from "../src/concepts/Federating/Federating.ts";
 import { MemoryProvider } from "../src/concepts/Federating/provider.ts";
 import { RegisteringConcept, type User } from "../src/concepts/Registering/Registering.ts";
@@ -37,6 +38,7 @@ beforeAll(async () => {
     StudyPlanning: new Budgeting(connection.db, "StudyPlanning"),
     Library: new MaterialKeeping(connection.db, "Library"),
     GroundedTutoring: new GroundedTutoring(connection.db),
+    TreeStyling: new TreeStyling(connection.db, "TreeStyling"),
   });
 });
 
@@ -137,6 +139,7 @@ describe("SkillMapping framework registration", () => {
         StudyPlanning: new Budgeting(secondConnection.db, "StudyPlanning"),
         Library: new MaterialKeeping(secondConnection.db, "Library"),
         GroundedTutoring: new GroundedTutoring(secondConnection.db),
+        TreeStyling: new TreeStyling(secondConnection.db, "TreeStyling"),
       });
       expect(await second.concepts.SkillMapping._skill({ skill }))
         .toEqual(await skills._skill({ skill }));

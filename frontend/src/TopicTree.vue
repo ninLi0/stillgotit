@@ -11,11 +11,15 @@ import { kindFor } from "./tree-kinds.ts";
 const props = defineProps<{ unit: string; topic: string; chosen: string | null; label?: string }>();
 const picker = ref<InstanceType<typeof TreePicker> | null>(null);
 const kind = computed(() => kindFor(props.unit, props.chosen));
-const said = ref("");
+const said = ref(""), problem = ref("");
 
-function choose(next: string | null) {
-  chooseKind(props.unit, next);
+// The new kind shows at once. The server saves it in the background; if it does not, the saved kind comes back and
+// the reason shows under the tree.
+async function choose(next: string | null) {
+  problem.value = "";
   said.value = `${props.topic} now grows ${article(kindFor(props.unit, next).name)}.`;
+  const failure = await chooseKind(props.unit, next);
+  if (failure) { said.value = ""; problem.value = `The tree could not be changed. ${failure}`; }
 }
 function article(name: string) { return `${/^[AEIOU]/.test(name) ? "an" : "a"} ${name.toLowerCase()}`; }
 </script>
@@ -30,6 +34,7 @@ function article(name: string) { return `${/^[AEIOU]/.test(name) ? "an" : "a"} $
     </div>
     <button type="button" class="secondary meadow topic-tree-change" aria-haspopup="dialog" :aria-label="`Change tree for ${topic}`" @click="picker?.open()">Change tree</button>
     <p class="sr-only" role="status">{{ said }}</p>
+    <p v-if="problem" class="error topic-tree-problem" role="alert">{{ problem }}</p>
     <TreePicker ref="picker" :unit="unit" :topic="topic" :chosen="chosen" @choose="choose" />
   </div>
 </template>
@@ -43,6 +48,7 @@ function article(name: string) { return `${/^[AEIOU]/.test(name) ? "an" : "a"} $
 .topic-tree-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .topic-tree-name { font-size: 15px; line-height: 1.3; }
 .topic-tree-about { font-size: 13px; line-height: 1.4; color: var(--muted); }
+.topic-tree-problem { flex: 1 0 100%; margin: 0; font-size: 13px; }
 .topic-tree-change { flex: none; min-height: 38px; padding: 0 14px; font-size: 13px; white-space: nowrap; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 </style>
