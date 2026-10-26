@@ -267,8 +267,9 @@ describe("Evidence behind each skill's estimate", () => {
     expect(passages).toEqual([{ kind: "TEXT", location: citation!.location, text: LESSON_TEXT }]);
     // The page labels the passage with the material's title and the place in it.
     expect(sourceLabel(citation!.location, material.title)).toBe("Matrix multiplication · Lines 1–2");
-    // Another learner cannot read the passage.
-    expect(await other.post("/courses/materials/read", { material: citation!.material })).toEqual({ status: 403, body: { error: "FORBIDDEN" } });
+    // Another learner cannot read the passage, and the refusal says so (Learning.md, "Refusal sentences").
+    expect(await other.post("/courses/materials/read", { material: citation!.material }))
+      .toEqual({ status: 403, body: { error: "FORBIDDEN", detail: "This material is not available in this course. Reload the page to see its materials." } });
   }, 60_000);
 
   test("If the location is an image, show the image.", async () => {

@@ -204,6 +204,12 @@ export const refusalDetails: Readonly<Record<string, string>> = {
   GRADED_MATERIAL_NOT_SOURCE: "Graded work is evidence, not a teaching source.",
   IMPORTED_GATE_UNAVAILABLE: "Imported coursework cannot show the complete demonstration gate.",
   REGRADE_IMPORTED_UNAVAILABLE: "Imported coursework has no practice task to regrade, so correct it manually instead.",
+  // Learning.md, "Refusal sentences": the learning endpoints' session and change refusals, and the material refusal that
+  // Suggest shares with the course endpoints.
+  SESSION_UNAVAILABLE: "This session is closed or is not one of yours. Choose one of your open sessions.",
+  SESSION_CHANGED: "This session closed before the tutor's answer could be saved. Your own work in it is still saved.",
+  SKILL_CHANGED: "This skill changed while the tutor was answering, so nothing was saved. Try again.",
+  MATERIAL_UNAVAILABLE: "This material is not available in this course. Reload the page to see its materials.",
 };
 
 /** Codes whose design gives a sentence only on some endpoints. Other endpoints answer the same code without one. */

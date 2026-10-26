@@ -11,6 +11,8 @@ import type { CourseTutor } from "../src/host/tutor.ts";
 import { connectMongo, localMongoUri } from "../src/storage/mongo.ts";
 
 const ORIGIN = "http://localhost:5173", DAY = 86_400_000, cleanups: (() => Promise<void>)[] = [];
+// Learning.md, "Refusal sentences": a material that is not the learner's own in this course.
+const MATERIAL_UNAVAILABLE = "This material is not available in this course. Reload the page to see its materials.";
 afterAll(async () => { for (const cleanup of cleanups.reverse()) await cleanup(); });
 
 // The sentences SkillMapping states for each refusal these endpoints pass through.
@@ -430,7 +432,7 @@ test("AddSkillSource attaches an owned material from the skill's course and refu
   const outsiderMaterial = await app.material(outsider, outsiderCourse, "Outsider notes");
   for (const material of [otherCourseMaterial, outsiderMaterial, crypto.randomUUID()]) {
     expect(await learner.post("/courses/skills/sources/add", { skill, material })).toMatchObject({ status: 403, body: { error: "FORBIDDEN" } });
-    expect(await learner.invoke("/courses/skills/sources/add", { skill, material })).toEqual({ ok: false, error: { kind: "domain", value: "MATERIAL_UNAVAILABLE" } });
+    expect(await learner.invoke("/courses/skills/sources/add", { skill, material })).toEqual({ ok: false, error: { kind: "domain", value: "MATERIAL_UNAVAILABLE", detail: MATERIAL_UNAVAILABLE } });
   }
   expect(await learner.ok("/courses/read", { course })).toEqual(read);
   const draft = await app.skill(learner, unit, source, "A draft", false);
