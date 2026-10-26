@@ -9,6 +9,7 @@ import EstimatePanel from "./EstimatePanel.vue";
 import PixelIcon from "./PixelIcon.vue";
 import MasteryCells from "./MasteryCells.vue";
 import InfoBubble from "./InfoBubble.vue";
+import SourcePreview from "./SourcePreview.vue";
 import { stageOf } from "./pixel-art.ts";
 import type { OpenSource } from "./revamp-types.ts";
 import { api, unwrap } from "./api.ts";
@@ -28,7 +29,8 @@ type Attachment = { material: string; name: string; preview: string };
 // aiReason explains why AI features are off when aiAvailable is false. materials gives titles for cited sources.
 // initialDraft prefills the message box of a new conversation (for example "Ask about this page" in Materials); it is never sent by itself.
 const props = defineProps<{ skill: string; course: string; materials: { material: string; title: string }[]; aiAvailable: boolean; aiReason: string; active?: boolean; initialDraft?: string }>();
-// `back` returns to the skill tree. `open-source` asks the shell to show a cited source in Materials. `session` names
+// `back` returns to the skill tree. `open-source` asks the shell to show a cited source in Materials, from the source
+// preview's "Open in Materials". `session` names
 // the conversation on screen (null for a new one), so the sidebar can mark it.
 const emit = defineEmits<{ changed: []; back: []; "open-source": [source: OpenSource]; session: [skill: string, session: string | null] }>();
 const data = shallowRef<SkillData | null>(null), selected = ref<StudySession["session"] | "">(""), busy = ref(false), error = ref(""), notice = ref("");
@@ -310,7 +312,9 @@ watch([() => (freshLesson.value || !data.value?.sessions.length ? "new" : select
   ([, count], [, before]) => { void tabLine.place(count > 0 && before > 0); });
 async function toggleRail() { evidenceOpen.value = !evidenceOpen.value; await nextTick(); if (evidenceOpen.value) railClose.value?.focus(); }
 async function closeRail() { evidenceOpen.value = false; await nextTick(); railChip.value?.focus(); }
-function openSource(source: OpenSource) { emit("open-source", source); }
+// A cited source, from a reply's passage or the rail's Taught from list, opens in a preview on this page.
+const sourcePreview = ref<InstanceType<typeof SourcePreview> | null>(null);
+function openSource(source: OpenSource) { void sourcePreview.value?.open(source); }
 /** A draft from elsewhere starts a new conversation with the message box filled in and focused. It is not sent. */
 async function applyDraft(draft: string | undefined) {
   if (!draft) return;
@@ -545,6 +549,7 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
         <SourcesUsed :citations="railCitations" :titles="materialTitles" id-prefix="rail-source" variant="rail" @open="openSource" />
       </section>
     </aside>
+    <SourcePreview ref="sourcePreview" :titles="materialTitles" @open-materials="emit('open-source', $event)" @ask="applyDraft($event.question)" />
   </section>
 </template>
 

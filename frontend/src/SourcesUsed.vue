@@ -13,7 +13,8 @@ type Part = { kind: "TEXT"; text: string } | { kind: "IMAGE"; image: Loaded<stri
 // `titles` names each course material, for labels before its passage is opened. `idPrefix` keeps element ids unique.
 // `variant` picks the look: "chips" under a tutor answer ("From <source> ↗"), or "rail" for the Taught from card.
 // `compact` lays the chips out in one wrapping row with a single "From", for the sources under each tutor reply.
-// Choosing a source opens its passage here, as before, and also emits `open` so the shell can show it in Materials.
+// Choosing a chip opens its passage below the row, and the passage's "Show in the material" emits `open`. Choosing a
+// source in the rail emits `open` at once. The lesson page answers `open` with a preview of the material in place.
 const props = withDefaults(defineProps<{ citations: readonly Citation[]; titles: Record<string, string>; idPrefix: string; variant?: "chips" | "rail"; compact?: boolean }>(), { variant: "chips", compact: false });
 const emit = defineEmits<{ open: [source: OpenSource] }>();
 const open = reactive(new Set<string>());
@@ -89,9 +90,9 @@ function toggle(citation: Citation) {
   const key = keyOf(citation);
   if (open.has(key)) { open.delete(key); return; }
   open.add(key);
-  emit("open", { material: citation.material, location: citation.location });
   void show(citation);
 }
+function preview(citation: Citation) { emit("open", { material: citation.material, location: citation.location }); }
 onBeforeUnmount(() => objectUrls.forEach((url) => URL.revokeObjectURL(url)));
 </script>
 
@@ -100,8 +101,9 @@ onBeforeUnmount(() => objectUrls.forEach((url) => URL.revokeObjectURL(url)));
     <ul class="source-list" :aria-label="variant === 'rail' ? 'Sources this skill is taught from' : 'Sources used'">
       <li v-for="(entry, index) in entries" :key="entry.key" :class="{ open: entry.open }">
         <span v-if="variant === 'chips' && (!compact || index === 0)" class="from" aria-hidden="true">From</span>
-        <button type="button" class="source-toggle" :aria-expanded="entry.open" :aria-controls="entry.id" @click="toggle(entry.citation)"><span v-if="variant === 'rail'" class="file-tag" aria-hidden="true">FILE</span><span class="source-name">{{ entry.label }}</span><span aria-hidden="true"> ↗</span></button>
-        <div v-show="entry.open" :id="entry.id" class="passage" role="region" :aria-label="entry.label">
+        <button v-if="variant === 'rail'" type="button" class="source-toggle" aria-haspopup="dialog" @click="preview(entry.citation)"><span class="file-tag" aria-hidden="true">FILE</span><span class="source-name">{{ entry.label }}</span><span aria-hidden="true"> ↗</span></button>
+        <button v-else type="button" class="source-toggle" :aria-expanded="entry.open" :aria-controls="entry.id" @click="toggle(entry.citation)"><span class="source-name">{{ entry.label }}</span><span aria-hidden="true"> ↗</span></button>
+        <div v-if="variant === 'chips'" v-show="entry.open" :id="entry.id" class="passage" role="region" :aria-label="entry.label">
           <template v-if="entry.open">
             <p v-if="entry.read.state === 'loading'" class="hint" role="status">Opening the passage…</p>
             <div v-else-if="entry.read.state === 'failed'" class="passage-problem" role="alert">
@@ -126,6 +128,7 @@ onBeforeUnmount(() => objectUrls.forEach((url) => URL.revokeObjectURL(url)));
                 <p v-if="entry.citation.location !== 'content'" class="hint">The cited part, {{ entry.label }}, could not be shown on its own. The full readable text is below.</p>
                 <p class="passage-text" tabindex="0">{{ entry.read.value.content.trim() || 'This source has no readable text.' }}</p>
               </template>
+              <button type="button" class="source-more" aria-haspopup="dialog" @click="preview(entry.citation)">Show in the material</button>
             </template>
           </template>
         </div>
@@ -158,5 +161,6 @@ onBeforeUnmount(() => objectUrls.forEach((url) => URL.revokeObjectURL(url)));
 .passage-figure img{display:block;max-width:100%;max-height:420px;height:auto;border-radius:6px;border:1px solid var(--line);background:var(--inset)}
 .passage-problem{font-size:13px;border-left:3px solid var(--coral);padding:4px 0 4px 10px;margin:0 0 8px}
 .passage-problem p{margin:0 0 4px}
+.source-more{border:0;background:transparent;padding:4px 0;font-size:12px;font-weight:600;color:var(--dawn-soft-text);text-decoration:underline;text-underline-offset:3px}
 .source-retry{border:0;background:transparent;padding:4px 0;font-size:12px;color:var(--ink);text-decoration:underline;text-underline-offset:3px}
 </style>
