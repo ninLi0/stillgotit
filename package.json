@@ -31,6 +31,7 @@
     "check": "sync-engine check && sync-engine artifacts check && tsc --noEmit && bun run check:frontend",
     "db:up": "docker compose up -d --wait --wait-timeout 60 && bun scripts/init-mongo.ts",
     "db:stop": "docker compose stop",
+    "db:clean": "bun scripts/drop-test-databases.ts",
     "demo:course": "bun scripts/demo-course.ts",
     "demo:unit": "bun scripts/demo-unit.ts",
     "demo:skill": "bun scripts/demo-skill.ts",
