@@ -256,6 +256,14 @@ export type StillGotItWire = {
     output: Record<string, never>;
     error: { error: AppWideError | "COURSE_UNAVAILABLE" | "INVALID_INPUT" | "INVALID_SKILL_TITLE" | "NOT_SIGNED_IN" | "SKILL_DETAILS_UNAVAILABLE" | "SKILL_UNIT_MISMATCH" };
   };
+  "/courses/skills/discard": {
+    input: {
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+      "skill": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["discardDraft"]>[0], ["skill"]>>;
+    };
+    output: Record<string, never>;
+    error: { error: AppWideError | "COURSE_UNAVAILABLE" | "DRAFT_DISCARD_UNAVAILABLE" | "INVALID_INPUT" | "NOT_SIGNED_IN" };
+  };
   "/courses/skills/edit": {
     input: {
       "gate": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["reviseDraft"]>[0], ["gate"]>>;
@@ -1080,6 +1088,13 @@ export type StillGotItHttp = {
       "skill": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["editDetails"]>[0], ["skill"]>>;
       "title": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["editDetails"]>[0], ["title"]>>;
       "unit": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["editDetails"]>[0], ["unit"]>>;
+    };
+    output: Record<string, never>;
+    error: { error: HttpAppWideError | "CONFLICT" | "FORBIDDEN" | "INVALID_REQUEST" | "UNAUTHORIZED" };
+  };
+  "/courses/skills/discard": {
+    input: {
+      "skill": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["discardDraft"]>[0], ["skill"]>>;
     };
     output: Record<string, never>;
     error: { error: HttpAppWideError | "CONFLICT" | "FORBIDDEN" | "INVALID_REQUEST" | "UNAUTHORIZED" };

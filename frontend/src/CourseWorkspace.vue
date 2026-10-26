@@ -325,11 +325,27 @@ watch(() => reviewing.value?.key, loadDraftEdit, { immediate: true });
 const reviewSuggestion = computed(() => reviewing.value?.kind === "suggestion" ? suggestions.value[reviewing.value.index] : undefined);
 const reviewMaterial = computed(() => { const item = reviewing.value; if (item?.kind === "suggestion") return suggestionSource.value || material.value; return item ? data.value.skillSources.find((row) => row.skill === item.skill)?.material ?? "" : ""; });
 const reviewSourceTitle = computed(() => data.value.materials.find((source) => source.material === reviewMaterial.value)?.title ?? "");
-// Saved drafts have no discard action on the server; only confirmed skills can be archived.
-const discardReason = computed(() => reviewing.value?.kind === "draft" ? "Saved drafts can't be discarded. Leave it unconfirmed and it stays off your tree." : "");
-function discardCurrent() {
-  const item = reviewing.value; if (item?.kind !== "suggestion") return;
-  suggestions.value.splice(item.index, 1);
+// A saved draft is discarded on the server. While a draft save waits for its reply, that save may be the one that
+// created this draft, and its retry would bring the draft back, so Discard waits until the saves have finished.
+const discardReason = computed(() => reviewing.value?.kind === "draft" && pendingDraftCount.value ? "Finish saving your skill drafts first." : "");
+async function discardCurrent() {
+  const item = reviewing.value; if (!item) return;
+  if (item.kind === "suggestion") {
+    suggestions.value.splice(item.index, 1);
+    if (!reviewItems.value.length) reviewOpen.value = false;
+    return;
+  }
+  const title = draftOf(item.skill)?.title;
+  await task(async () => {
+    // Read the queue again: it lives in session storage, so a save may have started since the button was drawn.
+    if (draftSaves.read().length) throw new Error("Finish saving your skill drafts first.");
+    const result = await api.courses.skills.discard({ skill: item.skill });
+    // Reload after a refusal too, so a draft confirmed or discarded in another tab shows as it is now.
+    await refresh();
+    unwrap(result);
+    if (selectedSkill.value === item.skill) selectedSkill.value = null;
+    message.value = `Draft discarded. ${title ? `“${title}” is` : "It is"} no longer in this course.`;
+  });
   if (!reviewItems.value.length) reviewOpen.value = false;
 }
 async function confirmCurrent() {
@@ -531,7 +547,7 @@ watch(view, (now) => { if (now === "setup" && material.value && !preview.value) 
         <section v-if="showReview && reviewing" class="review-card card" aria-labelledby="review-title">
           <header class="review-head">
             <h2 id="review-title" class="display" tabindex="-1">Review suggested skills</h2>
-            <InfoBubble text="Edit each suggestion to match what your course expects. Confirming saves it and adds it as a leaf on your tree. Discard drops a suggestion that has not been saved." />
+            <InfoBubble text="Edit each suggestion to match what your course expects. Confirming saves it and adds it as a leaf on your tree. Discard drops a new suggestion, or deletes a saved draft from this course with its requirements. A discarded draft can't be brought back." />
             <span class="review-dots" role="group" aria-label="Suggestions">
               <button v-for="(item, i) in reviewItems" :key="item.key" type="button" class="dot" :class="{ on: i === reviewAt, saved: item.kind === 'draft' }" :aria-label="`Suggestion ${i + 1} of ${reviewItems.length}${item.kind === 'draft' ? ', saved draft' : ''}`" :aria-current="i === reviewAt ? 'step' : undefined" @click="reviewIndex = i" />
             </span>

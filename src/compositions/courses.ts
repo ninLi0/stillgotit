@@ -145,6 +145,14 @@ const ConfirmSkill = endpoint("/courses/skills/confirm", ({ session, skill, owne
   ), { validators },
 );
 
+// A saved draft is removed with its versions. SkillMapping refuses any skill that is not a draft with its own code.
+const DiscardDraft = endpoint("/courses/skills/discard", ({ session, skill, owner }) =>
+  receive({ session, skill }).then(Sessioning.use({ session }).responds({ subject: owner })).then(
+    where(OwnedSkill({ owner, skill })).then(SkillMapping.discardDraft({ owner, skill }).responds({})).then(respond({})).named("owned"),
+    where(no(OwnedSkill({ owner, skill }))).then(respond({ error: "COURSE_UNAVAILABLE" })).named("missing"),
+  ), { validators },
+);
+
 // The same refusals as ProposeSkill, then the graded-work check for the learner's own material in that course.
 const EditDraft = endpoint("/courses/skills/edit", ({ session, skill, unit, material, materials, title, outcome, gate, owner, course, materialTitle, graded }) =>
   receive({ session, skill, unit, material, title, outcome, gate }).then(Sessioning.use({ session }).responds({ subject: owner })).then(
@@ -264,6 +272,6 @@ const SetUnitEmphasis = endpoint("/courses/units/emphasis", ({ session, unit, em
 );
 
 export const composition = { OwnedCourse, OwnedUnit, OwnedSkill, CourseList, ListCourses, CreateCourse,
-  UnavailableSkillMaterial, Materials, Units, Skills, Prerequisites, SkillSources, Versions, ReadCourse, ReadMaterial, AddUnit, AddMaterial, ProposeSkill, ConfirmSkill, EditDraft,
+  UnavailableSkillMaterial, Materials, Units, Skills, Prerequisites, SkillSources, Versions, ReadCourse, ReadMaterial, AddUnit, AddMaterial, ProposeSkill, ConfirmSkill, DiscardDraft, EditDraft,
   EditSkillDetails, ReviseSkill, RevisedTrack, RepairRevisedTrack, AddSkillSource, SetSkillPrerequisites, ArchiveSkill, RestoreSkill, SetUnitEmphasis,
   CourseActivityInProgress, ArchiveCourse, RestoreCourse };
