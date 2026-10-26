@@ -346,6 +346,11 @@ const cueText = (text: string) =>
 /** Part of one cue line: the speaker its voice tag names, if it starts with one, and the cleaned text that follows. */
 type CuePiece = { voice?: string; text: string };
 const lineText = (pieces: readonly CuePiece[]) => pieces.map((piece) => piece.text).filter(Boolean).join(" ");
+/** A short name and a colon at the start of cue text, followed by what that speaker said: up to 40 characters with a letter. */
+function speakerPrefix(text: string): { speaker: string; rest: string } | null {
+  const match = /^([^\s:][^:]{0,39}):\s+(?=\S)/.exec(text), speaker = match?.[1]!.trim();
+  return match && speaker && /\p{L}/u.test(speaker) ? { speaker, rest: text.slice(match[0].length) } : null;
+}
 
 /**
  * The readable text of a WebVTT or SubRip caption file, or null when the text is neither. It keeps what was said, in
@@ -392,6 +397,17 @@ export function transcriptText(text: string): string | null {
     }
     return { start, end, shown: written.length > 0, pieces: pieces.flat() };
   });
+  // Zoom and other tools write the speaker as text, "Eric Ni: Okay.", instead of a voice tag. When no cue has a voice tag,
+  // more than half of the cues with text start with a short name and a colon, and some name starts two or more cues,
+  // each such name is read as a voice tag.
+  if (!spoken.some((cue) => cue.pieces.some((piece) => piece.voice))) {
+    const firsts = spoken.flatMap((cue) => cue.pieces.find((piece) => piece.text) ?? []), names = firsts.map((piece) => speakerPrefix(piece.text));
+    const counts = new Map<string, number>();
+    for (const name of names) if (name) counts.set(name.speaker, (counts.get(name.speaker) ?? 0) + 1);
+    if (2 * names.filter(Boolean).length > firsts.length && [...counts.values()].some((count) => count > 1)) {
+      firsts.forEach((piece, i) => { const name = names[i]; if (name) { piece.voice = name.speaker; piece.text = name.rest; } });
+    }
+  }
   const paragraphs: { speaker: string; parts: string[] }[] = [];
   let last: { end: number; text: string } | undefined;
   for (const cue of spoken) {

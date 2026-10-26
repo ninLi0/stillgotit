@@ -289,6 +289,16 @@ describe("Caption files", () => {
       .toBe("Yes. No. Yes. Yes.");
   });
 
+  test("a short name and a colon that start most cues are read as the speaker, as in Zoom transcripts", () => {
+    const cues = (...texts: string[]) => `WEBVTT\n\n${texts.map((text, i) => `${i + 1}\n00:00:${String(2 * i).padStart(2, "0")}.000 --> 00:00:${String(2 * i + 1).padStart(2, "0")}.500\n${text}`).join("\n\n")}`;
+    const zoom = cues("Eric Ni: Okay, let's get started.", "Eric Ni: Today we finish the proof.", "Sam Lee: Can you repeat the last step?", "Eric Ni: Sure. Note: the kernel is trivial.");
+    expect(transcriptText(zoom)).toBe("Eric Ni: Okay, let's get started. Today we finish the proof.\n\nSam Lee: Can you repeat the last step?\n\nEric Ni: Sure. Note: the kernel is trivial.");
+    // Labels that never repeat, or that start only half of the cues, stay as text.
+    expect(transcriptText(cues("Definition: a group is a set.", "It has an operation.", "Example: the integers.")))
+      .toBe("Definition: a group is a set. It has an operation. Example: the integers.");
+    expect(transcriptText(cues("Eric Ni: Hello.", "More words.", "Still more.", "Eric Ni: Bye."))).toBe("Eric Ni: Hello. More words. Still more. Eric Ni: Bye.");
+  });
+
   test("blocks hold 100 lines and end with a paragraph, and a file with no cue text has no readable text", async () => {
     const cues = Array.from({ length: 60 }, (_, i) => `${i + 1}\n00:${String(i).padStart(2, "0")}:00,000 --> 00:${String(i).padStart(2, "0")}:01,000\nSentence ${i + 1}.`);
     const result = await read("long.srt", strToU8(cues.join("\n\n")));
