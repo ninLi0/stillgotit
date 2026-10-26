@@ -38,7 +38,8 @@ export type LandState = { design: number; selected: string | null; hover: string
 /** The narrowest slot a topic gets, in CSS px, so neighbouring signposts never touch. Past that the forest scrolls. */
 const MIN_SLOT_PX = 160;
 /** Where the sun sits on its arc, from 0 (left) to 1 (right). The prototype ties it to today's study minutes, which
- * the Forest view does not receive, so it stays at the prototype's morning position. */
+ * the Forest view does not receive, so it stays at the prototype's morning position,
+ * lifted only when a tree would stand in front of it (sunPlace). */
 const SUN_AT = 0.27;
 const SKY = ["#B9D8E8", "#C3DEEC", "#CDE4EF", "#D7E9F1", "#E0EEF2", "#EAF2EE", "#F3F1DF"];
 
@@ -53,7 +54,7 @@ export function layoutForest(units: readonly ViewUnit[], design: number, viewW: 
   const trees = shown.map((u, i): ForestTree => {
     const back = n > 2 && i % 2 === 1, base = back ? G - 4 : G + 2, cx = Math.round(slot * (i + 0.75));
     const kind = kindFor(u.unit, u.kind);
-    const grown = growTree(kind, u.unit, design, u.skills.length + 2, Math.min(slot * 1.2, 130), G * (back ? 0.66 : 0.6), 3.2, 1.25);
+    const grown = growTree(kind, u.unit, design, u.skills.length + 2, Math.min(slot * 1.2, 130), G * (back ? 0.8 : 0.74), 3.2, 1.25);
     const t = moveTree(grown, Math.round(cx - grown.w / 2), base);
     const tips = t.tips.slice().sort((a, b) => a[0] - b[0]);
     // Spread the skills evenly across the tips, left to right; the spare tips stay buds. growTree grows until there
@@ -116,11 +117,27 @@ function painter(ctx: CanvasRenderingContext2D, px: number, tone = (c: string) =
   return { rect, cell, disc, toned: (t) => painter(ctx, px, (c) => t(tone(c))) };
 }
 
+/** Where the sun, or the moon by night, sits: at its morning place on the arc, or higher when a tree would stand in
+ * front of it there, as far as the top of the canvas allows. A leaf counts with room for its selection brackets and
+ * its due flag. */
+export function sunPlace(layout: ForestLayout): { x: number; y: number } {
+  const { Wv, G } = layout, x = Math.round(Wv * (0.1 + 0.8 * SUN_AT)), arc = Math.round(G * 0.5 - Math.sin(SUN_AT * Math.PI) * G * 0.32);
+  let under = Infinity;
+  const mark = (cx: number, cy: number) => { if (Math.abs(Math.round(cx) - x) <= 8) under = Math.min(under, Math.round(cy)); };
+  const record = { cell: mark, rect: (rx: number, ry: number, w: number) => { for (let i = 0; i < Math.round(w); i++) mark(rx + i, ry); } };
+  for (const t of layout.trees) {
+    paintTree(record, { segs: t.segs, crown: t.crown, buds: t.buds.map((b) => [b.x, b.y] as const), leaves: t.leaves.map((lf) => [lf.x, lf.y] as const) },
+      t.kind, rng(t.seed), { widen: true });
+    for (const lf of t.leaves) for (let dx = -5; dx <= 5; dx++) mark(lf.x + dx, lf.y - (lf.skill.dueToday ? 8 : 5));
+  }
+  return { x, y: Math.max(9, Math.min(arc, under - 10)) };
+}
+
 /** Sky bands (solid, never a gradient) and the sun on its arc, or the moon by night (scene-palette.ts). */
 export function drawSky(ctx: CanvasRenderingContext2D, layout: ForestLayout, px: number) {
-  const { rect, cell, disc } = painter(ctx, px), { Wc, Wv, G } = layout, bh = Math.ceil(G / SKY.length);
+  const { rect, cell, disc } = painter(ctx, px), { Wc, G } = layout, bh = Math.ceil(G / SKY.length);
   SKY.forEach((c, i) => rect(0, i * bh, Wc, bh, c));
-  const sx = Math.round(Wv * (0.1 + 0.8 * SUN_AT)), sy = Math.round(G * 0.5 - Math.sin(SUN_AT * Math.PI) * G * 0.32);
+  const { x: sx, y: sy } = sunPlace(layout);
   disc(sx, sy, 8, dayOrNight("#F9E3A8", MOON.glow)); disc(sx, sy, 6, dayOrNight("#F3CD7A", MOON.rim)); disc(sx, sy, 4, dayOrNight("#E3A233", MOON.face));
   cell(sx - 2, sy - 2, dayOrNight("#F9E3A8", MOON.crater));
 }

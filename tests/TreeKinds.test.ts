@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { TREE_KINDS, TREE_KIND_IDS, defaultKind, findKind, kindFor, surpriseKind } from "../frontend/src/tree-kinds.ts";
-import { growTree } from "../frontend/src/tree-draw.ts";
+import { growTree, paintTree } from "../frontend/src/tree-draw.ts";
 import { GROUND, growGrove, type GroveTopic } from "../frontend/src/GroveScene.ts";
-import { layoutForest } from "../frontend/src/ForestScene.ts";
+import { layoutForest, sunPlace } from "../frontend/src/ForestScene.ts";
 import { PAL, rng } from "../frontend/src/pixel-art.ts";
 import type { ViewUnit } from "../frontend/src/revamp-types.ts";
 import { TREE_KINDS as OFFERED_KINDS, treeKindOffered } from "../src/computations/tree-kinds.ts";
@@ -114,6 +114,30 @@ describe("Drawing each kind", () => {
         expect(tree.kind.id).toBe(kind.id);
         expect(new Set(tree.leaves.map((leaf) => leaf.skill.skill)).size).toBe(skills);
       }
+    }
+  });
+
+  test("in the Forest view, the taller trees stay inside the canvas and leave the sun clear", () => {
+    // A desktop scene and a phone's, each with one to four topics of 1, 3, 6 or 12 skills, every one due today.
+    for (const [width, height, cell] of [[1100, 640, 5], [343, 420, 4]] as const) for (const kind of TREE_KINDS) for (let topics = 1; topics <= 4; topics++) {
+      const units: ViewUnit[] = uuids(topics, topics).map((unit, i) => ({ unit, title: `Topic ${i + 1}`, kind: kind.id,
+        skills: Array.from({ length: [1, 3, 6, 12][i]! }, (_, j) => ({ skill: `${unit}-${j}`, title: "Skill", outcome: "", mastery: null, dueToday: true })) }));
+      const layout = layoutForest(units, 1, width, height, cell), sun = sunPlace(layout), painted: [number, number][] = [];
+      const record = { cell: (x: number, y: number) => { painted.push([Math.round(x), Math.round(y)]); },
+        rect: (x: number, y: number, w: number, h: number) => { for (let i = 0; i < Math.round(w); i++) for (let j = 0; j < Math.round(h); j++) painted.push([Math.round(x) + i, Math.round(y) + j]); } };
+      for (const tree of layout.trees) {
+        paintTree(record, { segs: tree.segs, crown: tree.crown, buds: tree.buds.map((b) => [b.x, b.y] as const), leaves: tree.leaves.map((leaf) => [leaf.x, leaf.y] as const) },
+          tree.kind, rng(tree.seed), { widen: true });
+        for (const leaf of tree.leaves) {
+          // The due flag reaches 8 cells above the leaf, and the selection brackets 5 cells to either side.
+          expect(leaf.y - 8).toBeGreaterThanOrEqual(0);
+          expect(leaf.x - 5).toBeGreaterThanOrEqual(0);
+          expect(leaf.x + 5).toBeLessThan(layout.Wc);
+          for (let dx = -5; dx <= 5; dx++) painted.push([leaf.x + dx, leaf.y - 8]);
+        }
+      }
+      expect(sun.y - 8).toBeGreaterThanOrEqual(0);
+      expect(painted.filter(([x, y]) => (x - sun.x) ** 2 + (y - sun.y) ** 2 <= 65)).toEqual([]);
     }
   });
 
