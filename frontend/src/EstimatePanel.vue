@@ -176,6 +176,9 @@ const basisText = computed(() => {
   return basis && basis !== props.data.estimate?.basis.trim() ? basis : "";
 });
 function openCase(item: Case) { if (item.task) emit("openSession", item.task); }
+/** While the chart's line draws itself, the timeline's rows rise one after another, each a sixth of the entrance
+ * later than the row above; rows past the seventh rise with the seventh, so the stagger stays short. */
+function stagger(row: number) { return { "--row": Math.min(row, 6) }; }
 /** The chart's points: the starting point, then every change in the concept's order, with the timeline's own labels. */
 const chartPoints = computed<ChartPoint[]>(() => {
   const explanation = props.data.explanation;
@@ -223,14 +226,14 @@ const chartPoints = computed<ChartPoint[]>(() => {
       <!-- One row per change: the date, the kind's mark, a plain sentence with its timing, and the values, which the
            sentence also says, so screen readers skip the values column. -->
       <ol class="rows timeline">
-        <li class="row">
+        <li class="row" :style="stagger(0)">
           <span class="row-when"><span>{{ startDate.day }}</span><span class="row-weekday">{{ startDate.weekday }}</span></span>
           <span class="row-mark"><PixelIcon :rows="MARKS.start" :size="10" :label="KIND_NAMES.START" /></span>
           <p class="row-text">The estimate started at {{ percent(data.explanation.start.confidence) }}.</p>
           <span class="row-values" aria-hidden="true"><strong>{{ percent(data.explanation.start.confidence) }}</strong></span>
           <div class="row-more"><p class="row-detail">{{ startText }}</p></div>
         </li>
-        <li v-for="{ key, change, date, text, detail } in changeRows" :key="key" class="row">
+        <li v-for="({ key, change, date, text, detail }, index) in changeRows" :key="key" class="row" :style="stagger(index + 1)">
           <span class="row-when"><span>{{ date.day }}</span><span class="row-weekday">{{ date.weekday }}</span></span>
           <span class="row-mark"><PixelIcon :rows="MARKS[KIND_MARKS[change.kind]]" :size="10" :label="KIND_NAMES[change.kind]" /></span>
           <p class="row-text">{{ text }}</p>
@@ -244,7 +247,7 @@ const chartPoints = computed<ChartPoint[]>(() => {
       <template v-if="ignoredRows.length">
         <h3>Attempts that did not count</h3>
         <ul class="rows ignored">
-          <li v-for="item in ignoredRows" :key="item.key" class="row">
+          <li v-for="(item, index) in ignoredRows" :key="item.key" class="row" :style="stagger(changeRows.length + 1 + index)">
             <span class="row-when"><template v-if="item.date"><span>{{ item.date.day }}</span><span class="row-weekday">{{ item.date.weekday }}</span></template></span>
             <span class="row-mark"><PixelIcon :rows="MARKS.ignored" :size="10" label="Did not count" /></span>
             <p class="row-text">{{ item.name }}</p>
@@ -299,7 +302,7 @@ h3{font-family:var(--font-display);font-weight:500;font-size:11px;letter-spacing
 /* Evidence rows: the date, the kind's mark on a lavender rail, the sentence, and the values. The date and values
    columns have fixed widths so the attempts that did not count line up under the same columns. */
 .rows{list-style:none;margin:10px 0 0;padding:0}
-.row{position:relative;display:grid;grid-template-columns:38px 10px minmax(0,1fr) 52px;grid-template-areas:"date mark text values" "date mark more more";gap:0 8px;padding:0 0 12px;line-height:1.35}
+.row{position:relative;display:grid;grid-template-columns:38px 10px minmax(0,1fr) 52px;grid-template-areas:"date mark text values" "date mark more more";gap:0 8px;padding:0 0 12px;line-height:1.35;animation:sgRise var(--dur-enter) var(--ease-enter) calc(var(--row, 0) * var(--dur-enter) / 6) both}
 .timeline .row:not(:last-child)::before{content:"";position:absolute;left:50px;top:14px;bottom:-3px;width:2px;background:#E3DEF7}
 .row-when{grid-area:date;display:flex;flex-direction:column;color:var(--ink);font-size:11px;font-weight:600;line-height:1.35;white-space:nowrap}
 .row-weekday{color:var(--muted);font-weight:400}

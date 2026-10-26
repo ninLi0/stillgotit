@@ -565,11 +565,10 @@ onBeforeUnmount(() => {
 .md :deep(hr) { width: 100%; height: 1px; border: 0; background: #ECECE8; }
 .md :deep(a) { color: #2A6B85; text-underline-offset: 3px; }
 
-/* A cited location is highlighted briefly when the viewer opens at it. */
-.page-frame.flash, .slide.flash, .photo-frame.flash { outline: 3px solid var(--sand-edge); outline-offset: 4px; animation: viewerFrame 1.8s ease-out both; }
-.canvas :deep(.flash-text) { border-radius: 6px; background: var(--sand-soft); box-shadow: 0 0 0 6px var(--sand-soft); animation: viewerText 1.8s ease-out both; }
-@keyframes viewerFrame { 0%, 55% { outline-color: var(--sand-edge); } 100% { outline-color: transparent; } }
-@keyframes viewerText { 0%, 55% { background: var(--sand-soft); box-shadow: 0 0 0 6px var(--sand-soft); } 100% { background: transparent; box-shadow: 0 0 0 6px transparent; } }
+/* A cited location is highlighted briefly when the viewer opens at it. The highlight holds still, then lets go over
+   the draw duration so it has faded by the time FLASH_MS (1800 ms) removes it. */
+.page-frame.flash, .slide.flash, .photo-frame.flash { outline: 3px solid var(--sand-edge); outline-offset: 4px; animation: sgFlashFrame var(--dur-draw) var(--ease-enter) calc(1800ms - var(--dur-draw)) both; }
+.canvas :deep(.flash-text) { border-radius: 6px; background: var(--sand-soft); box-shadow: 0 0 0 6px var(--sand-soft); animation: sgFlashText var(--dur-draw) var(--ease-enter) calc(1800ms - var(--dur-draw)) both; }
 
 .chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; background: #FFFFFF; border-top: 1px solid #ECECE8; }
 .chips-label { font-size: 12px; white-space: nowrap; }

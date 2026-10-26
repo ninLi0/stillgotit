@@ -62,7 +62,7 @@ const headline = computed(() => {
   </section>
 </template>
 <style scoped>
-.tradeoffs{margin-top:22px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px;align-items:center;background:#EEF8FC;border:1px solid #C7E5F2;border-radius:24px;padding:20px 24px;box-shadow:0 10px 28px rgba(20,20,20,.07);overflow-wrap:anywhere;animation:sgRise 240ms ease-out both}
+.tradeoffs{margin-top:22px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px;align-items:center;background:#EEF8FC;border:1px solid #C7E5F2;border-radius:24px;padding:20px 24px;box-shadow:0 10px 28px rgba(20,20,20,.07);overflow-wrap:anywhere;animation:sgRise var(--dur-enter) var(--ease-enter) both}
 .proposal-body{min-width:0}
 .proposal-eyebrow{margin:0 0 4px;font-size:12px;color:#1F6E92}
 h3{margin:0 0 6px;font-family:var(--font-display);font-weight:400;font-size:24px;line-height:1.25}
@@ -90,6 +90,5 @@ h4{font-size:13px;margin:12px 0 4px}
 .keep{border:1px solid var(--line);border-radius:12px;background:#FFFFFF;min-height:44px;padding:0 20px;font-size:14px;font-weight:700;white-space:nowrap;color:var(--ink)}
 .keep:hover:not(:disabled){border-color:rgba(20,20,20,.35)}
 .blocked{margin:0;font-size:12px;max-width:220px}
-@keyframes sgRise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 @media(max-width:760px){.tradeoffs{grid-template-columns:1fr;padding:18px}.decision{flex-direction:row;flex-wrap:wrap;min-width:0}}
 </style>

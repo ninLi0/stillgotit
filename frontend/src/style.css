@@ -15,6 +15,16 @@
   --font-display: "Pixelify Sans", monospace;
   --font-body: "Instrument Sans", -apple-system, "Helvetica Neue", sans-serif;
   --font-mono: "Spline Sans Mono", ui-monospace, monospace;
+  /* Motion (design/visual-design.md, "Motion"). Four curves, each named for what it moves, and four durations. */
+  --ease-enter: cubic-bezier(.22, 1, .36, 1); /* Things that appear or fade away: a fast start and a soft landing. */
+  --ease-move: cubic-bezier(.65, 0, .35, 1); /* Things that travel from one place to another: as gentle leaving as arriving. */
+  --ease-grow: cubic-bezier(.2, .9, .3, 1.2); /* Things that grow into place: a small overshoot that settles. */
+  --ease-loop: cubic-bezier(.37, 0, .63, 1); /* The scenes' ambient loops and the waiting signs: a soft swell, like a sine wave. */
+  --dur-quick: 120ms; /* Presses, color changes, and controls that fade in. */
+  --dur-enter: 240ms; /* Cards, messages, notices, bubbles and dialogs coming in. */
+  --dur-move: 320ms; /* The lesson's rail, the sidebar's capsule and the lesson's tab mark moving. */
+  --dur-draw: 520ms; /* The estimate line drawing itself. */
+  --loop-beat: 1.2s; /* One beat of a waiting sign: the tutor's dots, the star beside an import's progress and the recording square. */
 
   font-family: var(--font-body); color: var(--ink); background: #FFFFFF; font-synthesis: none; line-height: 1.5;
   font-variant-numeric: tabular-nums;
@@ -101,20 +111,59 @@ form .primary { margin-top: 18px; }
 .practice-button:active:not(:disabled), .small-button:active:not(:disabled), .prompt-choices button:active { transform: translateY(1px); }
 .compact .record-button:not(.recording) { border: 0 !important; background: transparent; }
 
-/* Motion shows what just changed: cards and messages rise in over 240ms. */
-@keyframes sgRise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-@keyframes pop { from { opacity: 0; transform: scale(.92); } to { opacity: 1; transform: none; } }
-@keyframes grow { from { transform: scale(0); } to { transform: none; } }
-@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
-@keyframes pulse { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
-.message, .attempt-review, .assessment, .skill-draft, .rise { animation: sgRise 240ms ease-out both; }
-.file-card, .attachment-chip { animation: pop 180ms ease-out both; }
-.leaf-shape { transform-box: fill-box; transform-origin: 50% 100%; animation: grow 520ms cubic-bezier(.2, .9, .3, 1.2) both; transition: fill 600ms ease; }
-.notice, .error, .step { animation: fade 220ms ease-out both; }
-.working span { display: inline-block; animation: pulse 1.2s ease-in-out infinite; }
-.primary, .secondary, .dropzone, .file-remove, .history-item, .practice-button, .small-button, .new-lesson, .prompt-choices button { transition: background-color 120ms, transform 80ms, box-shadow 80ms; }
+/* ---- Motion (design/visual-design.md, "Motion") ----
+   Motion shows what just changed, on the curves and durations above. Every keyframe the app uses is here, once. */
+@keyframes sgRise { from { opacity: 0; transform: translateY(8px); } }
+@keyframes sgPop { from { opacity: 0; transform: scale(.92); } }
+@keyframes sgFade { from { opacity: 0; } }
+@keyframes sgOpen { from { opacity: 0; transform: scale(.96); } }
+@keyframes sgSlide { from { opacity: 0; transform: translateX(24px); } }
+@keyframes sgPulse { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
+@keyframes sgDot { 0%, 80%, 100% { opacity: .25; transform: none; } 40% { opacity: 1; transform: translateY(-3px); } }
+/* The estimate line draws itself from its start to its end. Its path has pathLength="1", so one dash of length 1 is
+   the whole line; the dash exists only while the line draws, and the line is solid again afterwards. */
+@keyframes sgDraw { from { stroke-dasharray: 1 1; stroke-dashoffset: 1; } to { stroke-dasharray: 1 1; stroke-dashoffset: 0; } }
+/* The Materials viewer's highlight on a cited page or passage lets go. */
+@keyframes sgFlashFrame { to { outline-color: transparent; } }
+@keyframes sgFlashText { to { background: transparent; box-shadow: 0 0 0 6px transparent; } }
+
+.message, .attempt-review, .assessment, .rise { animation: sgRise var(--dur-enter) var(--ease-enter) both; }
+.file-card, .attachment-chip { animation: sgPop var(--dur-enter) var(--ease-grow) both; }
+.notice, .error { animation: sgFade var(--dur-enter) var(--ease-enter) both; }
+.working span { display: inline-block; animation: sgPulse var(--loop-beat) var(--ease-loop) infinite; }
+.primary, .secondary, .dropzone, .file-remove, .history-item, .practice-button, .small-button, .new-lesson, .prompt-choices button {
+  transition: background-color var(--dur-quick) var(--ease-enter), transform var(--dur-quick) var(--ease-enter), box-shadow var(--dur-quick) var(--ease-enter);
+}
+/* Dialogs open with a short scale and fade, and their backdrop fades in with them. */
+dialog[open] { animation: sgOpen var(--dur-enter) var(--ease-enter); }
+dialog[open]::backdrop { animation: sgFade var(--dur-enter) var(--ease-enter); }
+
+/* Ambient scene motion. Each scene draws what stays still on a canvas and lays its moving sprites over it as SVG
+   rectangles. A sprite's offset eases on the loop curve, one way and back, and is rounded to whole device pixels
+   (--snap, which each scene sets from the screen's pixel ratio), so the sprite glides while its edges stay crisp.
+   Each sprite sets how far it goes (--reach-x, --reach-y), how long one way takes (--period-x, --period-y), and where in
+   its cycle it starts (--delay-x, --delay-y, negative). */
+@property --drift-x { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --drift-y { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@keyframes sgDriftX { to { --drift-x: var(--reach-x); } }
+@keyframes sgDriftY { to { --drift-y: var(--reach-y); } }
+.drift {
+  transform: translate(round(var(--drift-x), var(--snap, 1px)), round(var(--drift-y), var(--snap, 1px)));
+  animation: sgDriftX var(--period-x) var(--ease-loop) var(--delay-x) infinite alternate, sgDriftY var(--period-y) var(--ease-loop) var(--delay-y) infinite alternate;
+}
+/* The Plan sea's whale swims from today toward the lighthouse, fading in at the start and out at the end of each
+   crossing; on the way it dives a little and surfaces again, and it spouts each time it surfaces. */
+@keyframes sgSwim { 0% { --drift-x: 0px; opacity: 0; } 8%, 92% { opacity: 1; } 100% { --drift-x: var(--reach-x); opacity: 0; } }
+@keyframes sgDive { to { --drift-y: var(--reach-y); opacity: .7; } }
+@keyframes sgSpout { 0%, 100% { opacity: 1; } 14%, 86% { opacity: 0; } }
+/* The lighthouse lamp breathes between a deep and a pale yellow, and its beam fades in as it brightens. */
+@keyframes sgLamp { from { fill: #E3A233; } }
+@keyframes sgBeam { from { opacity: 0; } }
+
 @media (prefers-reduced-motion: reduce) {
+  /* Nothing moves: entrances show their end state, and the scenes keep their sprites where they are drawn. */
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  dialog::backdrop { animation: none !important; }
 }
 
 /* Reasons for disabled buttons appear as a tooltip when the pointer is over the button. Screen readers still read them

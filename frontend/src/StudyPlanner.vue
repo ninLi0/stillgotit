@@ -316,7 +316,7 @@ watch(() => props.revision, () => Promise.all([read(), readCourse()]).catch((pro
 .exam-title{display:flex;align-items:center;gap:6px;font-family:var(--font-display);font-size:18px}
 .exam-covers{font-size:11px;font-weight:600;opacity:.9}
 .items{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
-.item{display:flex;flex-direction:column;gap:6px;padding:8px 9px;border-radius:8px;border:1px solid rgba(13,63,88,.14);box-shadow:0 2px 0 rgba(13,63,88,.22);color:var(--ink);animation:sgRise 240ms ease-out both}
+.item{display:flex;flex-direction:column;gap:6px;padding:8px 9px;border-radius:8px;border:1px solid rgba(13,63,88,.14);box-shadow:0 2px 0 rgba(13,63,88,.22);color:var(--ink);animation:sgRise var(--dur-enter) var(--ease-enter) both}
 .item-title{font-size:12px;font-weight:650;line-height:1.35;text-wrap:pretty;overflow-wrap:anywhere}
 .type-square{display:inline-block;width:7px;height:7px;margin:0 6px 1px 0;vertical-align:middle}
 .item-meta{font-size:11px;font-weight:600;line-height:1.35;color:var(--muted);overflow-wrap:anywhere}
@@ -337,7 +337,6 @@ watch(() => props.revision, () => Promise.all([read(), readCourse()]).catch((pro
 .rows li{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--inset);font-size:13px;overflow-wrap:anywhere}
 .row-min{color:var(--muted);flex:none}
 .settings-dialog{border:0;border-radius:22px;padding:22px;width:min(360px,calc(100vw - 32px));box-shadow:0 20px 50px rgba(20,20,20,.25);color:var(--ink);background:#FFFFFF}.settings-dialog::backdrop{background:rgba(20,20,20,.35)}.settings-form{max-width:none}.settings-form h3{font-family:var(--font-display);font-weight:400;font-size:22px;margin:0 0 4px}.settings-form label{margin:14px 0 6px;font-size:13px;font-weight:700}.settings-form input{min-height:40px;font-size:14px;margin-top:6px;border-radius:10px}.dialog-actions{display:flex;justify-content:flex-end;align-items:center;gap:16px;margin-top:18px}.dialog-actions .primary{min-height:40px;padding:0 18px;font-size:14px}
-@keyframes sgRise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 @media(max-width:900px){.planner{padding:22px 18px 40px}}
 @media(max-width:760px){.below{grid-template-columns:1fr}.next{grid-template-columns:1fr}.next-actions{align-items:flex-start}}
 </style>
