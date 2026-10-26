@@ -299,6 +299,25 @@ describe("Caption files", () => {
     expect(transcriptText(cues("Eric Ni: Hello.", "More words.", "Still more.", "Eric Ni: Bye."))).toBe("Eric Ni: Hello. More words. Still more. Eric Ni: Bye.");
   });
 
+  test("a paragraph that runs past a minute ends at the next sentence end, or at the longest pause when nothing ends a sentence", () => {
+    const stamp = (seconds: number) => {
+      const ms = Math.round(seconds * 1000), two = (n: number) => String(n).padStart(2, "0");
+      return `${two(Math.floor(ms / 3_600_000))}:${two(Math.floor(ms / 60_000) % 60)}:${two(Math.floor(ms / 1000) % 60)},${String(ms % 1000).padStart(3, "0")}`;
+    };
+    // Cue i runs from 5i to 5i + 4.5 seconds, so no pause between cues is longer than 2 seconds.
+    const srt = (count: number, text: (i: number) => string, end = (i: number) => 5 * i + 4.5) =>
+      Array.from({ length: count }, (_, i) => `${i + 1}\n${stamp(5 * i)} --> ${stamp(end(i))}\n${text(i)}`).join("\n\n");
+    const joined = (from: number, to: number, text: (i: number) => string) => Array.from({ length: to - from + 1 }, (_, i) => text(from + i)).join(" ");
+    // Punctuated: each paragraph ends with the first sentence that ends after it has run a minute (64.5 seconds here).
+    const sentence = (i: number) => `Sentence ${i}.`;
+    expect(transcriptText(srt(30, sentence))).toBe([joined(0, 12, sentence), joined(13, 25, sentence), joined(26, 29, sentence)].join("\n\n"));
+    // Unpunctuated: in the paragraph's second minute it ends at the longest pause (after cue 15), then at the first of equal pauses.
+    const word = (i: number) => `word ${i}`;
+    expect(transcriptText(srt(40, word, (i) => i === 15 ? 78 : 5 * i + 4.5))).toBe([joined(0, 15, word), joined(16, 28, word), joined(29, 39, word)].join("\n\n"));
+    // A pause that would leave less than half a minute after it does not split the paragraph.
+    expect(transcriptText(srt(16, word))).toBe(joined(0, 15, word));
+  });
+
   test("blocks hold 100 lines and end with a paragraph, and a file with no cue text has no readable text", async () => {
     const cues = Array.from({ length: 60 }, (_, i) => `${i + 1}\n00:${String(i).padStart(2, "0")}:00,000 --> 00:${String(i).padStart(2, "0")}:01,000\nSentence ${i + 1}.`);
     const result = await read("long.srt", strToU8(cues.join("\n\n")));
