@@ -83,19 +83,19 @@ Classmates and friends are potential early testers. The app does not require a p
 
 ## Concept design
 
-The [concept specifications](p1-concepts.md) define five concepts.
+The [concept specifications](../../design/p1-concepts.md) define five concepts.
 
 | Concept | Responsibility |
 | --- | --- |
-| [SkillMapping](p1-concepts.md#1-skillmapping-user-material) | Define skills, sources, and prerequisites. Keep earlier versions of requirements. |
-| [GroundedTutoring](p1-concepts.md#2-groundedtutoring-learner-scope-topic-definition) | Teach from source material. Record practice through voice, text, and photos. |
-| [AssessmentReviewing](p1-concepts.md#3-assessmentreviewing-author-subject-definition-task) | Judge submitted work. Retain imports, regrades, and corrections. |
-| [MasteryEstimating](p1-concepts.md#4-masteryestimating-learner-subject-definition-evidence) | Estimate current mastery from confidence, time, evidence, and manual adjustments. |
-| [StudyPlanning](p1-concepts.md#5-studyplanning-learner-scope-subject-definition) | Fit activities into available time. Apply exam priorities and confirmed tradeoffs. |
+| [SkillMapping](../../design/p1-concepts.md#1-skillmapping-user-material) | Define skills, sources, and prerequisites. Keep earlier versions of requirements. |
+| [GroundedTutoring](../../design/p1-concepts.md#2-groundedtutoring-learner-scope-topic-definition) | Teach from source material. Record practice through voice, text, and photos. |
+| [AssessmentReviewing](../../design/p1-concepts.md#3-assessmentreviewing-author-subject-definition-task) | Judge submitted work. Retain imports, regrades, and corrections. |
+| [MasteryEstimating](../../design/p1-concepts.md#4-masteryestimating-learner-subject-definition-evidence) | Estimate current mastery from confidence, time, evidence, and manual adjustments. |
+| [StudyPlanning](../../design/p1-concepts.md#5-studyplanning-learner-scope-subject-definition) | Fit activities into available time. Apply exam priorities and confirmed tradeoffs. |
 
 A regrade changes one judgment. It does not add a new attempt. A manual mastery adjustment sets a new estimate that continues to change. Finishing a session consumes time even when the answer is wrong.
 
-The [essential reactions](p1-concepts.md#essential-reactions) connect the concepts. The [composition note](p1-concepts.md#how-the-concepts-work-together) defines their shared types.
+The [essential reactions](../../design/p1-concepts.md#essential-reactions) connect the concepts. The [composition note](../../design/p1-concepts.md#how-the-concepts-work-together) defines their shared types.
 
 ## UI sketches
 
@@ -188,4 +188,4 @@ The physics example shows the same interaction in another subject. Each learner 
 
 Build one complete path first: add material, confirm a skill, submit photographed work with spoken reasoning, inspect the assessment, and receive a next activity. This follows the TA's advice to test a working version early.
 
-I plan to ask two classmates or friends to try that path. I will check whether the skill map is clear, voice and photos reduce effort, and the evidence helps them plan. The [initial numerical rules](p1-concepts.md#initial-policies-and-implementation-scope) need testing. No student study has been completed.
+I plan to ask two classmates or friends to try that path. I will check whether the skill map is clear, voice and photos reduce effort, and the evidence helps them plan. The [initial numerical rules](../../design/p1-concepts.md#initial-policies-and-implementation-scope) need testing. No student study has been completed.

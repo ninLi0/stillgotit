@@ -15,7 +15,7 @@ StillGotIt helps college students learn the skills in a course and keep them aft
   - the [host](design/host.md), which names each part of the server that works outside the concepts;
   - the [runtime responsibilities](design/runtime.md): where the app runs, accounts and requests, writes without transactions, the AI tutor, and file import;
   - the [visual design study](design/visual-design.md), which covers the Pixel Nature look.
-- **The P1 design:** the [design submission](docs/history/p1-design.md) and its [concept design](docs/history/p1-concepts.md).
+- **The P1 design:** the [design submission](docs/history/p1-design.md) and its [concept design](design/p1-concepts.md).
 
 ## Run locally
 
