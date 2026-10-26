@@ -214,6 +214,15 @@ async function assess() {
 async function saveConfidence() { await act(async () => { unwrap(await api.learning.confidence({ skill: props.skill, confidence: confidence.value })); }, "Starting point saved. You can now check your understanding."); }
 async function requestHint() { const active = current.value; if (active) await act(async () => { await timedAnswer(async () => unwrap(await api.learning.hint({ studySession: active.session }))); }); }
 async function retryReply() { const active = current.value; if (active) await act(async () => { await timedAnswer(async () => unwrap(await api.learning.reply({ studySession: active.session }))); }); }
+/**
+ * Finishing closes the lesson for good, so it leaves Home's Continue card. Its conversation stays here to read. A message
+ * still in the box would be lost with the box, so the learner sends or clears it first; the refusal shows in the alert area.
+ */
+async function finishLesson() {
+  const active = current.value; if (!active?.lesson || active.status !== "OPEN" || busy.value || recording.value) return;
+  if (response.value.trim() || attachments.value.length) { notice.value = ""; error.value = "Send or clear your message before finishing this lesson."; await nextTick(); errorBox.value?.focus(); return; }
+  await act(async () => { unwrap(await api.learning.finish({ studySession: active.session })); }, "Lesson finished. Its conversation stays here to read.");
+}
 async function correctTranscript(turnIndex: number) { const active = current.value; if (!active) return; await act(async () => { unwrap(await api.learning.transcript({ studySession: active.session, turnIndex, text: speechEdits.value[turnIndex] ?? "" })); reviewed.value = false; }, "Transcript correction saved. Review your answer again before assessment."); }
 async function requestRegrade(assessment: string, basedOn: string) {
   await act(async () => { unwrap(await api.learning.regrade({ case: assessment, basedOn, reason: reason.value })); reason.value = ""; }, "Regrade saved. The assessment above shows the new result.");
@@ -424,7 +433,7 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
                 <p v-for="(file, fileIndex) in item.turn.media" :key="file.file" class="attachment-label"><span class="attach-thumb" aria-hidden="true" />{{ item.turn.media.length > 1 ? `Attachment ${fileIndex + 1} of ${item.turn.media.length}` : 'Attachment' }} · {{ file.name }}</p>
                 <div v-if="item.turn.speaker === 'TUTOR'" class="reply-foot"><ReplyMeta :seconds="replySeconds(current, item.turnIndex)" :sources="item.turn.citations.length" :tutor="answerLabel('turn', current.session, item.turnIndex)" /><ReplyActions :message-key="`${current.session}:${item.turnIndex}`" :text="item.turn.text" :what="item.turn.purpose === 'HINT' ? 'hint' : 'tutor reply'" describedby="listen-reason" /></div></article>
               <!-- A lesson question without a reply: the retry sits where the tutor's reply would be. -->
-              <div v-if="current.lesson && current.dialogue.at(-1)?.turn.speaker === 'LEARNER' && !pending" class="retry-row"><span class="avatar"><PixelIcon name="leaf" :size="16" /></span><button class="secondary dawn reply-retry" :disabled="busy || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="retryReply"><span aria-hidden="true">↻</span>Retry tutor reply</button></div>
+              <div v-if="current.lesson && current.status === 'OPEN' && current.dialogue.at(-1)?.turn.speaker === 'LEARNER' && !pending" class="retry-row"><span class="avatar"><PixelIcon name="leaf" :size="16" /></span><button class="secondary dawn reply-retry" :disabled="busy || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="retryReply"><span aria-hidden="true">↻</span>Retry tutor reply</button></div>
               <div v-if="current.task && current.status === 'OPEN' && current.dialogue.some(item => item.turn.speaker === 'LEARNER' && item.turn.purpose === 'RESPONSE')" class="review-step">
                 <button class="secondary dawn" :disabled="busy || recording" :aria-expanded="reviewOpen" @click="reviewOpen = !reviewOpen">{{ reviewOpen ? 'Close review' : 'Review and assess my work' }}</button>
                 <div v-if="reviewOpen" class="attempt-review">
@@ -434,7 +443,7 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
                   <div class="assess-row"><button class="primary dawn" :disabled="busy || !!assessReason" :aria-describedby="assessReason ? 'assess-reason' : undefined" @click="assess">Assess my work</button><p v-if="assessReason" id="assess-reason" class="hint reason">{{ assessReason }}</p></div>
                 </div>
               </div>
-              <button v-if="current.status === 'CLOSED' && !currentCases.some(item => item.judgment)" class="secondary dawn" :disabled="busy || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="assess">Retry saved assessment</button>
+              <button v-if="current.task && current.status === 'CLOSED' && !currentCases.some(item => item.judgment)" class="secondary dawn" :disabled="busy || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="assess">Retry saved assessment</button>
               <article v-for="item in currentCases" :key="item.case" class="assessment">
                 <template v-if="item.judgment">
                   <div class="result-top"><div><p class="eyebrow">Assessment</p><h3 :class="{ success: SUCCESS.has(item.judgment.result) }">{{ resultLabels[item.judgment.result] }}</h3></div><div v-if="attemptChange(item.case)" class="result-figure"><p class="eyebrow">Mastery</p><p class="result-pct"><span aria-hidden="true">{{ attemptChange(item.case)!.before }} → {{ attemptChange(item.case)!.after }}</span><span class="sr-only">from {{ attemptChange(item.case)!.before }} to {{ attemptChange(item.case)!.after }}</span></p><p class="result-delta">{{ attemptChange(item.case)!.delta }}</p></div>
@@ -469,10 +478,12 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
               <div class="composer-tools"><div class="input-tools"><label class="attach-button tool-pill" :class="{ unavailable: !current || busy || recording }" :title="current ? 'Attach photos of your work' : 'Start a lesson before attaching work'"><span aria-hidden="true">＋ Photo of work</span><span class="sr-only">{{ attachments.length ? 'Add another photo of your work' : 'Add photos of your work' }}</span><input type="file" accept="image/*" capture="environment" multiple :disabled="busy || recording || !current" @change="uploadWork" /></label>
                 <SpeechInput :disabled="busy || !aiAvailable" :active="active !== false" :describedby="aiAvailable ? undefined : 'ai-reason-chat'" compact @recording="recording = $event" @transcript="response = response ? response + '\n' + $event : $event; channel = 'VOICE'" @error="error = $event" />
                 <button v-if="current?.task" class="hint-button tool-pill" :disabled="busy || recording || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="requestHint">Ask for a hint</button>
+                <button v-else-if="current?.lesson" type="button" class="tool-pill" :disabled="busy || recording" @click="finishLesson">Finish lesson</button>
               </div><div class="composer-right"><span class="note-info"><InfoBubble :text="composerNote" label="About this message box" /></span><button class="send-button" :disabled="!canSend" :aria-label="current?.task ? 'Save answer' : 'Send message'" :aria-describedby="aiAvailable || current?.task ? undefined : 'ai-reason-chat'" @click="submitMessage"><span aria-hidden="true">↑</span></button></div></div>
             </div>
             <p v-if="recording" class="composer-note" role="status">Recording. Stop to review your words before sending.</p>
           </template>
+          <div v-else-if="current.lesson" class="finished-message"><p>This lesson is finished. Start a new conversation to keep going.</p><button class="message-action" :disabled="busy" @click="newLesson">Keep learning</button></div>
           <div v-else class="finished-message"><p>This attempt is saved.</p><button v-if="!currentCases.some(item => item.judgment)" class="secondary dawn" :disabled="busy || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="startTask">Try a fresh check</button><button class="message-action" :disabled="busy" @click="newLesson">Keep learning</button></div>
           <p v-if="aiOff" id="ai-reason-chat" class="hint">{{ aiOff }}</p>
           <p v-if="current && listenUnavailable" id="listen-reason" class="hint">{{ listenUnavailable }}</p>

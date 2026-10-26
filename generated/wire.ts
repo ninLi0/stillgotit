@@ -454,6 +454,14 @@ export type StillGotItWire = {
     };
     error: { error: AppWideError | "DEADLINE_TRADEOFF_CONFIRMATION_REQUIRED" | "EVIDENCE_DATE_MISMATCH" | "EVIDENCE_REVISION_NOT_NEW" | "EVIDENCE_TRACK_MISMATCH" | "EVIDENCE_TRACK_UNAVAILABLE" | "IMPORTED_GATE_UNAVAILABLE" | "INVALID_INPUT" | "INVALID_MASTERY_EVIDENCE" | "INVALID_PLAN_INPUT" | "INVALID_REVISED_JUDGMENT" | "JUDGMENT_REVISION_OUTDATED" | "NOT_SIGNED_IN" | "PLAN_PREFERENCES_UNAVAILABLE" | "PLAN_SESSION_IN_PROGRESS" | "REVISION_CASE_UNAVAILABLE" | "ROUTINE_PLAN_OUTDATED" | "ROUTINE_PLAN_UNAVAILABLE" | "ROUTINE_SESSION_IN_PROGRESS" };
   };
+  "/learning/finish": {
+    input: {
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+      "studySession": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["close"]>[0], ["session"]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_byTask"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_lesson"]>[0], ["lesson"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_session"]>[0], ["session"]>]>]>>;
+    };
+    output: Record<string, never>;
+    error: { error: AppWideError | "INVALID_INPUT" | "NOT_SIGNED_IN" | "SESSION_CLOSE_UNAVAILABLE" | "SESSION_UNAVAILABLE" };
+  };
   "/learning/hint": {
     input: {
       "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
@@ -1266,6 +1274,13 @@ export type StillGotItHttp = {
     } | {
       "judgment": Jsonify<AllOf<[AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["revise"]>>, ["judgment"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_effectiveJudgment"]>>>, ["judgment"]>]>>;
     };
+    error: { error: HttpAppWideError | "INVALID_REQUEST" | "UNAUTHORIZED" };
+  };
+  "/learning/finish": {
+    input: {
+      "studySession": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["close"]>[0], ["session"]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_byTask"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_lesson"]>[0], ["lesson"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_session"]>[0], ["session"]>]>]>>;
+    };
+    output: Record<string, never>;
     error: { error: HttpAppWideError | "INVALID_REQUEST" | "UNAUTHORIZED" };
   };
   "/learning/hint": {

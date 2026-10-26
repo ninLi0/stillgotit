@@ -33,6 +33,10 @@ const HintReady = former("admit requested help in (studySession)", ({ owner, stu
   R.OpenSession({ owner, studySession }), Tutoring._task({ task: studySession }),
 ).form({ allowed: true })).optional();
 const TranscriptReady = former("admit a transcript correction in (studySession)", ({ owner, studySession }) => where(R.OpenSession({ owner, studySession })).form({ allowed: true })).optional();
+// The two conditions of FinishLesson's "owned" branch, so an open practice task is declined with this entry's sentence.
+const FinishReady = former("admit finishing lesson (studySession)", ({ owner, studySession }) => where(
+  R.OpenSession({ owner, studySession }), Tutoring._lesson({ lesson: studySession }),
+).form({ allowed: true })).optional();
 const AssessmentReady = former("admit review of (studySession)", ({ owner, studySession, dialogueLength, reviewed, unseen, outsideHelp }, { skill, definition, data }) => where(
   R.OpenSession({ owner, studySession }).is({ skill, definition }), Mastery._track({ learner: owner, subject: skill, definition }),
   Tutoring._sessionData({ session: studySession }).is({ data }), C.attemptIsReady({ data, dialogueLength, reviewed, unseen, outsideHelp }),
@@ -66,7 +70,7 @@ const PracticePrerequisite = former("the prerequisite to work on before practici
 ).form({ title })).optional();
 /** The practice explanation that names the prerequisite PracticePrerequisite found. */
 export const prerequisiteDetail = ({ title }: { title: string }) => `Work on “${title}” first. This skill builds on it.`;
-export const composition = { LessonReady, TaskReady, PracticePrerequisite, ResponseReady, QuestionReady, ReplyReady, HintReady, TranscriptReady, AssessmentReady, RetryReady, RegradeReady, AdjustReady, SuggestionReady, GradedReady, CourseReady, PlanReady, ItemReady, BeginReady };
+export const composition = { LessonReady, TaskReady, PracticePrerequisite, ResponseReady, QuestionReady, ReplyReady, HintReady, TranscriptReady, FinishReady, AssessmentReady, RetryReady, RegradeReady, AdjustReady, SuggestionReady, GradedReady, CourseReady, PlanReady, ItemReady, BeginReady };
 
 // Transport admission uses these same declared reads before starting a causal flow. Each path lists its formers in the
 // order they run; a command that asks the tutor passes TutorReady first, so a retired choice is refused before any write.
@@ -80,6 +84,7 @@ export const admissions = {
   "/learning/reply": [tutorReady, { check: ReplyReady, fields: ["studySession"], detail: "Send a question in an open lesson before asking for a reply." }],
   "/learning/hint": [tutorReady, { check: HintReady, fields: ["studySession"], detail: "Choose an open practice task to request a hint." }],
   "/learning/transcript": [{ check: TranscriptReady, fields: ["studySession"], detail: "Choose an open session before correcting a transcript." }],
+  "/learning/finish": [{ check: FinishReady, fields: ["studySession"], detail: "Choose one of your open lessons. A practice task closes when you submit it for assessment." }],
   "/learning/assess": [tutorReady, { check: AssessmentReady, fields: ["studySession", "dialogueLength", "reviewed", "unseen", "outsideHelp"], detail: "Review your complete answer and transcripts. If it was already submitted, use its saved assessment or retry." }],
   "/learning/retry": [tutorReady, { check: RetryReady, fields: ["studySession"], detail: "Choose a saved attempt that is still awaiting assessment." }],
   "/learning/regrade": [tutorReady, { check: RegradeReady, fields: ["assessment", "basedOn"], detail: "Choose your own assessment and review its latest judgment before requesting a regrade." }],
