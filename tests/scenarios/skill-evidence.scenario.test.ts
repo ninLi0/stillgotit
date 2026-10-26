@@ -302,8 +302,9 @@ describe("Evidence behind each skill's estimate", () => {
     expect(refused).toEqual({ status: 400, body: { error: "INVALID_REQUEST", detail: UNAVAILABLE_SKILL } });
     // The page shows the specific reason, which does not reveal whether the skill exists.
     expect(failureText(refused.body)).toBe(UNAVAILABLE_SKILL);
-    // The other learner cannot read the estimate either.
-    expect(await other.post("/learning/read", { skill })).toEqual({ status: 400, body: { error: "INVALID_REQUEST" } });
+    // The other learner cannot read the estimate either, and the refusal says so (Courses.md, "Course and skill refusals").
+    expect(await other.post("/learning/read", { skill }))
+      .toEqual({ status: 400, body: { error: "INVALID_REQUEST", detail: "This skill is not available. Reload the page to see your skills." } });
     // Without a session, nothing is adjusted.
     expect((await app.browser().post("/learning/adjust", attempt)).status).toBe(401);
 
