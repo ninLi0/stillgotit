@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { messageTime, secondsLabel, sourcesLabel, turnsLabel } from "../frontend/src/labels.ts";
-import { UnansweredQuestions, answerSeconds } from "../frontend/src/reply-stats.ts";
+import { UnansweredQuestions, answerSeconds, citedSources } from "../frontend/src/reply-stats.ts";
 
 const turn = (turnIndex: number, speaker: "LEARNER" | "TUTOR", purpose: string, at: string) =>
   ({ turnIndex, turn: { speaker, purpose, at } });
@@ -46,6 +46,20 @@ describe("Answer time", () => {
   test("an unreadable or backwards time gives no answer time", () => {
     expect(answerSeconds([turn(0, "LEARNER", "RESPONSE", "not a time"), turn(1, "TUTOR", "EXPLANATION", "2026-10-25T15:00:05.000Z")], 1)).toBeNull();
     expect(answerSeconds([turn(0, "LEARNER", "RESPONSE", "2026-10-25T15:00:05.000Z"), turn(1, "TUTOR", "EXPLANATION", "2026-10-25T15:00:00.000Z")], 1)).toBeNull();
+  });
+});
+
+describe("Sources in the rail", () => {
+  const cite = (material: string, location: string) => ({ material, location });
+  const said = (speaker: "LEARNER" | "TUTOR", ...citations: { material: string; location: string }[]) => ({ turn: { speaker, citations } });
+
+  test("each conversation's own sources come first, then its replies' sources, each source once", () => {
+    const sessions = [
+      { citations: [cite("m1", "p/1")], dialogue: [said("LEARNER"), said("TUTOR", cite("m1", "p/1"), cite("m1", "p/3")), said("TUTOR", cite("m2", "s/2"))] },
+      { citations: [cite("m2", "s/2"), cite("m3", "content")], dialogue: [said("TUTOR", cite("m1", "p/3"), cite("m3", "p/9"))] },
+    ];
+    expect(citedSources(sessions)).toEqual([cite("m1", "p/1"), cite("m1", "p/3"), cite("m2", "s/2"), cite("m3", "content"), cite("m3", "p/9")]);
+    expect(citedSources([])).toEqual([]);
   });
 });
 

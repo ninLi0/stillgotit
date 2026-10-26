@@ -18,6 +18,24 @@ export function answerSeconds(dialogue: readonly { turnIndex: number; turn: Turn
   return Number.isFinite(seconds) && seconds >= 0 ? seconds : null;
 }
 
+type Cited = { material: string; location: string };
+/**
+ * Every source a skill's conversations cite, once each, for the rail's Taught from card: each lesson's or task's own
+ * sources, then those its tutor replies cite. A material and location cited again is listed only the first time.
+ */
+export function citedSources<C extends Cited>(sessions: readonly { citations: readonly C[]; dialogue: readonly { turn: { speaker: string; citations: readonly C[] } }[] }[]): C[] {
+  const seen = new Set<string>(), out: C[] = [];
+  const add = (citation: C) => {
+    const key = `${citation.material}\n${citation.location}`;
+    if (!seen.has(key)) { seen.add(key); out.push(citation); }
+  };
+  for (const session of sessions) {
+    session.citations.forEach(add);
+    for (const item of session.dialogue) if (item.turn.speaker === "TUTOR") item.turn.citations.forEach(add);
+  }
+  return out;
+}
+
 type MarkStorage = Pick<Storage, "getItem" | "setItem">;
 
 /** The browser's local storage, or null when it is blocked. */

@@ -13,7 +13,7 @@ import { stageOf } from "./pixel-art.ts";
 import type { OpenSource } from "./revamp-types.ts";
 import { api, unwrap } from "./api.ts";
 import { messageTime, resultLabels, secondsLabel, sessionLabels, turnsLabel } from "./labels.ts";
-import { UnansweredQuestions, answerSeconds, localStore } from "./reply-stats.ts";
+import { UnansweredQuestions, answerSeconds, citedSources, localStore } from "./reply-stats.ts";
 import { focusedControl, restoreFocus } from "./focus.ts";
 import { PendingAdjustment, sessionStore } from "./pending-adjustment.ts";
 import { listenUnavailable, stopSpeaking } from "./speech.ts";
@@ -245,14 +245,7 @@ function sessionDate(id: string) {
 }
 function assessed(id: string) { return data.value?.cases.some((item) => item.task === id && !!item.judgment) ?? false; }
 // Every source this skill's conversations were taught from, once each, for the rail's Taught from card.
-const railCitations = computed(() => {
-  const seen = new Set<string>(), out: StudySession["citations"][number][] = [];
-  for (const session of data.value?.sessions ?? []) for (const citation of session.citations) {
-    const key = `${citation.material}\n${citation.location}`;
-    if (!seen.has(key)) { seen.add(key); out.push(citation); }
-  }
-  return out;
-});
+const railCitations = computed(() => citedSources(data.value?.sessions ?? []));
 /** Splits a tutor answer into prose and fenced code or $$ maths blocks, so blocks render in the mono font. */
 function blocks(text: string): { code: boolean; text: string }[] {
   const out: { code: boolean; text: string }[] = [], pattern = /```[^\n]*\n?([\s\S]*?)```|\$\$([\s\S]*?)\$\$/g;
@@ -415,6 +408,7 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
                 <template v-if="item.turn.speaker === 'TUTOR'">
                   <div class="speaker-row"><span class="speaker"><span class="avatar"><PixelIcon name="leaf" :size="16" /></span> StillGotIt<span v-if="messageTime(item.turn.at)" class="sr-only">, <time :datetime="item.turn.at">{{ messageTime(item.turn.at) }}</time></span><span v-if="item.turn.purpose === 'HINT'" class="tag hint-tag">Hint</span><span v-else-if="item.turn.purpose === 'CORRECTION'" class="tag">Transcript correction</span></span></div>
                   <div class="prose-blocks"><template v-for="(part, partIndex) in blocks(item.turn.text)" :key="partIndex"><pre v-if="part.code" class="code-block">{{ part.text }}</pre><p v-else class="prose">{{ part.text }}</p></template></div>
+                  <SourcesUsed v-if="item.turn.citations.length" :key="`${current.session}:${item.turnIndex}`" :citations="item.turn.citations" :titles="materialTitles" :id-prefix="`passage-${current.session}-${item.turnIndex}`" compact @open="openSource" />
                 </template>
                 <template v-else><span class="sr-only">You{{ purposeNote(item.turn.purpose) }}</span><span v-if="messageTime(item.turn.at)" class="sr-only">, <time :datetime="item.turn.at">{{ messageTime(item.turn.at) }}</time></span><span v-if="purposeNote(item.turn.purpose)" class="tag you-tag" aria-hidden="true">{{ purposeNote(item.turn.purpose).replace(' · ', '') }}</span>
                   <p class="prose">{{ item.turn.text }}</p></template>

@@ -12,8 +12,9 @@ type Loaded<T> = { state: "loading" } | { state: "ready"; value: T } | { state: 
 type Part = { kind: "TEXT"; text: string } | { kind: "IMAGE"; image: Loaded<string> } | { kind: "PAGE"; page: number };
 // `titles` names each course material, for labels before its passage is opened. `idPrefix` keeps element ids unique.
 // `variant` picks the look: "chips" under a tutor answer ("From <source> ↗"), or "rail" for the Taught from card.
+// `compact` lays the chips out in one wrapping row with a single "From", for the sources under each tutor reply.
 // Choosing a source opens its passage here, as before, and also emits `open` so the shell can show it in Materials.
-const props = withDefaults(defineProps<{ citations: readonly Citation[]; titles: Record<string, string>; idPrefix: string; variant?: "chips" | "rail" }>(), { variant: "chips" });
+const props = withDefaults(defineProps<{ citations: readonly Citation[]; titles: Record<string, string>; idPrefix: string; variant?: "chips" | "rail"; compact?: boolean }>(), { variant: "chips", compact: false });
 const emit = defineEmits<{ open: [source: OpenSource] }>();
 const open = reactive(new Set<string>());
 const reads = reactive(new Map<string, Loaded<MaterialData>>());
@@ -92,10 +93,10 @@ onBeforeUnmount(() => objectUrls.forEach((url) => URL.revokeObjectURL(url)));
 </script>
 
 <template>
-  <div class="sources" :class="variant">
+  <div class="sources" :class="[variant, { compact }]">
     <ul class="source-list" :aria-label="variant === 'rail' ? 'Sources this skill is taught from' : 'Sources used'">
-      <li v-for="entry in entries" :key="entry.key">
-        <span v-if="variant === 'chips'" class="from" aria-hidden="true">From</span>
+      <li v-for="(entry, index) in entries" :key="entry.key" :class="{ open: entry.open }">
+        <span v-if="variant === 'chips' && (!compact || index === 0)" class="from" aria-hidden="true">From</span>
         <button type="button" class="source-toggle" :aria-expanded="entry.open" :aria-controls="entry.id" @click="toggle(entry.citation)"><span v-if="variant === 'rail'" class="file-tag" aria-hidden="true">FILE</span><span class="source-name">{{ entry.label }}</span><span aria-hidden="true"> ↗</span></button>
         <div v-show="entry.open" :id="entry.id" class="passage" role="region" :aria-label="entry.label">
           <template v-if="entry.open">
@@ -133,6 +134,9 @@ onBeforeUnmount(() => objectUrls.forEach((url) => URL.revokeObjectURL(url)));
 <style scoped>
 .source-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
 .chips .source-list{margin-top:12px}
+/* Compact: one wrapping row of chips. A chip whose passage is open takes a whole row, so the passage has full width. */
+.compact .source-list{flex-direction:row;flex-wrap:wrap;align-items:center;gap:6px 8px;margin-top:10px}
+.compact li.open{flex-basis:100%}
 .chips li{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
 .chips .source-toggle{padding:3px 10px;border:1px solid var(--line);border-radius:999px;background:#FFFFFF;color:var(--ink);font-size:12px;font-weight:600;text-align:left;max-width:100%;overflow-wrap:anywhere}
 .chips .source-toggle:hover{background:var(--inset)}
