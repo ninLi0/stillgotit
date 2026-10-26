@@ -1,5 +1,7 @@
 # StillGotIt
 
+> This is the P1 design submission, last revised on October 7, 2026 (commit `b5c3426`). The implemented design has replaced it, and the [design index](../../design/README.md) describes the current design. It was moved here from the repository root on October 25, 2026.
+
 A web app to help students learn course skills and keep using them over time.
 
 ## Problem framing and stakeholders
@@ -81,19 +83,19 @@ Classmates and friends are potential early testers. The app does not require a p
 
 ## Concept design
 
-The [concept specifications](concepts.md) define five concepts.
+The [concept specifications](p1-concepts.md) define five concepts.
 
 | Concept | Responsibility |
 | --- | --- |
-| [SkillMapping](concepts.md#1-skillmapping-user-material) | Define skills, sources, and prerequisites. Keep earlier versions of requirements. |
-| [GroundedTutoring](concepts.md#2-groundedtutoring-learner-scope-topic-definition) | Teach from source material. Record practice through voice, text, and photos. |
-| [AssessmentReviewing](concepts.md#3-assessmentreviewing-author-subject-definition-task) | Judge submitted work. Retain imports, regrades, and corrections. |
-| [MasteryEstimating](concepts.md#4-masteryestimating-learner-subject-definition-evidence) | Estimate current mastery from confidence, time, evidence, and manual adjustments. |
-| [StudyPlanning](concepts.md#5-studyplanning-learner-scope-subject-definition) | Fit activities into available time. Apply exam priorities and confirmed tradeoffs. |
+| [SkillMapping](p1-concepts.md#1-skillmapping-user-material) | Define skills, sources, and prerequisites. Keep earlier versions of requirements. |
+| [GroundedTutoring](p1-concepts.md#2-groundedtutoring-learner-scope-topic-definition) | Teach from source material. Record practice through voice, text, and photos. |
+| [AssessmentReviewing](p1-concepts.md#3-assessmentreviewing-author-subject-definition-task) | Judge submitted work. Retain imports, regrades, and corrections. |
+| [MasteryEstimating](p1-concepts.md#4-masteryestimating-learner-subject-definition-evidence) | Estimate current mastery from confidence, time, evidence, and manual adjustments. |
+| [StudyPlanning](p1-concepts.md#5-studyplanning-learner-scope-subject-definition) | Fit activities into available time. Apply exam priorities and confirmed tradeoffs. |
 
 A regrade changes one judgment. It does not add a new attempt. A manual mastery adjustment sets a new estimate that continues to change. Finishing a session consumes time even when the answer is wrong.
 
-The [essential reactions](concepts.md#essential-reactions) connect the concepts. The [composition note](concepts.md#how-the-concepts-work-together) defines their shared types.
+The [essential reactions](p1-concepts.md#essential-reactions) connect the concepts. The [composition note](p1-concepts.md#how-the-concepts-work-together) defines their shared types.
 
 ## UI sketches
 
@@ -101,7 +103,7 @@ The eight sketches show the main interactions. Values and dates are examples. Tr
 
 ### Confirm course skills
 
-![Course setup with sources, proposed skills, demonstration criteria, and initial confidence.](images/10-confirm-course-skills.png)
+![Course setup with sources, proposed skills, demonstration criteria, and initial confidence.](../images/10-confirm-course-skills.png)
 
 1. Upload a document or paste text. If needed, choose a suggested reference before teaching starts.
 2. Edit the proposed skill names, criteria, and groups. Confirm the map and mark important units.
@@ -111,15 +113,15 @@ You can revise confirmed requirements later. The skill keeps its leaf and earlie
 
 ### Course tree and skill focus
 
-The trunk is the course. Branches are units. Each leaf is one skill. Black, white, and gray keep the labels clear. The [rendering note](tree-rendering-research.md) explains how the tree can grow with course data.
+The trunk is the course. Branches are units. Each leaf is one skill. Black, white, and gray keep the labels clear. The [rendering note](../tree-rendering-research.md) explains how the tree can grow with course data.
 
-![Course tree with Matrix multiplication selected.](images/08-monochrome-skill-leaves.png)
+![Course tree with Matrix multiplication selected.](../images/08-monochrome-skill-leaves.png)
 
 1. Select a leaf to open its skill. Branch position shows course grouping, not prerequisites.
 2. A solid leaf and clear label mark the selection. A separate panel shows its name, estimate, and evidence.
 3. New skills use free positions. Existing leaves stay in place. A new leaf shows “Not assessed.”
 
-![Matrices branch with skill labels, estimates, and the selected skill panel.](images/09-focused-skill-leaves.png)
+![Matrices branch with skill labels, estimates, and the selected skill panel.](../images/09-focused-skill-leaves.png)
 
 1. Select a leaf or unit button to focus on its branch. Other units fade into the background.
 2. Read the estimate and next action in the panel. A hinted success prompts a fresh check without hints.
@@ -127,7 +129,7 @@ The trunk is the course. Branches are units. Each leaf is one skill. Black, whit
 
 ### Learn from your course
 
-![A source passage, AI explanation, follow-up conversation, and button to start practice.](images/15-source-based-lesson.png)
+![A source passage, AI explanation, follow-up conversation, and button to start practice.](../images/15-source-based-lesson.png)
 
 1. Open the cited page to read the source in context. The passage and file shown here are examples.
 2. Read an explanation and worked example based on that passage. The screen identifies AI-generated content.
@@ -136,7 +138,7 @@ The trunk is the course. Branches are units. Each leaf is one skill. Black, whit
 
 ### Talk through work on paper
 
-![Photographed physics work, a spoken follow-up, transcript, and capture controls.](images/14-voice-and-paper-work.png)
+![Photographed physics work, a spoken follow-up, transcript, and capture controls.](../images/14-voice-and-paper-work.png)
 
 1. Take or upload photos of the whole solution. Add pages or close-ups as needed. Keep the original images with the attempt.
 2. Explain aloud and hear the AI's questions. Pause or switch to typing. During an independent check, corrections wait until submission unless you request a hint.
@@ -146,7 +148,7 @@ The physics example shows the same interaction in another subject. Each learner 
 
 ### Practice and inspect the assessment
 
-![Matrix practice with a recorded hint, assessment, regrade option, and next check.](images/11-practice-and-assessment.png)
+![Matrix practice with a recorded hint, assessment, regrade option, and next check.](../images/11-practice-and-assessment.png)
 
 1. Show the result and reasoning. The grader uses photos and conversation together. This text sketch shows the feedback layout.
 2. Review the recorded assistance. A correct answer after a hint is supported success.
@@ -154,7 +156,7 @@ The physics example shows the same interaction in another subject. Each learner 
 
 ### Import graded coursework
 
-![Midterm import with original marks, performance date, and skill mapping.](images/12-import-graded-work.png)
+![Midterm import with original marks, performance date, and skill mapping.](../images/12-import-graded-work.png)
 
 1. Import answers, marks, feedback, and the date of the exam.
 2. Check the extracted work and question-to-skill mapping. A total exam score cannot update every skill.
@@ -162,7 +164,7 @@ The physics example shows the same interaction in another subject. Each learner 
 
 ### Follow and adapt the study plan
 
-![Study plan with a daily budget, workload shortfall, and exam cuts awaiting confirmation.](images/13-adaptive-study-plan.png)
+![Study plan with a daily budget, workload shortfall, and exam cuts awaiting confirmation.](../images/13-adaptive-study-plan.png)
 
 1. See the estimated time for each activity. The proposed day fits the daily budget.
 2. Review changes after missed work. If preparation exceeds available time, exam work gets priority. Deferred work stays visible.
@@ -186,4 +188,4 @@ The physics example shows the same interaction in another subject. Each learner 
 
 Build one complete path first: add material, confirm a skill, submit photographed work with spoken reasoning, inspect the assessment, and receive a next activity. This follows the TA's advice to test a working version early.
 
-I plan to ask two classmates or friends to try that path. I will check whether the skill map is clear, voice and photos reduce effort, and the evidence helps them plan. The [initial numerical rules](concepts.md#initial-policies-and-implementation-scope) need testing. No student study has been completed.
+I plan to ask two classmates or friends to try that path. I will check whether the skill map is clear, voice and photos reduce effort, and the evidence helps them plan. The [initial numerical rules](p1-concepts.md#initial-policies-and-implementation-scope) need testing. No student study has been completed.
