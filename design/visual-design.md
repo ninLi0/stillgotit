@@ -179,6 +179,69 @@ For example, ink `#151515` has v = 21 / 255 = 0.0824 in each channel, so each ch
 
 </details>
 
+### Dark mode
+
+The app has a light and a dark appearance. With nothing chosen, it follows the device's own setting (`prefers-color-scheme`), and Appearance in Settings lets a learner choose System, Light, or Dark. The choice is kept in the browser, not on the server, because whether a dark page suits the learner depends on the device and the room it is used in. [frontend/src/theme.ts](../frontend/src/theme.ts) applies the choice, and a short script in `frontend/index.html` applies a saved choice before the first paint, so a reload never flashes the other theme.
+
+Every color the interface uses is a token on `:root` in [frontend/src/style.css](../frontend/src/style.css), named for its role, such as `--ground`, `--card`, `--ink`, and `--meadow-soft`. The dark theme sets the same tokens again, so no component needs to know which theme is showing.
+
+- **A deep ink ground, not black.** The page is `#121311`, a near-black with a little green in it. Cards and dialogs are one step lighter (`#1B1C1A`), and insets and fields step lighter again (`#242522`, `#2A2B28`, `#32332F`), so depth reads as lighter layers rather than shadows.
+- **Text turns over.** Ink becomes `#ECECE7`, soft `#C4C4BE`, muted `#A5A59F`, and faint `#94948E`, so the four levels keep their order.
+- **Each biome keeps its hue.** Primary buttons take a lighter, calmer version of the biome's color (meadow `#7CC094`, ocean `#7BBCD8`, sand `#E0B67D`, dawn `#A69CE8`) with very dark text in the same hue, and the edge under them stays one step darker. Soft colors, washes, and the sidebar's capsules become deep tints of the hue, such as meadow soft `#1E3327`, with light text in the hue.
+- **Borders where shadows disappear.** A shadow does not show on a dark ground, so dialogs draw a 1 px light edge, and cards keep their 1 px ring. Focus rings are light ink.
+- **What stays the same.** Layout, type, and motion do not change. The coral badge, the exam plank's blue, and the sun-yellow of practice keep their colors, because they pass on both grounds. The pixel icons, and the leaf sprites on cards and in legends, keep their palette, because their light fills carry each shape on a dark card. The evidence marks are the exception: their color is all they have, so their slate, violet, and green turn lighter (`#8E9BA2`, `#8F82E8`, `#6DB487`). PDF pages and images stay as the file has them.
+- **The scenes turn to night.** Home's meadow, the grove, the Plan sea, the Forest view, and the sample grove on the sign-in page are drawn by night. Each sky runs from dusk at the horizon to deep blue above, the moon takes the sun's place, and a few stars are scattered once over the open sky. Land and sea keep their hues and their order from light to dark: [frontend/src/scene-palette.ts](../frontend/src/scene-palette.ts) dims each day color by one rule in OKLab, and chooses the skies, seas, clouds, and a few others by hand. Lights stay lit: the lighthouse lamp and its beam, the flags, the buoys, and the flowers. The leaves carry each skill's stage, so their greens turn lighter rather than darker and stand out from the dark crowns; poles turn pale, and the selected leaf's brackets turn from ink to pale. Cards and labels over a scene take the dark card, and the scenes draw again as soon as the theme changes.
+
+These are the ratios for the same pairs in the dark theme, with the pairs that matter only there added. They are computed the same way as above. A translucent ground is measured over white, the brightest thing a scene can show beneath it.
+
+| Pair | Where | Ratio |
+| --- | --- | --- |
+| Ink `#ECECE7` on the ground `#121311` | Headings and main text on the page | 15.72:1 |
+| Ink `#ECECE7` on a card `#1B1C1A` | Headings and main text on cards | 14.43:1 |
+| Soft `#C4C4BE` on a card | Paragraphs | 9.76:1 |
+| Muted `#A5A59F` on a card | Hints and captions | 6.91:1 |
+| Muted `#A5A59F` on inset `#242522` | Text inside the sign-in steps | 6.22:1 |
+| Faint `#94948E` on a card | Eyebrows | 5.61:1 |
+| `#8DCDA3` on a card | The eyebrow on Home's scene card | 9.28:1 |
+| `#F4F4F0` on `#33352F` | The ⓘ bubbles and disabled-button reasons | 11.26:1 |
+| Meadow text `#0B2A18` on `#7CC094` | Meadow primary buttons | 7.23:1 |
+| Ocean text `#06283A` on `#7BBCD8` | Ocean primary buttons | 7.31:1 |
+| Sand text `#3A2006` on `#E0B67D` | Sand primary buttons | 8.03:1 |
+| Dawn text `#18104A` on `#A69CE8` | Dawn primary buttons | 7.05:1 |
+| `#A3DBB5` on `#1E3327` | Meadow secondary buttons | 8.57:1 |
+| `#9CD0E7` on `#172E3A` | Ocean secondary buttons | 8.46:1 |
+| `#E9C38C` on `#342716` | Sand secondary buttons | 8.74:1 |
+| `#C7BFF8` on `#25213E` | Dawn secondary buttons | 8.96:1 |
+| Ink on the sidebar capsules `#2A4A36`, `#1F4456`, `#4A3820` | The selected row in the sidebar | 8.31:1, 8.77:1, 9.44:1 |
+| `#D2CCFA` on `#221F38` | The open lesson under Home in the sidebar | 10.41:1 |
+| White on `#1E6F96` | The exam day's plank on Plan | 5.57:1 |
+| `#F3A588` on `#3B2119` | Error messages and the Due today pill | 7.44:1 |
+| `#EAC57B` on `#382E17` | The New pill | 8.13:1 |
+| `#8FCAE2` on `#18303B` | The Review pill | 7.68:1 |
+| Green `#6CC495` on a card | Saved notices, such as "Skill confirmed." | 8.12:1 |
+| Green `#6CC495` on `#1B3326` | The Strong pill | 6.44:1 |
+| Green `#6CC495` on `#1E3327` | The "App default" tag in Settings | 6.40:1 |
+| White on coral `#C35124` | The sidebar's Materials badge | 4.64:1 |
+| `#E3AE6C` on a card | "N to review" in the Materials file list | 8.58:1 |
+| `#F0CF9C` on `#342716` | Emphasis marks in Manage skills and in a graded import | 9.75:1 |
+| `#ABA5C9` on a card | Eyebrows in the estimate's evidence and in the lesson's rail cards | 7.30:1 |
+| `#8E8E88` on a card | Dates in "How the estimate got here" | 5.19:1 |
+| `#F2A07F` on `#3B2119` | The FILE tag under a reply's sources | 7.13:1 |
+| `#E6E6E0`, and links in `#8FCAE2`, on a text page `#1F201D` | Text pages and Markdown in Materials | 13.07:1, 9.13:1 |
+| `#D3E8F1`, `#C3CCD0`, and `#929FA5` on a slide `#1F201D` | Slide titles, lines, and footers in Materials | 12.93:1, 10.03:1, 6.02:1 |
+| Soft `#C4C4BE` on `rgba(27, 28, 26, .94)` over white | The caption over the sample grove on the sign-in page | 8.27:1 |
+| Soft `#C4C4BE` on `rgba(27, 28, 26, .78)` over white | "+ Plant a topic" on the grove | 4.77:1 |
+| `#9CCFE7` on `rgba(27, 28, 26, .9)` over white | Minutes planned on the Plan sea | 7.58:1 |
+| Filled cell `#6DB487` against empty `#363832` | Mastery cells (3:1 needed) | 4.82:1 |
+| `#5AAAD3` against `#22394A` | Plan load cells (3:1 needed) | 4.64:1 |
+| Faint `#94948E` on a field `#151614` | Form-field outlines (3:1 needed) | 5.95:1 |
+| `#8C8D87` on a field `#151614` | Checkbox outlines (3:1 needed) | 5.42:1 |
+| Ink `#ECECE7` on a card | Focus rings (3:1 needed) | 14.43:1 |
+| `#8E9BA2`, `#8F82E8`, and `#6DB487` on a card | The evidence marks for the starting point, an attempt or adjustment, and time without practice (3:1 needed) | 6.00:1, 5.32:1, 6.95:1 |
+| `#A3DBB5` and `#9CD0E7` on `rgba(18, 19, 17, .72)` over the night sky and sea | "You · today" on Home and on the Plan sea | 10.95:1, 9.56:1 |
+| A leaf `#3E9C6C`, its highlight `#7CC59D`, and a bud `#E3A233` on a night crown `#354B43` | The leaves on the grove and in the Forest view (by day the leaf is 2.60:1 on its crown) | 2.76:1, 4.61:1, 4.24:1 |
+| `#F2EFE4` on a night crown `#354B43` | The brackets around the selected leaf | 8.15:1 |
+
 ## Sources
 
 - **The design handoff.** [design/revamp/README.md](revamp/README.md) records the Pixel Nature look, with the clickable prototype `StillGotIt A5 - Pixel Nature.dc.html` and the pixel-art data in `pixel-art.js`. The handoff says its type and pixel palette come from the WhaleLife app's theme files, and the Plan sea's whale is WhaleLife's.

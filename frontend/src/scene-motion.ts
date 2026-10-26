@@ -3,10 +3,11 @@
 // cells. A moving sprite is placed at a whole cell and carries a drift: how far it travels from there and how long one
 // way takes. The `.drift` rule in style.css eases that offset on the loop curve, one way and back, and rounds it to
 // whole device pixels, so the sprite glides and its edges stay crisp. Nothing here runs a timer.
+import { sceneColor } from "./scene-palette.ts";
 
 /** A rectangle of a sprite, in cells, relative to the sprite's place. */
 export type CellRect = { x: number; y: number; w: number; h: number; fill: string };
-/** The same rectangle as SVG attributes in CSS pixels, ready for `<rect v-bind>`. */
+/** The same rectangle as SVG attributes in CSS pixels, ready for `<rect v-bind>`, in the colors of the current theme. */
 export type PixelRect = { x: number; y: number; width: number; height: number; fill: string };
 
 /**
@@ -21,7 +22,7 @@ export type Drift = { x?: number; y?: number; seconds: number; ySeconds?: number
 export type Sprite = { key: string; at: string; rects: PixelRect[]; motion: Record<string, string> };
 
 export function toPixels(rects: readonly CellRect[], unit: number): PixelRect[] {
-  return rects.map((r) => ({ x: r.x * unit, y: r.y * unit, width: r.w * unit, height: r.h * unit, fill: r.fill }));
+  return rects.map((r) => ({ x: r.x * unit, y: r.y * unit, width: r.w * unit, height: r.h * unit, fill: sceneColor(r.fill) }));
 }
 
 /** The custom properties `.drift` reads. A negative delay starts the loop part of the way through its cycle, so the

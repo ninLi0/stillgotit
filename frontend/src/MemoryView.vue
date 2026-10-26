@@ -274,7 +274,7 @@ const summary = computed(() => {
 .tick, .day { font-size: 11px; fill: var(--muted); }
 .threshold { fill: none; stroke-width: 1; stroke-dasharray: 4 3; }
 .threshold-label, .half-label { font-size: 11px; font-weight: 600; fill: var(--soft); }
-.halo { paint-order: stroke; stroke: #FFFFFF; stroke-width: 3px; stroke-linejoin: round; }
+.halo { paint-order: stroke; stroke: var(--card); stroke-width: 3px; stroke-linejoin: round; }
 .end { font-size: 12px; font-weight: 700; fill: var(--ink); }
 .line { fill: none; stroke-width: 2; stroke-linecap: square; stroke-linejoin: miter; animation: sgDraw var(--dur-draw) var(--ease-enter); }
 .arrive { animation: sgFade var(--dur-quick) var(--ease-enter) calc(var(--dur-draw) * var(--arrive, 0)) both; }
@@ -301,7 +301,7 @@ const summary = computed(() => {
 .shaped-top { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 8px; }
 .shaped-top .card-title { margin: 0; }
 .chooser { display: flex; flex-direction: column; gap: 4px; margin: 0; font-size: 12px; font-weight: 600; color: var(--muted); min-width: 0; max-width: 100%; }
-.chooser select { min-height: 38px; max-width: 100%; padding: 6px 10px; border: 1px solid var(--faint); border-radius: 10px; background: #FFFFFF; color: var(--ink); font-size: 14px; font-weight: 600; }
+.chooser select { min-height: 38px; max-width: 100%; padding: 6px 10px; border: 1px solid var(--faint); border-radius: 10px; background: var(--field); color: var(--ink); font-size: 14px; font-weight: 600; }
 .summary { margin: 4px 0 12px; }
 .rows-title { margin: 18px 0 6px; font-size: 14px; }
 .evidence-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }

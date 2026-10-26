@@ -5,6 +5,7 @@
 import { PAL, SPRITES, hash, rng, stageOf } from "./pixel-art.ts";
 import { growTree, moveTree, paintTree, type CrownPart, type Segment } from "./tree-draw.ts";
 import { kindFor, type TreeKind } from "./tree-kinds.ts";
+import { leafColor, sceneColor } from "./scene-palette.ts";
 
 /** CSS pixels per cell. */
 export const CELL = 4;
@@ -141,7 +142,7 @@ export function drawGrove(canvas: HTMLCanvasElement, grove: Grove, cssWidth: num
   const W = Math.ceil(cssWidth / CELL), G = GROUND, H = HEIGHT, size = CELL * dpr;
   const rect = (x: number, y: number, w: number, h: number, colour: string) => {
     const left = Math.round(x * size), top = Math.round(y * size);
-    ctx.fillStyle = colour;
+    ctx.fillStyle = sceneColor(colour);
     ctx.fillRect(left, top, Math.round((x + w) * size) - left, Math.round((y + h) * size) - top);
   };
   const cell = (x: number, y: number, colour: string) => rect(Math.round(x), Math.round(y), 1, 1, colour);
@@ -171,7 +172,7 @@ export function drawGrove(canvas: HTMLCanvasElement, grove: Grove, cssWidth: num
     for (const leaf of tree.leaves) {
       const { x, y, skill } = leaf;
       SPRITES[stageOf(skill.mastery)].forEach((row, ry) => {
-        for (let rx = 0; rx < row.length; rx++) { const ch = row[rx]!; if (ch !== ".") cell(x - 3 + rx, y - 3 + ry, PAL[ch] ?? "#000000"); }
+        for (let rx = 0; rx < row.length; rx++) { const ch = row[rx]!; if (ch !== ".") cell(x - 3 + rx, y - 3 + ry, leafColor(PAL[ch] ?? "#000000")); }
       });
       // Due today: a small coral flag planted beside the leaf, so its growth stage stays visible.
       if (skill.due) { rect(x + 3, y - 8, 1, 5, "#48555C"); rect(x + 4, y - 8, 2, 2, "#D9663A"); cell(x + 5, y - 7, "#EE9C78"); }

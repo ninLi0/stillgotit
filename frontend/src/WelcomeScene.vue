@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from "vue";
+import { onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { CELL, GROUND, HEIGHT, drawGrove, growGrove, type GroveTopic, type GroveTree } from "./GroveScene.ts";
 import { STAGE_LABELS, rng, type Stage } from "./pixel-art.ts";
 import PixelIcon from "./PixelIcon.vue";
+import { GROVE_NIGHT_SKY, MOON, WELCOME_NIGHT_SKY, dayOrNight, isNight, scatterStars, sceneColor } from "./scene-palette.ts";
+import { currentTheme } from "./theme.ts";
 
 // The welcome panel shows the app's own picture of learning before anyone signs in: a sample grove drawn with the same
 // code as the Home screen (design/revamp/README.md), at half size so three topic trees fit the panel. Each tree is a
@@ -55,25 +57,30 @@ function draw() {
   const ctx = cv.getContext("2d"); if (!ctx) return;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.imageSmoothingEnabled = false;
   // The grove image sits at the bottom; the sky above it continues the grove's own top band, with a sun and clouds in 2px cells.
+  // By night the sky darkens upward, and the moon and a few stars come out (scene-palette.ts).
   // The grove stops FOOT pixels above the caption so the signposts under the ground stay in view.
   const gh = Math.round(HEIGHT * CELL * SCALE), gw = Math.round(groveCss * SCALE), top = h - gh - FOOT, x0 = Math.round((w - gw) / 2);
   const U = CELL * SCALE, band = Math.ceil(Math.max(top, 1) / SKY.length);
-  SKY.forEach((colour, i) => { ctx.fillStyle = colour; ctx.fillRect(0, Math.max(0, top - (i + 1) * band), w, band); });
-  const cell = (x: number, y: number, colour: string) => { ctx.fillStyle = colour; ctx.fillRect(Math.round(x) * U, Math.round(y) * U, U, U); };
+  (isNight() ? WELCOME_NIGHT_SKY : SKY).forEach((colour, i) => { ctx.fillStyle = colour; ctx.fillRect(0, Math.max(0, top - (i + 1) * band), w, band); });
+  const cell = (x: number, y: number, colour: string) => { ctx.fillStyle = sceneColor(colour); ctx.fillRect(Math.round(x) * U, Math.round(y) * U, U, U); };
   const sunX = Math.round(w / U) - 16, sunY = 12;
-  for (let dy = -5; dy <= 5; dy++) for (let dx = -5; dx <= 5; dx++) { const q = dx * dx + dy * dy; if (q <= 26) cell(sunX + dx, sunY + dy, q <= 8 ? "#F3CD7A" : "#F9E3A8"); }
+  for (let dy = -5; dy <= 5; dy++) for (let dx = -5; dx <= 5; dx++) { const q = dx * dx + dy * dy; if (q <= 26) cell(sunX + dx, sunY + dy, q <= 8 ? dayOrNight("#F3CD7A", MOON.face) : dayOrNight("#F9E3A8", MOON.rim)); }
+  if (isNight()) { cell(sunX + 1, sunY - 2, MOON.crater); cell(sunX - 2, sunY + 1, MOON.crater); cell(sunX + 2, sunY + 2, MOON.crater); }
   const R = rng(5), cols = Math.floor(w / U);
   for (let i = 0; i < 4; i++) {
     const cw = 10 + Math.floor(R() * 10), x = Math.floor(R() * Math.max(1, cols - cw)), y = 6 + Math.floor(R() * Math.max(1, Math.floor(top / U) - 20));
-    ctx.fillStyle = "#FFFFFF"; ctx.fillRect(x * U, y * U, cw * U, 2 * U); ctx.fillRect((x + 2) * U, (y - 1) * U, Math.max(3, cw - 5) * U, U);
-    ctx.fillStyle = "#EEF6F9"; ctx.fillRect((x + 1) * U, (y + 2) * U, (cw - 2) * U, U);
+    ctx.fillStyle = sceneColor("#FFFFFF"); ctx.fillRect(x * U, y * U, cw * U, 2 * U); ctx.fillRect((x + 2) * U, (y - 1) * U, Math.max(3, cw - 5) * U, U);
+    ctx.fillStyle = sceneColor("#EEF6F9"); ctx.fillRect((x + 1) * U, (y + 2) * U, (cw - 2) * U, U);
   }
+  // By night the grove's sky bands are darker than the page's sky, so they run the full width instead of ending at the grove.
+  if (isNight()) { const bandPx = Math.ceil(GROUND / GROVE_NIGHT_SKY.length) * U; GROVE_NIGHT_SKY.forEach((colour, i) => { ctx.fillStyle = colour; ctx.fillRect(0, top + i * bandPx, w, bandPx); }); }
   ctx.drawImage(off, 0, 0, off.width, off.height, x0, top, gw, gh);
   // Below the grove, the ground continues in the grove's own bottom colour, across the whole width.
   const soil = off.getContext("2d")?.getImageData(Math.floor(off.width / 2), off.height - 1, 1, 1).data;
-  const soilColour = soil ? `rgb(${soil[0]}, ${soil[1]}, ${soil[2]})` : "#B9A26E";
+  const soilColour = soil ? `rgb(${soil[0]}, ${soil[1]}, ${soil[2]})` : sceneColor("#B9A26E");
   ctx.fillStyle = soilColour; ctx.fillRect(0, top + gh, w, FOOT);
   if (gw < w) { const groundTop = top + Math.round(GROUND * CELL * SCALE); ctx.fillRect(0, groundTop, x0, h - groundTop); ctx.fillRect(x0 + gw, groundTop, w - x0 - gw, h - groundTop); }
+  scatterStars(ctx, U * dpr, Math.ceil(w / U), Math.ceil(h / U), 5);
   planks.value = grove.trees.map((tree: GroveTree) => ({ key: tree.key, title: tree.title, meta: tree.meta, left: x0 + tree.cx * CELL * SCALE, top: top + (GROUND + 4) * CELL * SCALE }));
 }
 onMounted(() => {
@@ -83,6 +90,7 @@ onMounted(() => {
   // Signpost widths depend on the fonts, so the scene is drawn again once they have loaded.
   void document.fonts?.ready.then(draw);
 });
+watch(currentTheme, draw);
 onBeforeUnmount(() => observer?.disconnect());
 </script>
 
@@ -105,13 +113,13 @@ onBeforeUnmount(() => observer?.disconnect());
 </template>
 
 <style scoped>
-.welcome-scene { position: relative; margin: 0; align-self: stretch; min-height: 460px; display: flex; flex-direction: column; justify-content: flex-end; border-radius: 24px; overflow: hidden; background: #CFE3EE; }
+.welcome-scene { position: relative; margin: 0; align-self: stretch; min-height: 460px; display: flex; flex-direction: column; justify-content: flex-end; border-radius: 24px; overflow: hidden; background: var(--sky); }
 .scene-wrap { position: absolute; inset: 0 0 112px; overflow: hidden; }
 canvas { display: block; image-rendering: pixelated; }
-.plank { position: absolute; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; max-width: 150px; padding: 3px 8px 4px; background: #E9D6A8; box-shadow: inset 0 -2px 0 #CDB884, 0 0 0 2px #C08324; white-space: nowrap; }
-.plank-title { max-width: 100%; overflow: hidden; text-overflow: ellipsis; font: 400 12px/15px var(--font-display); color: var(--ink); }
-.plank-meta { font: 600 11px/14px var(--font-body); color: var(--soft); font-variant-numeric: tabular-nums; }
-.scene-caption { position: relative; margin: 14px; padding: 14px 16px; border-radius: 16px; background: rgba(255, 255, 255, .94); box-shadow: 0 0 0 1px var(--card-border); }
+.plank { position: absolute; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; max-width: 150px; padding: 3px 8px 4px; background: var(--plank); box-shadow: inset 0 -2px 0 var(--plank-edge), 0 0 0 2px var(--plank-ring); white-space: nowrap; }
+.plank-title { max-width: 100%; overflow: hidden; text-overflow: ellipsis; font: 400 12px/15px var(--font-display); color: var(--plank-ink); }
+.plank-meta { font: 600 11px/14px var(--font-body); color: var(--plank-soft); font-variant-numeric: tabular-nums; }
+.scene-caption { position: relative; margin: 14px; padding: 14px 16px; border-radius: 16px; background: var(--scene-card); box-shadow: 0 0 0 1px var(--card-border); }
 .scene-caption .eyebrow { margin: 0 0 4px; }
 .caption-text { margin: 0 0 10px; font-size: 14px; color: var(--soft); line-height: 1.5; }
 .legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 14px; }

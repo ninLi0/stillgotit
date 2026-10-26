@@ -90,19 +90,19 @@ const cells = computed(() => {
 .nav-capsule.sand { background: var(--sand-nav); }
 .nav-capsule.dawn { background: var(--dawn-nav); }
 .nav-label { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.badge { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--coral); color: #fff; font-size: 12px; font-weight: 700; }
-.nav-row.current .badge { background: #fff; color: var(--coral); }
-.sub-row { display: flex; align-items: center; gap: 8px; margin: 0 4px 2px 34px; padding: 6px 10px; border: 0; border-radius: 10px; background: #F1EEFF; color: var(--dawn-text); font-size: 13px; font-weight: 600; text-align: left; min-width: 0; }
+.badge { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--coral); color: var(--on-fill); font-size: 12px; font-weight: 700; }
+.nav-row.current .badge { background: var(--on-fill); color: var(--coral); }
+.sub-row { display: flex; align-items: center; gap: 8px; margin: 0 4px 2px 34px; padding: 6px 10px; border: 0; border-radius: 10px; background: var(--dawn-wash); color: var(--dawn-wash-text); font-size: 13px; font-weight: 600; text-align: left; min-width: 0; }
 .sub-row.current { box-shadow: 0 0 0 1px var(--dawn-edge); }
-.sub-square { width: 8px; height: 8px; flex: none; background: #8B7FE0; }
+.sub-square { width: 8px; height: 8px; flex: none; background: var(--dawn-edge); }
 .sub-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bottom { margin-top: auto; display: flex; flex-direction: column; gap: 6px; }
 .today { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
 .today-top { display: flex; align-items: center; gap: 6px; }
 .today-min { margin-left: auto; font-size: 13px; font-weight: 700; color: var(--ink); white-space: nowrap; }
 .today-cells { display: flex; gap: 2px; }
-.today-cell { flex: 1 1 0; height: 6px; border-radius: 1px; background: #F1EBDA; }
-.today-cell.on { background: #E3A233; }
+.today-cell { flex: 1 1 0; height: 6px; border-radius: 1px; background: var(--sun-off); }
+.today-cell.on { background: var(--sun); }
 .foot-row { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 38px; padding: 0 10px; border: 0; border-radius: 12px; background: transparent; color: var(--soft); font-size: 13px; font-weight: 600; text-align: left; }
 .foot-row:hover { background: var(--inset-2); color: var(--ink); }
 .foot-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

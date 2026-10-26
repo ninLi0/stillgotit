@@ -62,33 +62,33 @@ const headline = computed(() => {
   </section>
 </template>
 <style scoped>
-.tradeoffs{margin-top:22px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px;align-items:center;background:#EEF8FC;border:1px solid #C7E5F2;border-radius:24px;padding:20px 24px;box-shadow:0 10px 28px rgba(20,20,20,.07);overflow-wrap:anywhere;animation:sgRise var(--dur-enter) var(--ease-enter) both}
+.tradeoffs{margin-top:22px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px;align-items:center;background:var(--ocean-wash);border:1px solid var(--ocean-line);border-radius:24px;padding:20px 24px;box-shadow:0 10px 28px rgb(var(--shadow) / .07);overflow-wrap:anywhere;animation:sgRise var(--dur-enter) var(--ease-enter) both}
 .proposal-body{min-width:0}
-.proposal-eyebrow{margin:0 0 4px;font-size:12px;color:#1F6E92}
+.proposal-eyebrow{margin:0 0 4px;font-size:12px;color:var(--ocean-eyebrow)}
 h3{margin:0 0 6px;font-family:var(--font-display);font-weight:400;font-size:24px;line-height:1.25}
 .sentence{margin:0 0 10px;font-size:14px;color:var(--muted);line-height:1.5}
 .defer-chips{list-style:none;display:flex;flex-wrap:wrap;gap:8px;margin:0;padding:0}
-.defer-chips li{padding:5px 12px;border-radius:10px;border:1px dashed rgba(20,20,20,.35);font-size:13px;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.defer-chips li{padding:5px 12px;border-radius:10px;border:1px dashed var(--line-strong);font-size:13px;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
 h4{font-size:13px;margin:12px 0 4px}
 .schedule{margin-top:10px;font-size:13px}
 .schedule summary{cursor:pointer;display:inline-block;color:var(--ocean-soft-text);font-weight:700;text-decoration:underline;text-underline-offset:4px;list-style:none}
 .schedule summary::-webkit-details-marker{display:none}
 .schedule p{margin:4px 0}
 .facts{margin:10px 0 0}
-.facts div{display:flex;flex-wrap:wrap;gap:0 6px;padding:5px 0;border-top:1px solid #D7ECF5}
+.facts div{display:flex;flex-wrap:wrap;gap:0 6px;padding:5px 0;border-top:1px solid var(--ocean-rule)}
 .facts dt{color:var(--muted)}
 .facts dt::after{content:":"}
 .facts dd{margin:0;font-weight:700}
 .cuts{list-style:none;padding:0;margin:0}
-.cuts li{padding:8px 10px;margin:6px 0;border-radius:10px;background:#FFFFFF}
+.cuts li{padding:8px 10px;margin:6px 0;border-radius:10px;background:var(--card)}
 .cuts .hint{margin:2px 0 0;font-size:12px}
 .cut-title{margin:0!important}
 .scheduled{padding-left:20px;margin:4px 0}
 .scheduled li{font-size:12px;margin:6px 0}
 .decision{display:flex;flex-direction:column;gap:8px;min-width:190px}
 .decision .primary{min-height:44px;padding:0 20px;font-size:14px}
-.keep{border:1px solid var(--line);border-radius:12px;background:#FFFFFF;min-height:44px;padding:0 20px;font-size:14px;font-weight:700;white-space:nowrap;color:var(--ink)}
-.keep:hover:not(:disabled){border-color:rgba(20,20,20,.35)}
+.keep{border:1px solid var(--line);border-radius:12px;background:var(--card);min-height:44px;padding:0 20px;font-size:14px;font-weight:700;white-space:nowrap;color:var(--ink)}
+.keep:hover:not(:disabled){border-color:var(--line-strong)}
 .blocked{margin:0;font-size:12px;max-width:220px}
 @media(max-width:760px){.tradeoffs{grid-template-columns:1fr;padding:18px}.decision{flex-direction:row;flex-wrap:wrap;min-width:0}}
 </style>

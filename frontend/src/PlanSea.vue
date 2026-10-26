@@ -2,6 +2,8 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { rng, WHALE } from "./pixel-art.ts";
 import { cloudDrift, cloudRects, driftStyle, snapStyle, sprite, toPixels, type CellRect, type Sprite } from "./scene-motion.ts";
+import { MOON, MOONLIT, dayOrNight, isNight, scatterStars, sceneColor } from "./scene-palette.ts";
+import { currentTheme } from "./theme.ts";
 
 // The Plan sea (design/revamp/README.md): a pixel canvas, 4px cells, one column per day of the week grid below.
 // Day 0 is the learner's sailboat, the other days are buoys, and the exam day (when an active exam falls in the week)
@@ -54,6 +56,8 @@ const SPOUT_PX = [[17, -4, 2, 3], [15, -6, 2, 2], [19, -6, 2, 2]].map(([x, y, w,
 
 const scene = computed(() => {
   const { W, H, Hz, cx } = geo.value, exam = examAt.value, c0 = cx(0), target = cx(exam ?? 6);
+  // By night the sails, stripes and buoys are moonlit rather than the clouds' grey (scene-palette.ts).
+  const lit = (rects: readonly CellRect[]) => rects.map((r) => (r.fill === WHITE ? { ...r, fill: dayOrNight(WHITE, MOONLIT) } : r));
   // Clouds sit where the seed puts them (the same places as before) and drift a few dozen pixels each way.
   const clouds: Sprite[] = [], R = rng(21), M = rng(121);
   for (let i = 0; i < Math.max(3, Math.floor(W / 50)); i++) {
@@ -75,16 +79,16 @@ const scene = computed(() => {
   const buoys: Sprite[] = [];
   for (let i = 1; i <= 6; i++) {
     if (i === exam) continue;
-    buoys.push(sprite(`buoy-${i}`, cx(i), Hz + 6, U, BUOY, { x: 1, seconds: 2.3, phase: (i * 0.29) % 1, y: 3, ySeconds: 1.4 + (i % 3) * 0.25, yPhase: (i * 0.17) % 1 }));
+    buoys.push(sprite(`buoy-${i}`, cx(i), Hz + 6, U, lit(BUOY), { x: 1, seconds: 2.3, phase: (i * 0.29) % 1, y: 3, ySeconds: 1.4 + (i % 3) * 0.25, yPhase: (i * 0.17) % 1 }));
   }
   // The exam day's island and lighthouse; its lamp breathes and its beam fades in as the lamp brightens.
   const island = exam === null ? null : {
-    at: `translate(${target * U} ${Hz * U})`, rects: toPixels(ISLAND, U), lamp: toPixels(LAMP, U), beams: toPixels(BEAMS, U),
+    at: `translate(${target * U} ${Hz * U})`, rects: toPixels(lit(ISLAND), U), lamp: toPixels(LAMP, U), beams: toPixels(BEAMS, U),
     motion: driftStyle({ seconds: 1.5 }),
   };
   // Today's sailboat. On an exam day that is today, the boat sits just left of the island.
   const bx = exam === 0 ? c0 - 12 : c0, by = Hz + 7;
-  const boat = sprite("boat", bx, by, U, BOAT, { x: 1, seconds: 2.9, y: 3, ySeconds: 1.8 });
+  const boat = sprite("boat", bx, by, U, lit(BOAT), { x: 1, seconds: 2.9, y: 3, ySeconds: 1.8 });
   const wake = { at: `translate(${bx * U} ${by * U})`, rects: toPixels(WAKE, U) };
   // The whale crosses from today toward the lighthouse on the loop curve at about 4 px a second on average (about 6 at
   // its fastest, mid-crossing), fading in at the start and out at the end. On the way it dives 8 px and surfaces every
@@ -106,17 +110,19 @@ function draw() {
   cv.style.width = `${W * U}px`; cv.style.height = `${H * U}px`;
   const ctx = cv.getContext("2d"); if (!ctx) return;
   ctx.setTransform(ratio, 0, 0, ratio, 0, 0); ctx.imageSmoothingEnabled = false;
-  const cell = (x: number, y: number, c: string) => { ctx.fillStyle = c; ctx.fillRect(Math.round(x) * U, Math.round(y) * U, U, U); };
-  const rect = (x: number, y: number, w: number, h: number, c: string) => { ctx.fillStyle = c; ctx.fillRect(Math.round(x) * U, Math.round(y) * U, Math.round(w) * U, Math.round(h) * U); };
-  // Sky in solid bands and the sun.
+  const cell = (x: number, y: number, c: string) => { ctx.fillStyle = sceneColor(c); ctx.fillRect(Math.round(x) * U, Math.round(y) * U, U, U); };
+  const rect = (x: number, y: number, w: number, h: number, c: string) => { ctx.fillStyle = sceneColor(c); ctx.fillRect(Math.round(x) * U, Math.round(y) * U, Math.round(w) * U, Math.round(h) * U); };
+  // Sky in solid bands and the sun, or the moon by night.
   const sky = ["#D3EAF4", "#DCEFF6", "#E6F4F7", "#F0F7F3"], bh = Math.ceil(Hz / sky.length);
   sky.forEach((c, i) => rect(0, i * bh, W, bh, c));
   // With day planks in the sky, the sun sits high at the right, clear of them.
   const sunX = props.horizon === undefined ? Math.round(W * 0.5) : W - 11, sunY = props.horizon === undefined ? Math.round(Hz * 0.45) : 6;
-  for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) { const q = dx * dx + dy * dy; if (q <= 17) cell(sunX + dx, sunY + dy, q <= 5 ? "#F3CD7A" : "#F9E3A8"); }
+  for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) { const q = dx * dx + dy * dy; if (q <= 17) cell(sunX + dx, sunY + dy, q <= 5 ? dayOrNight("#F3CD7A", MOON.face) : dayOrNight("#F9E3A8", MOON.rim)); }
+  if (isNight()) { cell(sunX + 1, sunY - 1, MOON.crater); cell(sunX - 2, sunY + 1, MOON.crater); }
   // Sea in solid bands; its glints are sprites.
   const sea = ["#9BD7EC", "#80CBE6", "#66BEDF", "#4FAFD6", "#3A9CC8", "#2D88B6"], sh = Math.ceil((H - Hz) / sea.length);
   sea.forEach((c, i) => rect(0, Hz + i * sh, W, sh, c));
+  scatterStars(ctx, U * ratio, W, Hz, 21);
 }
 
 function measure() {
@@ -131,7 +137,7 @@ onMounted(() => {
   if (wrap.value) observer.observe(wrap.value);
   measure();
 });
-watch(() => [props.examDay, props.centers, props.horizon, size.value, dpr.value], () => draw(), { flush: "post" });
+watch(() => [props.examDay, props.centers, props.horizon, size.value, dpr.value, currentTheme.value], () => draw(), { flush: "post" });
 onBeforeUnmount(() => { observer?.disconnect(); });
 </script>
 
@@ -141,7 +147,7 @@ onBeforeUnmount(() => { observer?.disconnect(); });
       <canvas ref="canvas" aria-hidden="true" />
       <svg class="sprites" :width="geo.W * U" :height="geo.H * U" shape-rendering="crispEdges" aria-hidden="true" focusable="false">
         <g v-for="s in scene.clouds" :key="s.key" :transform="s.at"><g class="drift" :style="s.motion"><rect v-for="(r, i) in s.rects" :key="i" v-bind="r" /></g></g>
-        <g v-for="g in scene.glints" :key="g.key" class="drift" :style="g.motion"><path :d="g.light" fill="#D6F0F8" /><path :d="g.dark" fill="#BDE6F4" /></g>
+        <g v-for="g in scene.glints" :key="g.key" class="drift" :style="g.motion"><path :d="g.light" :fill="sceneColor('#D6F0F8')" /><path :d="g.dark" :fill="sceneColor('#BDE6F4')" /></g>
         <g v-for="s in scene.buoys" :key="s.key" :transform="s.at"><g class="drift" :style="s.motion"><rect v-for="(r, i) in s.rects" :key="i" v-bind="r" /></g></g>
         <g v-if="scene.island" :transform="scene.island.at" :style="scene.island.motion">
           <rect v-for="(r, i) in scene.island.rects" :key="i" v-bind="r" />
@@ -153,8 +159,8 @@ onBeforeUnmount(() => { observer?.disconnect(); });
         <g :transform="scene.whale.at">
           <g class="swim" :style="scene.whale.swim">
             <g class="dive" :style="scene.whale.dive">
-              <rect v-for="(r, i) in WHALE_PX" :key="i" v-bind="r" />
-              <g class="spout"><rect v-for="(r, i) in SPOUT_PX" :key="i" v-bind="r" /></g>
+              <rect v-for="(r, i) in WHALE_PX" :key="i" v-bind="r" :fill="sceneColor(r.fill)" />
+              <g class="spout"><rect v-for="(r, i) in SPOUT_PX" :key="i" v-bind="r" :fill="sceneColor(r.fill)" /></g>
             </g>
           </g>
         </g>
@@ -166,7 +172,7 @@ onBeforeUnmount(() => { observer?.disconnect(); });
 </template>
 
 <style scoped>
-.plan-sea{position:relative;height:136px;border-radius:16px;overflow:hidden;border:1px solid #CFE7F2;background:#9BD7EC}
+.plan-sea{position:relative;height:136px;border-radius:16px;overflow:hidden;border:1px solid var(--sea-line);background:var(--sea)}
 .sea-wrap{position:absolute;inset:0}
 canvas{position:absolute;left:0;top:0;image-rendering:pixelated}
 .sprites{position:absolute;left:0;top:0;overflow:hidden;pointer-events:none}
@@ -177,8 +183,8 @@ canvas{position:absolute;left:0;top:0;image-rendering:pixelated}
 .swim{transform:translateX(round(var(--drift-x),var(--snap,1px)));animation:sgSwim var(--period-x) var(--ease-loop) var(--delay-x) infinite}
 .dive{transform:translateY(round(var(--drift-y),var(--snap,1px)));animation:sgDive var(--period-y) var(--ease-loop) var(--delay-y) infinite alternate}
 .spout{animation:sgSpout calc(var(--period-y) * 2) var(--ease-loop) var(--delay-y) infinite}
-.sea-sign{position:absolute;transform:translate(-50%,-100%);display:flex;flex-direction:column;align-items:center;padding:3px 9px 4px;background:#E9D6A8;box-shadow:inset 0 -2px 0 #CDB884,0 0 0 2px #C08324;white-space:nowrap;pointer-events:none}
-.sign-title{font-family:var(--font-display);font-size:13px;color:var(--ink)}
-.sign-date{font-size:11px;font-weight:700;color:var(--soft)}
-.sea-you{position:absolute;transform:translateX(-50%);font-family:var(--font-display);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#08344D;background:rgba(255,255,255,.85);padding:2px 6px;white-space:nowrap;pointer-events:none}
+.sea-sign{position:absolute;transform:translate(-50%,-100%);display:flex;flex-direction:column;align-items:center;padding:3px 9px 4px;background:var(--plank);box-shadow:inset 0 -2px 0 var(--plank-edge),0 0 0 2px var(--plank-ring);white-space:nowrap;pointer-events:none}
+.sign-title{font-family:var(--font-display);font-size:13px;color:var(--plank-ink)}
+.sign-date{font-size:11px;font-weight:700;color:var(--plank-soft)}
+.sea-you{position:absolute;transform:translateX(-50%);font-family:var(--font-display);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--sea-label);background:var(--scene-label);padding:2px 6px;white-space:nowrap;pointer-events:none}
 </style>

@@ -98,7 +98,7 @@ function hide(event: KeyboardEvent) {
 </template>
 
 <style scoped>
-/* The estimate chart's look: 1px ring-grey rules, 2px lines, whole pixels, marks in a white halo. */
+/* The estimate chart's look: 1px ring-grey rules, 2px lines, whole pixels, marks in a halo of the card's color. */
 .memory-curves{margin:0}
 .chart-box{position:relative;width:100%}
 .chart-svg{display:block;overflow:visible}
@@ -107,7 +107,7 @@ function hide(event: KeyboardEvent) {
 .threshold{fill:none;stroke-width:1;stroke-dasharray:4 3}
 .threshold-label,.flag-label{font-size:11px;font-weight:600;fill:var(--soft)}
 .flag-label.on{fill:var(--ink)}
-.halo{paint-order:stroke;stroke:#FFFFFF;stroke-width:3px;stroke-linejoin:round}
+.halo{paint-order:stroke;stroke:var(--card);stroke-width:3px;stroke-linejoin:round}
 .leader{fill:var(--faint)}
 .reference{fill:none;stroke-width:1;stroke-linecap:square}
 .line{fill:none;stroke-width:2;stroke-linecap:square;stroke-linejoin:miter;animation:sgDraw var(--dur-draw) var(--ease-enter);transition:opacity var(--dur-quick) var(--ease-enter)}
@@ -115,7 +115,7 @@ function hide(event: KeyboardEvent) {
 .line.lit{stroke-width:3}
 .arrive{animation:sgFade var(--dur-quick) var(--ease-enter) calc(var(--dur-draw) * var(--arrive, 0)) both}
 .hit{position:absolute;width:24px;height:24px;padding:0;border:0;border-radius:4px;background:transparent;cursor:default}
-.tip{position:absolute;z-index:3;display:flex;flex-direction:column;gap:1px;width:max-content;max-width:200px;padding:7px 10px;border-radius:10px;background:#1C1C1D;color:#FFFFFF;font-size:12px;line-height:1.35;transform:translate(-50%,-100%);pointer-events:none;box-shadow:0 10px 24px rgba(0,0,0,.22)}
+.tip{position:absolute;z-index:3;display:flex;flex-direction:column;gap:1px;width:max-content;max-width:200px;padding:7px 10px;border-radius:10px;background:var(--tip);color:var(--tip-text);font-size:12px;line-height:1.35;transform:translate(-50%,-100%);pointer-events:none;box-shadow:0 10px 24px rgb(var(--shadow) / .22)}
 .tip.below{transform:translateX(-50%)}
 .tip strong{font-size:13px;font-weight:700}
 .tip-note{color:var(--ring)}

@@ -5,6 +5,7 @@ import PixelIcon from "./PixelIcon.vue";
 import MasteryCells from "./MasteryCells.vue";
 import CourseWorkspace from "./CourseWorkspace.vue";
 import TutorPanel from "./TutorPanel.vue";
+import AppearanceChoice from "./AppearanceChoice.vue";
 import WelcomeScene from "./WelcomeScene.vue";
 import { HOME_VIEW_KEY, type HomeView } from "./revamp-types.ts";
 
@@ -339,6 +340,7 @@ onMounted(async () => {
       </div>
       <p v-if="viewNote" class="view-note" role="status">{{ viewNote }}</p>
     </section>
+    <section class="settings-section"><AppearanceChoice /></section>
     <section class="settings-section"><TutorPanel ref="tutorPanel" inline /></section>
     <section class="settings-section">
       <h3 class="eyebrow">Account</h3>
@@ -358,7 +360,7 @@ onMounted(async () => {
 .switch-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
 .switch-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 650; }
 .switch-score { font-size: 12px; color: var(--muted); }
-.menu { position: absolute; z-index: 20; top: calc(100% + 6px); left: 0; display: flex; flex-direction: column; gap: 2px; width: 100%; min-width: 220px; max-width: min(360px, calc(100vw - 32px)); max-height: 60vh; overflow-y: auto; padding: 6px; border-radius: 14px; background: #fff; box-shadow: 0 10px 30px rgb(0 0 0 / .12), 0 0 0 1px var(--ring); }
+.menu { position: absolute; z-index: 20; top: calc(100% + 6px); left: 0; display: flex; flex-direction: column; gap: 2px; width: 100%; min-width: 220px; max-width: min(360px, calc(100vw - 32px)); max-height: 60vh; overflow-y: auto; padding: 6px; border-radius: 14px; background: var(--card); box-shadow: 0 10px 30px rgb(var(--shadow) / .12), 0 0 0 1px var(--ring); }
 .menu-heading { padding: 6px 10px 4px; }
 .row { padding: 8px 10px; border: 0; border-radius: 10px; background: transparent; color: var(--ink); font-size: 14px; text-align: left; overflow-wrap: anywhere; }
 .row:hover, .row.current { background: var(--meadow-soft); }
@@ -377,11 +379,11 @@ onMounted(async () => {
 .switch-note { margin: 8px 4px 0; font-size: 13px; color: var(--soft); line-height: 1.4; }
 .welcome-archived { width: 100%; max-width: 440px; }
 .welcome-archived .archived-row { padding: 4px 0; }
-.floating-error { position: fixed; z-index: 50; left: 50%; bottom: 20px; transform: translateX(-50%); width: min(520px, calc(100vw - 32px)); box-shadow: 0 10px 24px rgba(0, 0, 0, .18); }
+.floating-error { position: fixed; z-index: 50; left: 50%; bottom: 20px; transform: translateX(-50%); width: min(520px, calc(100vw - 32px)); box-shadow: 0 10px 24px rgb(var(--shadow) / .18); }
 
 /* Sign-in and the pages before a course opens. */
 .welcome { min-height: 100dvh; padding: 14px; }
-.welcome-main { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 40px; min-height: calc(100dvh - 28px); padding: 40px 48px; border: 1px solid var(--card-border); border-radius: 24px; background: #fff; align-items: center; }
+.welcome-main { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 40px; min-height: calc(100dvh - 28px); padding: 40px 48px; border: 1px solid var(--card-border); border-radius: 24px; background: var(--card); align-items: center; }
 .welcome-text { max-width: 520px; display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
 .brand { display: flex; align-items: center; gap: 8px; margin-bottom: 28px; }
 .brand-name { font: 500 20px var(--font-display); }
@@ -402,9 +404,9 @@ onMounted(async () => {
 @media (max-width: 520px) { .welcome { padding: 8px; } .hero-title { font-size: 40px; } .steps { grid-template-columns: minmax(0, 1fr); } }
 
 /* Settings modal */
-.app-settings { border: 0; border-radius: 22px; padding: 24px; width: min(660px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow-y: auto; box-shadow: 0 20px 50px rgba(0, 0, 0, .18); color: var(--ink); background: #fff; }
-.app-settings::backdrop { background: rgba(21, 21, 21, .35); }
-.settings-head { position: sticky; top: -24px; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: -24px -24px 6px; padding: 24px 24px 8px; background: #fff; }
+.app-settings { border: 0; border-radius: 22px; padding: 24px; width: min(660px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow-y: auto; box-shadow: 0 20px 50px rgb(var(--shadow) / .18); color: var(--ink); background: var(--card); }
+.app-settings::backdrop { background: var(--backdrop); }
+.settings-head { position: sticky; top: -24px; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: -24px -24px 6px; padding: 24px 24px 8px; background: var(--card); }
 .settings-head h2 { margin: 0; font-size: 26px; }
 .settings-close { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 10px; background: var(--inset); color: var(--ink); font-size: 16px; line-height: 1; }
 .settings-close:hover { background: var(--inset-2); }
@@ -412,9 +414,9 @@ onMounted(async () => {
 .settings-section:last-of-type { border-bottom: 0; padding-bottom: 4px; }
 .settings-section h3 { margin: 0 0 10px; }
 .view-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.view-tile { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 0; border-radius: 16px; background: #fff; box-shadow: 0 0 0 1px var(--ring); text-align: left; }
+.view-tile { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 0; border-radius: 16px; background: var(--card); box-shadow: 0 0 0 1px var(--ring); text-align: left; }
 .view-tile[aria-checked="true"] { box-shadow: 0 0 0 2px var(--meadow-edge); background: var(--meadow-soft); }
-.tile-preview { display: flex; align-items: center; justify-content: center; height: 84px; border-radius: 12px; background: #F1F8F2; }
+.tile-preview { display: flex; align-items: center; justify-content: center; height: 84px; border-radius: 12px; background: var(--meadow-wash); }
 .tile-preview.tasks { flex-direction: column; align-items: stretch; gap: 6px; padding: 10px 14px; background: var(--inset); }
 .tile-line { display: flex; align-items: center; gap: 6px; }
 .tile-bar { flex: 1; height: 6px; background: var(--ring); }

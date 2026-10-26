@@ -243,31 +243,31 @@ const chartPoints = computed<ChartPoint[]>(() => {
 .estimate-panel{font-size:13px;overflow-wrap:anywhere}
 .estimate-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .estimate-figure{min-width:0}
-.rail-title{color:#777094}
+.rail-title{color:var(--estimate-eyebrow)}
 .readiness{margin:8px 0 0;color:var(--soft);font-size:12px;line-height:1.5}
 .adjust-toggle{flex:none;border:0;border-radius:999px;background:var(--dawn-soft);color:var(--dawn-soft-text);padding:4px 10px;font-size:12px;font-weight:700;white-space:nowrap}
-.adjust-toggle:hover:not(:disabled){background:#DEDAFF}
-.adjust-form{max-width:none;margin:12px 0 6px;padding:12px;background:#FAF9FE;border:1px solid #ECE9F5;border-radius:14px}
+.adjust-toggle:hover:not(:disabled){background:var(--dawn-nav)}
+.adjust-form{max-width:none;margin:12px 0 6px;padding:12px;background:var(--lesson-rail);border:1px solid var(--lesson-card-ring);border-radius:14px}
 .adjust-fields{display:grid;grid-template-columns:1fr;gap:10px}
 .adjust-form label{font-size:12px;font-weight:600;margin:0 0 6px}
 .value-input{display:flex;align-items:center;gap:8px;max-width:140px}
 .value-input input{min-height:38px;padding:6px 10px;font-variant-numeric:tabular-nums;border-radius:10px}
 .adjust-form .hint{font-size:12px;margin:6px 0 0}
-.adjust-form textarea{display:block;width:100%;min-height:42px;padding:8px 10px;border:1px solid var(--ring);border-radius:10px;font:inherit;font-size:13px;background:#FFFFFF;color:var(--ink);resize:vertical}
+.adjust-form textarea{display:block;width:100%;min-height:42px;padding:8px 10px;border:1px solid var(--ring);border-radius:10px;font:inherit;font-size:13px;background:var(--field);color:var(--ink);resize:vertical}
 .adjust-form [aria-invalid="true"]{border-color:var(--coral);border-width:2px}
 .adjust-form .primary{min-height:38px;margin-top:12px;padding:0 14px;font-size:13px}
 .adjust-form .error{margin:12px 0 0}
-.waiting-note{margin:0 0 10px;padding:8px 10px;border-left:3px solid var(--dawn-edge);background:#FFFFFF;border-radius:4px;font-size:12px}
+.waiting-note{margin:0 0 10px;padding:8px 10px;border-left:3px solid var(--dawn-edge);background:var(--card);border-radius:4px;font-size:12px}
 .working-note{margin:10px 0 0;color:var(--muted)}
 .notice{margin:10px 0 0}
-h3{font-family:var(--font-display);font-weight:500;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#777094;margin:16px 0 6px}
+h3{font-family:var(--font-display);font-weight:500;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--estimate-eyebrow);margin:16px 0 6px}
 .basis{margin:0 0 6px;color:var(--soft);line-height:1.5;font-size:12px}
 .provisional{display:inline-block;margin-right:6px;padding:0 7px;border-radius:999px;font-size:11px;font-weight:700;color:var(--dawn-soft-text);background:var(--dawn-soft)}
 /* Evidence rows: the date, the kind's mark on a lavender rail, the sentence, and the values. The date and values
    columns have fixed widths so the attempts that did not count line up under the same columns. */
 .rows{list-style:none;margin:10px 0 0;padding:0}
 .row{position:relative;display:grid;grid-template-columns:38px 10px minmax(0,1fr) 52px;grid-template-areas:"date mark text values" "date mark more more";gap:0 8px;padding:0 0 12px;line-height:1.35;animation:sgRise var(--dur-enter) var(--ease-enter) calc(var(--row, 0) * var(--dur-enter) / 6) both}
-.timeline .row:not(:last-child)::before{content:"";position:absolute;left:50px;top:14px;bottom:-3px;width:2px;background:#E3DEF7}
+.timeline .row:not(:last-child)::before{content:"";position:absolute;left:50px;top:14px;bottom:-3px;width:2px;background:var(--estimate-track)}
 .row-when{grid-area:date;display:flex;flex-direction:column;color:var(--ink);font-size:11px;font-weight:600;line-height:1.35;white-space:nowrap}
 .row-weekday{color:var(--muted);font-weight:400}
 .row-mark{grid-area:mark;display:flex;padding-top:3px}
@@ -279,15 +279,15 @@ h3{font-family:var(--font-display);font-weight:500;font-size:11px;letter-spacing
 .row-reason{color:var(--ink);font-style:italic}
 .row-values{grid-area:values;display:flex;flex-direction:column;align-items:flex-end;color:var(--muted);font-size:11px;line-height:1.35;text-align:right;white-space:nowrap}
 .row-values strong{color:var(--ink);font-size:13px;font-weight:700;line-height:1.25}
-.row-date{color:#8A8A86;font-size:12px;white-space:nowrap}
+.row-date{color:var(--dim);font-size:12px;white-space:nowrap}
 .case-history{list-style:none;margin:0;padding:0}
-.case-history li{padding:8px 0;border-top:1px solid #EEEBF5}
+.case-history li{padding:8px 0;border-top:1px solid var(--lesson-divider)}
 .case-history li:first-child{border-top:0}
 .case-line{display:flex;flex-wrap:wrap;gap:2px 10px;align-items:baseline}
 .case-line .row-date{text-align:left}
 .case-note{margin:4px 0 0;color:var(--muted);font-size:12px}
 .case-note span{display:block;font-size:11px;font-weight:700;color:var(--ink);margin-top:6px}
-.imported{padding-left:10px!important;border-left:3px solid #A79CEE}
+.imported{padding-left:10px!important;border-left:3px solid var(--estimate-imported)}
 .case-open{border:0;background:transparent;padding:0 0 0 8px;font-size:12px;font-weight:600;color:var(--dawn-soft-text);text-decoration:underline;text-underline-offset:3px}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
 </style>

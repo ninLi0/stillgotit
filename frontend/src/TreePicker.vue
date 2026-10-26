@@ -74,8 +74,8 @@ defineExpose({ open });
 
 <style scoped>
 .tree-picker { border: 0; border-radius: 22px; padding: 22px; width: min(520px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow-y: auto;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, .18); color: var(--ink); background: #FFFFFF; }
-.tree-picker::backdrop { background: rgba(21, 21, 21, .35); }
+  box-shadow: 0 20px 50px rgb(var(--shadow) / .18); color: var(--ink); background: var(--card); }
+.tree-picker::backdrop { background: var(--backdrop); }
 .picker-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .picker-names { min-width: 0; }
 .picker-topic { overflow-wrap: anywhere; }
@@ -87,13 +87,13 @@ defineExpose({ open });
 .picker-grid li { position: relative; }
 .picker-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
 .picker-tile { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; padding: 8px 4px 10px; border: 0; border-radius: 14px;
-  background: #FFFFFF; box-shadow: 0 0 0 1px var(--ring); transition: background-color var(--dur-quick) var(--ease-enter), box-shadow var(--dur-quick) var(--ease-enter); }
+  background: var(--card); box-shadow: 0 0 0 1px var(--ring); transition: background-color var(--dur-quick) var(--ease-enter), box-shadow var(--dur-quick) var(--ease-enter); }
 .picker-tile:hover { background: var(--inset); }
 .picker-tile[aria-current="true"] { background: var(--meadow-soft); box-shadow: 0 0 0 2px var(--meadow-edge); }
 .picker-tile .tree-preview { border-radius: 8px; }
 .tile-name { font-size: 14px; font-weight: 700; line-height: 1.2; }
 .tile-tag { position: absolute; top: 4px; right: 4px; padding: 1px 6px; border-radius: 999px; background: var(--inset-2); color: var(--soft); font-size: 11px; font-weight: 700; line-height: 1.5; }
-.tile-tag.now { background: var(--meadow-edge); color: #FFFFFF; }
+.tile-tag.now { background: var(--meadow-edge); color: var(--on-fill); }
 .picker-caption { min-height: 42px; margin: 12px 0 0; font-size: 14px; line-height: 1.5; color: var(--soft); }
 .picker-caption strong { color: var(--ink); }
 .picker-actions { display: flex; justify-content: flex-start; margin-top: 10px; }

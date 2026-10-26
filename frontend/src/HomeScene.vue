@@ -4,6 +4,8 @@ import { SPRITES, iconRects, rng } from "./pixel-art.ts";
 import { cloudDrift, cloudRects, snapStyle, sprite, type CellRect, type Sprite } from "./scene-motion.ts";
 import ContinueCard from "./ContinueCard.vue";
 import type { OpenSession } from "./continue-session.ts";
+import { MOON, dayOrNight, isNight, leafColor, scatterStars, sceneColor } from "./scene-palette.ts";
+import { currentTheme } from "./theme.ts";
 
 // The Home hero scene (design/revamp/README.md): a pixel meadow drawn on a canvas at 4px cells × devicePixelRatio, a
 // dotted path from "You · today" past one post per day to the exam hill and its flag. The panel on top is the slot.
@@ -49,7 +51,7 @@ const sprites = computed<Sprite[]>(() => {
     CLOTH.forEach((column, k) => out.push(sprite(`cloth-${k}`, xE + 1, fy - 9, U, column, { y: [0, 1, 1.5, 2][k], seconds: 0.8, phase: 0.15 * k })));
   }
   // "You · today": the leaf bobs a few pixels above its mound.
-  out.push(sprite("leaf", xT - 3, G + 3 - 7, U, LEAF, { y: -3, seconds: 1.6 }));
+  out.push(sprite("leaf", xT - 3, G + 3 - 7, U, LEAF.map((r) => ({ ...r, fill: leafColor(r.fill) })), { y: -3, seconds: 1.6 }));
   return out;
 });
 
@@ -59,14 +61,15 @@ function draw() {
   if (cv.width !== W * U * ratio || cv.height !== H * U * ratio) { cv.width = W * U * ratio; cv.height = H * U * ratio; }
   const ctx = cv.getContext("2d"); if (!ctx) return;
   ctx.setTransform(ratio, 0, 0, ratio, 0, 0); ctx.imageSmoothingEnabled = false;
-  const cell = (x: number, y: number, c: string) => { ctx.fillStyle = c; ctx.fillRect(Math.round(x) * U, Math.round(y) * U, U, U); };
-  const rect = (x: number, y: number, w: number, h: number, c: string) => { ctx.fillStyle = c; ctx.fillRect(Math.round(x) * U, Math.round(y) * U, Math.round(w) * U, Math.round(h) * U); };
+  const cell = (x: number, y: number, c: string) => { ctx.fillStyle = sceneColor(c); ctx.fillRect(Math.round(x) * U, Math.round(y) * U, U, U); };
+  const rect = (x: number, y: number, w: number, h: number, c: string) => { ctx.fillStyle = sceneColor(c); ctx.fillRect(Math.round(x) * U, Math.round(y) * U, Math.round(w) * U, Math.round(h) * U); };
   // Sky as solid bands, never a gradient.
   const sky = ["#CFE6F0", "#D7EBF2", "#E0EFF3", "#E9F3F1", "#F3F4E6"], bh = Math.ceil(G / sky.length);
   sky.forEach((c, i) => rect(0, i * bh, W, bh, c));
-  // The sun's arc follows today's minutes against the budget.
+  // The sun's arc follows today's minutes against the budget; by night the moon takes its place.
   const p = Math.max(0, Math.min(1, props.progress)), sx = Math.round(xT + (xE - xT) * p * 0.8), sy = Math.round(G * 0.5 - Math.sin(Math.max(0.2, p) * Math.PI) * G * 0.32);
-  for (let dy = -5; dy <= 5; dy++) for (let dx = -5; dx <= 5; dx++) { const q = dx * dx + dy * dy; if (q <= 26) cell(sx + dx, sy + dy, q <= 10 ? "#E3A233" : "#F3CD7A"); }
+  for (let dy = -5; dy <= 5; dy++) for (let dx = -5; dx <= 5; dx++) { const q = dx * dx + dy * dy; if (q <= 26) cell(sx + dx, sy + dy, q <= 10 ? dayOrNight("#E3A233", MOON.face) : dayOrNight("#F3CD7A", MOON.rim)); }
+  if (isNight()) { cell(sx + 1, sy - 2, MOON.crater); cell(sx - 2, sy + 1, MOON.crater); cell(sx + 2, sy + 1, MOON.crater); }
   for (let x = 0; x < W; x++) { const top = Math.round(G - (G * 0.24 + Math.sin(x / 23 + 0.4) * G * 0.08)); rect(x, top, 1, G - top, "#BFDCC8"); }
   for (let x = 0; x < W; x++) { const top = Math.round(G - (G * 0.1 + Math.sin(x / 13 + 1) * 2)); rect(x, top, 1, G - top, "#A3D6B4"); }
   rect(0, G, W, H - G, "#7CC497"); rect(0, G, W, 1, "#9AD6AE"); rect(0, Math.round(G + (H - G) * 0.6), W, H, "#6DB892");
@@ -82,6 +85,7 @@ function draw() {
   if (props.sign) rect(xE, G - 16, 1, 9, "#48555C");
   // The mound under "You · today"; its leaf is a sprite.
   rect(xT - 4, py, 9, 1, "#5FAE85");
+  scatterStars(ctx, U * ratio, W, G, 3);
 }
 
 onMounted(() => {
@@ -94,7 +98,7 @@ onMounted(() => {
   dpr.value = window.devicePixelRatio || 1;
   draw();
 });
-watch([size, dpr, () => props.days, () => props.sign, () => props.progress], draw, { flush: "post" });
+watch([size, dpr, () => props.days, () => props.sign, () => props.progress, currentTheme], draw, { flush: "post" });
 onBeforeUnmount(() => { observer?.disconnect(); });
 </script>
 
@@ -114,15 +118,15 @@ onBeforeUnmount(() => { observer?.disconnect(); });
 </template>
 
 <style scoped>
-.home-scene { position: relative; min-height: 214px; border-radius: 24px; overflow: hidden; border: 1px solid #DCEBE1; background: #DDEFF3; }
+.home-scene { position: relative; min-height: 214px; border-radius: 24px; overflow: hidden; border: 1px solid var(--home-line); background: var(--home-sky); }
 .scene-art { position: absolute; inset: 0; }
 canvas { position: absolute; left: 0; top: 0; image-rendering: pixelated; }
 .sprites { position: absolute; left: 0; top: 0; overflow: hidden; pointer-events: none; }
-.plank { position: absolute; transform: translate(-50%, -100%); display: flex; flex-direction: column; align-items: center; padding: 3px 9px 4px; background: #E9D6A8; box-shadow: inset 0 -2px 0 #CDB884, 0 0 0 2px #C08324; white-space: nowrap; pointer-events: none; }
-.plank-title { font: 400 13px var(--font-display); color: #151515; }
-.plank-when { font-size: 11px; font-weight: 700; color: #4A4A48; }
-.you { position: absolute; z-index: 2; transform: translateX(-30%); font: 400 11px var(--font-display); letter-spacing: 1px; text-transform: uppercase; color: #1F4A30; background: rgba(255, 255, 255, .85); padding: 2px 6px; white-space: nowrap; pointer-events: none; }
-.scene-panel { position: relative; z-index: 1; margin: 16px; max-width: 52%; background: #FFFFFF; border-radius: 18px; padding: 16px 18px; box-shadow: 0 0 0 1px rgba(20, 40, 30, .06), 0 10px 22px rgba(20, 60, 40, .08); display: flex; flex-direction: column; gap: 6px; animation: sgRise var(--dur-enter) var(--ease-enter) both; }
+.plank { position: absolute; transform: translate(-50%, -100%); display: flex; flex-direction: column; align-items: center; padding: 3px 9px 4px; background: var(--plank); box-shadow: inset 0 -2px 0 var(--plank-edge), 0 0 0 2px var(--plank-ring); white-space: nowrap; pointer-events: none; }
+.plank-title { font: 400 13px var(--font-display); color: var(--plank-ink); }
+.plank-when { font-size: 11px; font-weight: 700; color: var(--plank-soft); }
+.you { position: absolute; z-index: 2; transform: translateX(-30%); font: 400 11px var(--font-display); letter-spacing: 1px; text-transform: uppercase; color: var(--meadow-label); background: var(--scene-label); padding: 2px 6px; white-space: nowrap; pointer-events: none; }
+.scene-panel { position: relative; z-index: 1; margin: 16px; max-width: 52%; background: var(--card); border-radius: 18px; padding: 16px 18px; box-shadow: 0 0 0 1px rgb(var(--shadow) / .06), 0 10px 22px rgb(var(--shadow) / .08); display: flex; flex-direction: column; gap: 6px; animation: sgRise var(--dur-enter) var(--ease-enter) both; }
 @media (max-width: 760px) { .scene-panel { max-width: 66%; } }
 @media (max-width: 520px) { .scene-panel { max-width: none; margin: 12px 12px 86px; } }
 </style>

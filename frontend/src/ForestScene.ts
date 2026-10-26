@@ -5,6 +5,7 @@
 // device-pixel size of one cell, so every cell lands on whole device pixels and stays crisp. Each topic's tree is the
 // kind the learner chose for it, or the unit's default kind (tree-kinds.ts).
 import { PAL, SPRITES, hash, rng, stageOf } from "./pixel-art.ts";
+import { MOON, dayOrNight, isNight, leafColor, sceneColor } from "./scene-palette.ts";
 import type { ViewSkill, ViewUnit } from "./revamp-types.ts";
 import { growTree, moveTree, paintTree, type CrownPart, type Segment } from "./tree-draw.ts";
 import { kindFor, type TreeKind } from "./tree-kinds.ts";
@@ -98,27 +99,30 @@ export function hitForest(layout: ForestLayout, mx: number, my: number): { leaf:
   return { leaf, tree };
 }
 
-type Paint = { rect: (x: number, y: number, w: number, h: number, c: string) => void; cell: (x: number, y: number, c: string) => void; disc: (cx: number, cy: number, r: number, c: string) => void };
-function painter(ctx: CanvasRenderingContext2D, px: number): Paint {
+type Paint = { rect: (x: number, y: number, w: number, h: number, c: string) => void; cell: (x: number, y: number, c: string) => void; disc: (cx: number, cy: number, r: number, c: string) => void;
+  /** The same painter with `tone` applied to every color after the theme's own, for the trees of the topics not picked out. */
+  toned: (tone: (c: string) => string) => Paint };
+function painter(ctx: CanvasRenderingContext2D, px: number, tone = (c: string) => c): Paint {
   const rect = (x: number, y: number, w: number, h: number, c: string) => {
     const rw = Math.round(w), rh = Math.round(h);
     if (rw <= 0 || rh <= 0) return;
-    ctx.fillStyle = c;
+    ctx.fillStyle = tone(sceneColor(c));
     ctx.fillRect(Math.round(x) * px, Math.round(y) * px, rw * px, rh * px);
   };
   const cell = (x: number, y: number, c: string) => rect(x, y, 1, 1, c);
   const disc = (cx: number, cy: number, r: number, c: string) => {
     for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) if (dx * dx + dy * dy <= r * r + 1) cell(cx + dx, cy + dy, c);
   };
-  return { rect, cell, disc };
+  return { rect, cell, disc, toned: (t) => painter(ctx, px, (c) => t(tone(c))) };
 }
 
-/** Sky bands (solid, never a gradient) and the sun on its arc. */
+/** Sky bands (solid, never a gradient) and the sun on its arc, or the moon by night (scene-palette.ts). */
 export function drawSky(ctx: CanvasRenderingContext2D, layout: ForestLayout, px: number) {
   const { rect, cell, disc } = painter(ctx, px), { Wc, Wv, G } = layout, bh = Math.ceil(G / SKY.length);
   SKY.forEach((c, i) => rect(0, i * bh, Wc, bh, c));
   const sx = Math.round(Wv * (0.1 + 0.8 * SUN_AT)), sy = Math.round(G * 0.5 - Math.sin(SUN_AT * Math.PI) * G * 0.32);
-  disc(sx, sy, 8, "#F9E3A8"); disc(sx, sy, 6, "#F3CD7A"); disc(sx, sy, 4, "#E3A233"); cell(sx - 2, sy - 2, "#F9E3A8");
+  disc(sx, sy, 8, dayOrNight("#F9E3A8", MOON.glow)); disc(sx, sy, 6, dayOrNight("#F3CD7A", MOON.rim)); disc(sx, sy, 4, dayOrNight("#E3A233", MOON.face));
+  cell(sx - 2, sy - 2, dayOrNight("#F9E3A8", MOON.crater));
 }
 
 /** Where each cloud sits, in cells, and how wide it is, from a fixed seed so the clouds keep their places. */
@@ -178,11 +182,11 @@ function drawTree(paint: Paint, t: ForestTree, state: LandState) {
     rect(t.trunk + dx, t.base, 1, hh, state.topic === t.unit ? "#E3C46A" : "#5A9F7A");
   }
   // The other topics' trees are drawn paler while one topic is picked out.
-  paintTree(paint, { segs: t.segs, crown: t.crown, buds: t.buds.map((b) => [b.x, b.y] as const), leaves: t.leaves.map((lf) => [lf.x, lf.y] as const) },
-    t.kind, RT, { tone: dim ? paler : undefined, widen: true });
+  paintTree(dim ? paint.toned(paler) : paint, { segs: t.segs, crown: t.crown, buds: t.buds.map((b) => [b.x, b.y] as const), leaves: t.leaves.map((lf) => [lf.x, lf.y] as const) },
+    t.kind, RT, { widen: true });
   for (const lf of t.leaves) {
     SPRITES[stageOf(lf.skill.mastery)].forEach((row, ry) => {
-      for (let rx = 0; rx < row.length; rx++) { const ch = row.charAt(rx); if (ch !== ".") cell(lf.x - 3 + rx, lf.y - 3 + ry, PAL[ch] ?? "#000000"); }
+      for (let rx = 0; rx < row.length; rx++) { const ch = row.charAt(rx); if (ch !== ".") cell(lf.x - 3 + rx, lf.y - 3 + ry, leafColor(PAL[ch] ?? "#000000")); }
     });
     if (lf.skill.dueToday) { rect(lf.x + 3, lf.y - 8, 1, 5, "#48555C"); rect(lf.x + 4, lf.y - 8, 2, 2, "#D9663A"); cell(lf.x + 5, lf.y - 7, "#EE9C78"); }
     const mark = lf.skill.skill === state.selected ? "#151515" : lf.skill.skill === state.hover ? "#5F5F5C" : null;
@@ -198,9 +202,12 @@ function drawTree(paint: Paint, t: ForestTree, state: LandState) {
   }
 }
 
-/** A color mixed 40% of the way toward the forest's pale morning sky, for the trees of the topics not picked out. */
+/** A color mixed 40% of the way toward the forest's sky at the horizon, pale by morning and dark by night, for the trees of
+ * the topics not picked out. It takes a color the theme has already chosen, so by night it fades the tree into the night
+ * sky rather than toward white. */
 function paler(color: string): string {
-  const value = Number.parseInt(color.slice(1), 16), toward = [0xF1, 0xF5, 0xEF];
+  const horizon = isNight() ? sceneColor(SKY[SKY.length - 1]!) : "#F1F5EF", sky = Number.parseInt(horizon.slice(1), 16);
+  const value = Number.parseInt(color.slice(1), 16), toward = [sky >> 16, (sky >> 8) & 255, sky & 255];
   const channel = (shift: number, i: number) => Math.round(((value >> shift) & 255) * 0.6 + toward[i]! * 0.4);
   return `#${[channel(16, 0), channel(8, 1), channel(0, 2)].map((v) => v.toString(16).padStart(2, "0")).join("")}`;
 }

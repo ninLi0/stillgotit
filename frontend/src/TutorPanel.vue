@@ -162,14 +162,14 @@ defineExpose({ open });
 </template>
 
 <style scoped>
-.tutor-panel{border:0;border-radius:22px;padding:24px;width:min(560px,calc(100vw - 32px));box-shadow:0 20px 50px rgba(0,0,0,.18);color:var(--ink);background:#fff}.tutor-panel::backdrop{background:rgba(21,21,21,.35)}
+.tutor-panel{border:0;border-radius:22px;padding:24px;width:min(560px,calc(100vw - 32px));box-shadow:0 20px 50px rgb(var(--shadow) / .18);color:var(--ink);background:var(--card)}.tutor-panel::backdrop{background:var(--backdrop)}
 .tutor-head{display:flex;align-items:center;gap:6px;margin:0 0 10px}.tutor-panel h2{font:500 22px var(--font-display);margin:0}.tutor-panel.inline{padding:0;width:auto;box-shadow:none;border-radius:0}.tutor-intro{font-size:13px;color:var(--muted);margin:0 0 14px}
 .tutor-status{margin:0;padding:10px 12px;border-left:3px solid var(--strong);border-radius:0 10px 10px 0;background:var(--inset);font-size:14px}.tutor-status.retired{border-left-color:var(--error)}
 .tutor-group{min-width:0;margin:18px 0 0;padding:0;border:0}.tutor-group legend{padding:0;margin:0 0 8px;font-size:14px;font-weight:600}.tutor-group .hint{margin:8px 0 0}
 .model-option{display:flex;align-items:flex-start;gap:12px;margin:0 0 8px;padding:12px 14px;border:1px solid var(--ring);border-radius:14px;font-size:14px;font-weight:400;cursor:pointer}.model-option:hover{border-color:var(--meadow-edge)}.model-option.chosen{border-color:var(--meadow-edge);background:var(--meadow-soft);box-shadow:0 0 0 1px var(--meadow-edge)}
 .tutor-panel input[type=radio]{flex:none;width:18px;height:18px;min-height:0;margin:2px 0 0;padding:0;accent-color:var(--meadow-edge);cursor:pointer}
 .option-text{display:flex;flex-direction:column;gap:2px;min-width:0}.option-name{font-weight:600}.option-about{font-size:13px}.option-tradeoff{font-size:13px;color:var(--muted)}
-.option-tag{display:inline-block;margin-left:8px;padding:1px 8px;border-radius:10px;background:var(--meadow-soft);color:var(--strong);font-size:11px;font-weight:600;line-height:1.6;vertical-align:1px}.chosen .option-tag{background:#fff}
+.option-tag{display:inline-block;margin-left:8px;padding:1px 8px;border-radius:10px;background:var(--meadow-soft);color:var(--strong);font-size:11px;font-weight:600;line-height:1.6;vertical-align:1px}.chosen .option-tag{background:var(--card)}
 .level-options{display:flex;flex-wrap:wrap;gap:8px}.level-option{display:flex;align-items:center;gap:8px;margin:0;padding:8px 14px 8px 12px;border:1px solid var(--line);border-radius:999px;font-size:14px;font-weight:400;cursor:pointer}.level-option:hover{border-color:var(--meadow-edge)}.level-option.chosen{border-color:var(--meadow-edge);background:var(--meadow-nav);font-weight:700}.tutor-panel .level-option input[type=radio]{margin:0}
 .tutor-warning{margin:14px 0 0;padding:10px 12px;border-left:3px solid var(--meadow-edge);background:var(--inset);font-size:13px}
 .tutor-actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:20px}.tutor-actions button{min-height:40px;padding:6px 18px;font-size:14px}.save-action{display:inline-flex;flex-direction:column}.save-action .reason{margin:6px 0 0;font-size:12px}

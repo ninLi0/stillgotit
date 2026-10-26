@@ -72,7 +72,7 @@ function startNew() { emit("new"); void collapse(); }
 /* A row is the sidebar's capsule in the lesson's dawn tint when its conversation is the one on screen. */
 .conv-row { display: flex; flex-direction: column; gap: 1px; width: 100%; min-height: 44px; padding: 5px 14px; border: 0; border-radius: 999px; background: transparent; color: var(--ink); text-align: left; transition: background-color var(--dur-quick) var(--ease-enter); }
 .conv-row:hover { background: var(--inset-2); }
-.conv-row.current, .conv-row.current:hover { background: #DEDAFF; }
+.conv-row.current, .conv-row.current:hover { background: var(--dawn-nav); }
 .conv-line { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .conv-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 600; }
 .conv-row.current .conv-name { font-weight: 700; }
@@ -90,7 +90,7 @@ function startNew() { emit("new"); void collapse(); }
   .conv-toggle { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 40px; padding: 0 12px; border: 0; border-radius: 12px; background: var(--inset); color: var(--ink); font-size: 14px; font-weight: 700; text-align: left; }
   .conv-toggle:hover, .conv-toggle[aria-expanded="true"] { background: var(--inset-2); }
   .conv-toggle-label { flex: 1; }
-  .conv-count { display: inline-grid; place-items: center; min-width: 22px; height: 20px; padding: 0 6px; border-radius: 999px; background: #FFFFFF; color: var(--soft); font-size: 12px; font-weight: 700; }
+  .conv-count { display: inline-grid; place-items: center; min-width: 22px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--card); color: var(--soft); font-size: 12px; font-weight: 700; }
   .conv-toggle svg { flex: none; color: var(--muted); }
   .conv-body { display: none; max-height: 55dvh; margin: 6px 0 0; padding: 6px; border-radius: 14px; box-shadow: 0 0 0 1px var(--ring); animation: sgRise var(--dur-enter) var(--ease-enter) both; }
   .expanded .conv-body { display: flex; }

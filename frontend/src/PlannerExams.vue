@@ -60,7 +60,7 @@ defineExpose({ close, alertBox: () => errorBox.value });
   </section>
 </template>
 <style scoped>
-.exams{background:#FFFFFF;border:1px solid var(--line);border-radius:18px;padding:20px 22px;overflow-wrap:anywhere;min-width:0}
+.exams{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:20px 22px;overflow-wrap:anywhere;min-width:0}
 h3{margin:0 0 6px;font-family:var(--font-display);font-weight:400;font-size:21px}
 .exam-list{list-style:none;padding:0;margin:0}
 .exam-list li{padding:12px 0;border-top:1px solid var(--inset)}
@@ -81,9 +81,9 @@ legend{padding:0;font-size:13px;font-weight:700}
 .unit-group legend{font-family:var(--font-display);font-weight:400;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--faint)}
 .check{position:relative;display:flex;align-items:flex-start;gap:10px;font-size:13px!important;font-weight:400!important;margin:8px 0!important;cursor:pointer}
 .check input{position:absolute;opacity:0;width:18px;height:18px;min-height:0;margin:0;left:0}
-.check .box{width:18px;height:18px;flex:none;border-radius:5px;border:1.5px solid #BDBDB8;background:#FFFFFF;display:grid;place-items:center}
+.check .box{width:18px;height:18px;flex:none;border-radius:5px;border:1.5px solid var(--check-line);background:var(--field);display:grid;place-items:center}
 .check input:checked+.box{background:var(--ocean-edge);border-color:var(--ocean-edge)}
-.check input:checked+.box::after{content:"✓";color:#FFFFFF;font-size:12px;font-weight:800;line-height:1}
+.check input:checked+.box::after{content:"✓";color:var(--on-fill);font-size:12px;font-weight:800;line-height:1}
 .check input:focus-visible+.box{outline:2px solid var(--ink);outline-offset:2px}
 .exam-form .primary{min-height:40px;padding:0 16px;font-size:14px;margin-top:16px}
 .error{margin-top:12px}

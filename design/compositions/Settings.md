@@ -2,7 +2,7 @@
 
 A learner chooses which Gemini model the tutor uses and how much it thinks before answering, which Gemini calls the thinking level. `TutorPreferring`, an instance of [Preferring](../concepts/Preferring.md), keeps that choice on the server for the signed-in learner, so it follows them to every browser. Every tutor request reads the choice on the server and sends that model and level to Gemini. No request uses a model name or level from the browser until the server has checked it against its own catalog. Dictation is the one exception: it keeps the server's configured model with no thinking level and its own error sentences. The [application stage](../stages/materials.md) binds the instance.
 
-The learner also chooses which view Home shows: the skill tree or the task list. `ViewPreferring`, a second instance of Preferring, keeps that choice on the server in the same way, so it also follows the learner to every browser. [The home view](#the-home-view) describes it.
+The learner also chooses which view Home shows: the skill tree or the task list. `ViewPreferring`, a second instance of Preferring, keeps that choice on the server in the same way, so it also follows the learner to every browser. [The home view](#the-home-view) describes it. The appearance (System, Light, or Dark) is different: it stays in the browser and never reaches the server, because whether a dark page suits the learner depends on the device and the room it is used in, and System already follows each device's own setting ([Dark mode](../visual-design.md#dark-mode)).
 
 ## The model catalog
 

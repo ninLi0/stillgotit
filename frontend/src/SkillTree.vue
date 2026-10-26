@@ -5,6 +5,8 @@ import PixelIcon from "./PixelIcon.vue";
 import TopicTree from "./TopicTree.vue";
 import { STAGE_LABELS, type Stage } from "./pixel-art.ts";
 import { CELL, GROUND, HEIGHT, PLOT, average, drawGrove, growGrove, leafNear, shiftGrove, treeAt, type GroveLeaf, type GroveTopic } from "./GroveScene.ts";
+import { scatterStars } from "./scene-palette.ts";
+import { currentTheme } from "./theme.ts";
 
 // The grove: one pixel tree per topic, each confirmed skill a leaf at a branch tip (design/revamp/README.md,
 // "Tree view"). The canvas is decoration; every leaf is also a real button laid over it, so the grove works from the
@@ -113,9 +115,12 @@ const tagStyle = computed(() => {
 watch(tagLeaf, async () => { await nextTick(); tagWidth.value = tagEl.value?.offsetWidth ?? 0; }, { immediate: true });
 
 function draw() {
-  if (canvas.value) drawGrove(canvas.value, placed.value.grove, placed.value.cssWidth, dpr.value, props.selected, hot.value);
+  if (!canvas.value) return;
+  drawGrove(canvas.value, placed.value.grove, placed.value.cssWidth, dpr.value, props.selected, hot.value);
+  const ctx = canvas.value.getContext("2d");
+  if (ctx) scatterStars(ctx, CELL * dpr.value, Math.ceil(placed.value.cssWidth / CELL), GROUND, 7);
 }
-watch([placed, () => props.selected, hot, dpr], draw, { flush: "post" });
+watch([placed, () => props.selected, hot, dpr, currentTheme], draw, { flush: "post" });
 
 // Hit-testing happens in cell space: the nearest leaf within about five cells.
 function leafAtPointer(event: MouseEvent) {
@@ -214,7 +219,7 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.grove { min-width: 0; border-radius: 24px; background: #FFFFFF; box-shadow: 0 0 0 1px rgba(20, 20, 20, .05), 0 12px 22px rgba(20, 20, 20, .06); padding: 14px; }
+.grove { min-width: 0; border-radius: 24px; background: var(--card); box-shadow: 0 0 0 1px var(--line-faint), 0 12px 22px rgb(var(--shadow) / .06); padding: 14px; }
 .grove-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 2px 6px 12px; }
 .grove-summary { display: flex; align-items: center; gap: 4px; min-width: 0; }
 .grove-summary .eyebrow { font-size: 12px; white-space: nowrap; }
@@ -222,26 +227,26 @@ onBeforeUnmount(() => {
 .legend { display: flex; align-items: center; gap: 6px 14px; flex-wrap: wrap; margin: 0; padding: 0; list-style: none; font-size: 12px; color: var(--muted); }
 .legend li { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
 .regrow { display: flex; align-items: center; gap: 6px; border: 0; border-radius: 999px; background: var(--inset); color: var(--ink); padding: 6px 12px; font-size: 12px; font-weight: 600; white-space: nowrap; }
-.regrow:hover { background: #D6EFDF; }
+.regrow:hover { background: var(--meadow-soft-hover); }
 .grove-scroll { overflow-x: auto; overflow-y: hidden; border-radius: 18px; }
 .grove-stage { position: relative; }
 .grove-stage canvas { display: block; image-rendering: pixelated; }
-.plank { position: absolute; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; padding: 4px 10px 5px; border: 0; border-radius: 0; background: #E9D6A8;
-  box-shadow: inset 0 -2px 0 #CDB884, 0 0 0 2px #C08324; white-space: nowrap; pointer-events: none; }
+.plank { position: absolute; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; padding: 4px 10px 5px; border: 0; border-radius: 0; background: var(--plank);
+  box-shadow: inset 0 -2px 0 var(--plank-edge), 0 0 0 2px var(--plank-ring); white-space: nowrap; pointer-events: none; }
 /* A named topic's sign is a button that picks out its tree, outlined in amber while it is picked out (as in the Forest view). */
 button.plank { pointer-events: auto; }
-button.plank:hover { background: #F3E3BC; }
-.plank.on { box-shadow: inset 0 -2px 0 #CDB884, 0 0 0 2px #E3A233; }
-.plank-title { max-width: 100%; overflow: hidden; text-overflow: ellipsis; font: 400 13px/16px var(--font-display); color: var(--ink); }
-.plank-meta { font: 600 12px/15px var(--font-body); color: var(--soft); font-variant-numeric: tabular-nums; }
+button.plank:hover { background: var(--plank-hover); }
+.plank.on { box-shadow: inset 0 -2px 0 var(--plank-edge), 0 0 0 2px var(--sun); }
+.plank-title { max-width: 100%; overflow: hidden; text-overflow: ellipsis; font: 400 13px/16px var(--font-display); color: var(--plank-ink); }
+.plank-meta { font: 600 12px/15px var(--font-body); color: var(--plank-soft); font-variant-numeric: tabular-nums; }
 /* Leaf buttons sit over their leaves for keyboard and screen-reader use; the pointer goes through to the canvas. */
 .leaf-button { position: absolute; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 6px; background: transparent; pointer-events: none; }
-.leaf-tag { position: absolute; z-index: 2; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 8px; background: #1C1C1D; color: #FFFFFF;
-  font-size: 12px; font-weight: 600; line-height: 1.3; white-space: nowrap; pointer-events: none; box-shadow: 0 6px 14px rgba(20, 20, 20, .2); font-variant-numeric: tabular-nums; }
-.leaf-tag-pct { color: #86D6AC; }
-.plant-plot { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding: 0 4px 32px; border: 2px dashed rgba(20, 20, 20, .25);
-  border-radius: 14px; background: rgba(255, 255, 255, .35); font: 400 13px/16px var(--font-display); color: var(--soft); white-space: nowrap; }
-.plant-plot:hover { background: rgba(255, 255, 255, .6); }
+.leaf-tag { position: absolute; z-index: 2; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 8px; background: var(--tip); color: var(--tip-text);
+  font-size: 12px; font-weight: 600; line-height: 1.3; white-space: nowrap; pointer-events: none; box-shadow: 0 6px 14px rgb(var(--shadow) / .2); font-variant-numeric: tabular-nums; }
+.leaf-tag-pct { color: var(--tag-accent); }
+.plant-plot { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding: 0 4px 32px; border: 2px dashed var(--dash);
+  border-radius: 14px; background: var(--plot); font: 400 13px/16px var(--font-display); color: var(--soft); white-space: nowrap; }
+.plant-plot:hover { background: var(--plot-hover); }
 .grove-empty { display: flex; justify-content: center; padding: 12px 6px 2px; }
 .grove-topic { margin-top: 12px; padding: 10px 12px; border-radius: 16px; background: var(--inset); animation: sgRise var(--dur-enter) var(--ease-enter) both; }
 </style>

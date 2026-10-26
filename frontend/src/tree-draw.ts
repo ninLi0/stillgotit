@@ -4,6 +4,7 @@
 // `need` tips, because every skill needs a tip for its leaf (spare tips stay open buds). Everything is in cells, with
 // the trunk's foot at y = 0 and the tree growing upward into negative y, inside a box `w` cells wide.
 import { SPRITES, PAL, hash, rng, type Stage } from "./pixel-art.ts";
+import { sceneColor } from "./scene-palette.ts";
 import type { BranchShape, ColumnShape, ConiferShape, CrownColors, PalmShape, Range, TreeKind } from "./tree-kinds.ts";
 
 /** A trunk or branch piece: [x1, y1, x2, y2, thickness in cells]. */
@@ -284,16 +285,15 @@ export type Paint = { cell: (x: number, y: number, color: string) => void; rect:
  * Paints a placed tree: the crown pieces behind the wood, the trunk and branches, the crown pieces in front, a green
  * pocket behind each leaf when the kind has one, and the open buds on spare tips. `leaves` are the leaf sprites'
  * centres; the caller paints the sprites themselves afterwards. `random` gives the crown its ragged edges and
- * speckles and is seeded by the caller, so the tree looks the same each time it is drawn. `tone` maps each color, for
- * the Forest view's dimmed trees, and `widen` adds a cell to every limb thicker than two cells, for its larger trees.
+ * speckles and is seeded by the caller, so the tree looks the same each time it is drawn.
+ * `widen` adds a cell to every limb thicker than two cells, for the Forest view's larger trees.
  */
 export function paintTree({ cell }: Paint, tree: { segs: readonly Segment[]; crown: readonly CrownPart[]; buds: readonly (readonly [number, number])[];
   leaves?: readonly (readonly [number, number])[] }, kind: TreeKind, random: () => number,
-  { tone = (color: string) => color, widen = false }: { tone?: (color: string) => string; widen?: boolean } = {}) {
-  const colors = (set: Omit<CrownColors, "pocket">) => ({ shadow: tone(set.shadow), base: tone(set.base), speckle: tone(set.speckle), light: tone(set.light),
-    accent: set.accent ? tone(set.accent) : undefined, accentRate: set.accentRate ?? 0 });
+  { widen = false }: { widen?: boolean } = {}) {
+  const colors = (set: Omit<CrownColors, "pocket">) => ({ shadow: set.shadow, base: set.base, speckle: set.speckle, light: set.light, accent: set.accent, accentRate: set.accentRate ?? 0 });
   const C = colors(kind.crown), P = kind.crown.pocket ? colors(kind.crown.pocket) : undefined;
-  const B = { main: tone(kind.bark.main), shade: tone(kind.bark.shade), twig: tone(kind.bark.twig), mark: kind.bark.mark ? tone(kind.bark.mark) : undefined };
+  const B = { main: kind.bark.main, shade: kind.bark.shade, twig: kind.bark.twig, mark: kind.bark.mark };
   const fill = (lower: boolean, lit: boolean, set = C) => lower ? set.shadow : lit ? set.light
     : set.accent && random() < set.accentRate ? set.accent : random() < 0.12 ? set.speckle : set.base;
   const blob = (x: number, y: number, r: number, set = C) => {
@@ -394,7 +394,8 @@ export function evenTips(tips: readonly [number, number][], count: number): [num
 
 /**
  * Draws a small square preview of `kind` for the tree picker: two sky bands, a strip of grass and soil, and the tree
- * with one sample leaf for each of `stages`, in 2 px cells (as in the sign-in page's sample grove).
+ * with one sample leaf for each of `stages`, in 2 px cells (as in the sign-in page's sample grove). Every color is
+ * painted through the theme (scene-palette.ts), so the preview shows the tree by night in the dark theme.
  */
 export function drawTreePreview(canvas: HTMLCanvasElement, kind: TreeKind, size: number, dpr: number, stages: readonly Stage[]) {
   const unit = 2, cells = Math.floor(size / unit), ground = cells - 7, px = unit * dpr;
@@ -405,7 +406,7 @@ export function drawTreePreview(canvas: HTMLCanvasElement, kind: TreeKind, size:
   ctx.imageSmoothingEnabled = false;
   const rect = (x: number, y: number, w: number, h: number, color: string) => {
     const left = Math.round(x * px), top = Math.round(y * px);
-    ctx.fillStyle = color; ctx.fillRect(left, top, Math.round((x + w) * px) - left, Math.round((y + h) * px) - top);
+    ctx.fillStyle = sceneColor(color); ctx.fillRect(left, top, Math.round((x + w) * px) - left, Math.round((y + h) * px) - top);
   };
   const cell = (x: number, y: number, color: string) => rect(Math.round(x), Math.round(y), 1, 1, color);
   rect(0, 0, cells, Math.ceil(ground / 2), "#DEECF3"); rect(0, Math.ceil(ground / 2), cells, ground - Math.ceil(ground / 2), "#E5F0F5");

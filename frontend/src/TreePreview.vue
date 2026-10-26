@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import type { Stage } from "./pixel-art.ts";
 import { drawTreePreview } from "./tree-draw.ts";
 import type { TreeKind } from "./tree-kinds.ts";
+import { currentTheme } from "./theme.ts";
 
 // A small drawn picture of one tree kind on a strip of grass, for the tree picker and the topic's tree. It is
 // decoration: the kind's name always sits next to it. `leaves` are sample leaf stages to hang on the tree.
@@ -15,6 +16,8 @@ function draw() {
 }
 onMounted(draw);
 watch(() => [props.kind, props.size, props.leaves], draw, { flush: "post" });
+// The preview is drawn by day or by night, so it draws again when the theme changes.
+watch(currentTheme, draw, { flush: "post" });
 </script>
 
 <template>

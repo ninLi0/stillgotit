@@ -59,8 +59,8 @@ defineExpose({ open });
 
 <style scoped>
 /* The app's dialog: white, 22 px corners, a soft shadow over a dimmed page; style.css scales it in as it opens. */
-.source-preview { border: 0; border-radius: 22px; padding: 20px 22px 22px; width: min(960px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow-y: auto; box-shadow: 0 20px 50px rgba(0, 0, 0, .18); color: var(--ink); background: #FFFFFF; }
-.source-preview::backdrop { background: rgba(21, 21, 21, .35); }
+.source-preview { border: 0; border-radius: 22px; padding: 20px 22px 22px; width: min(960px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow-y: auto; box-shadow: 0 20px 50px rgb(var(--shadow) / .18); color: var(--ink); background: var(--card); }
+.source-preview::backdrop { background: var(--backdrop); }
 .preview-head { display: flex; align-items: flex-start; gap: 8px 16px; flex-wrap: wrap; margin-bottom: 14px; }
 .preview-heading { flex: 1; min-width: 200px; }
 .preview-heading .eyebrow { margin-bottom: 4px; }

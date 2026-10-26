@@ -547,23 +547,23 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
 </template>
 
 <style scoped>
-.learn{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 312px;height:calc(100dvh - 28px);min-height:560px;background:#FFFFFF}
+.learn{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 312px;height:calc(100dvh - 28px);min-height:560px;background:var(--card)}
 .learn.narrow{grid-template-columns:minmax(0,1fr)}
 .learn-main{display:flex;flex-direction:column;min-width:0;min-height:0}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
 /* Header */
-.learn-head{padding:18px 28px 0;background:#FFFFFF;border-bottom:1px solid #ECEAF3}
+.learn-head{padding:18px 28px 0;background:var(--card);border-bottom:1px solid var(--lesson-head-line)}
 .head-row{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
 .head-title{display:flex;align-items:center;gap:14px;min-width:240px;flex:1}
-.sprite-tile{flex:none;width:52px;height:52px;border-radius:14px;background:var(--dawn-soft);display:grid;place-items:center;box-shadow:inset 0 -3px 0 #E2DEF6}
-.sprite-tile.green{background:#EAF7EE;box-shadow:none}
+.sprite-tile{flex:none;width:52px;height:52px;border-radius:14px;background:var(--dawn-soft);display:grid;place-items:center;box-shadow:inset 0 -3px 0 var(--lesson-tile-edge)}
+.sprite-tile.green{background:var(--meadow-tile);box-shadow:none}
 .title-block{min-width:0}
-.back-link{white-space:nowrap;border:0;background:none;padding:0;font-size:12px;font-weight:600;color:#6B6490;margin-bottom:2px}
+.back-link{white-space:nowrap;border:0;background:none;padding:0;font-size:12px;font-weight:600;color:var(--lesson-back);margin-bottom:2px}
 .back-link:hover{color:var(--ink)}
 .learn-head h1{margin:0;font-family:var(--font-display);font-weight:400;font-size:26px;line-height:1.3;text-wrap:balance;overflow-wrap:anywhere}
 .head-actions{display:flex;align-items:center;gap:10px;flex:none}
-.mastery-chip{display:flex;flex-direction:column;align-items:flex-start;gap:5px;border:1px solid #E6E3F2;border-radius:12px;background:#FFFFFF;padding:7px 12px;min-width:76px;color:var(--ink)}
-button.mastery-chip:hover{border-color:#C9C1F0}
+.mastery-chip{display:flex;flex-direction:column;align-items:flex-start;gap:5px;border:1px solid var(--lesson-chip-line);border-radius:12px;background:var(--card);padding:7px 12px;min-width:76px;color:var(--ink)}
+button.mastery-chip:hover{border-color:var(--lesson-chip-hover)}
 .mastery-chip :deep(.mastery-cells){width:63px}
 .chip-top{display:flex;align-items:baseline;gap:6px}
 .chip-top strong{font-size:16px;font-variant-numeric:tabular-nums}
@@ -575,21 +575,21 @@ button.mastery-chip:hover{border-color:#C9C1F0}
 .tab:hover:not(:disabled){color:var(--ink)}
 .tab.chosen{font-weight:700;color:var(--ink)}
 /* The 3px line under the chosen tab, or under "+ New conversation" when that is chosen. */
-.tab-line{position:absolute;left:0;top:0;height:3px;background:#8A7EE0;pointer-events:none}
+.tab-line{position:absolute;left:0;top:0;height:3px;background:var(--dawn-edge);pointer-events:none}
 .tab-line.sliding{transition:transform var(--dur-move) var(--ease-move),width var(--dur-move) var(--ease-move)}
 .tab-square{width:8px;height:8px;flex:none}
-.tab-square.lesson{background:#2F7D9B}
-.tab-square.practice{background:#E3A233}
+.tab-square.lesson{background:var(--mark-lesson)}
+.tab-square.practice{background:var(--mark-practice)}
 .tab-meta{font-size:12px;font-weight:500;color:var(--faint)}
 .tab-done{font-size:11px;font-weight:800;color:var(--strong)}
-.new-lesson{font-weight:700;color:#4B3FA8}
-.new-lesson:hover:not(:disabled){color:var(--dawn-text)}
+.new-lesson{font-weight:700;color:var(--lesson-new)}
+.new-lesson:hover:not(:disabled){color:var(--lesson-new-hover)}
 /* Thread */
 /* The thread scrolls inside thread-wrap, which also holds the "Jump to latest" pill over its bottom edge. */
 .thread-wrap{position:relative;flex:1;min-height:0;display:flex;flex-direction:column}
-.chat-thread{flex:1;min-height:0;overflow-y:auto;background:#FFFFFF}
+.chat-thread{flex:1;min-height:0;overflow-y:auto;background:var(--card)}
 .jump-wrap{position:absolute;left:0;right:0;bottom:14px;z-index:5;display:flex;justify-content:center;pointer-events:none}
-.jump-latest{pointer-events:auto;display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:0 14px;border:0;border-radius:999px;background:#FFFFFF;color:var(--dawn-soft-text);font-size:13px;font-weight:700;box-shadow:0 0 0 1px var(--ring),0 8px 24px rgba(20,20,20,.07);animation:sgRise var(--dur-enter) var(--ease-enter) both}
+.jump-latest{pointer-events:auto;display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:0 14px;border:0;border-radius:999px;background:var(--card);color:var(--dawn-soft-text);font-size:13px;font-weight:700;box-shadow:0 0 0 1px var(--ring),0 8px 24px rgb(var(--shadow) / .07);animation:sgRise var(--dur-enter) var(--ease-enter) both}
 .jump-latest:hover{background:var(--dawn-soft)}
 .thread-inner{max-width:760px;margin:0 auto;padding:30px 32px 24px}
 .confidence-note{border:1px solid var(--line);padding:16px 20px;border-radius:16px;margin-bottom:24px;background:var(--inset)}
@@ -603,8 +603,8 @@ button.mastery-chip:hover{border-color:#C9C1F0}
 .chat-welcome h2{margin:12px 0 10px;font-family:var(--font-display);font-weight:400;font-size:34px;line-height:1.2;letter-spacing:0}
 .chat-welcome p{margin:0;font-size:15px;color:var(--muted);line-height:1.7}
 .prompt-choices{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:24px}
-.prompt-choices button{border:1px solid var(--line);border-radius:999px;background:#FFFFFF;padding:10px 16px;font-size:13px;color:var(--ink)}
-.prompt-choices button:hover:not(:disabled){border-color:rgba(20,20,20,.35)}
+.prompt-choices button{border:1px solid var(--line);border-radius:999px;background:var(--card);padding:10px 16px;font-size:13px;color:var(--ink)}
+.prompt-choices button:hover:not(:disabled){border-color:var(--line-strong)}
 .message{margin:0 0 28px;max-width:100%;font-size:15px}
 /* The learner's messages are compact bubbles on the right; the tutor's replies run the full width with no bubble. */
 .from-you{margin-left:auto;margin-bottom:24px;width:fit-content;max-width:70%;padding:10px 15px;background:var(--dawn-soft);border-radius:18px 18px 4px 18px}
@@ -613,7 +613,7 @@ button.mastery-chip:hover{border-color:#C9C1F0}
 .speaker{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--ink)}
 .avatar{flex:none;display:grid;place-items:center;width:28px;height:28px;border-radius:9px;background:var(--dawn-soft)}
 /* The opening is a card, and a labelled rule separates it from the dialogue that follows. */
-.opening-card{margin-bottom:24px;padding:18px 22px 14px;border-radius:18px;background:#FFFFFF;box-shadow:0 0 0 1px var(--ring)}
+.opening-card{margin-bottom:24px;padding:18px 22px 14px;border-radius:18px;background:var(--card);box-shadow:0 0 0 1px var(--ring)}
 .thread-divider{display:flex;align-items:center;gap:12px;margin:0 0 26px;font-family:var(--font-display);font-size:11px;font-weight:500;line-height:1.3;text-transform:uppercase;letter-spacing:1px;color:var(--faint)}
 .thread-divider::before,.thread-divider::after{content:"";flex:1;height:1px;background:var(--card-border)}
 /* Under each tutor answer: the meta line, then Copy and Listen, shown on hover or focus and always under the latest answer. */
@@ -626,31 +626,31 @@ button.mastery-chip:hover{border-color:#C9C1F0}
 .reply-retry{min-height:32px;padding:0 12px;font-size:13px}
 .tag{padding:1px 8px;border-radius:999px;background:var(--inset-2);color:var(--soft);font-size:11px;font-weight:700}
 .tag.hint-tag{background:var(--dawn-soft);color:var(--dawn-soft-text)}
-.tag.task{background:#4A775A;color:#FFFFFF}
-.you-tag{display:inline-block;margin-bottom:6px;background:#FFFFFF;color:var(--dawn-soft-text)}
+.tag.task{background:var(--task-tag);color:var(--on-fill)}
+.you-tag{display:inline-block;margin-bottom:6px;background:var(--card);color:var(--dawn-soft-text)}
 .prose{overflow-wrap:anywhere;line-height:1.8;font-size:15px;margin:0}
 .from-you .prose{line-height:1.6}
 .tutor-label{margin:8px 0 0;font-size:11px;color:var(--faint)}
-.attachment-label{display:inline-flex;align-items:center;gap:8px;margin:10px 0 0;padding:4px 10px 4px 4px;border-radius:8px;background:#FFFFFF;font-size:12px;color:var(--soft)}
+.attachment-label{display:inline-flex;align-items:center;gap:8px;margin:10px 0 0;padding:4px 10px 4px 4px;border-radius:8px;background:var(--card);font-size:12px;color:var(--soft)}
 .attach-thumb{width:26px;height:26px;border-radius:5px;background:var(--inset);flex:none}
 .message-action{border:0;background:transparent;color:var(--muted);padding:5px 0;font-size:12px;text-decoration:underline;text-underline-offset:4px}
 .review-step{margin:6px 0 20px}
 .attempt-review,.assessment{margin:14px 0 20px;padding:20px 22px;border-radius:16px;border:1px solid var(--line)}
 .attempt-review{background:var(--inset)}
-.assessment{background:#FFFFFF;box-shadow:0 8px 24px rgba(20,20,20,.07)}
+.assessment{background:var(--card);box-shadow:0 8px 24px rgb(var(--shadow) / .07)}
 .review-title{display:flex;align-items:center;gap:6px;margin:0 0 8px}
 .review-title h3{margin:0;font-family:var(--font-display);font-weight:400;font-size:21px}
 .check{position:relative;display:flex;align-items:center;gap:10px;padding:8px 0;margin:0;font-size:14px;font-weight:400;cursor:pointer}
 .check input{position:absolute;opacity:0;width:18px;height:18px;min-height:0;margin:0;left:0}
-.check .box{width:18px;height:18px;flex:none;border-radius:5px;border:1.5px solid #BDBDB8;background:#FFFFFF;display:grid;place-items:center}
+.check .box{width:18px;height:18px;flex:none;border-radius:5px;border:1.5px solid var(--check-line);background:var(--field);display:grid;place-items:center}
 .check input:checked+.box{background:var(--dawn-edge);border-color:var(--dawn-edge)}
-.check input:checked+.box::after{content:"✓";color:#FFFFFF;font-size:12px;font-weight:800;line-height:1}
+.check input:checked+.box::after{content:"✓";color:var(--on-fill);font-size:12px;font-weight:800;line-height:1}
 .check input:focus-visible+.box{outline:2px solid var(--ink);outline-offset:2px}
 .assess-row{display:flex;align-items:center;gap:14px;margin-top:12px}
 .assess-row .primary{min-height:44px;padding:0 20px;font-size:14px}
 .transcript{margin:14px 0}
 .transcript label{font-size:13px;font-weight:700}
-.transcript textarea,.assessment textarea,.assessment select{width:100%;padding:10px;border:1px solid var(--ring);border-radius:10px;font:inherit;background:#FFFFFF}
+.transcript textarea,.assessment textarea,.assessment select{width:100%;padding:10px;border:1px solid var(--ring);border-radius:10px;font:inherit;background:var(--field)}
 .result-top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
 .result-top .eyebrow{margin:0 0 4px;font-size:12px}
 .result-top h3{margin:0;font-family:var(--font-display);font-weight:400;font-size:24px;color:var(--ink)}
@@ -668,17 +668,17 @@ button.mastery-chip:hover{border-color:#C9C1F0}
 .regrade label{margin-top:14px}
 .working{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
 /* Composer */
-.composer-area{padding:12px 32px 16px;background:#FFFFFF}
+.composer-area{padding:12px 32px 16px;background:var(--card)}
 .composer-inner{max-width:760px;margin:0 auto}
-.composer{border:1px solid var(--line);border-radius:22px;padding:10px 14px 10px 18px;background:#FFFFFF;box-shadow:0 1px 2px rgba(20,20,20,.05),0 10px 30px rgba(20,20,20,.08)}
+.composer{border:1px solid var(--line);border-radius:22px;padding:10px 14px 10px 18px;background:var(--card);box-shadow:0 1px 2px rgb(var(--shadow) / .05),0 10px 30px rgb(var(--shadow) / .08)}
 .composer:focus-within{border-color:var(--dawn-edge)}
 .composer textarea{border:0;outline:none;width:100%;resize:none;overflow-y:auto;min-height:52px;max-height:calc(6 * 1.6em + 8px);padding:4px 0;font-family:inherit;font-size:15px;line-height:1.6;background:transparent;color:var(--ink);box-shadow:none}
 .composer-tools{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .input-tools{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
 .composer-right{display:flex;align-items:center;gap:6px}
 .note-info :deep(.info-bubble){left:auto;right:0;top:auto;bottom:calc(100% + 6px)}
-.tool-pill{display:flex;align-items:center;gap:6px;margin:0;border:1px solid var(--line);border-radius:999px;background:#FFFFFF;padding:5px 12px;min-height:30px;font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap;cursor:pointer}
-.tool-pill:hover:not(:disabled){border-color:rgba(20,20,20,.35);color:var(--ink)}
+.tool-pill{display:flex;align-items:center;gap:6px;margin:0;border:1px solid var(--line);border-radius:999px;background:var(--card);padding:5px 12px;min-height:30px;font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap;cursor:pointer}
+.tool-pill:hover:not(:disabled){border-color:var(--line-strong);color:var(--ink)}
 /* The tutor model and thinking level the next answer will use, as a quiet pill among the tools. It opens the Tutor
    panel in Settings. Phones show the model alone; the level stays in its name and tooltip. */
 .tutor-pick{display:flex;align-items:center;gap:4px;margin:0;border:0;border-radius:999px;background:transparent;padding:5px 8px 5px 10px;min-height:30px;font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap}
@@ -695,7 +695,7 @@ button.mastery-chip:hover{border-color:#C9C1F0}
 /* While a message is on its way the button keeps its dawn colors and shows a ring that turns once a beat on the loop
    curve: a dawn-text arc on a faint track. With reduced motion the ring stands still. */
 .send-button.waiting:disabled{background:var(--dawn);color:var(--dawn-text);box-shadow:0 3px 0 var(--dawn-edge);cursor:progress}
-.send-ring{width:18px;height:18px;border-radius:50%;border:2.5px solid rgba(33,24,90,.22);border-top-color:var(--dawn-text);animation:sgSpin var(--loop-beat) var(--ease-loop) infinite}
+.send-ring{width:18px;height:18px;border-radius:50%;border:2.5px solid color-mix(in srgb, var(--dawn-text) 22%, transparent);border-top-color:var(--dawn-text);animation:sgSpin var(--loop-beat) var(--ease-loop) infinite}
 .composer-note{margin:8px 0 0;text-align:center;font-size:12px;color:var(--coral-text)}
 .is-recording{border-color:var(--coral)}
 .attachment-list{display:flex;flex-wrap:wrap;gap:6px;list-style:none;margin:2px 0 8px;padding:0}
@@ -707,20 +707,20 @@ button.mastery-chip:hover{border-color:#C9C1F0}
 .finished-message{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:15px;font-size:13px;color:var(--muted)}
 .finished-message .secondary{min-height:38px;font-size:13px}
 /* Rail */
-.rail{border-left:1px solid #EEEAF7;background:#FAF9FE;overflow-y:auto;overflow-x:hidden;padding:16px 14px;display:flex;flex-direction:column;gap:10px;min-height:0}
+.rail{border-left:1px solid var(--lesson-rail-edge);background:var(--lesson-rail);overflow-y:auto;overflow-x:hidden;padding:16px 14px;display:flex;flex-direction:column;gap:10px;min-height:0}
 /* On narrow screens the rail slides in over the lesson on the move curve and its backdrop fades in. Where the browser
    can keep a hidden element drawn while it transitions (transition-behavior: allow-discrete), both also leave the same
    way; elsewhere they disappear at once. These rules name the rail as the lesson's own child (.narrow > .rail): the
    Taught from list's root also has the class "rail" and this component's scope, and must not become a second overlay. */
-.narrow>.rail{position:absolute;top:0;right:0;bottom:0;width:312px;max-width:100%;z-index:20;box-shadow:-12px 0 32px rgba(20,20,20,.12);animation:sgSlide var(--dur-move) var(--ease-move);transition:transform var(--dur-move) var(--ease-move),opacity var(--dur-move) var(--ease-move),display var(--dur-move) allow-discrete}
+.narrow>.rail{position:absolute;top:0;right:0;bottom:0;width:312px;max-width:100%;z-index:20;box-shadow:-12px 0 32px rgb(var(--shadow) / .12);animation:sgSlide var(--dur-move) var(--ease-move);transition:transform var(--dur-move) var(--ease-move),opacity var(--dur-move) var(--ease-move),display var(--dur-move) allow-discrete}
 .rail[hidden]{display:none}
 .narrow>.rail[hidden]{transform:translateX(24px);opacity:0}
-.rail-backdrop{position:absolute;inset:0;z-index:19;background:rgba(21,21,21,.28);animation:sgFade var(--dur-move) var(--ease-move);transition:opacity var(--dur-move) var(--ease-move),display var(--dur-move) allow-discrete}
+.rail-backdrop{position:absolute;inset:0;z-index:19;background:var(--rail-shade);animation:sgFade var(--dur-move) var(--ease-move);transition:opacity var(--dur-move) var(--ease-move),display var(--dur-move) allow-discrete}
 .rail-backdrop[hidden]{display:none;opacity:0;pointer-events:none}
-.rail-close{position:sticky;top:-16px;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:8px;margin:-16px -14px 0;padding:12px 12px 8px 16px;background:#FAF9FE}
+.rail-close{position:sticky;top:-16px;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:8px;margin:-16px -14px 0;padding:12px 12px 8px 16px;background:var(--lesson-rail)}
 .rail-title{font:400 15px var(--font-display);color:var(--ink)}
-.rail-x{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;padding:0;border:0;border-radius:10px;background:#EEEAF7;color:var(--ink);font-size:15px;line-height:1}
-.rail-x:hover{background:#E2DEF6}
+.rail-x{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;padding:0;border:0;border-radius:10px;background:var(--lesson-rail-edge);color:var(--ink);font-size:15px;line-height:1}
+.rail-x:hover{background:var(--lesson-tile-edge)}
 .message.pending{opacity:.85}
 .sending{margin:4px 0 0;font-size:11px;font-weight:600;color:var(--muted)}
 .thinking .dots{display:inline-flex;gap:3px;font-size:22px;line-height:1;color:var(--muted)}
@@ -728,9 +728,9 @@ button.mastery-chip:hover{border-color:#C9C1F0}
 /* The three dots rise and brighten one after another, a sixth of a beat apart. */
 .thinking .dots span{animation:sgDot var(--loop-beat) var(--ease-loop) infinite}.thinking .dots span:nth-child(2){animation-delay:calc(var(--loop-beat) / 6)}.thinking .dots span:nth-child(3){animation-delay:calc(var(--loop-beat) / 3)}
 @media (prefers-reduced-motion:reduce){.thinking .dots span{opacity:.6}}
-.rail-card{background:#FFFFFF;border-radius:18px;padding:16px;box-shadow:0 0 0 1px #ECE9F5;flex:none}
+.rail-card{background:var(--card);border-radius:18px;padding:16px;box-shadow:0 0 0 1px var(--lesson-card-ring);flex:none}
 .rail-card.goal{display:flex;flex-direction:column;gap:6px}
-.rail-eyebrow{color:#777094;white-space:nowrap}
+.rail-eyebrow{color:var(--estimate-eyebrow);white-space:nowrap}
 .rail-head{display:flex;align-items:center;justify-content:space-between}
 .rail-head :deep(.info-bubble){left:auto;right:0}
 .mastery-row{display:flex;align-items:center;gap:12px;margin-top:10px}
@@ -739,7 +739,7 @@ button.mastery-chip:hover{border-color:#C9C1F0}
 .mastery-figure :deep(.mastery-cells){max-width:none}
 .goal-text{margin:0;font-size:14px;line-height:1.55}
 .gate-text{margin:0;font-size:13px;line-height:1.55;color:var(--soft)}
-.divider{height:1px;background:#EEEBF5;margin:8px 0}
+.divider{height:1px;background:var(--lesson-divider);margin:8px 0}
 .rail-empty{margin:8px 0 0;font-size:12px}
 @media(max-width:900px){.learn-head{padding:14px 18px 0}.thread-inner{padding:22px 18px 18px}.composer-area{padding:10px 18px 14px}}
 @media(max-width:650px){.learn{height:calc(100dvh - 20px);min-height:520px}.head-title{min-width:0}.learn-head h1{font-size:22px}.sprite-tile{width:44px;height:44px}.heading-action .primary{min-height:42px;padding:0 12px;font-size:13px;white-space:normal}.from-you{max-width:85%}.opening-card{padding:16px 16px 12px}.prose{font-size:14px}.confidence{flex-wrap:wrap}.chat-welcome h2{font-size:29px}}

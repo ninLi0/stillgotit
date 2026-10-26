@@ -9,6 +9,8 @@ import { cloudPlaces, drawLand, drawSky, hitForest, layoutForest, plotX, type Fo
 import { focusedControl } from "./focus.ts";
 import { rng, stageOf, type Stage } from "./pixel-art.ts";
 import { cloudDrift, cloudRects, snapStyle, sprite, type Sprite } from "./scene-motion.ts";
+import { scatterStars } from "./scene-palette.ts";
+import { currentTheme } from "./theme.ts";
 import type { ForestProps, ViewSkill, ViewUnit } from "./revamp-types.ts";
 import { averageEstimate } from "../../src/computations/course-score.ts";
 
@@ -138,7 +140,7 @@ function paintSky() {
   const L = layout.value, target = sky.value;
   if (!L || !target) return;
   const ctx = prepare(target, L);
-  if (ctx) drawSky(ctx, L, cellPx.value);
+  if (ctx) { drawSky(ctx, L, cellPx.value); scatterStars(ctx, cellPx.value, L.Wc, L.G, 11); }
 }
 function paintLand() {
   const L = layout.value, target = canvas.value;
@@ -156,6 +158,7 @@ watch(layout, () => {
 }, { flush: "post" });
 // A changed estimate or due flag keeps the same layout but changes the sprites.
 watch(() => props.units, paintAll, { deep: true, flush: "post" });
+watch(currentTheme, paintAll, { flush: "post" });
 watch([() => props.selected, hover, topic], paintLand, { flush: "post" });
 
 function measure() {
@@ -329,7 +332,7 @@ onUnmounted(() => {
                 <PixelIcon name="tree" :size="24" />
                 <span class="topic-main">
                   <strong class="topic-name">{{ t.title }}</strong>
-                  <MasteryCells class="topic-cells" :value="t.avg" :cells="14" :height="5" off="#F1F1EE" />
+                  <MasteryCells class="topic-cells" :value="t.avg" :cells="14" :height="5" off="var(--mastery-off-soft)" />
                 </span>
                 <span class="topic-figures">
                   <span class="topic-pct">{{ t.avg === null ? "New" : `${t.avg}%` }}</span><span class="topic-count">{{ plural(t.skills.length, "skill") }}</span>
@@ -358,7 +361,7 @@ onUnmounted(() => {
 
 <style scoped>
 /* The forest opens like the app's dialogs, with a short scale and fade. */
-.forest { position: fixed; inset: 0; z-index: 55; display: flex; flex-direction: column; gap: 12px; padding: 14px; background: #FFFFFF; color: var(--ink); font-family: var(--font-body); overflow-y: auto; overscroll-behavior: contain; animation: sgOpen var(--dur-enter) var(--ease-enter); }
+.forest { position: fixed; inset: 0; z-index: 55; display: flex; flex-direction: column; gap: 12px; padding: 14px; background: var(--ground); color: var(--ink); font-family: var(--font-body); overflow-y: auto; overscroll-behavior: contain; animation: sgOpen var(--dur-enter) var(--ease-enter); }
 .forest:focus { outline: none; }
 
 /* Header */
@@ -369,34 +372,34 @@ onUnmounted(() => {
 .forest-course { font-size: 12px; overflow-wrap: anywhere; }
 .forest-title { margin: 0; font-family: var(--font-display); font-size: 22px; font-weight: 500; line-height: 1.2; }
 .forest-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.forest-regrow { border: 0; border-radius: 12px; background: #FFFFFF; padding: 9px 14px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.forest-regrow { border: 0; border-radius: 12px; background: var(--card); padding: 9px 14px; font-size: 13px; font-weight: 600; white-space: nowrap; }
 .forest-regrow:hover { background: var(--inset-2); }
 .forest-back { min-height: 40px; padding: 0 16px; font-size: 14px; white-space: nowrap; }
 
 /* Body: canvas and aside */
 .forest-body { flex: 1 1 0; min-height: 360px; display: grid; grid-template-columns: minmax(0, 1fr) 340px; grid-template-rows: minmax(0, 1fr); gap: 14px; }
-.forest-scene { position: relative; min-height: 0; border-radius: 24px; overflow: hidden; background: #CFE3EE; box-shadow: 0 18px 25px rgba(20, 20, 20, .08); }
+.forest-scene { position: relative; min-height: 0; border-radius: 24px; overflow: hidden; background: var(--sky); box-shadow: 0 18px 25px rgb(var(--shadow) / .08); }
 .forest-scroll { position: absolute; inset: 0; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; }
 .forest-stage { position: relative; overflow: hidden; }
 .forest-sky, .forest-canvas { position: absolute; left: 0; top: 0; display: block; image-rendering: pixelated; }
 .forest-sky, .forest-clouds { pointer-events: none; }
 .forest-clouds { position: absolute; left: 0; top: 0; overflow: hidden; }
 .forest-canvas.pointing { cursor: pointer; }
-.forest-sign { position: absolute; z-index: 2; width: max-content; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 5px 12px 6px; border: 0; border-radius: 0; background: #E9D6A8; box-shadow: inset 0 -2px 0 #CDB884, 0 0 0 2px #C08324, 0 6px 0 -1px rgba(20, 20, 20, .12); text-align: center; }
-.forest-sign:hover { background: #F3E3BC; }
-.forest-sign.on { box-shadow: inset 0 -2px 0 #CDB884, 0 0 0 2px #E3A233, 0 6px 0 -1px rgba(20, 20, 20, .12); }
-.sign-title { display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; font-family: var(--font-display); font-size: 15px; font-weight: 500; line-height: 1.2; color: var(--ink); }
-.sign-meta { font-size: 11px; font-weight: 600; color: var(--soft); white-space: nowrap; }
-.forest-tag { position: absolute; z-index: 4; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 10px; background: #263B2E; color: #FFFFFF; font-size: 12px; font-weight: 600; white-space: nowrap; pointer-events: none; box-shadow: 0 6px 14px rgba(20, 20, 20, .2); }
-.tag-pct { color: #86D6AC; }
-.forest-info { position: absolute; left: 12px; top: 10px; z-index: 5; display: inline-flex; border-radius: 10px; background: rgba(255, 255, 255, .9); }
+.forest-sign { position: absolute; z-index: 2; width: max-content; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 5px 12px 6px; border: 0; border-radius: 0; background: var(--plank); box-shadow: inset 0 -2px 0 var(--plank-edge), 0 0 0 2px var(--plank-ring), 0 6px 0 -1px rgb(var(--shadow) / .12); text-align: center; }
+.forest-sign:hover { background: var(--plank-hover); }
+.forest-sign.on { box-shadow: inset 0 -2px 0 var(--plank-edge), 0 0 0 2px var(--sun), 0 6px 0 -1px rgb(var(--shadow) / .12); }
+.sign-title { display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; font-family: var(--font-display); font-size: 15px; font-weight: 500; line-height: 1.2; color: var(--plank-ink); }
+.sign-meta { font-size: 11px; font-weight: 600; color: var(--plank-soft); white-space: nowrap; }
+.forest-tag { position: absolute; z-index: 4; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 10px; background: var(--forest-tag); color: var(--tip-text); font-size: 12px; font-weight: 600; white-space: nowrap; pointer-events: none; box-shadow: 0 6px 14px rgb(var(--shadow) / .2); }
+.tag-pct { color: var(--tag-accent); }
+.forest-info { position: absolute; left: 12px; top: 10px; z-index: 5; display: inline-flex; border-radius: 10px; background: var(--scene-chip); }
 
-.forest-aside { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 20px; border-radius: 24px; background: #FFFFFF; box-shadow: 0 18px 25px rgba(20, 20, 20, .07); }
+.forest-aside { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 20px; border-radius: 24px; background: var(--card); box-shadow: 0 18px 25px rgb(var(--shadow) / .07); }
 
 /* Selected skill */
 .forest-card { margin: -4px -4px 18px; padding: 16px; border-radius: 18px; background: var(--inset-2); animation: sgRise var(--dur-enter) var(--ease-enter); }
 .card-top { display: flex; align-items: center; gap: 12px; }
-.card-sprite { flex: none; display: grid; place-items: center; width: 48px; height: 48px; border-radius: 14px; background: #FFFFFF; }
+.card-sprite { flex: none; display: grid; place-items: center; width: 48px; height: 48px; border-radius: 14px; background: var(--card); }
 .card-names { min-width: 0; }
 .card-title { margin: 2px 0 0; font-family: var(--font-display); font-size: 20px; font-weight: 500; line-height: 1.2; overflow-wrap: anywhere; }
 .card-score { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; margin-top: 12px; }
@@ -424,7 +427,7 @@ onUnmounted(() => {
 .topic-figures { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; text-align: right; white-space: nowrap; }
 .topic-pct { font-size: 13px; font-weight: 700; line-height: 1.3; }
 .topic-count { font-size: 11px; line-height: 1.3; color: var(--muted); }
-.skill-list { display: flex; flex-direction: column; gap: 2px; margin: 2px 0 8px 20px; padding-left: 12px; border-left: 2px solid #DDDDD8; }
+.skill-list { display: flex; flex-direction: column; gap: 2px; margin: 2px 0 8px 20px; padding-left: 12px; border-left: 2px solid var(--branch); }
 .topic-tree-row { margin: 4px 0 6px 20px; padding: 8px 10px; border-radius: 14px; background: var(--inset); }
 .skill-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 8px; border: 0; border-radius: 10px; background: transparent; text-align: left; }
 .skill-row:hover { background: var(--inset); }
@@ -434,7 +437,7 @@ onUnmounted(() => {
 .skill-status.due { color: var(--coral-text); }
 .skill-status.new { color: var(--new-text); }
 
-.forest-plant { width: 100%; margin-top: 14px; padding: 12px; border: 2px dashed rgba(20, 20, 20, .25); border-radius: 14px; background: transparent; font-family: var(--font-display); font-size: 14px; color: var(--soft); }
+.forest-plant { width: 100%; margin-top: 14px; padding: 12px; border: 2px dashed var(--dash); border-radius: 14px; background: transparent; font-family: var(--font-display); font-size: 14px; color: var(--soft); }
 .forest-plant:hover { background: var(--inset); }
 
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }

@@ -139,19 +139,20 @@ onBeforeUnmount(() => { observer?.disconnect(); document.removeEventListener("po
 </template>
 
 <style scoped>
-/* Lines are 1px hairlines in the ring grey, the estimate is a 2px line, and markers carry a 2px white ring. */
+/* Lines are 1px hairlines in the ring grey, the estimate is a 2px line, and markers carry a 2px ring in the card color. */
 .estimate-chart{margin:4px 0 0}
 .chart-box{position:relative;width:100%}
 .chart-svg{display:block;overflow:visible}
 .rule{fill:var(--ring)}
 .tick,.day{font-size:11px;fill:var(--muted)}
 .now{font-size:12px;font-weight:700;fill:var(--ink)}
-.line{fill:none;stroke-width:2;stroke-linecap:square;stroke-linejoin:miter;animation:sgDraw var(--dur-draw) var(--ease-enter)}
+.line{fill:none;stroke:var(--mastery-on);stroke-width:2;stroke-linecap:square;stroke-linejoin:miter;animation:sgDraw var(--dur-draw) var(--ease-enter)}
 /* Markers and the value now fade in as the line reaches them; --arrive is that moment as a share of the draw. */
 .arrive{animation:sgFade var(--dur-quick) var(--ease-enter) calc(var(--dur-draw) * var(--arrive, 0)) both}
+.ring rect{fill:var(--card)}
 .marker.on .ring rect{fill:var(--dawn-soft)}
 .hit{position:absolute;padding:0;border:0;border-radius:4px;background:transparent;cursor:default}
-.tip{position:absolute;z-index:3;display:flex;flex-direction:column;gap:1px;width:max-content;max-width:180px;padding:7px 10px;border-radius:10px;background:#1C1C1D;color:#FFFFFF;font-size:12px;line-height:1.35;transform:translate(-50%,-100%);pointer-events:none;box-shadow:0 10px 24px rgba(0,0,0,.22)}
+.tip{position:absolute;z-index:3;display:flex;flex-direction:column;gap:1px;width:max-content;max-width:180px;padding:7px 10px;border-radius:10px;background:var(--tip);color:var(--tip-text);font-size:12px;line-height:1.35;transform:translate(-50%,-100%);pointer-events:none;box-shadow:0 10px 24px rgb(var(--shadow) / .22)}
 .tip.below{transform:translateX(-50%)}
 .tip strong{font-size:13px;font-weight:700}
 .tip-day{color:var(--ring)}
