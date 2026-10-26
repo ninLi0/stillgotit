@@ -7752,7 +7752,7 @@ then
 
 Authored path: `Progress.ActivateRoutine`.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 35.
-- Covered by [Progress reactions](../design/compositions/Progress.md), line 47.
+- Covered by [Progress reactions](../design/compositions/Progress.md), line 51.
 
 ```reaction
 when StudyPlanning.replan (owner, scope: course, workloadComplete: false, plan)
@@ -7825,7 +7825,7 @@ then
 ### Progress.RepairReadClosure
 
 Authored path: `Progress.RepairReadClosure`.
-- Covered by [Progress reactions](../design/compositions/Progress.md), line 67.
+- Covered by [Progress reactions](../design/compositions/Progress.md), line 71.
 
 ```reaction
 when any action is returned (action: "use", concept: "Sessioning", result: identity)
@@ -7845,7 +7845,7 @@ then
 
 Authored path: `Progress.RepairReadEvidence`.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 78.
-- Covered by [Progress reactions](../design/compositions/Progress.md), line 65.
+- Covered by [Progress reactions](../design/compositions/Progress.md), line 69.
 
 ```reaction
 when any action is returned (action: "use", concept: "Sessioning", result: identity)
@@ -7914,7 +7914,7 @@ then
 
 Authored path: `Progress.ReplanAfterFinish`.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 37.
-- Covered by [Progress reactions](../design/compositions/Progress.md), line 53.
+- Covered by [Progress reactions](../design/compositions/Progress.md), line 57.
 
 ```reaction
 when StudyPlanning.finish (owner)
@@ -7930,7 +7930,7 @@ then
 ### Progress.ReplanAfterMiss
 
 Authored path: `Progress.ReplanAfterMiss`.
-- Covered by [Progress reactions](../design/compositions/Progress.md), line 59.
+- Covered by [Progress reactions](../design/compositions/Progress.md), line 63.
 
 ```reaction
 when StudyPlanning.miss (item, owner)
@@ -7943,11 +7943,26 @@ then
   StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false)
 ```
 
+### Progress.ReplanAfterRestore
+
+Authored path: `Progress.ReplanAfterRestore`.
+- Covered by [Progress reactions](../design/compositions/Progress.md), line 47.
+
+```reaction
+when SkillMapping.restoreCourse (course, owner)
+where
+  view "(owner) can refresh routine reviews in (course)" with (course, owner)
+  no view "(owner) has an activity in progress" with (owner)
+  view "review inputs for (owner) in (course)" with (course, owner) has (basis, candidates, explanation, horizonEnd)
+then
+  StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false)
+```
+
 ### Progress.ReplanAfterStop
 
 Authored path: `Progress.ReplanAfterStop`.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 37.
-- Covered by [Progress reactions](../design/compositions/Progress.md), line 55.
+- Covered by [Progress reactions](../design/compositions/Progress.md), line 59.
 
 ```reaction
 when StudyPlanning.stop (owner)

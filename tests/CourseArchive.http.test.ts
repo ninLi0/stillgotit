@@ -13,18 +13,18 @@ const ORIGIN = "http://localhost:5173", cleanups: (() => Promise<void>)[] = [];
 afterAll(async () => { for (const cleanup of cleanups.reverse()) await cleanup(); });
 
 // A fixed instant keeps study dates stable: 11:00 in New York on 2026-11-02.
-const NOW = new Date("2026-11-02T16:00:00Z");
+const NOW = new Date("2026-11-02T16:00:00Z"), DAY = 86_400_000;
 const ARCHIVE_UNAVAILABLE = "Choose one of your active courses.", RESTORE_UNAVAILABLE = "Choose one of your archived courses.";
 const IN_PROGRESS = "Finish or stop the current activity in this course before archiving it.";
 
-async function setup() {
+async function setup(clock: () => Date = () => NOW) {
   const connection = await connectMongo({ uri: process.env.MONGODB_TEST_URI ?? localMongoUri, database: `stillgotit_test_${crypto.randomUUID().replaceAll("-", "")}` });
   const provider = new MemoryProvider(), owners: string[] = [];
   const tutor: Pick<CourseTutor, "generate" | "suggest"> = {
     suggest: async () => { throw new Error("These tests request no suggestions."); },
     generate: async () => { throw new Error("These tests make no tutor requests."); },
   };
-  const runtime = await createRuntime({ database: connection.db, provider, providerOrigin: "https://commons.example", publicOrigin: ORIGIN, tutor, clock: () => NOW });
+  const runtime = await createRuntime({ database: connection.db, provider, providerOrigin: "https://commons.example", publicOrigin: ORIGIN, tutor, clock });
   cleanups.push(async () => {
     await runtime.gateway.beginDrain(); await connection.db.dropDatabase(); await connection.client.close();
     for (const owner of owners) await rm(resolve(".data/files", createHash("sha256").update(owner).digest("hex")), { recursive: true, force: true });
@@ -188,3 +188,36 @@ test("finishing or stopping an activity refreshes the plans of active courses an
   const plans = await app.runtime.application.concepts.StudyPlanning._plans({ owner: cy.user, scope: setAside.course });
   expect(plans.filter((row) => row.status === "PROPOSED")).toEqual([]);
 }, 90_000);
+
+test("restoring a course with a study budget proposes its reviews again, and a course without one gets no plan", async () => {
+  let now = NOW;
+  const app = await setup(() => now), dee = await app.learner("archive-dee");
+  const planned = await dee.course("Statics", ["Forces", "Moments"]), unplanned = await dee.course("Optics", ["Lenses"]);
+  const { StudyPlanning } = app.runtime.application.concepts;
+  const madeOn = async (plan: string) => (await StudyPlanning._plan({ plan: plan as never }))[0]!.inputs.today;
+  await dee.ok("/learning/confidence", { skill: planned.skills[0], confidence: 40 });
+  await dee.ok("/planning/configure", { course: planned.course, dailyMinutes: 30 });
+  const old = (await dee.plan(planned.course)).plan!.plan;
+  expect(await madeOn(old)).toBe("2026-11-02");
+  await dee.ok("/courses/archive", { course: planned.course });
+  await dee.ok("/courses/archive", { course: unplanned.course });
+
+  // A day passes while the course is set aside. Nothing refreshes its plan, which still starts on the day it was made.
+  now = new Date(NOW.getTime() + DAY);
+  expect((await dee.plan(planned.course)).plan!.plan).toBe(old);
+
+  // Restoring it proposes its reviews from the new day, and the routine proposal replaces the old plan.
+  expect(await dee.ok("/courses/restore", { course: planned.course })).toEqual({});
+  const fresh = (await dee.plan(planned.course)).plan!.plan;
+  expect(fresh).not.toBe(old);
+  expect(await madeOn(fresh)).toBe("2026-11-03");
+  const plans = await StudyPlanning._plans({ owner: dee.user, scope: planned.course });
+  const status = (plan: string) => plans.find((row) => row.plan === plan)?.status;
+  expect(plans).toHaveLength(2);
+  expect([status(old), status(fresh)]).toEqual(["SUPERSEDED", "ACTIVE"]);
+
+  // A course with no study budget has nothing to plan, so restoring it makes no proposal.
+  expect(await dee.ok("/courses/restore", { course: unplanned.course })).toEqual({});
+  expect(await StudyPlanning._plans({ owner: dee.user, scope: unplanned.course })).toEqual([]);
+  expect((await dee.plan(unplanned.course)).plan).toBeNull();
+}, 60_000);

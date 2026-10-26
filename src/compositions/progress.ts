@@ -36,6 +36,10 @@ const ReplanAfterConfidence = reaction(({ owner, skill, course, candidates, hori
 const ReplanAfterBudget = reaction(({ owner, course, candidates, horizonEnd, basis, explanation }) => when(Planning.configure({ owner, scope: course }).responds({}))
   .where(R.CanReplan({ owner, course }), no(ActivityInProgress({ owner })), R.PlanContext({ owner, course }).is({ candidates, horizonEnd, basis, explanation }))
   .then(Planning.replan({ owner, scope: course, candidates, horizonEnd, basis, explanation, workloadComplete: false })));
+// An archived course's plan is left alone while days pass and activities end elsewhere, so restoring it plans it again.
+const ReplanAfterRestore = reaction(({ owner, course, candidates, horizonEnd, basis, explanation }) => when(Mapping.restoreCourse({ owner, course }).responds({}))
+  .where(R.CanReplan({ owner, course }), no(ActivityInProgress({ owner })), R.PlanContext({ owner, course }).is({ candidates, horizonEnd, basis, explanation }))
+  .then(Planning.replan({ owner, scope: course, candidates, horizonEnd, basis, explanation, workloadComplete: false })));
 const ActivateRoutine = reaction(({ owner, course, plan, currentBasis }) => when(Planning.replan({ owner, scope: course, workloadComplete: false }).responds({ plan }))
   .where(R.PlanContext({ owner, course }).is({ basis: currentBasis }), Planning._proposalCheck({ owner, plan, currentBasis }).is({ canActivate: true, needsConfirmation: false }))
   .then(Planning.activateRoutine({ owner, plan, currentBasis })));
@@ -66,4 +70,4 @@ const RepairReadClosure = reaction(({ identity, owner, course, unit, skill, asse
       Tutoring._session({ session: task }).is({ owner, status: "OPEN" }))
     .then(Tutoring.close({ owner, session: task })));
 export const composition = { RepairReadEvidence, RepairReadClosure, SubmitReviewed, CloseSubmitted, AssessedEvidence, RevisedEvidence, ImportedEvidence, InitializedEvidence,
-  ReplanAfterEvidence, ReplanAfterConfidence, ReplanAfterBudget, ActivateRoutine, ReplanAfterFinish, ReplanAfterStop, ReplanAfterMiss };
+  ReplanAfterEvidence, ReplanAfterConfidence, ReplanAfterBudget, ReplanAfterRestore, ActivateRoutine, ReplanAfterFinish, ReplanAfterStop, ReplanAfterMiss };
