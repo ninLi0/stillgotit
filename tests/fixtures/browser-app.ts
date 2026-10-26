@@ -10,7 +10,13 @@ import { CourseTutor } from "../../src/host/tutor.ts";
 import { Gemini } from "../../src/host/gemini.ts";
 import { MaterialFiles } from "../../src/host/material-files.ts";
 if (process.env.ALLOW_UI_FIXTURES !== "1") throw new Error("This server requires ALLOW_UI_FIXTURES=1.");
-const origin = "http://127.0.0.1:5174";
+// FIXTURE_PORT and FIXTURE_HOST let several checkouts run this fixture at once (defaults 5174 and 127.0.0.1). Cookies
+// ignore the port, so two fixtures on one host sign each other out: give each its own loopback host as well as a port.
+const port = Number(process.env.FIXTURE_PORT || "5174"), host = (process.env.FIXTURE_HOST || "127.0.0.1").replace(/^\[(.*)\]$/, "$1");
+if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("FIXTURE_PORT must be a whole port number from 1 to 65535.");
+// The HTTP policy accepts cookies only on HTTPS or a loopback origin.
+if (!["127.0.0.1", "localhost", "::1"].includes(host)) throw new Error("FIXTURE_HOST must be a loopback host: 127.0.0.1, localhost, or ::1.");
+const origin = `http://${host === "::1" ? "[::1]" : host}:${port}`;
 class UIProvider extends MemoryProvider {
   override address(input: { nonce: string; verifier: string }) { return super.address(input).replace("memory://connect", `${origin}/fixture/connect`); }
 }
@@ -59,7 +65,7 @@ const testTutor: Pick<CourseTutor, "suggest" | "generate"> = failReplies ? { sug
 const runtime = await createRuntime({ database: db, provider, providerOrigin: origin, publicOrigin: origin, tutor: testTutor, gemini });
 const site = serveSite({ api: runtime.handle, directory: `${import.meta.dir}/../../frontend/dist` });
 let dropDraftReply = process.env.STILLGOTIT_TEST_DROP_DRAFT_REPLY === "1";
-const server = Bun.serve({ hostname: "127.0.0.1", port: 5174, maxRequestBodySize: 26 * 1024 * 1024, async fetch(request) {
+const server = Bun.serve({ hostname: host, port, maxRequestBodySize: 26 * 1024 * 1024, async fetch(request) {
   const url = new URL(request.url);
   if (url.pathname === "/fixture/connect") {
     const reply = provider.approve(request.url, { subject: "ui-test-learner", username: "ui_tester" });
