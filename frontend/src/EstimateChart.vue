@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import PixelIcon from "./PixelIcon.vue";
-import { CHART, layoutChart, type ChartKind, type ChartPoint } from "./estimate-chart.ts";
+import { CHART, KIND_MARKS, KIND_NAMES, layoutChart, type ChartPoint } from "./estimate-chart.ts";
 import { planDay } from "./labels.ts";
 import { MARKS, PAL, iconRects, ringOf, type MarkName } from "./pixel-art.ts";
 
@@ -20,8 +20,6 @@ function measure() {
 }
 const layout = computed(() => layoutChart(props.points, width.value));
 
-const MARK_OF: Record<ChartKind, MarkName> = { START: "start", ATTEMPT: "attempt", ADJUSTMENT: "adjustment", TIME: "time" };
-const KIND_NAME: Record<ChartKind, string> = { START: "Starting point", ATTEMPT: "Assessed attempt", ADJUSTMENT: "Your adjustment", TIME: "Time without practice" };
 const glyphs = Object.fromEntries((Object.keys(MARKS) as MarkName[]).map((name) => [name, { mark: iconRects(MARKS[name]), ring: iconRects(ringOf(MARKS[name])) }])) as Record<MarkName, { mark: ReturnType<typeof iconRects>; ring: ReturnType<typeof iconRects> }>;
 
 function percent(value: number) { return `${Math.round(value)}%`; }
@@ -43,10 +41,10 @@ const dates = computed(() => {
 const legend = computed(() => {
   const kinds = new Set(props.points.map((p) => p.kind));
   const lowered = props.points.some((p, i) => i > 0 && p.kind !== "TIME" && p.before !== null && Math.round(p.before) < Math.round(props.points[i - 1]!.after));
-  const items: { mark: MarkName; text: string }[] = [{ mark: "start", text: KIND_NAME.START }];
-  if (kinds.has("ATTEMPT")) items.push({ mark: "attempt", text: KIND_NAME.ATTEMPT });
-  if (kinds.has("ADJUSTMENT")) items.push({ mark: "adjustment", text: KIND_NAME.ADJUSTMENT });
-  if (kinds.has("TIME") || lowered) items.push({ mark: "time", text: KIND_NAME.TIME });
+  const items: { mark: MarkName; text: string }[] = [{ mark: "start", text: KIND_NAMES.START }];
+  if (kinds.has("ATTEMPT")) items.push({ mark: "attempt", text: KIND_NAMES.ATTEMPT });
+  if (kinds.has("ADJUSTMENT")) items.push({ mark: "adjustment", text: KIND_NAMES.ADJUSTMENT });
+  if (kinds.has("TIME") || lowered) items.push({ mark: "time", text: KIND_NAMES.TIME });
   return items;
 });
 const note = computed(() => {
@@ -100,8 +98,8 @@ onBeforeUnmount(() => { observer?.disconnect(); document.removeEventListener("po
         <text v-for="t in layout.ticks" :key="`label-${t.value}`" class="tick" :x="layout.plot.left - 6" :y="t.y + 4" text-anchor="end">{{ t.value }}%</text>
         <path class="line" :d="layout.path" :stroke="PAL.m" />
         <g v-for="m in layout.markers" :key="m.index" class="marker" :class="{ on: active === m.index }" :transform="`translate(${m.x - 5} ${m.y - 5})`">
-          <g class="ring" transform="translate(-2 -2)"><rect v-for="(r, i) in glyphs[MARK_OF[m.point.kind]].ring" :key="i" :x="r.x" :y="r.y" :width="r.w" height="1" :fill="r.fill" /></g>
-          <rect v-for="(r, i) in glyphs[MARK_OF[m.point.kind]].mark" :key="`m${i}`" :x="r.x" :y="r.y" :width="r.w" height="1" :fill="r.fill" />
+          <g class="ring" transform="translate(-2 -2)"><rect v-for="(r, i) in glyphs[KIND_MARKS[m.point.kind]].ring" :key="i" :x="r.x" :y="r.y" :width="r.w" height="1" :fill="r.fill" /></g>
+          <rect v-for="(r, i) in glyphs[KIND_MARKS[m.point.kind]].mark" :key="`m${i}`" :x="r.x" :y="r.y" :width="r.w" height="1" :fill="r.fill" />
         </g>
         <text class="now" :x="layout.end.x + 10" :y="layout.end.y + 4">{{ percent(layout.end.value) }}</text>
         <text class="day" :x="layout.plot.left + CHART.inset - 4" :y="layout.axisY">{{ dates.first }}</text>

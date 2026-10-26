@@ -2,8 +2,13 @@
 // whole CSS pixel, so the SVG's edges stay crisp. The chart only places the concept's own values: the starting
 // confidence, each change's value before and after, and the value now. It computes no score and no decay.
 
+import type { MarkName } from "./pixel-art.ts";
+
 /** One point on the chart: the starting point, or one change from the estimate timeline. */
 export type ChartKind = "START" | "ATTEMPT" | "ADJUSTMENT" | "TIME";
+/** Each kind's name and mark, shared by the chart's legend and markers and the evidence timeline's row icons. */
+export const KIND_NAMES: Record<ChartKind, string> = { START: "Starting point", ATTEMPT: "Assessed attempt", ADJUSTMENT: "Your adjustment", TIME: "Time without practice" };
+export const KIND_MARKS: Record<ChartKind, MarkName> = { START: "start", ATTEMPT: "attempt", ADJUSTMENT: "adjustment", TIME: "time" };
 export type ChartPoint = {
   at: string; kind: ChartKind;
   /** The value just before the change, after time had lowered it; null for the starting point. */

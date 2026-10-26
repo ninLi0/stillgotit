@@ -60,14 +60,14 @@ export type Stage = keyof typeof SPRITES;
 /**
  * The evidence marks, 10×10, shared by the estimate chart's markers and the evidence timeline's row icons: a hollow
  * square for the starting point, a filled square for an assessed attempt, a hollow diamond for the learner's own
- * adjustment, a falling stair for time without practice, and a grey square for an attempt that did not count.
+ * adjustment, a falling stair for time without practice, and a filled slate square for an attempt that did not count.
  */
 export const MARKS = {
   start: ["..........", ".SSSSSSSS.", ".SSSSSSSS.", ".SS....SS.", ".SS....SS.", ".SS....SS.", ".SS....SS.", ".SSSSSSSS.", ".SSSSSSSS.", ".........."],
   attempt: ["..........", ".pppppppp.", ".pppppppp.", ".pppppppp.", ".pppppppp.", ".pppppppp.", ".pppppppp.", ".pppppppp.", ".pppppppp.", ".........."],
   adjustment: ["....pp....", "...pppp...", "..pp..pp..", ".pp....pp.", "pp......pp", "pp......pp", ".pp....pp.", "..pp..pp..", "...pppp...", "....pp...."],
   time: ["..........", "mmmm......", "mmmm......", "..mm......", "..mmmmm...", "..mmmmm...", ".....mm...", ".....mmmmm", ".....mmmmm", ".........."],
-  ignored: ["..........", ".EEEEEEEE.", ".EEEEEEEE.", ".EEEEEEEE.", ".EEEEEEEE.", ".EEEEEEEE.", ".EEEEEEEE.", ".EEEEEEEE.", ".EEEEEEEE.", ".........."],
+  ignored: ["..........", ".SSSSSSSS.", ".SSSSSSSS.", ".SSSSSSSS.", ".SSSSSSSS.", ".SSSSSSSS.", ".SSSSSSSS.", ".SSSSSSSS.", ".SSSSSSSS.", ".........."],
 } as const;
 export type MarkName = keyof typeof MARKS;
 
