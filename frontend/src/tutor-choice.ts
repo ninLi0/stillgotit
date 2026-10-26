@@ -11,7 +11,7 @@ type SkillData = StillGotItHttp["/learning/read"]["output"]["data"];
 
 /**
  * The latest settings record the page received. The Tutor panel reads it after sign-in and each time it opens.
- * The header button and the answer labels show this record; it is empty until the first read answers.
+ * The message box's tutor button and the answer labels show this record; it is empty until the first read answers.
  */
 export const tutorSettings = shallowRef<TutorSettings | null>(null);
 
@@ -34,6 +34,18 @@ export function orderedLevels(levels: readonly TutorLevel[]): TutorLevel[] {
  */
 export function modelName(model: string, settings: TutorSettings | null = tutorSettings.value): string {
   return settings?.models.find((offer) => offer.model === model)?.name ?? model;
+}
+
+/**
+ * What the message box's tutor button shows for a settings record: the model and level that apply, in full, and the
+ * sentence that names them for screen readers and the tooltip. Before the first read it shows "Tutor", and for a saved
+ * choice that is no longer offered it asks the learner to choose again.
+ */
+export function tutorPick(settings: TutorSettings | null): { model: string; level: string; label: string } {
+  if (!settings) return { model: "Tutor", level: "", label: "Choose the tutor model" };
+  if (settings.status === "RETIRED") return { model: "Tutor: choose again", level: "", label: "Tutor: choose again. Your saved model is no longer offered." };
+  const model = modelName(settings.choice.model, settings), level = levelName(settings.choice.level);
+  return { model, level, label: `${model}, ${level} thinking. Choose the tutor model` };
 }
 
 /** The label under a tutor answer: "{model} · {level} thinking". */

@@ -19,7 +19,7 @@ import { focusedControl, restoreFocus } from "./focus.ts";
 import { PendingAdjustment, sessionStore } from "./pending-adjustment.ts";
 import { listenUnavailable, stopSpeaking } from "./speech.ts";
 import type { StillGotItHttp } from "../../generated/wire.ts";
-import { answerKey, newAnswers, takeTutor, tutorLabel, type TutorUsed } from "./tutor-choice.ts";
+import { answerKey, newAnswers, takeTutor, tutorLabel, tutorPick, tutorSettings, type TutorUsed } from "./tutor-choice.ts";
 import { sessionRequest, takeSession } from "./continue-session.ts";
 import { useSlidingMark } from "./sliding-mark.ts";
 type SkillData = StillGotItHttp["/learning/read"]["output"]["data"];
@@ -32,7 +32,7 @@ const props = defineProps<{ skill: string; course: string; materials: { material
 // `back` returns to the skill tree. `open-source` asks the shell to show a cited source in Materials, from the source
 // preview's "Open in Materials". `session` names
 // the conversation on screen (null for a new one), so the sidebar can mark it.
-const emit = defineEmits<{ changed: []; back: []; "open-source": [source: OpenSource]; session: [skill: string, session: string | null] }>();
+const emit = defineEmits<{ changed: []; back: []; "open-source": [source: OpenSource]; session: [skill: string, session: string | null]; tutor: [] }>();
 const data = shallowRef<SkillData | null>(null), selected = ref<StudySession["session"] | "">(""), busy = ref(false), error = ref(""), notice = ref("");
 const noticeBox = ref<HTMLElement | null>(null), errorBox = ref<HTMLElement | null>(null), composerInput = ref<HTMLTextAreaElement | null>(null), heading = ref<HTMLElement | null>(null);
 const confidence = ref(50), freshLesson = ref(false), recording = ref(false), reviewOpen = ref(false), thread = ref<HTMLElement | null>(null), evidenceOpen = ref(false);
@@ -250,6 +250,9 @@ const stage = computed(() => stageOf(pct.value));
 const masteryNote = computed(() => [data.value?.estimate?.basis ?? "No estimate yet. Set your starting confidence, then practice.",
   data.value?.explanation?.provisional ? "Provisional: no assessed attempt has counted toward this estimate yet." : "",
   "The mastery estimate is a study aid, not a course grade."].filter(Boolean).join(" "));
+// The message box names the tutor model and thinking level that apply, from the latest settings record, and changes
+// as soon as a new choice is saved.
+const tutorChoice = computed(() => tutorPick(tutorSettings.value));
 // While a message is on its way, the send button is a turning ring that says what it waits for.
 const sendLabel = computed(() => pending.value ? (pending.value.reply ? "Waiting for the tutor's answer" : "Saving your answer") : current.value?.task ? "Save answer" : "Send message");
 const composerNote = computed(() => current.value?.task ? "Review your complete answer before requesting assessment." : "Grounded in your course materials. Check important details.");
@@ -515,6 +518,7 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
               <textarea id="chat-message" ref="composerInput" v-model="response" rows="2" :placeholder="current?.task ? 'Explain your reasoning. You can type, speak, or attach your work.' : 'Ask a question or tell me what you want to learn…'" @keydown="enterToSend" />
               <div class="composer-tools"><div class="input-tools"><label class="attach-button tool-pill" :class="{ unavailable: !current || busy || recording }" :title="current ? 'Attach photos of your work' : 'Start a lesson before attaching work'"><span aria-hidden="true">＋ Photo of work</span><span class="sr-only">{{ attachments.length ? 'Add another photo of your work' : 'Add photos of your work' }}</span><input type="file" accept="image/*" capture="environment" multiple :disabled="busy || recording || !current" @change="uploadWork" /></label>
                 <SpeechInput :disabled="busy || !aiAvailable" :active="active !== false" :describedby="aiAvailable ? undefined : 'ai-reason-chat'" compact @recording="recording = $event" @transcript="response = response ? response + '\n' + $event : $event; channel = 'VOICE'" @error="error = $event" />
+                <button type="button" class="tutor-pick" aria-haspopup="dialog" :aria-label="tutorChoice.label" :title="tutorChoice.label" @click="emit('tutor')"><span>{{ tutorChoice.model }}<span v-if="tutorChoice.level" class="tutor-level"> · {{ tutorChoice.level }}</span></span><svg aria-hidden="true" viewBox="0 0 12 12" width="12" height="12"><path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" /></svg></button>
                 <button v-if="current?.task" class="hint-button tool-pill" :disabled="busy || recording || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="requestHint">Ask for a hint</button>
                 <button v-else-if="current?.lesson" type="button" class="tool-pill" :disabled="busy || recording" @click="finishLesson">Finish lesson</button>
               </div><div class="composer-right"><span class="note-info"><InfoBubble :text="composerNote" label="About this message box" /></span><button class="send-button" :class="{ waiting: !!pending }" :disabled="!canSend" :aria-label="sendLabel" :aria-describedby="aiAvailable || current?.task || pending ? undefined : 'ai-reason-chat'" @click="submitMessage"><span v-if="pending" class="send-ring" aria-hidden="true" /><span v-else aria-hidden="true">↑</span></button></div></div>
@@ -688,6 +692,12 @@ button.mastery-chip:hover{border-color:#C9C1F0}
 .note-info :deep(.info-bubble){left:auto;right:0;top:auto;bottom:calc(100% + 6px)}
 .tool-pill{display:flex;align-items:center;gap:6px;margin:0;border:1px solid var(--line);border-radius:999px;background:#FFFFFF;padding:5px 12px;min-height:30px;font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap;cursor:pointer}
 .tool-pill:hover:not(:disabled){border-color:rgba(20,20,20,.35);color:var(--ink)}
+/* The tutor model and thinking level the next answer will use, as a quiet pill among the tools. It opens the Tutor
+   panel in Settings. Phones show the model alone; the level stays in its name and tooltip. */
+.tutor-pick{display:flex;align-items:center;gap:4px;margin:0;border:0;border-radius:999px;background:transparent;padding:5px 8px 5px 10px;min-height:30px;font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap}
+.tutor-pick:hover{background:var(--inset-2);color:var(--ink)}
+.tutor-pick svg{flex:none}
+@media(max-width:650px){.tutor-level{display:none}}
 .attach-button{position:relative}
 .attach-button input{position:absolute;width:1px;height:1px;min-height:0;opacity:0;padding:0;border:0}
 .attach-button:focus-within{outline:2px solid var(--ink);outline-offset:2px}

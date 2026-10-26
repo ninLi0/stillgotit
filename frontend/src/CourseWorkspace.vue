@@ -29,7 +29,7 @@ import type { AskAboutPage, HomeView, OpenSource, ViewerSkill, ViewSkill, ViewUn
 
 // The shell (sidebar + app card) lives here because the views do; App.vue fills the course switcher slot and owns
 // Settings, the tutor panel and the Home view preference.
-const props = defineProps<{ course: Course; username: string; tutorChoice: string; homeView: HomeView }>();
+const props = defineProps<{ course: Course; username: string; homeView: HomeView }>();
 const emit = defineEmits<{ settings: []; tutor: []; "update:homeView": [view: HomeView] }>();
 const view = ref<"home" | "setup" | "chat" | "plan">("home");
 const viewKey = `stillgotit-view:${props.course.course}`;
@@ -435,8 +435,8 @@ watch(view, (now) => { if (now === "setup" && material.value && !preview.value) 
 <template>
   <div class="app-frame">
     <ShellSidebar :view="view" :forest-open="forestOpen" :lesson-title="view === 'chat' && current?.status === 'CONFIRMED' ? current.title : undefined"
-      :materials-badge="draftWaiting" :today="homePlan.minutes.value" :tutor-label="tutorChoice" :username="username"
-      @navigate="navigate" @forest="openForest" @lesson="openChat" @tutor="emit('tutor')" @settings="emit('settings')">
+      :materials-badge="draftWaiting" :today="homePlan.minutes.value" :username="username"
+      @navigate="navigate" @forest="openForest" @lesson="openChat" @settings="emit('settings')">
       <template #switcher><slot name="switcher" /></template>
       <template #conversations><SidebarConversations :rows="recent" :current="shownSession" :loaded="recentLoaded" :error="recentError" @open="openConversation" @new="newConversation" @retry="loadRecent" /></template>
     </ShellSidebar>
@@ -657,7 +657,7 @@ watch(view, (now) => { if (now === "setup" && material.value && !preview.value) 
       </div>
     </section>
     <div v-show="view === 'chat'" class="lesson-view">
-      <KeepAlive :max="12"><SkillStudy v-if="current?.status === 'CONFIRMED'" ref="study" :key="current.skill" :skill="current.skill" :course="course.course" :materials="data.materials" :ai-available="ai.available" :ai-reason="ai.reason" :active="view === 'chat'" :initial-draft="lessonDraft?.skill === current.skill ? lessonDraft.text : undefined" @changed="progressChanged" @back="showOnTree(current.skill)" @open-source="openSource" @session="sessionShown" /></KeepAlive>
+      <KeepAlive :max="12"><SkillStudy v-if="current?.status === 'CONFIRMED'" ref="study" :key="current.skill" :skill="current.skill" :course="course.course" :materials="data.materials" :ai-available="ai.available" :ai-reason="ai.reason" :active="view === 'chat'" :initial-draft="lessonDraft?.skill === current.skill ? lessonDraft.text : undefined" @changed="progressChanged" @back="showOnTree(current.skill)" @open-source="openSource" @session="sessionShown" @tutor="emit('tutor')" /></KeepAlive>
       <div v-if="current?.status !== 'CONFIRMED'" class="no-lesson"><h2 class="display" tabindex="-1">Choose a leaf to begin.</h2><button class="primary meadow" @click="view = 'home'">Go to your tree</button></div>
     </div>
   </section>

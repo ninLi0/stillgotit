@@ -47,3 +47,15 @@ describe("Names shown for models and levels", () => {
     expect(choice.orderedLevels(["HIGH", "LOW", "MINIMAL", "MEDIUM"] as never)).toEqual(["MINIMAL", "LOW", "MEDIUM", "HIGH"]);
   });
 });
+
+describe("The tutor button in the message box", () => {
+  const record = (status: string) => ({ status, choice: { model: "gemini-3.8-flash", level: "MEDIUM" }, models: [{ model: "gemini-3.8-flash", name: "Gemini 3.8 Flash" }] });
+  test("it names the model and level in full, and its spoken name says what it opens", () => {
+    expect(choice.tutorPick(record("SAVED") as never)).toEqual({ model: "Gemini 3.8 Flash", level: "Medium", label: "Gemini 3.8 Flash, Medium thinking. Choose the tutor model" });
+    expect(choice.tutorPick(record("DEFAULT") as never).level).toBe("Medium");
+  });
+  test("before the first read it says Tutor, and a retired choice asks the learner to choose again", () => {
+    expect(choice.tutorPick(null)).toEqual({ model: "Tutor", level: "", label: "Choose the tutor model" });
+    expect(choice.tutorPick(record("RETIRED") as never)).toEqual({ model: "Tutor: choose again", level: "", label: "Tutor: choose again. Your saved model is no longer offered." });
+  });
+});
