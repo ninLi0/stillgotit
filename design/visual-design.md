@@ -55,10 +55,21 @@ The main colors and the font names are tokens at the top of [frontend/src/style.
   - The sign-in page shows a sample grove with topic signs and a legend of the leaf stages.
 - **There are no gradients.** Skies and seas are solid bands of color. Depth comes from the 3 px solid edge under primary buttons (`box-shadow: 0 3px 0` with the edge color), which shrinks to 1 px when the button is pressed.
 
+### The lesson's conversation
+
+- **Tabs name each conversation.** Above the thread, each tab shows the conversation's kind and number ("Lesson 2", "Practice 1"), the day it started, and how many turns it has, such as "Oct 25 · 4 turns", with ✓ once it is assessed.
+- **The opening is a card.** The tutor's lesson, or the practice task, sits in a white card with a ring, below the learner's request. A rule labelled "Conversation", in the eyebrow style, separates it from the dialogue that follows.
+- **The learner's messages are bubbles; the tutor's replies are not.** The learner's messages are compact dawn bubbles (`#EEEBFF`) on the right, at most 70% of the thread's width (85% on phones). The tutor's replies run the full width without a bubble: a first line with the leaf in a small dawn tile and "StillGotIt", then the reply at 15 px with a 1.8 line height, and code and maths in mono blocks.
+- **Each reply ends with one meta line and small actions.** The meta line is 11 px in faint text: how long the answer took, how many sources it cites, and the model and thinking level when the page saw the answer arrive, such as "Answered in 7 s · 2 sources · Gemini 3.8 Flash · Medium thinking". Copy and Listen sit at the right of that line. They appear when the pointer is over the reply or focus is inside it, and they always show under the latest reply and on touch screens. When a lesson question has no reply, "Retry tutor reply" sits in the tutor's place.
+- **A message's time is in its tooltip.** Hovering a message shows when it was saved, such as "Oct 25, 3:04 PM". Screen readers hear the same time after the speaker's name.
+- **The thread stays where the learner is reading.** New messages scroll the thread to the latest one. When the learner has scrolled more than one screen up, a white "Jump to latest ↓" pill appears over the bottom of the thread instead.
+- **The message box grows with its text.** It starts at two lines and grows to six; longer text scrolls inside it. Enter sends, and Shift+Enter starts a new line.
+- **Assessment cards show the change in mastery.** Beside the result, "Mastery" heads the estimate before and after the attempt, such as "50% → 95%", with the change in points below. An attempt that did not count says "Did not change the estimate" and gives the reason.
+
 ### Motion
 
 - A 450 ms tick moves the clouds and the exam flag on Home, the clouds in the Forest view, and the boat, buoys, whale, and lighthouse lamp on Plan.
-- Cards and messages rise 8 px into place over 240 ms, file cards appear over 180 ms, and notices and errors fade in over 220 ms. While the tutor answers, three dots pulse in the tutor's place below the learner's message.
+- Cards and messages rise 8 px into place over 240 ms, file cards appear over 180 ms, and notices and errors fade in over 220 ms. While the tutor answers, three dots pulse in the tutor's place below the learner's message, next to the seconds waited ("12 s"). Copy and Listen fade in under a reply over 120 ms.
 - When the device asks for reduced motion, every animation and transition is turned off, and the scenes are drawn once.
 
 ### Contrast

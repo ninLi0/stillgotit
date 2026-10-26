@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { secondsLabel, sourcesLabel } from "../frontend/src/labels.ts";
+import { messageTime, secondsLabel, sourcesLabel, turnsLabel } from "../frontend/src/labels.ts";
 import { answerSeconds } from "../frontend/src/reply-stats.ts";
 
 const turn = (turnIndex: number, speaker: "LEARNER" | "TUTOR", purpose: string, at: string) =>
@@ -49,5 +49,18 @@ describe("Reply labels", () => {
   test("source counts name one source or several", () => {
     expect(sourcesLabel(1)).toBe("1 source");
     expect(sourcesLabel(2)).toBe("2 sources");
+  });
+
+  test("turn counts name one turn or several", () => {
+    expect(turnsLabel(0)).toBe("0 turns");
+    expect(turnsLabel(1)).toBe("1 turn");
+    expect(turnsLabel(4)).toBe("4 turns");
+  });
+
+  test("a saved time reads as a New York date and time", () => {
+    expect(messageTime("2026-10-25T19:04:00.000Z")).toBe("Oct 25, 3:04 PM");
+    // Late evening in New York is already the next day in UTC.
+    expect(messageTime(Date.UTC(2026, 0, 2, 3, 30))).toBe("Jan 1, 10:30 PM");
+    expect(messageTime("not a time")).toBe("");
   });
 });
