@@ -99,7 +99,7 @@ No new endpoint is needed. The existing read returns every location and file ref
 
 ## Listening
 
-Listening to lessons, practice questions, tutor replies, and hints is screen-only. The browser speaks text that Read already returns, so it needs no endpoint or contract.
+Listening to lessons, practice questions, tutor replies, and hints is screen-only. The browser speaks text that Read already returns, so it needs no endpoint or contract. Formulas are read as words where the form is common, such as "x squared" for `x^2` and "a over b" for `\frac{a}{b}`, and otherwise as their source without the delimiters.
 
 ## Suggestions and ordering
 
@@ -146,6 +146,8 @@ Failures follow one path for every kind. For a provider failure, the host record
 - **HINT** answers with nonblank text of at most 30,000 characters. It needs no citation.
 - **GRADE** answers with one of the five results, a gateMet flag, and a nonblank rationale. INDEPENDENT requires saved help NONE. gateMet requires INDEPENDENT and fresh work.
 - **EXTRACT** reads one graded upload for the [graded import](Importing.md), as described below.
+
+The text of a LESSON, TASK, REPLY, HINT, or GRADE answer may carry LaTeX. Its instruction asks for mathematics between dollar signs, `$…$` inline and `$$…$$` on its own lines for a displayed equation or matrix, never as Unicode approximations or in code fences, and for no other Markdown. The lesson page renders the text as Markdown and draws each formula with KaTeX, which it loads only when a text holds a formula; a formula KaTeX cannot read shows as its source. The learner's own messages get the same formulas, and the rest of a message shows as typed. EXTRACT rows stay plain text with Unicode symbols, because the graded import shows them as written.
 
 An EXTRACT request has exactly one source, the graded material, and no separate learner work. Graded work may be a PDF, with or without a text layer, or photos of the pages. The host sends every original of the material inline and in full, so the tutor can read handwriting and marks. Unlike the other kinds, EXTRACT never falls back to extracted text. When an original cannot be sent in full, the host refuses the request before contacting the tutor and records one of these reasons:
 
