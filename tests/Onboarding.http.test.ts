@@ -80,7 +80,7 @@ describe("Commons and courses through HTTP reactions", () => {
     expect((await browser.post("/courses")).body).toEqual({ courses: [] });
     const created = await browser.post("/courses/create", { title: "MIT 18.06SC Linear Algebra" });
     expect(created.status).toBe(200);
-    const saved = { courses: [{ course: created.body.course, title: "MIT 18.06SC Linear Algebra" }] };
+    const saved = { courses: [{ course: created.body.course, title: "MIT 18.06SC Linear Algebra", status: "ACTIVE" }] };
     expect((await browser.post("/courses")).body).toEqual(saved);
     await app.restart();
     expect((await browser.post("/courses")).body).toEqual(saved);

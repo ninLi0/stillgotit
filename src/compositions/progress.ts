@@ -39,13 +39,14 @@ const ReplanAfterBudget = reaction(({ owner, course, candidates, horizonEnd, bas
 const ActivateRoutine = reaction(({ owner, course, plan, currentBasis }) => when(Planning.replan({ owner, scope: course, workloadComplete: false }).responds({ plan }))
   .where(R.PlanContext({ owner, course }).is({ basis: currentBasis }), Planning._proposalCheck({ owner, plan, currentBasis }).is({ canActivate: true, needsConfirmation: false }))
   .then(Planning.activateRoutine({ owner, plan, currentBasis })));
-// No course can be replanned during an activity, so finishing or stopping one refreshes every course of the learner
-// with saved preferences. An exam or budget change made in another course during the activity takes effect here.
+// No course can be replanned during an activity, so finishing or stopping one refreshes every active course of the
+// learner with saved preferences. An exam or budget change made in another course during the activity takes effect
+// here. An archived course is skipped, so it makes no new proposals while it is set aside.
 const ReplanAfterFinish = reaction(({ owner, course, candidates, horizonEnd, basis, explanation }) => when(Planning.finish({ owner }).responds({}))
-  .where(Mapping._courses({ owner }).is({ course }), R.CanReplan({ owner, course }), no(ActivityInProgress({ owner })), R.PlanContext({ owner, course }).is({ candidates, horizonEnd, basis, explanation }))
+  .where(Mapping._courses({ owner }).is({ course, status: "ACTIVE" }), R.CanReplan({ owner, course }), no(ActivityInProgress({ owner })), R.PlanContext({ owner, course }).is({ candidates, horizonEnd, basis, explanation }))
   .then(Planning.replan({ owner, scope: course, candidates, horizonEnd, basis, explanation, workloadComplete: false })));
 const ReplanAfterStop = reaction(({ owner, course, candidates, horizonEnd, basis, explanation }) => when(Planning.stop({ owner }).responds({}))
-  .where(Mapping._courses({ owner }).is({ course }), R.CanReplan({ owner, course }), no(ActivityInProgress({ owner })), R.PlanContext({ owner, course }).is({ candidates, horizonEnd, basis, explanation }))
+  .where(Mapping._courses({ owner }).is({ course, status: "ACTIVE" }), R.CanReplan({ owner, course }), no(ActivityInProgress({ owner })), R.PlanContext({ owner, course }).is({ candidates, horizonEnd, basis, explanation }))
   .then(Planning.replan({ owner, scope: course, candidates, horizonEnd, basis, explanation, workloadComplete: false })));
 const ReplanAfterMiss = reaction(({ owner, item, course, candidates, horizonEnd, basis, explanation }) => when(Planning.miss({ owner, item }).responds({}))
   .where(Planning._item({ item }).is({ owner, scope: course }), R.CanReplan({ owner, course }), no(ActivityInProgress({ owner })), R.PlanContext({ owner, course }).is({ candidates, horizonEnd, basis, explanation }))

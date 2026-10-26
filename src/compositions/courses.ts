@@ -3,17 +3,18 @@ import { compute, each, former, is, no, now, reaction, returned, view, when, whe
 import { concepts, computations } from "../concepts.ts";
 import { courseInput, courseListOutput, emphasisInput, prerequisitesInput, recordOutput, skillTextInput, validators, materialInput, proposalInput, proposalSaveInput, structuredOutput } from "./reusable/inputs.ts";
 
-const { Sessioning, SkillMapping, Library, MasteryEstimating } = concepts;
+const { Sessioning, SkillMapping, Library, MasteryEstimating, StudyPlanning } = concepts;
 
 const OwnedCourse = view("(owner) owns (course) with (title)", ({ owner, course }, { title }) =>
   where(SkillMapping._course({ course }).is({ owner, title })),
 ).optional();
 
-const CourseList = former("the courses belonging to (owner)", ({ owner }, { course, title }) =>
-  each(SkillMapping._courses({ owner }).is({ course }))
+// Every course in every status, so the page can list archived courses apart from current ones.
+const CourseList = former("the courses belonging to (owner)", ({ owner }, { course, title, status }) =>
+  each(SkillMapping._courses({ owner }).is({ course, status }))
     .where(OwnedCourse({ owner, course }).is({ title }))
     .arranged(course)
-    .form({ course, title }),
+    .form({ course, title, status }),
 );
 
 const ListCourses = endpoint("/courses", ({ session, owner }) =>
@@ -144,6 +145,14 @@ const ConfirmSkill = endpoint("/courses/skills/confirm", ({ session, skill, owne
   ), { validators },
 );
 
+// A saved draft is removed with its versions. SkillMapping refuses any skill that is not a draft with its own code.
+const DiscardDraft = endpoint("/courses/skills/discard", ({ session, skill, owner }) =>
+  receive({ session, skill }).then(Sessioning.use({ session }).responds({ subject: owner })).then(
+    where(OwnedSkill({ owner, skill })).then(SkillMapping.discardDraft({ owner, skill }).responds({})).then(respond({})).named("owned"),
+    where(no(OwnedSkill({ owner, skill }))).then(respond({ error: "COURSE_UNAVAILABLE" })).named("missing"),
+  ), { validators },
+);
+
 // The same refusals as ProposeSkill, then the graded-work check for the learner's own material in that course.
 const EditDraft = endpoint("/courses/skills/edit", ({ session, skill, unit, material, materials, title, outcome, gate, owner, course, materialTitle, graded }) =>
   receive({ session, skill, unit, material, title, outcome, gate }).then(Sessioning.use({ session }).responds({ subject: owner })).then(
@@ -233,6 +242,28 @@ const RestoreSkill = endpoint("/courses/skills/restore", ({ session, skill, owne
   ), { validators },
 );
 
+// An activity in progress in the course is refused before archiving: the planning concept allows one in progress across
+// all of a learner's courses, and one left running in an archived course would block work in every other course.
+const CourseActivityInProgress = view("(owner) has an activity in progress in (course)", ({ owner, course }) =>
+  where(StudyPlanning._next({ owner, scope: course }).is({ status: "IN_PROGRESS" })),
+).holds();
+
+const ArchiveCourse = endpoint("/courses/archive", ({ session, course, owner }) =>
+  receive({ session, course }).then(Sessioning.use({ session }).responds({ subject: owner })).then(
+    where(OwnedCourse({ owner, course }), no(CourseActivityInProgress({ owner, course })))
+      .then(SkillMapping.archiveCourse({ owner, course }).responds({})).then(respond({})).named("owned"),
+    where(no(OwnedCourse({ owner, course }))).then(respond({ error: "COURSE_UNAVAILABLE" })).named("missing"),
+    where(OwnedCourse({ owner, course }), CourseActivityInProgress({ owner, course })).then(respond({ error: "COURSE_ACTIVITY_IN_PROGRESS" })).named("busy"),
+  ), { validators },
+);
+
+const RestoreCourse = endpoint("/courses/restore", ({ session, course, owner }) =>
+  receive({ session, course }).then(Sessioning.use({ session }).responds({ subject: owner })).then(
+    where(OwnedCourse({ owner, course })).then(SkillMapping.restoreCourse({ owner, course }).responds({})).then(respond({})).named("owned"),
+    where(no(OwnedCourse({ owner, course }))).then(respond({ error: "COURSE_UNAVAILABLE" })).named("missing"),
+  ), { validators },
+);
+
 const SetUnitEmphasis = endpoint("/courses/units/emphasis", ({ session, unit, emphasized, owner }) =>
   receive({ session, unit, emphasized }).then(Sessioning.use({ session }).responds({ subject: owner })).then(
     where(OwnedUnit({ owner, unit })).then(SkillMapping.setEmphasis({ owner, unit, emphasized }).responds({})).then(respond({})).named("owned"),
@@ -241,5 +272,6 @@ const SetUnitEmphasis = endpoint("/courses/units/emphasis", ({ session, unit, em
 );
 
 export const composition = { OwnedCourse, OwnedUnit, OwnedSkill, CourseList, ListCourses, CreateCourse,
-  UnavailableSkillMaterial, Materials, Units, Skills, Prerequisites, SkillSources, Versions, ReadCourse, ReadMaterial, AddUnit, AddMaterial, ProposeSkill, ConfirmSkill, EditDraft,
-  EditSkillDetails, ReviseSkill, RevisedTrack, RepairRevisedTrack, AddSkillSource, SetSkillPrerequisites, ArchiveSkill, RestoreSkill, SetUnitEmphasis };
+  UnavailableSkillMaterial, Materials, Units, Skills, Prerequisites, SkillSources, Versions, ReadCourse, ReadMaterial, AddUnit, AddMaterial, ProposeSkill, ConfirmSkill, DiscardDraft, EditDraft,
+  EditSkillDetails, ReviseSkill, RevisedTrack, RepairRevisedTrack, AddSkillSource, SetSkillPrerequisites, ArchiveSkill, RestoreSkill, SetUnitEmphasis,
+  CourseActivityInProgress, ArchiveCourse, RestoreCourse };

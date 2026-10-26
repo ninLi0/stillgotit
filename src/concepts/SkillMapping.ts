@@ -17,11 +17,15 @@ export type Material = string;
 export type MaterialSet = readonly Material[];
 export type SkillSet = readonly Skill[];
 export type SkillStatus = "DRAFT" | "CONFIRMED" | "ARCHIVED";
+export type CourseStatus = "ACTIVE" | "ARCHIVED";
 
 interface CourseDocument {
   _id: Course;
   owner: User;
   title: string;
+  // Whether the course is in the learner's current courses. Courses saved
+  // before this field existed have none and are active.
+  status?: CourseStatus;
   // Internal claim held while one prerequisite or status change runs in this
   // course. Queries do not expose it.
   prerequisiteLock?: { holder: string; expires: Date };
@@ -94,6 +98,24 @@ export class InvalidCourseTitleError extends Error {
   constructor() {
     super("Enter a course title.");
     this.name = "InvalidCourseTitleError";
+  }
+}
+
+export class CourseArchiveUnavailableError extends Error {
+  readonly code = "COURSE_ARCHIVE_UNAVAILABLE";
+
+  constructor() {
+    super("Choose one of your active courses.");
+    this.name = "CourseArchiveUnavailableError";
+  }
+}
+
+export class CourseRestoreUnavailableError extends Error {
+  readonly code = "COURSE_RESTORE_UNAVAILABLE";
+
+  constructor() {
+    super("Choose one of your archived courses.");
+    this.name = "CourseRestoreUnavailableError";
   }
 }
 
@@ -460,8 +482,39 @@ export class SkillMapping {
     }
 
     const course = randomUUID();
-    await this.courses.insertOne({ _id: course, owner, title });
+    await this.courses.insertOne({ _id: course, owner, title, status: "ACTIVE" });
     return { course };
+  }
+
+  async archiveCourse({ owner, course }: {
+    owner: User;
+    course: Course;
+  }): Promise<Record<string, never>> {
+    // One conditional write checks ownership and status and changes only the
+    // status, so of two requests that arrive together one archives the course
+    // and the other is refused. A course without a status is active.
+    const updated = await this.courses.updateOne(
+      { _id: course, owner, status: { $ne: "ARCHIVED" } },
+      { $set: { status: "ARCHIVED" } },
+    );
+    if (updated.matchedCount !== 1) {
+      throw new CourseArchiveUnavailableError();
+    }
+    return {};
+  }
+
+  async restoreCourse({ owner, course }: {
+    owner: User;
+    course: Course;
+  }): Promise<Record<string, never>> {
+    const updated = await this.courses.updateOne(
+      { _id: course, owner, status: "ARCHIVED" },
+      { $set: { status: "ACTIVE" } },
+    );
+    if (updated.matchedCount !== 1) {
+      throw new CourseRestoreUnavailableError();
+    }
+    return {};
   }
 
   async addUnit({ owner, course, title }: {
@@ -469,7 +522,8 @@ export class SkillMapping {
     course: Course;
     title: string;
   }): Promise<{ unit: Unit }> {
-    // Courses cannot be deleted or reassigned through this concept.
+    // Courses cannot be deleted or reassigned through this concept. An archived
+    // course still accepts units, as the specification states.
     const ownedCourse = await this.courses.findOne({ _id: course, owner });
     if (!ownedCourse) {
       throw new UnitCourseUnavailableError();
@@ -925,10 +979,10 @@ export class SkillMapping {
   }
 
   async _courses({ owner }: { owner: User }): Promise<
-    { course: Course; title: string }[]
+    { course: Course; title: string; status: CourseStatus }[]
   > {
     const rows = await this.courses.find({ owner }).sort({ _id: 1 }).toArray();
-    return rows.map(({ _id, title }) => ({ course: _id, title }));
+    return rows.map(({ _id, title, status }) => ({ course: _id, title, status: status ?? "ACTIVE" }));
   }
 
   // Internal lookup. The application must check ownership before exposing data.

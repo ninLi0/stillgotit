@@ -31,12 +31,15 @@ const error = ref(""), notice = ref("");
 const PENDING = "stillgotit-sign-in-pending", SELECTED = "stillgotit-selected-course";
 // The last chosen course survives reloads. Storage can be blocked, so a failed read falls back to the first course.
 const chosenCourse = ref(readChoice()), creating = ref(false), menuOpen = ref(false), switcher = ref<HTMLElement | null>(null);
-const selected = computed(() => courses.value.find((c) => c.course === chosenCourse.value) ?? courses.value[0]);
+// Only active courses open. Archived ones are listed apart, under "Archived courses", with a Restore action.
+const activeCourses = computed(() => courses.value.filter((c) => c.status === "ACTIVE"));
+const archivedCourses = computed(() => courses.value.filter((c) => c.status === "ARCHIVED"));
+const selected = computed(() => activeCourses.value.find((c) => c.course === chosenCourse.value) ?? activeCourses.value[0]);
 const inCourse = computed(() => !!username.value && !!selected.value && !creating.value);
 
 function readChoice() { try { return localStorage.getItem(SELECTED) ?? ""; } catch { return ""; } }
 function selectCourse(course: string) {
-  chosenCourse.value = course; creating.value = false; menuOpen.value = false; error.value = ""; notice.value = "";
+  chosenCourse.value = course; creating.value = false; menuOpen.value = false; error.value = ""; notice.value = ""; courseNote.value = "";
   try { localStorage.setItem(SELECTED, course); } catch { /* The choice still applies until reload. */ }
 }
 async function startCourse() {
@@ -111,6 +114,58 @@ async function createCourse() {
   await nextTick(); document.getElementById("home-title")?.focus();
 }
 
+// Archiving asks first, in a dialog like Settings. The course keeps everything and can be restored from the menu.
+const archiveDialog = ref<HTMLDialogElement | null>(null), archiveTarget = ref<Course | null>(null), archiveError = ref("");
+// The archived list starts folded. courseNote reports an archive or restore under the course switcher.
+const archivedOpen = ref(false), courseNote = ref("");
+function askArchive() {
+  if (!selected.value) return;
+  archiveTarget.value = selected.value; archiveError.value = ""; menuOpen.value = false;
+  archiveDialog.value?.showModal();
+}
+async function archiveCourse() {
+  const target = archiveTarget.value;
+  if (!target) return;
+  busy.value = true; archiveError.value = ""; error.value = "";
+  const result: object = await api.courses.archive({ course: target.course });
+  if ("error" in result) {
+    // The refusal's sentence stays in the dialog, so the learner sees why and can cancel. The course list is read
+    // again, so a course archived from another tab leaves the page.
+    const failure = result as { error: unknown; detail?: unknown };
+    archiveError.value = failureText(failure);
+    if (failure.error === "UNAUTHORIZED") archiveDialog.value?.close();
+    await loadAccount();
+    busy.value = false;
+    return;
+  }
+  archiveDialog.value?.close();
+  await loadAccount();
+  const next = activeCourses.value[0];
+  const text = `“${target.title}” is archived. Restore it from Archived courses${next ? " in the course menu" : ""}.`;
+  // Open another active course, or the welcome page when none is left.
+  if (next) { selectCourse(next.course); courseNote.value = text; } else { creating.value = false; notice.value = text; }
+  busy.value = false;
+  await nextTick(); document.getElementById(next ? "home-title" : "page-title")?.focus();
+}
+async function restoreCourse(course: Course) {
+  busy.value = true; error.value = ""; notice.value = ""; courseNote.value = "";
+  const result: object = await api.courses.restore({ course: course.course });
+  if ("error" in result) {
+    const failure = result as { error: unknown; detail?: unknown };
+    error.value = failureText(failure);
+    // Read the list again, so a course restored from another tab moves back among the current courses.
+    await loadAccount();
+    busy.value = false;
+    return;
+  }
+  await loadAccount();
+  const text = `“${course.title}” is back in your courses.`;
+  // With no active course open, the restored course opens. Otherwise the current course stays open.
+  if (!inCourse.value && !creating.value) selectCourse(course.course);
+  if (inCourse.value) courseNote.value = text; else notice.value = text;
+  busy.value = false;
+}
+
 const settingsDialog = ref<HTMLDialogElement | null>(null);
 // The header names the choice in the latest tutor settings record the page received. It reads only "Tutor" until one arrives.
 const tutorPanel = ref<InstanceType<typeof TutorPanel> | null>(null);
@@ -128,7 +183,7 @@ async function signOut() {
   busy.value = true; error.value = "";
   const result = await api.auth.logout({});
   if ("error" in result && result.error !== "UNAUTHORIZED") error.value = failureText(result);
-  else { username.value = null; courses.value = []; notice.value = ""; creating.value = false; menuOpen.value = false; }
+  else { username.value = null; courses.value = []; notice.value = ""; courseNote.value = ""; creating.value = false; menuOpen.value = false; }
   busy.value = false;
 }
 
@@ -163,14 +218,24 @@ onMounted(async () => {
       @update:home-view="saveHomeView" @settings="openSettings()" @tutor="openSettings(true)">
       <template #switcher>
         <div ref="switcher" class="switcher" @keydown.esc="closeMenu(true)">
-          <button class="switch card" type="button" :aria-expanded="menuOpen" aria-controls="course-menu" :disabled="busy" @click="menuOpen = !menuOpen">
+          <button class="switch card" type="button" :aria-expanded="menuOpen" aria-controls="course-menu" :disabled="busy" @click="menuOpen = !menuOpen; courseNote = ''">
             <span class="switch-text"><span class="eyebrow">Course</span><span class="switch-title">{{ selected!.title }}</span></span><svg aria-hidden="true" viewBox="0 0 12 12" width="12" height="12"><path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" /></svg>
           </button>
           <div v-if="menuOpen" id="course-menu" class="menu">
             <p class="menu-heading eyebrow">Courses</p>
-            <button v-for="c in courses" :key="c.course" type="button" class="row" :class="{ current: c.course === selected!.course && !creating }" :aria-current="c.course === selected!.course && !creating ? 'true' : undefined" @click="selectCourse(c.course)">{{ c.title }}</button>
+            <button v-for="c in activeCourses" :key="c.course" type="button" class="row" :class="{ current: c.course === selected!.course && !creating }" :aria-current="c.course === selected!.course && !creating ? 'true' : undefined" @click="selectCourse(c.course)">{{ c.title }}</button>
             <button type="button" class="row" @click="startCourse">+ New course</button>
+            <button type="button" class="row" aria-haspopup="dialog" @click="askArchive">Archive this course…</button>
+            <template v-if="archivedCourses.length">
+              <button type="button" class="row fold" :aria-expanded="archivedOpen" aria-controls="menu-archived" @click="archivedOpen = !archivedOpen">
+                <span>Archived courses ({{ archivedCourses.length }})</span><svg aria-hidden="true" viewBox="0 0 12 12" width="12" height="12"><path :d="archivedOpen ? 'M3 7.5 6 4.5 9 7.5' : 'M3 4.5 6 7.5 9 4.5'" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" /></svg>
+              </button>
+              <ul v-if="archivedOpen" id="menu-archived" class="archived-list">
+                <li v-for="c in archivedCourses" :key="c.course" class="archived-row"><span class="archived-title">{{ c.title }}</span><button type="button" class="quiet" :disabled="busy" :aria-label="`Restore ${c.title}`" @click="restoreCourse(c)">Restore</button></li>
+              </ul>
+            </template>
           </div>
+          <p v-if="courseNote" class="switch-note" role="status">{{ courseNote }}</p>
         </div>
       </template>
     </CourseWorkspace>
@@ -215,8 +280,14 @@ onMounted(async () => {
             <span class="create-wrap"><button class="primary meadow" :disabled="busy || !title.trim()" :aria-describedby="title.trim() ? undefined : 'course-reason'">{{ busy ? 'Saving…' : 'Create course' }}</button><p v-if="!title.trim()" id="course-reason" class="hint reason">Enter a course name to continue.</p></span>
           </form>
           <div class="welcome-links">
-            <button v-if="courses.length" class="quiet retry" :disabled="busy" @click="selectCourse(selected!.course)">Back to {{ selected!.title }}</button>
+            <button v-if="selected" class="quiet retry" :disabled="busy" @click="selectCourse(selected.course)">Back to {{ selected.title }}</button>
             <button class="quiet retry" type="button" :disabled="busy" @click="openSettings()">Settings</button>
+          </div>
+          <div v-if="archivedCourses.length" class="welcome-archived">
+            <button type="button" class="quiet retry" :aria-expanded="archivedOpen" aria-controls="welcome-archived" @click="archivedOpen = !archivedOpen">Archived courses ({{ archivedCourses.length }})</button>
+            <ul v-if="archivedOpen" id="welcome-archived" class="archived-list">
+              <li v-for="c in archivedCourses" :key="c.course" class="archived-row"><span class="archived-title">{{ c.title }}</span><button type="button" class="quiet" :disabled="busy" :aria-label="`Restore ${c.title}`" @click="restoreCourse(c)">Restore</button></li>
+            </ul>
           </div>
         </template>
         <div v-if="error" class="error" role="alert"><p>{{ error }}</p><button v-if="username" class="quiet" :disabled="busy" @click="reload">Reload saved work</button></div>
@@ -225,6 +296,16 @@ onMounted(async () => {
       <WelcomeScene />
     </main>
   </div>
+
+  <dialog v-if="username" ref="archiveDialog" class="app-settings confirm-dialog" aria-labelledby="archive-title" aria-describedby="archive-text">
+    <h2 id="archive-title" class="display">Archive “{{ archiveTarget?.title }}”?</h2>
+    <p id="archive-text" class="confirm-text">It leaves your course list. Its materials, skills, progress and plan are kept, and you can restore it from Archived courses in the course menu.</p>
+    <p v-if="archiveError" class="error" role="alert">{{ archiveError }}</p>
+    <div class="confirm-actions">
+      <button type="button" class="quiet" :disabled="busy" @click="archiveDialog?.close()">Cancel</button>
+      <button type="button" class="primary meadow" :disabled="busy" @click="archiveCourse">{{ busy ? 'Archiving…' : 'Archive course' }}</button>
+    </div>
+  </dialog>
 
   <dialog v-if="username" ref="settingsDialog" class="app-settings" aria-labelledby="app-settings-title">
     <header class="settings-head">
@@ -265,6 +346,15 @@ onMounted(async () => {
 .menu-heading { padding: 6px 10px 4px; }
 .row { padding: 8px 10px; border: 0; border-radius: 10px; background: transparent; color: var(--ink); font-size: 14px; text-align: left; overflow-wrap: anywhere; }
 .row:hover, .row.current { background: var(--meadow-soft); }
+.row.fold { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; border-top: 1px solid var(--line); border-radius: 0 0 10px 10px; color: var(--muted); }
+.row.fold svg { flex: none; }
+.archived-list { list-style: none; margin: 0; padding: 0 0 2px; display: flex; flex-direction: column; gap: 2px; }
+.archived-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 4px 10px; font-size: 14px; color: var(--soft); }
+.archived-title { min-width: 0; overflow-wrap: anywhere; }
+.archived-row .quiet { flex: none; padding: 4px 0; }
+.switch-note { margin: 8px 4px 0; font-size: 13px; color: var(--soft); line-height: 1.4; }
+.welcome-archived { width: 100%; max-width: 440px; }
+.welcome-archived .archived-row { padding: 4px 0; }
 .floating-error { position: fixed; z-index: 50; left: 50%; bottom: 20px; transform: translateX(-50%); width: min(520px, calc(100vw - 32px)); box-shadow: 0 10px 24px rgba(0, 0, 0, .18); }
 
 /* Sign-in and the pages before a course opens. */
@@ -309,4 +399,10 @@ onMounted(async () => {
 .tile-name { font-size: 14px; font-weight: 700; }
 .view-note { margin: 10px 0 0; font-size: 13px; color: var(--muted); }
 .account-line { margin: 0 0 10px; font-size: 14px; color: var(--soft); }
+.confirm-dialog { width: min(460px, calc(100vw - 32px)); }
+.confirm-dialog h2 { margin: 0 0 8px; font-size: 24px; overflow-wrap: anywhere; }
+.confirm-text { margin: 0; color: var(--soft); font-size: 15px; line-height: 1.5; }
+.confirm-dialog .error { margin: 12px 0 0; }
+.confirm-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px 20px; margin-top: 18px; }
+.confirm-actions .primary { margin-top: 0; }
 </style>

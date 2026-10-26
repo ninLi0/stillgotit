@@ -43,7 +43,7 @@ describe("SkillMapping course storage", () => {
 
     expect(course).toBeString();
     expect(await skills._course({ course })).toEqual([{ owner, title }]);
-    expect(await skills._courses({ owner })).toEqual([{ course, title }]);
+    expect(await skills._courses({ owner })).toEqual([{ course, title, status: "ACTIVE" }]);
   });
 
   test("refuses blank titles without changing saved courses", async () => {
@@ -70,14 +70,14 @@ describe("SkillMapping course storage", () => {
 
     for (const title of titles) {
       const { course } = await skills.createCourse({ owner, title });
-      expected.push({ course, title });
+      expected.push({ course, title, status: "ACTIVE" as const });
     }
     const other = await skills.createCourse({ owner: otherOwner, title: "Biology" });
     expected.sort((a, b) => (a.course < b.course ? -1 : 1));
 
     expect(await skills._courses({ owner })).toEqual(expected);
     expect(await skills._courses({ owner: otherOwner })).toEqual([
-      { course: other.course, title: "Biology" },
+      { course: other.course, title: "Biology", status: "ACTIVE" },
     ]);
   });
 

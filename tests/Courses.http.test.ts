@@ -30,6 +30,7 @@ const SENTENCES: Record<string, string> = {
   SKILL_STILL_REQUIRED: "Remove this skill from other active skills' prerequisites first.",
   SKILL_RESTORE_UNAVAILABLE: "Choose one of your archived skills.",
   SKILL_RESTORE_PREREQUISITES: "Restore this skill's prerequisites before restoring the skill.",
+  DRAFT_DISCARD_UNAVAILABLE: "Only your draft skills can be discarded.",
 };
 // The HTTP error each refusal maps to in the host's public error policy, and its status.
 const HTTP: Record<string, { status: number; error: string }> = {
@@ -39,12 +40,13 @@ const HTTP: Record<string, { status: number; error: string }> = {
   SKILL_MATERIAL_UNAVAILABLE: { status: 409, error: "CONFLICT" }, SKILL_PREREQUISITES_UNAVAILABLE: { status: 409, error: "CONFLICT" },
   INVALID_SKILL_PREREQUISITES: { status: 400, error: "INVALID_REQUEST" }, SKILL_ARCHIVE_UNAVAILABLE: { status: 409, error: "CONFLICT" },
   SKILL_STILL_REQUIRED: { status: 409, error: "CONFLICT" }, SKILL_RESTORE_UNAVAILABLE: { status: 409, error: "CONFLICT" },
-  SKILL_RESTORE_PREREQUISITES: { status: 409, error: "CONFLICT" },
+  SKILL_RESTORE_PREREQUISITES: { status: 409, error: "CONFLICT" }, DRAFT_DISCARD_UNAVAILABLE: { status: 409, error: "CONFLICT" },
 };
 // Each endpoint calls exactly one SkillMapping action.
 const ACTIONS = {
   "/courses/skills/details": "editDetails", "/courses/skills/revise": "reviseDefinition", "/courses/skills/sources/add": "attachMaterial",
   "/courses/skills/prerequisites": "setPrerequisites", "/courses/skills/archive": "archive", "/courses/skills/restore": "restore",
+  "/courses/skills/discard": "discardDraft",
 } as const;
 
 async function setup({ clock, tutor = {
@@ -155,6 +157,7 @@ test("each new endpoint refuses an unknown or another learner's record with COUR
   const outsiderSource = await app.material(outsider, outsiderCourse);
   await learner.ok("/learning/confidence", { skill, confidence: 50 });
   await learner.ok("/courses/skills/prerequisites", { skill: second, prerequisites: [skill] });
+  const draft = await app.skill(learner, unit, source, "A draft", false);
   const before = await snapshot(app, learner, course);
   const requests: [string, Record<string, unknown>][] = [
     ["/courses/skills/details", { skill, unit: other, title: "Renamed by someone else" }],
@@ -164,6 +167,7 @@ test("each new endpoint refuses an unknown or another learner's record with COUR
     ["/courses/skills/prerequisites", { skill: second, prerequisites: [] }],
     ["/courses/skills/archive", { skill: second }],
     ["/courses/skills/restore", { skill }],
+    ["/courses/skills/discard", { skill: draft }],
     ["/courses/units/emphasis", { unit, emphasized: true }],
   ];
   for (const [path, input] of requests) {
@@ -177,6 +181,48 @@ test("each new endpoint refuses an unknown or another learner's record with COUR
     expect((await outsider.post(path, { ...input, owner: learner.user })).status, path).toBeGreaterThanOrEqual(400);
   }
   expect(await snapshot(app, learner, course)).toEqual(before);
+}, 60_000);
+
+test("DiscardDraft removes a saved draft with its versions and refuses any other skill with the concept's code and sentence", async () => {
+  const app = await setup(), { learner, course, unit, source, skills: [skill, archived] } = await app.course("discard", ["Products", "Set aside"]);
+  await learner.ok("/courses/skills/archive", { skill: archived });
+  const draft = await app.skill(learner, unit, source, "A draft", false), other = await app.skill(learner, unit, source, "Another draft", false);
+  // Editing the draft's requirements saves a second version, so both of its versions must go.
+  const mapping = app.concepts.SkillMapping, current = async () => (await mapping._skill({ skill: draft }))[0]!.current;
+  const first = await current();
+  await learner.ok("/courses/skills/edit", { skill: draft, unit, material: source, title: "A draft", outcome: "A changed outcome", gate: "A changed gate" });
+  const versions = [first, await current()];
+  expect(versions[1]).not.toBe(first);
+  for (const version of versions) expect(await mapping._version({ version })).toEqual([expect.objectContaining({ skill: draft })]);
+  const before = await learner.ok("/courses/read", { course });
+
+  expect(await learner.ok("/courses/skills/discard", { skill: draft })).toEqual({});
+  // The course read loses the draft's rows and nothing else.
+  const without = <T extends { skill: string }>(rows: T[]) => rows.filter((row) => row.skill !== draft);
+  const after = await learner.ok("/courses/read", { course });
+  expect(after).toEqual({ ...before, skills: without(before.skills), skillSources: without(before.skillSources), versions: without(before.versions),
+    prerequisites: without(before.prerequisites) });
+  expect(after.skills.map((row: { skill: string }) => row.skill)).toEqual(expect.arrayContaining([skill, archived, other]));
+  // SkillMapping no longer has the skill or any of its versions.
+  expect(await mapping._skill({ skill: draft })).toEqual([]);
+  expect((await mapping._skills({ unit })).map((row) => row.skill)).not.toContain(draft);
+  for (const version of versions) expect(await mapping._version({ version })).toEqual([]);
+  // Repeating the request finds no skill, so it gets the answer for an unknown record.
+  expect(await learner.post("/courses/skills/discard", { skill: draft })).toEqual({ status: 403, body: { error: "FORBIDDEN" } });
+  expect(await learner.invoke("/courses/skills/discard", { skill: draft })).toEqual({ ok: false, error: { kind: "domain", value: "COURSE_UNAVAILABLE" } });
+
+  // A confirmed skill and an archived skill are refused with the concept's code and sentence, and nothing changes.
+  await expectActionRefusal(app, learner, "/courses/skills/discard", { skill }, "DRAFT_DISCARD_UNAVAILABLE");
+  await expectActionRefusal(app, learner, "/courses/skills/discard", { skill: archived }, "DRAFT_DISCARD_UNAVAILABLE");
+  // Another learner is refused as for an unknown skill, and nothing changes.
+  const outsider = app.browser(); await outsider.signIn("discard-outsider");
+  expect(await outsider.post("/courses/skills/discard", { skill: other })).toEqual({ status: 403, body: { error: "FORBIDDEN" } });
+  expect(await outsider.invoke("/courses/skills/discard", { skill: other })).toEqual({ ok: false, error: { kind: "domain", value: "COURSE_UNAVAILABLE" } });
+  expect(await learner.ok("/courses/read", { course })).toEqual(after);
+
+  // The native gateway discards a draft the same way.
+  expect(await learner.invoke("/courses/skills/discard", { skill: other })).toEqual({ ok: true, value: {} });
+  expect((await learner.ok("/courses/read", { course })).skills.map((row: { skill: string }) => row.skill)).not.toContain(other);
 }, 60_000);
 
 test("EditSkillDetails renames and moves a confirmed skill within its course and passes SkillMapping refusals through", async () => {

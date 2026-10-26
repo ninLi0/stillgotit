@@ -139,6 +139,7 @@ export function stillGotItPolicy(publicOrigin: string, requestBodyBytes = BODY_L
       SKILL_CONFIRM_UNAVAILABLE: "CONFLICT",
       SKILL_SOURCE_REQUIRED: "INVALID_REQUEST",
       DRAFT_REVISION_UNAVAILABLE: "CONFLICT",
+      DRAFT_DISCARD_UNAVAILABLE: "CONFLICT",
       DRAFT_UNIT_MISMATCH: "INVALID_REQUEST",
       INVALID_DRAFT_CONTENT: "INVALID_REQUEST",
       UNIT_EMPHASIS_UNAVAILABLE: "FORBIDDEN",
@@ -155,6 +156,9 @@ export function stillGotItPolicy(publicOrigin: string, requestBodyBytes = BODY_L
       SKILL_STILL_REQUIRED: "CONFLICT",
       SKILL_RESTORE_UNAVAILABLE: "CONFLICT",
       SKILL_RESTORE_PREREQUISITES: "CONFLICT",
+      COURSE_ARCHIVE_UNAVAILABLE: "CONFLICT",
+      COURSE_RESTORE_UNAVAILABLE: "CONFLICT",
+      COURSE_ACTIVITY_IN_PROGRESS: "INVALID_REQUEST",
     },
     cookies: {
       session: {
@@ -210,6 +214,8 @@ export const refusalDetails: Readonly<Record<string, string>> = {
   SESSION_CHANGED: "This session closed before the tutor's answer could be saved. Your own work in it is still saved.",
   SKILL_CHANGED: "This skill changed while the tutor was answering, so nothing was saved. Try again.",
   MATERIAL_UNAVAILABLE: "This material is not available in this course. Reload the page to see its materials.",
+  // Courses.md: ArchiveCourse's refusal while an activity is in progress in the course.
+  COURSE_ACTIVITY_IN_PROGRESS: "Finish or stop the current activity in this course before archiving it.",
 };
 
 /** Codes whose design gives a sentence only on some endpoints. Other endpoints answer the same code without one. */

@@ -15,6 +15,8 @@ external User
   The identity that owns a course.
 external Material
   A source reference. Its content and access rules belong outside this concept.
+CourseStatus is ACTIVE or ARCHIVED
+  Whether a course is in the learner's list of current courses or set aside.
 SkillStatus is DRAFT or CONFIRMED or ARCHIVED
   Whether a skill is proposed, active, or inactive.
 opaque MaterialSet
@@ -31,6 +33,7 @@ opaque SkillMapRows
 a set of Courses with
   an owner User
   a title String
+  a status CourseStatus
 a set of Units with
   a course Course
   a title String
@@ -50,6 +53,7 @@ a set of Versions with
 a set of Revised Versions with
   a previous Version
 Rule: each unit belongs to an existing course. Each skill belongs to an existing unit.
+Rule: a new course is ACTIVE. Archiving a course sets it aside without removing anything: only its status changes, its units, skills, and versions stay as they are, and every other action and query treats an archived course like an active one. Restoring makes it ACTIVE again.
 Rule: a unit or skill belongs to the owner of its course. An unknown record belongs to no owner.
 Rule: emphasized records that the learner marked a unit as one the professor stressed, so the course shows which units matter most; a new unit is not emphasized.
 Rule: a skill's current version belongs to that skill. Existing versions never change. Discarding a draft removes its versions; other actions preserve them.
@@ -71,8 +75,26 @@ createCourse(owner: User, title: String) : returns (course: Course)
     refuses INVALID_COURSE_TITLE "Enter a course title."
   where title is not blank
   then
-    create course with owner and title
+    create course with owner, title, and status ACTIVE
     returns course
+
+archiveCourse(owner: User, course: Course) : returns ()
+  where course does not belong to owner or is not ACTIVE
+  then
+    refuses COURSE_ARCHIVE_UNAVAILABLE "Choose one of your active courses."
+  where course is owner's active course
+  then
+    set the course's status to ARCHIVED
+    returns
+
+restoreCourse(owner: User, course: Course) : returns ()
+  where course does not belong to owner or is not ARCHIVED
+  then
+    refuses COURSE_RESTORE_UNAVAILABLE "Choose one of your archived courses."
+  where course is owner's archived course
+  then
+    set the course's status to ACTIVE
+    returns
 
 addUnit(owner: User, course: Course, title: String) : returns (unit: Unit)
   where course does not belong to owner
@@ -232,8 +254,8 @@ restore(owner: User, skill: Skill) : returns ()
 ## Queries
 
 ```queries
-_courses(owner: User) : many (course: Course, title: String)
-  Returns the owner's courses, ordered by course identity. Returns no rows when there are none.
+_courses(owner: User) : many (course: Course, title: String, status: CourseStatus)
+  Returns the owner's courses in every status, each with its status, ordered by course identity. Returns no rows when there are none.
 
 _course(course: Course) : optional (owner: User, title: String)
   Returns the course's owner and title. Returns no row for an unknown course.
