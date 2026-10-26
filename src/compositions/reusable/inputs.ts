@@ -36,7 +36,8 @@ export const courseListOutput: EndpointValidator = (value) => {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return { ok: false };
   const record = value as Record<string, unknown>;
   return { ok: Object.keys(record).length === 1 && Array.isArray(record.courses) &&
-    record.courses.every((course) => recordOutput(["course", "title"])(course).ok) };
+    record.courses.every((course) => recordOutput(["course", "title", "status"])(course).ok &&
+      ["ACTIVE", "ARCHIVED"].includes((course as { status: string }).status)) };
 };
 
 export const errorOutput: EndpointValidator = (value) =>

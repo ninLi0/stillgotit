@@ -155,6 +155,9 @@ export function stillGotItPolicy(publicOrigin: string, requestBodyBytes = BODY_L
       SKILL_STILL_REQUIRED: "CONFLICT",
       SKILL_RESTORE_UNAVAILABLE: "CONFLICT",
       SKILL_RESTORE_PREREQUISITES: "CONFLICT",
+      COURSE_ARCHIVE_UNAVAILABLE: "CONFLICT",
+      COURSE_RESTORE_UNAVAILABLE: "CONFLICT",
+      COURSE_ACTIVITY_IN_PROGRESS: "INVALID_REQUEST",
     },
     cookies: {
       session: {
@@ -204,6 +207,8 @@ export const refusalDetails: Readonly<Record<string, string>> = {
   GRADED_MATERIAL_NOT_SOURCE: "Graded work is evidence, not a teaching source.",
   IMPORTED_GATE_UNAVAILABLE: "Imported coursework cannot show the complete demonstration gate.",
   REGRADE_IMPORTED_UNAVAILABLE: "Imported coursework has no practice task to regrade, so correct it manually instead.",
+  // Courses.md: ArchiveCourse's refusal while an activity is in progress in the course.
+  COURSE_ACTIVITY_IN_PROGRESS: "Finish or stop the current activity in this course before archiving it.",
 };
 
 /** Codes whose design gives a sentence only on some endpoints. Other endpoints answer the same code without one. */

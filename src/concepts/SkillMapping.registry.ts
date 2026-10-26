@@ -3,6 +3,8 @@ import spec from "@design/concepts/SkillMapping.md" with { type: "text" };
 import {
   SkillMapping,
   InvalidCourseTitleError,
+  CourseArchiveUnavailableError,
+  CourseRestoreUnavailableError,
   UnitCourseUnavailableError,
   InvalidUnitTitleError,
   UnitEmphasisUnavailableError,
@@ -35,6 +37,8 @@ export const skillMapping = registerConcept({
   spec,
   refusals: {
     INVALID_COURSE_TITLE: InvalidCourseTitleError,
+    COURSE_ARCHIVE_UNAVAILABLE: CourseArchiveUnavailableError,
+    COURSE_RESTORE_UNAVAILABLE: CourseRestoreUnavailableError,
     UNIT_COURSE_UNAVAILABLE: UnitCourseUnavailableError,
     INVALID_UNIT_TITLE: InvalidUnitTitleError,
     UNIT_EMPHASIS_UNAVAILABLE: UnitEmphasisUnavailableError,

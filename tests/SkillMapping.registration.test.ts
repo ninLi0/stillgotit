@@ -62,7 +62,7 @@ describe("SkillMapping framework registration", () => {
     const { course } = success(await skills.createCourse({ owner, title: "Linear Algebra" }));
     const { unit } = success(await skills.addUnit({ owner, course, title: "Matrices" }));
     const otherUnit = success(await skills.addUnit({ owner, course, title: "Review" }));
-    expect(await skills._courses({ owner })).toEqual([{ course, title: "Linear Algebra" }]);
+    expect(await skills._courses({ owner })).toEqual([{ course, title: "Linear Algebra", status: "ACTIVE" }]);
     expect(await skills._course({ course })).toEqual([{ owner, title: "Linear Algebra" }]);
     expect(await skills._unit({ unit })).toEqual([{ course, title: "Matrices" }]);
     expect(await skills._units({ course })).toHaveLength(2);

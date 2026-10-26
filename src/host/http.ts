@@ -33,7 +33,8 @@ const commandInput = (path: string, value: unknown) => (gradedCommands[path] ?? 
 /** Course changes that run under the learner's lock, over HTTP and through the native gateway. Paths exclude `/api`. */
 const courseCommands = new Set(["/courses/create", "/courses/units/add", "/courses/units/emphasis", "/courses/skills/propose",
   "/courses/skills/edit", "/courses/skills/confirm", "/courses/skills/details", "/courses/skills/revise", "/courses/skills/sources/add",
-  "/courses/skills/prerequisites", "/courses/skills/archive", "/courses/skills/restore"]);
+  "/courses/skills/prerequisites", "/courses/skills/archive", "/courses/skills/restore",
+  "/courses/archive", "/courses/restore"]);
 
 /**
  * An answer from the exported runtime gateway. A refusal whose code has a sentence also carries that sentence as
