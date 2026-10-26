@@ -22,6 +22,19 @@ The detail does not name the attachment that failed. The page lists only photos 
 
 Respond answers after the turn is saved. Question then requests the tutor's answer from the saved dialogue, so the provider receives every attached file. Assessment later uses all files saved in the learner's responses. Removing a photo before sending only changes the list the screen sends; nothing is saved until the learner sends.
 
+## Finishing a lesson
+
+A practice task closes when its attempt is submitted, as CloseSubmitted in the [progress reactions](Progress.md) describes. A lesson has no submission, so the learner says when it is finished. [FinishLesson](reaction:Learning.FinishLesson) takes `studySession`.
+
+- When the request arrives, `Sessioning.use` turns the session into the acting learner. No request field can name another learner.
+- Where [OpenSession](view:Reads.OpenSession) holds for that learner and session, and `GroundedTutoring._lesson` finds the session as a lesson, the endpoint calls `GroundedTutoring.close` with the learner as owner and the session, and answers `{}`.
+- Where OpenSession holds but `GroundedTutoring._lesson` finds no lesson, the session is an open practice task. The endpoint answers `SESSION_UNAVAILABLE` and changes nothing, because a task closes only when its attempt is submitted.
+- Where OpenSession does not hold, because the session is unknown, belongs to another learner, or is already closed, the endpoint answers `SESSION_UNAVAILABLE` and changes nothing. A second request to finish the same lesson gets this answer.
+
+No public code says "this is a practice task", so request admission does the explaining: it declines both refusal cases first, with the sentence of [FinishReady](former:Access.FinishReady), as the [request admission](LearningAccess.md) describes.
+
+A finished lesson keeps its request, explanation, and dialogue, and Read still returns it with status CLOSED. Respond, Question, Reply, and Transcript refuse it, because OpenSession no longer holds, and [Continue](reaction:Reads.Continue) no longer lists it. A lesson cannot be opened again; the learner starts a new lesson to keep going. No reaction is triggered by `GroundedTutoring.close`. CloseSubmitted and RepairReadClosure call it only for a task with a submitted case, which a lesson never has, so finishing a lesson changes no case, estimate, or plan.
+
 ## Assessment
 
 [Assess](reaction:Learning.Assess) requires the learner to review the complete attempt and declare freshness and outside help. Confirmation triggers submission and closure. The endpoint waits for those actions, asks the provider to judge the saved original work, rechecks the session, and records the judgment. It waits for the resulting progress reactions before responding. A provider failure leaves a closed, unjudged case. When the session is not one of the learner's open sessions, Assess answers `SESSION_UNAVAILABLE` before confirming anything. [RetryAssessment](reaction:Learning.RetryAssessment) grades that saved case without changing its work, date, criteria, or identity. Its session is already closed, so RetryAssessment answers `SESSION_UNAVAILABLE` only when the session is not one of the learner's own. The UI reads completed judgments instead of submitting them again.
@@ -32,7 +45,7 @@ Respond answers after the turn is saved. Question then requests the tutor's answ
 
 Each of these refusals reaches the learner with one sentence, which the host adds as `detail`, as the [runtime contract](../runtime.md) describes:
 
-- `SESSION_UNAVAILABLE`, from Respond, Question, Reply, Hint, Transcript, Assess, and RetryAssessment: "This session is closed or is not one of yours. Choose one of your open sessions."
+- `SESSION_UNAVAILABLE`, from Respond, Question, Reply, Hint, Transcript, FinishLesson, Assess, and RetryAssessment: "This session is closed or is not one of yours. Choose one of your open sessions."
 - `SESSION_CHANGED`, from Question, Reply, and Hint when the session closes while the tutor answers: "This session closed before the tutor's answer could be saved. Your own work in it is still saved."
 - `SKILL_CHANGED`, from Lesson and Task when the skill's requirements change, or the skill stops being one of the learner's confirmed skills, while the tutor answers: "This skill changed while the tutor was answering, so nothing was saved. Try again."
 - `MATERIAL_UNAVAILABLE`, from Suggest, and from the material read and the skill endpoints of the [course composition](Courses.md): "This material is not available in this course. Reload the page to see its materials."
@@ -113,6 +126,7 @@ Learning.Question at /learning/question
 Learning.Reply at /learning/reply
 Learning.Hint at /learning/hint
 Learning.Transcript at /learning/transcript
+Learning.FinishLesson at /learning/finish
 Learning.Assess at /learning/assess
 Learning.RetryAssessment at /learning/retry
 Learning.Correct at /learning/correct

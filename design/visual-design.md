@@ -75,6 +75,7 @@ The charts add no colors; each one comes from the palette above or from `pixel-a
 - **A message's time is in its tooltip.** Hovering a message shows when it was saved, such as "Oct 25, 3:04 PM". Screen readers hear the same time after the speaker's name.
 - **The thread stays where the learner is reading.** New messages scroll the thread to the latest one. When the learner has scrolled more than one screen up, a white "Jump to latest ↓" pill appears over the bottom of the thread instead.
 - **The message box grows with its text.** It starts at two lines and grows to six; longer text scrolls inside it. Enter sends, and Shift+Enter starts a new line.
+- **An open lesson can be finished.** "Finish lesson" ends the message box's tools, in the same outlined pill that holds "Ask for a hint" in practice, and acts at once, as the app's other lasting actions do; a message still in the box must be sent or cleared first. A finished lesson keeps its tab and thread but offers no "Retry tutor reply", and in place of the message box it shows "This lesson is finished. Start a new conversation to keep going." with "Keep learning", as a submitted attempt shows "This attempt is saved."
 - **Assessment cards show the change in mastery.** Beside the result, "Mastery" heads the estimate before and after the attempt, such as "50% → 95%", with the change in points below. An attempt that did not count says "Did not change the estimate" and gives the reason.
 
 ### Motion

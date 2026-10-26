@@ -164,6 +164,16 @@ const Transcript = endpoint("/learning/transcript", ({ session, studySession, tu
     where(R.OpenSession({ owner, studySession })).then(Tutoring.confirmTranscript({ owner, session: studySession, turnIndex, text }).responds({})).then(respond({})).named("owned"),
     where(no(R.OpenSession({ owner, studySession }))).then(respond({ error: "SESSION_UNAVAILABLE" })).named("missing"),
   ), options);
+// A lesson has no submission, so the learner finishes it here. A practice task closes only when its attempt is submitted
+// (CloseSubmitted in progress.ts), so an open task gets the same refusal as a session that is not open; admission's
+// sentence says to submit it instead. Nothing reacts to close, so no case, estimate, or plan changes.
+const FinishLesson = endpoint("/learning/finish", ({ session, studySession, owner }) => receive({ session, studySession })
+  .then(Sessioning.use({ session }).responds({ subject: owner })).then(
+    where(R.OpenSession({ owner, studySession }), Tutoring._lesson({ lesson: studySession }))
+      .then(Tutoring.close({ owner, session: studySession }).responds({})).then(respond({})).named("owned"),
+    where(R.OpenSession({ owner, studySession }), no(Tutoring._lesson({ lesson: studySession }))).then(respond({ error: "SESSION_UNAVAILABLE" })).named("practice"),
+    where(no(R.OpenSession({ owner, studySession }))).then(respond({ error: "SESSION_UNAVAILABLE" })).named("missing"),
+  ), options);
 
 // Admission also checks the dialogue length and the attempt's content with attemptIsReady; the endpoint checks only the
 // learner's review and declarations, and Tutoring.confirmAttempt checks the dialogue length itself. Confirming the attempt
@@ -276,4 +286,4 @@ const Suggest = endpoint("/courses/skills/suggest", ({ session, material, owner,
     .then(AI.generate({ owner, request: prepared }).responds({ answer })))
   .then(Sessioning.use({ session }).responds({ subject: owner }))
   .then(where(compute(C.generationFields, { answer }, { suggestions })).then(respond({ suggestions, tutor: Settings.SentTutor({ request: prepared }) }))), options);
-export const composition = { Read, Progress, Confidence, Lesson, Task, Respond, Question, Reply, Hint, Transcript, Assess, RetryAssessment, Correct, Regrade, Adjust, ReplanAfterAdjustment, Suggest };
+export const composition = { Read, Progress, Confidence, Lesson, Task, Respond, Question, Reply, Hint, Transcript, FinishLesson, Assess, RetryAssessment, Correct, Regrade, Adjust, ReplanAfterAdjustment, Suggest };

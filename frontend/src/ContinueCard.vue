@@ -4,7 +4,7 @@ import PixelIcon from "./PixelIcon.vue";
 import { activityLabel, continueOrder, requestSession, type OpenSession } from "./continue-session.ts";
 
 // Home's Continue card: the learner's open lessons and practice tasks in this course (/learning/continue). Selecting a
-// row opens that skill's study page on that session. Lessons stay open until a later change closes them, so the card
+// row opens that skill's study page on that session. Lessons stay open until the learner finishes them, so the card
 // shows the few most recent and counts the rest.
 const SHOWN = 4;
 const props = defineProps<{ sessions: readonly OpenSession[] }>();
