@@ -166,7 +166,7 @@ onBeforeUnmount(() => { observer?.disconnect(); });
 </template>
 
 <style scoped>
-.plan-sea{position:relative;height:136px;border-radius:16px;overflow:hidden;border:1px solid #CFE7F2;background:#9BD7EC}
+.plan-sea{position:relative;height:136px;border-radius:16px;overflow:hidden;border:1px solid var(--sea-line);background:var(--sea)}
 .sea-wrap{position:absolute;inset:0}
 canvas{position:absolute;left:0;top:0;image-rendering:pixelated}
 .sprites{position:absolute;left:0;top:0;overflow:hidden;pointer-events:none}
@@ -177,8 +177,8 @@ canvas{position:absolute;left:0;top:0;image-rendering:pixelated}
 .swim{transform:translateX(round(var(--drift-x),var(--snap,1px)));animation:sgSwim var(--period-x) var(--ease-loop) var(--delay-x) infinite}
 .dive{transform:translateY(round(var(--drift-y),var(--snap,1px)));animation:sgDive var(--period-y) var(--ease-loop) var(--delay-y) infinite alternate}
 .spout{animation:sgSpout calc(var(--period-y) * 2) var(--ease-loop) var(--delay-y) infinite}
-.sea-sign{position:absolute;transform:translate(-50%,-100%);display:flex;flex-direction:column;align-items:center;padding:3px 9px 4px;background:#E9D6A8;box-shadow:inset 0 -2px 0 #CDB884,0 0 0 2px #C08324;white-space:nowrap;pointer-events:none}
+.sea-sign{position:absolute;transform:translate(-50%,-100%);display:flex;flex-direction:column;align-items:center;padding:3px 9px 4px;background:var(--plank);box-shadow:inset 0 -2px 0 var(--plank-edge),0 0 0 2px var(--plank-ring);white-space:nowrap;pointer-events:none}
 .sign-title{font-family:var(--font-display);font-size:13px;color:var(--ink)}
 .sign-date{font-size:11px;font-weight:700;color:var(--soft)}
-.sea-you{position:absolute;transform:translateX(-50%);font-family:var(--font-display);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#08344D;background:rgba(255,255,255,.85);padding:2px 6px;white-space:nowrap;pointer-events:none}
+.sea-you{position:absolute;transform:translateX(-50%);font-family:var(--font-display);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--sea-label);background:var(--scene-label);padding:2px 6px;white-space:nowrap;pointer-events:none}
 </style>

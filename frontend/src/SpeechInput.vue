@@ -40,11 +40,11 @@ watch(() => props.active, (active) => { if (active === false && recorder?.state 
   </button><p v-if="!compact" class="hint">{{ recording ? 'Recording. Stop when you finish.' : 'Review the transcript below. The microphone recording is discarded.' }}</p></div>
 </template>
 <style scoped>
-.record-button{display:flex;gap:10px;align-items:center;border:2px solid var(--coral);background:#FFFFFF;border-radius:12px;padding:11px 16px;font-weight:700;color:var(--ink)}.recording{background:var(--coral);color:#FFFFFF}.voice-input{margin:18px 0}
+.record-button{display:flex;gap:10px;align-items:center;border:2px solid var(--coral);background:var(--card);border-radius:12px;padding:11px 16px;font-weight:700;color:var(--ink)}.recording{background:var(--coral);color:var(--on-fill)}.voice-input{margin:18px 0}
 .compact{margin:0}
-.compact .record-button{gap:6px;border:1px solid var(--line);border-radius:999px;background:#FFFFFF;padding:5px 12px;min-height:30px;font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap}
-.compact .record-button:hover:not(:disabled){border-color:rgba(20,20,20,.35);color:var(--ink)}
-.speak-square{width:8px;height:8px;flex:none;background:#C0503C}
+.compact .record-button{gap:6px;border:1px solid var(--line);border-radius:999px;background:var(--card);padding:5px 12px;min-height:30px;font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap}
+.compact .record-button:hover:not(:disabled){border-color:var(--line-strong);color:var(--ink)}
+.speak-square{width:8px;height:8px;flex:none;background:var(--record)}
 .compact .record-button.recording{background:var(--coral-wash);border-color:var(--coral);color:var(--coral-text)}
 /* While recording, the square pulses on the loop curve. */
 .compact .record-button.recording .speak-square{animation:sgPulse var(--loop-beat) var(--ease-loop) infinite}

@@ -114,15 +114,15 @@ onBeforeUnmount(() => { observer?.disconnect(); });
 </template>
 
 <style scoped>
-.home-scene { position: relative; min-height: 214px; border-radius: 24px; overflow: hidden; border: 1px solid #DCEBE1; background: #DDEFF3; }
+.home-scene { position: relative; min-height: 214px; border-radius: 24px; overflow: hidden; border: 1px solid var(--home-line); background: var(--home-sky); }
 .scene-art { position: absolute; inset: 0; }
 canvas { position: absolute; left: 0; top: 0; image-rendering: pixelated; }
 .sprites { position: absolute; left: 0; top: 0; overflow: hidden; pointer-events: none; }
-.plank { position: absolute; transform: translate(-50%, -100%); display: flex; flex-direction: column; align-items: center; padding: 3px 9px 4px; background: #E9D6A8; box-shadow: inset 0 -2px 0 #CDB884, 0 0 0 2px #C08324; white-space: nowrap; pointer-events: none; }
-.plank-title { font: 400 13px var(--font-display); color: #151515; }
-.plank-when { font-size: 11px; font-weight: 700; color: #4A4A48; }
-.you { position: absolute; z-index: 2; transform: translateX(-30%); font: 400 11px var(--font-display); letter-spacing: 1px; text-transform: uppercase; color: #1F4A30; background: rgba(255, 255, 255, .85); padding: 2px 6px; white-space: nowrap; pointer-events: none; }
-.scene-panel { position: relative; z-index: 1; margin: 16px; max-width: 52%; background: #FFFFFF; border-radius: 18px; padding: 16px 18px; box-shadow: 0 0 0 1px rgba(20, 40, 30, .06), 0 10px 22px rgba(20, 60, 40, .08); display: flex; flex-direction: column; gap: 6px; animation: sgRise var(--dur-enter) var(--ease-enter) both; }
+.plank { position: absolute; transform: translate(-50%, -100%); display: flex; flex-direction: column; align-items: center; padding: 3px 9px 4px; background: var(--plank); box-shadow: inset 0 -2px 0 var(--plank-edge), 0 0 0 2px var(--plank-ring); white-space: nowrap; pointer-events: none; }
+.plank-title { font: 400 13px var(--font-display); color: var(--plank-ink); }
+.plank-when { font-size: 11px; font-weight: 700; color: var(--plank-soft); }
+.you { position: absolute; z-index: 2; transform: translateX(-30%); font: 400 11px var(--font-display); letter-spacing: 1px; text-transform: uppercase; color: var(--meadow-label); background: var(--scene-label); padding: 2px 6px; white-space: nowrap; pointer-events: none; }
+.scene-panel { position: relative; z-index: 1; margin: 16px; max-width: 52%; background: var(--card); border-radius: 18px; padding: 16px 18px; box-shadow: 0 0 0 1px rgb(var(--shadow) / .06), 0 10px 22px rgb(var(--shadow) / .08); display: flex; flex-direction: column; gap: 6px; animation: sgRise var(--dur-enter) var(--ease-enter) both; }
 @media (max-width: 760px) { .scene-panel { max-width: 66%; } }
 @media (max-width: 520px) { .scene-panel { max-width: none; margin: 12px 12px 86px; } }
 </style>

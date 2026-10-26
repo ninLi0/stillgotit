@@ -62,6 +62,6 @@ onBeforeUnmount(() => { generation++; clearTimeout(timer); observer?.disconnect(
 </template>
 
 <style scoped>
-.pdf-canvas { display: block; position: relative; background: #FFFFFF; }
+.pdf-canvas { display: block; position: relative; background: var(--pdf-page); }
 canvas { display: block; width: 100%; height: 100%; }
 </style>

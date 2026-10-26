@@ -105,13 +105,13 @@ onBeforeUnmount(() => observer?.disconnect());
 </template>
 
 <style scoped>
-.welcome-scene { position: relative; margin: 0; align-self: stretch; min-height: 460px; display: flex; flex-direction: column; justify-content: flex-end; border-radius: 24px; overflow: hidden; background: #CFE3EE; }
+.welcome-scene { position: relative; margin: 0; align-self: stretch; min-height: 460px; display: flex; flex-direction: column; justify-content: flex-end; border-radius: 24px; overflow: hidden; background: var(--sky); }
 .scene-wrap { position: absolute; inset: 0 0 112px; overflow: hidden; }
 canvas { display: block; image-rendering: pixelated; }
-.plank { position: absolute; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; max-width: 150px; padding: 3px 8px 4px; background: #E9D6A8; box-shadow: inset 0 -2px 0 #CDB884, 0 0 0 2px #C08324; white-space: nowrap; }
+.plank { position: absolute; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; max-width: 150px; padding: 3px 8px 4px; background: var(--plank); box-shadow: inset 0 -2px 0 var(--plank-edge), 0 0 0 2px var(--plank-ring); white-space: nowrap; }
 .plank-title { max-width: 100%; overflow: hidden; text-overflow: ellipsis; font: 400 12px/15px var(--font-display); color: var(--ink); }
 .plank-meta { font: 600 11px/14px var(--font-body); color: var(--soft); font-variant-numeric: tabular-nums; }
-.scene-caption { position: relative; margin: 14px; padding: 14px 16px; border-radius: 16px; background: rgba(255, 255, 255, .94); box-shadow: 0 0 0 1px var(--card-border); }
+.scene-caption { position: relative; margin: 14px; padding: 14px 16px; border-radius: 16px; background: var(--scene-card); box-shadow: 0 0 0 1px var(--card-border); }
 .scene-caption .eyebrow { margin: 0 0 4px; }
 .caption-text { margin: 0 0 10px; font-size: 14px; color: var(--soft); line-height: 1.5; }
 .legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 14px; }

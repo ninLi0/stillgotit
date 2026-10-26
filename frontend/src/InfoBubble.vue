@@ -42,7 +42,7 @@ onBeforeUnmount(() => { document.removeEventListener("click", onDocumentClick, t
 <style scoped>
 .info-wrap { position: relative; display: inline-flex; align-items: center; }
 .info-button { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 8px; background: transparent; }
-.info-button:hover { background: #F1F1EE; }
-.info-bubble { position: absolute; top: calc(100% + 6px); left: 0; z-index: 40; width: 260px; padding: 10px 12px; border-radius: 12px; background: #1C1C1D; color: #fff; font-size: 12px; line-height: 1.5; box-shadow: 0 10px 24px rgba(0, 0, 0, .22); animation: sgRise var(--dur-enter) var(--ease-enter); }
+.info-button:hover { background: var(--inset-2); }
+.info-bubble { position: absolute; top: calc(100% + 6px); left: 0; z-index: 40; width: 260px; padding: 10px 12px; border-radius: 12px; background: var(--tip); color: var(--tip-text); font-size: 12px; line-height: 1.5; box-shadow: 0 10px 24px rgb(var(--shadow) / .22); animation: sgRise var(--dur-enter) var(--ease-enter); }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 </style>

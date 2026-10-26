@@ -141,15 +141,15 @@ onBeforeUnmount(() => objectUrls.forEach((url) => URL.revokeObjectURL(url)));
 .compact .source-list{flex-direction:row;flex-wrap:wrap;align-items:center;gap:6px 8px;margin-top:10px}
 .compact li.open{flex-basis:100%}
 .chips li{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
-.chips .source-toggle{padding:3px 10px;border:1px solid var(--line);border-radius:999px;background:#FFFFFF;color:var(--ink);font-size:12px;font-weight:600;text-align:left;max-width:100%;overflow-wrap:anywhere}
+.chips .source-toggle{padding:3px 10px;border:1px solid var(--line);border-radius:999px;background:var(--card);color:var(--ink);font-size:12px;font-weight:600;text-align:left;max-width:100%;overflow-wrap:anywhere}
 .chips .source-toggle:hover{background:var(--inset)}
-.rail .source-toggle{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:0;border-radius:10px;background:#F7F5FD;padding:8px 10px;font-size:13px;font-weight:600;color:var(--dawn-soft-text)}
+.rail .source-toggle{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:0;border-radius:10px;background:var(--lesson-source);padding:8px 10px;font-size:13px;font-weight:600;color:var(--dawn-soft-text)}
 .rail .source-toggle:hover{background:var(--dawn-soft)}
 .source-name{flex:1;min-width:0;overflow-wrap:anywhere}
 .chips .source-name{flex:initial}
-.file-tag{flex:none;font-size:9px;font-weight:800;padding:2px 5px;border-radius:5px;background:var(--coral-wash);color:#B5502B}
+.file-tag{flex:none;font-size:9px;font-weight:800;padding:2px 5px;border-radius:5px;background:var(--coral-wash);color:var(--file-tag)}
 .source-toggle[aria-expanded="true"]{box-shadow:0 0 0 2px var(--dawn-edge)}
-.passage{flex-basis:100%;margin:2px 0 10px;padding:12px 14px;border:1px solid var(--line);border-left:3px solid var(--dawn-edge);border-radius:10px;background:#FFFFFF;color:var(--ink)}
+.passage{flex-basis:100%;margin:2px 0 10px;padding:12px 14px;border:1px solid var(--line);border-left:3px solid var(--dawn-edge);border-radius:10px;background:var(--card);color:var(--ink)}
 .passage-label{margin:0 0 8px;font-size:12px;font-weight:600;color:var(--muted)}
 .passage-text{margin:0 0 8px;max-height:260px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;line-height:1.7}
 .passage-text:focus-visible{outline:3px solid var(--dawn-edge);outline-offset:2px}
