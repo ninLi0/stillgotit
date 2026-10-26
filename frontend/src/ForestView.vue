@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, useId, watch } from "vue";
+import CourseProgress from "./CourseProgress.vue";
 import InfoBubble from "./InfoBubble.vue";
 import MasteryCells from "./MasteryCells.vue";
 import PixelIcon from "./PixelIcon.vue";
@@ -269,11 +270,6 @@ onUnmounted(() => {
         </div>
       </div>
       <div class="forest-tools">
-        <ul class="forest-counts" aria-label="Skills by stage">
-          <li v-for="c in counts" :key="c.key" class="forest-count">
-            <PixelIcon :sprite="c.sprite" :size="21" /><strong>{{ c.n }}</strong><span>{{ c.label }}</span>
-          </li>
-        </ul>
         <button type="button" class="forest-regrow" title="Draw the trees again. Your skills stay the same." @click="emit('regrow')">Regrow</button>
         <button type="button" class="primary meadow forest-back" aria-label="Back to desk: close the course forest" @click="emit('close')">Back to desk</button>
       </div>
@@ -327,14 +323,8 @@ onUnmounted(() => {
           <p v-else class="card-empty">Choose a leaf or a signpost.</p>
         </section>
 
-        <section class="forest-whole" :aria-labelledby="`${titleId}-whole`">
-          <h3 :id="`${titleId}-whole`" class="eyebrow">Whole course</h3>
-          <div class="whole-row">
-            <span class="whole-pct">{{ courseAverage === null ? "–" : `${courseAverage}%` }}</span>
-            <span class="whole-note"><template v-if="courseAverage !== null">average mastery<br /></template>{{ courseNote }}</span>
-          </div>
-          <MasteryCells class="whole-cells" :value="courseAverage" :cells="20" :height="10" off="#F1F1EE" />
-        </section>
+        <!-- The course summary sits beside the forest (under it on phones), with the counts that once sat in the header. -->
+        <CourseProgress :heading-id="`${titleId}-progress`" :average="courseAverage" :note="courseNote" :counts="counts" />
 
         <section v-if="topics.length" class="forest-topics" :aria-labelledby="`${titleId}-topics`">
           <h3 :id="`${titleId}-topics`" class="eyebrow">Topics</h3>
@@ -347,7 +337,9 @@ onUnmounted(() => {
                   <strong class="topic-name">{{ t.title }}</strong>
                   <MasteryCells class="topic-cells" :value="t.avg" :cells="14" :height="5" off="#F1F1EE" />
                 </span>
-                <span class="topic-pct">{{ t.avg === null ? "New" : `${t.avg}%` }}</span>
+                <span class="topic-figures">
+                  <span class="topic-pct">{{ t.avg === null ? "New" : `${t.avg}%` }}</span><span class="topic-count">{{ plural(t.skills.length, "skill") }}</span>
+                </span>
               </button>
               <ul v-show="t.open" :id="`${titleId}-topic-${i}`" class="skill-list" :aria-label="`Skills in ${t.title}`">
                 <li v-for="s in t.skills" :key="s.skill">
@@ -381,10 +373,6 @@ onUnmounted(() => {
 .forest-course { font-size: 12px; overflow-wrap: anywhere; }
 .forest-title { margin: 0; font-family: var(--font-display); font-size: 22px; font-weight: 500; line-height: 1.2; }
 .forest-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.forest-counts { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
-.forest-count { display: flex; align-items: center; gap: 8px; padding: 6px 12px 6px 8px; border-radius: 999px; background: #FFFFFF; box-shadow: 0 0 0 1px var(--ring); font-size: 13px; white-space: nowrap; }
-.forest-count strong { font-size: 15px; font-weight: 700; }
-.forest-count span { color: var(--muted); }
 .forest-regrow { border: 0; border-radius: 12px; background: #FFFFFF; padding: 9px 14px; font-size: 13px; font-weight: 600; white-space: nowrap; }
 .forest-regrow:hover { background: var(--inset-2); }
 .forest-back { min-height: 40px; padding: 0 16px; font-size: 14px; white-space: nowrap; }
@@ -424,14 +412,7 @@ onUnmounted(() => {
 .card-open { flex: 1 1 auto; }
 .card-empty { margin: 0; font-size: 14px; line-height: 1.5; color: var(--muted); }
 
-/* Whole course */
-.forest-whole .eyebrow { margin-bottom: 6px; }
-.whole-row { display: flex; align-items: baseline; gap: 10px; }
-.whole-pct { font-size: 34px; font-weight: 700; line-height: 1; letter-spacing: -1px; }
-.whole-note { font-size: 14px; line-height: 1.35; color: var(--muted); }
-.forest-whole .whole-cells { margin-top: 10px; max-width: none; }
-
-/* Topics accordion */
+/* Topics accordion: one row per topic with its average as cells, the number, and its skill count. */
 .forest-topics { margin-top: 20px; }
 .forest-topics .eyebrow { margin-bottom: 8px; }
 .topic-list, .skill-list { margin: 0; padding: 0; list-style: none; }
@@ -442,7 +423,9 @@ onUnmounted(() => {
 .topic-main { min-width: 0; }
 .topic-name { display: block; font-size: 14px; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
 .topic-main .topic-cells { display: flex; margin-top: 5px; max-width: none; }
-.topic-pct { font-size: 13px; font-weight: 700; }
+.topic-figures { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; text-align: right; white-space: nowrap; }
+.topic-pct { font-size: 13px; font-weight: 700; line-height: 1.3; }
+.topic-count { font-size: 11px; line-height: 1.3; color: var(--muted); }
 .skill-list { display: flex; flex-direction: column; gap: 2px; margin: 2px 0 8px 20px; padding-left: 12px; border-left: 2px solid #DDDDD8; }
 .skill-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 8px; border: 0; border-radius: 10px; background: transparent; text-align: left; }
 .skill-row:hover { background: var(--inset); }

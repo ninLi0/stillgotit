@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
+import EstimateChart from "./EstimateChart.vue";
+import PixelIcon from "./PixelIcon.vue";
 import { api, errorMessage, failureText } from "./api.ts";
+import { KIND_MARKS, KIND_NAMES, type ChartPoint } from "./estimate-chart.ts";
+import { MARKS } from "./pixel-art.ts";
 import { focusedControl, restoreFocus } from "./focus.ts";
 import { planDay, resultLabels } from "./labels.ts";
 import { PendingAdjustment, sessionStore, type AdjustmentInput } from "./pending-adjustment.ts";
@@ -125,12 +129,60 @@ function timing(change: Change, index: number) {
 }
 const startText = computed(() => props.data.explanation?.start.startingBasis === "PREVIOUS_DEFINITION"
   ? "Carried over from an earlier version of this skill." : "Your reported starting confidence.");
+
+// ---- The evidence timeline's rows: a date, a mark for the kind, a plain sentence, and the values in their own column ----
+/** "Tue, Oct 13" as the date over the weekday; a date planDay could not read stays whole. */
+function dateParts(at: string) {
+  const [weekday, day] = planDay(at).split(", ");
+  return day ? { day, weekday } : { day: weekday ?? "", weekday: "" };
+}
+/** How a change moved the estimate, in whole percents as the values column shows them. */
+function moved(before: number, after: number) {
+  const from = Math.round(before), to = Math.round(after);
+  return to > from ? `raised it from ${from}% to ${to}%` : to < from ? `lowered it from ${from}% to ${to}%` : `left it at ${to}%`;
+}
+/** Each judgment as the subject of a sentence ("A small execution error lowered it …"). */
+const RESULT_SUBJECT: Record<string, string> = {
+  INDEPENDENT: "Independent success", SUPPORTED: "Success with help", SLIP: "A small execution error", GAP: "A gap in understanding", UNCERTAIN: "An uncertain result",
+};
+function attemptPlace(item: Case | undefined) {
+  if (!item) return "";
+  if (isImported(item)) return ` on imported work (original mark ${item.work.originalMark.trim()})`;
+  return item.task ? ` in ${props.sessionLabels[item.task] ?? "practice"}` : " in an assessment";
+}
+function changeText(change: Change) {
+  if (change.kind === "ATTEMPT") {
+    const item = casesById.value.get(change.source), judged = item?.judgment?.result;
+    const subject = judged ? RESULT_SUBJECT[judged] ?? resultLabels[judged] ?? "An assessed attempt" : "An assessed attempt";
+    const fresh = judged === "INDEPENDENT" && item?.fresh ? " on fresh work" : "";
+    return `${subject}${fresh}${attemptPlace(item)} ${moved(change.before, change.after)}.`;
+  }
+  return `${change.kind === "ADJUSTMENT" ? "Your adjustment" : "Time without practice"} ${moved(change.before, change.after)}.`;
+}
+/** The starting point's date and one row per change, in the concept's order. */
+const startDate = computed(() => dateParts(props.data.explanation?.start.at ?? ""));
+const changeRows = computed(() => (props.data.explanation?.changes ?? []).map((change, index) => ({
+  key: `${index}:${change.kind}:${change.source}`, change, date: dateParts(change.at), text: changeText(change), detail: timing(change, index),
+})));
+/** Each attempt that did not count, named as the timeline has always named it, with the case's date when it is known. */
+const ignoredRows = computed(() => (props.data.explanation?.ignored ?? []).map((row, index) => {
+  const item = casesById.value.get(row.evidence);
+  return { key: `${index}:${row.evidence}`, reason: row.reason, date: item ? dateParts(item.performedAt) : null,
+    name: [caseName(item) || "An attempt", result(item)].filter(Boolean).join(" · ") };
+}));
 // The readiness sentence above often repeats the explanation's basis sentence. Show it once.
 const basisText = computed(() => {
   const basis = props.data.explanation?.basis.trim() ?? "";
   return basis && basis !== props.data.estimate?.basis.trim() ? basis : "";
 });
 function openCase(item: Case) { if (item.task) emit("openSession", item.task); }
+/** The chart's points: the starting point, then every change in the concept's order, with the timeline's own labels. */
+const chartPoints = computed<ChartPoint[]>(() => {
+  const explanation = props.data.explanation;
+  if (!explanation) return [];
+  return [{ at: explanation.start.at, kind: "START", before: null, after: explanation.start.confidence, label: "Starting point" },
+    ...explanation.changes.map((change): ChartPoint => ({ at: change.at, kind: change.kind, before: change.before, after: change.after, label: kindLabel(change) }))];
+});
 </script>
 
 <template>
@@ -163,29 +215,42 @@ function openCase(item: Case) { if (item.task) emit("openSession", item.task); }
     <div role="status"><p v-if="sending" class="working-note">Saving your adjustment…</p><p v-else-if="saved" ref="savedBox" class="notice" tabindex="-1">{{ saved }}</p></div>
 
     <template v-if="data.explanation">
+      <h3 id="estimate-chart-heading">Estimate over time</h3>
+      <EstimateChart :points="chartPoints" :provisional="data.explanation.provisional" labelledby="estimate-chart-heading" />
       <h3>How the estimate got here</h3>
       <p v-if="basisText" class="basis">{{ basisText }}</p>
       <p v-if="data.explanation.provisional" class="basis"><span class="provisional">Provisional</span>No assessed attempt has counted toward this estimate yet.</p>
-      <ol class="timeline">
-        <li class="row kind-start">
-          <span class="row-date">{{ planDay(data.explanation.start.at) }}</span>
-          <div class="row-body"><strong>Starting point</strong><p>{{ startText }}</p></div>
-          <span class="row-value">{{ percent(data.explanation.start.confidence) }}</span>
+      <!-- One row per change: the date, the kind's mark, a plain sentence with its timing, and the values, which the
+           sentence also says, so screen readers skip the values column. -->
+      <ol class="rows timeline">
+        <li class="row">
+          <span class="row-when"><span>{{ startDate.day }}</span><span class="row-weekday">{{ startDate.weekday }}</span></span>
+          <span class="row-mark"><PixelIcon :rows="MARKS.start" :size="10" :label="KIND_NAMES.START" /></span>
+          <p class="row-text">The estimate started at {{ percent(data.explanation.start.confidence) }}.</p>
+          <span class="row-values" aria-hidden="true"><strong>{{ percent(data.explanation.start.confidence) }}</strong></span>
+          <div class="row-more"><p class="row-detail">{{ startText }}</p></div>
         </li>
-        <li v-for="(change, index) in data.explanation.changes" :key="`${index}:${change.kind}:${change.source}`" class="row" :class="`kind-${change.kind.toLowerCase()}`">
-          <span class="row-date">{{ planDay(change.at) }}</span>
-          <div class="row-body">
-            <strong>{{ kindLabel(change) }}</strong>
+        <li v-for="{ key, change, date, text, detail } in changeRows" :key="key" class="row">
+          <span class="row-when"><span>{{ date.day }}</span><span class="row-weekday">{{ date.weekday }}</span></span>
+          <span class="row-mark"><PixelIcon :rows="MARKS[KIND_MARKS[change.kind]]" :size="10" :label="KIND_NAMES[change.kind]" /></span>
+          <p class="row-text">{{ text }}</p>
+          <span class="row-values" aria-hidden="true"><strong>{{ percent(change.after) }}</strong><span>from {{ percent(change.before) }}</span></span>
+          <div class="row-more">
             <p v-if="change.kind === 'ADJUSTMENT' && change.reason" class="row-reason">“{{ change.reason }}”</p>
-            <p>{{ timing(change, index) }}</p>
+            <p class="row-detail">{{ detail }}</p>
           </div>
-          <span class="row-value"><span class="sr-only">From </span>{{ percent(change.before) }}<span aria-hidden="true"> → </span><span class="sr-only"> to </span>{{ percent(change.after) }}</span>
         </li>
       </ol>
-      <template v-if="data.explanation.ignored.length">
+      <template v-if="ignoredRows.length">
         <h3>Attempts that did not count</h3>
-        <ul class="ignored">
-          <li v-for="(item, index) in data.explanation.ignored" :key="`${index}:${item.evidence}`"><strong>{{ caseName(casesById.get(item.evidence)) || 'An attempt' }}</strong>{{ item.reason }}</li>
+        <ul class="rows ignored">
+          <li v-for="item in ignoredRows" :key="item.key" class="row">
+            <span class="row-when"><template v-if="item.date"><span>{{ item.date.day }}</span><span class="row-weekday">{{ item.date.weekday }}</span></template></span>
+            <span class="row-mark"><PixelIcon :rows="MARKS.ignored" :size="10" label="Did not count" /></span>
+            <p class="row-text">{{ item.name }}</p>
+            <span class="row-values" aria-hidden="true"><span>No change</span></span>
+            <div class="row-more"><p class="row-detail">{{ item.reason }}</p></div>
+          </li>
         </ul>
       </template>
     </template>
@@ -231,20 +296,23 @@ function openCase(item: Case) { if (item.task) emit("openSession", item.task); }
 h3{font-family:var(--font-display);font-weight:500;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#7A7397;margin:16px 0 6px}
 .basis{margin:0 0 6px;color:var(--soft);line-height:1.5;font-size:12px}
 .provisional{display:inline-block;margin-right:6px;padding:0 7px;border-radius:999px;font-size:11px;font-weight:700;color:var(--dawn-soft-text);background:var(--dawn-soft)}
-.timeline{list-style:none;margin:10px 0 0 4px;padding:0;border-left:2px solid #E3DEF7}
-.row{position:relative;display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"body date" "body value";gap:0 8px;padding:0 0 12px 14px;line-height:1.35}
-.row::before{content:"";position:absolute;left:-6px;top:5px;width:10px;height:10px;background:#A79CEE}
-.kind-start::before{background:#D6D1F2}
-.kind-time::before{background:#E3DEF7}
-.row-date{grid-area:date;color:#8A8A86;font-size:12px;white-space:nowrap;text-align:right}
-.row-body{grid-area:body;min-width:0}
-.row-body strong{font-weight:700}
-.row-body p{margin:2px 0 0;color:var(--faint);font-size:12px;line-height:1.4}
-.row-body .row-reason{color:var(--ink);font-style:italic}
-.row-value{grid-area:value;font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums;text-align:right;font-size:12px}
-.ignored{margin:0;padding-left:16px;font-size:12px}
-.ignored li{margin:0 0 6px}
-.ignored strong{margin-right:6px}
+/* Evidence rows: the date, the kind's mark on a lavender rail, the sentence, and the values. The date and values
+   columns have fixed widths so the attempts that did not count line up under the same columns. */
+.rows{list-style:none;margin:10px 0 0;padding:0}
+.row{position:relative;display:grid;grid-template-columns:38px 10px minmax(0,1fr) 52px;grid-template-areas:"date mark text values" "date mark more more";gap:0 8px;padding:0 0 12px;line-height:1.35}
+.timeline .row:not(:last-child)::before{content:"";position:absolute;left:50px;top:14px;bottom:-3px;width:2px;background:#E3DEF7}
+.row-when{grid-area:date;display:flex;flex-direction:column;color:var(--ink);font-size:11px;font-weight:600;line-height:1.35;white-space:nowrap}
+.row-weekday{color:var(--muted);font-weight:400}
+.row-mark{grid-area:mark;display:flex;padding-top:3px}
+.row-text{grid-area:text;min-width:0;margin:0;color:var(--ink);font-size:12px;line-height:1.4}
+/* The reason and the timing run under the values column too, so they wrap less in the narrow rail. */
+.row-more{grid-area:more;min-width:0}
+.row-more p{margin:2px 0 0;font-size:12px;line-height:1.4}
+.row-detail{color:var(--faint)}
+.row-reason{color:var(--ink);font-style:italic}
+.row-values{grid-area:values;display:flex;flex-direction:column;align-items:flex-end;color:var(--muted);font-size:11px;line-height:1.35;text-align:right;white-space:nowrap}
+.row-values strong{color:var(--ink);font-size:13px;font-weight:700;line-height:1.25}
+.row-date{color:#8A8A86;font-size:12px;white-space:nowrap}
 .case-history{list-style:none;margin:0;padding:0}
 .case-history li{padding:8px 0;border-top:1px solid #EEEBF5}
 .case-history li:first-child{border-top:0}
