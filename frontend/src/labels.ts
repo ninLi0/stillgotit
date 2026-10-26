@@ -32,6 +32,31 @@ export function sourceLabel(location: string, materialTitle?: string): string {
   return `${materialTitle?.trim() || "Course material"} · ${placeLabel(location)}`;
 }
 
+/** A wait in whole seconds, such as "7 s", or "2 min 5 s" from a minute up. */
+export function secondsLabel(seconds: number): string {
+  const whole = Math.max(0, Math.round(seconds)), minutes = Math.floor(whole / 60), rest = whole % 60;
+  return minutes ? `${minutes} min${rest ? ` ${rest} s` : ""}` : `${whole} s`;
+}
+
+/** How many sources one answer cites: "1 source", "2 sources". */
+export function sourcesLabel(count: number): string {
+  return `${count} ${count === 1 ? "source" : "sources"}`;
+}
+
+/** How many dialogue turns a conversation has: "1 turn", "3 turns". */
+export function turnsLabel(count: number): string {
+  return `${count} ${count === 1 ? "turn" : "turns"}`;
+}
+
+// The date and the time are formatted apart, because browsers join them differently ("Oct 25, 3:04 PM" or "Oct 25 at 3:04 PM").
+const shortDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: STUDY_TIME_ZONE });
+const clockTime = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", timeZone: STUDY_TIME_ZONE });
+/** A saved time, such as a dialogue turn's, as "Oct 25, 3:04 PM" in New York. Empty when it is not a time. */
+export function messageTime(at: string | number): string {
+  const time = typeof at === "number" ? at : Date.parse(at);
+  return Number.isFinite(time) ? `${shortDate.format(time)}, ${clockTime.format(time)}` : "";
+}
+
 /**
  * Sidebar names for a skill's conversations: "Lesson 1", "Lesson 2", … and "Practice 1", … counted separately.
  * Sessions arrive in the order they were started, so a new conversation never renumbers an earlier one.

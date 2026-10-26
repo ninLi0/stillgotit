@@ -2,8 +2,9 @@
 import { computed, nextTick, onBeforeUnmount, onDeactivated, onMounted, ref, shallowRef, watch } from "vue";
 import { useAttachUpload } from "./attach-upload.ts";
 import SpeechInput from "./SpeechInput.vue";
-import ListenButton from "./ListenButton.vue";
 import SourcesUsed from "./SourcesUsed.vue";
+import ReplyMeta from "./ReplyMeta.vue";
+import ReplyActions from "./ReplyActions.vue";
 import EstimatePanel from "./EstimatePanel.vue";
 import PixelIcon from "./PixelIcon.vue";
 import MasteryCells from "./MasteryCells.vue";
@@ -11,7 +12,8 @@ import InfoBubble from "./InfoBubble.vue";
 import { stageOf } from "./pixel-art.ts";
 import type { OpenSource } from "./revamp-types.ts";
 import { api, unwrap } from "./api.ts";
-import { resultLabels, sessionLabels } from "./labels.ts";
+import { messageTime, resultLabels, secondsLabel, sessionLabels, turnsLabel } from "./labels.ts";
+import { answerSeconds } from "./reply-stats.ts";
 import { focusedControl, restoreFocus } from "./focus.ts";
 import { PendingAdjustment, sessionStore } from "./pending-adjustment.ts";
 import { listenUnavailable, stopSpeaking } from "./speech.ts";
@@ -55,11 +57,12 @@ async function load() {
   data.value = result;
   if (!freshLesson.value && !result.sessions.some((session) => session.session === selected.value)) selected.value = result.sessions.find((session) => session.status === "OPEN")?.session ?? result.sessions.at(-1)?.session ?? "";
 }
-// `success` is shown after the step finishes. Focus returns to the control the learner used, or to the result when that control is gone.
-async function act(work: () => Promise<void>, success = "") {
+// `success` is shown after the step finishes; a function gives a sentence that depends on how the step went.
+// Focus returns to the control the learner used, or to the result when that control is gone.
+async function act(work: () => Promise<void>, success: string | (() => string) = "") {
   const previous = focusedControl();
   busy.value = true; error.value = ""; notice.value = "";
-  try { await work(); await load(); notice.value = success; emit("changed"); }
+  try { await work(); await load(); notice.value = typeof success === "function" ? success() : success; emit("changed"); }
   catch (problem) { error.value = problem instanceof Error ? problem.message : "This step could not finish."; await load().catch(() => undefined); }
   finally {
     busy.value = false; await nextTick();
@@ -67,12 +70,24 @@ async function act(work: () => Promise<void>, success = "") {
   }
 }
 // While the tutor answers, the message leaves the box and waits in the thread as "Sending". A failure puts it back.
-const pending = ref<{ text: string; files: string[] } | null>(null);
+// `reply` says whether the tutor answers it: a lesson question does, while a practice answer is only saved.
+const pending = ref<{ text: string; files: string[]; reply: boolean } | null>(null);
+// The tutor's place shows how long the learner has waited, in whole seconds. It stops when the answer lands.
+const waitStarted = ref(0), waitNow = ref(0);
+let waitTicker: ReturnType<typeof setInterval> | undefined;
+watch(pending, (now) => {
+  clearInterval(waitTicker); waitTicker = undefined;
+  if (!now?.reply) return;
+  waitStarted.value = waitNow.value = Date.now();
+  waitTicker = setInterval(() => { waitNow.value = Date.now(); }, 1000);
+});
+const waited = computed(() => secondsLabel(Math.floor((waitNow.value - waitStarted.value) / 1000)));
+onBeforeUnmount(() => clearInterval(waitTicker));
 function takeDraft() {
   const text = response.value, sent = attachments.value, ch = channel.value;
-  pending.value = { text, files: sent.map((item) => item.name) };
+  pending.value = { text, files: sent.map((item) => item.name), reply: !current.value?.task };
   response.value = ""; attachments.value = []; channel.value = "TEXT";
-  void scrollToLatest();
+  void scrollToLatest(true);
   return { text, sent, ch, restore() { response.value = text; attachments.value = sent; channel.value = ch; pending.value = null; } };
 }
 async function startLesson() {
@@ -89,11 +104,41 @@ async function submitMessage() { if (!canSend.value) return; if (current.value) 
 // A starter prompt fills the message box. Focus moves there so the learner can edit it or press Enter to send.
 function choosePrompt(text: string) { response.value = text; composerInput.value?.focus(); }
 function enterToSend(event: KeyboardEvent) { if (event.key === "Enter" && !event.shiftKey && !event.isComposing) { event.preventDefault(); void submitMessage(); } }
-async function scrollToLatest() { await nextTick(); if (thread.value) thread.value.scrollTop = thread.value.scrollHeight; }
+// New messages scroll the thread to the latest one. A learner who has scrolled more than one screen up to read is not
+// pulled away: "Jump to latest" appears instead. `force` scrolls anyway, for the learner's own message and a newly chosen conversation.
+const awayFromLatest = ref(false), newBelow = ref(false), jumpButton = ref<HTMLButtonElement | null>(null);
+function onThreadScroll() {
+  const box = thread.value; if (!box) return;
+  awayFromLatest.value = box.scrollHeight - box.scrollTop - box.clientHeight > box.clientHeight;
+  if (!awayFromLatest.value) newBelow.value = false;
+}
+async function scrollToLatest(force = false) {
+  if (!force && awayFromLatest.value) { newBelow.value = true; return; }
+  await nextTick();
+  if (thread.value) thread.value.scrollTop = thread.value.scrollHeight;
+  awayFromLatest.value = false; newBelow.value = false;
+}
+/** The pill scrolls to the latest message. Keyboard focus, which was on the pill, moves to the message box or the thread. */
+function jumpToLatest() {
+  const box = thread.value; if (!box) return;
+  const hadFocus = document.activeElement === jumpButton.value;
+  box.scrollTo({ top: box.scrollHeight, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  awayFromLatest.value = false; newBelow.value = false;
+  if (hadFocus) (composerInput.value && !composerInput.value.disabled ? composerInput.value : box).focus({ preventScroll: true });
+}
+// The message box grows with its text up to six lines; CSS caps the height, and longer text scrolls inside the box.
+function fitComposer() {
+  const box = composerInput.value; if (!box) return;
+  box.style.height = "auto"; box.style.height = `${box.scrollHeight}px`;
+}
+watch(response, () => { void nextTick(fitComposer); });
+onMounted(() => window.addEventListener("resize", fitComposer));
+onBeforeUnmount(() => window.removeEventListener("resize", fitComposer));
 async function startTask() { await act(async () => { const result = unwrap(await api.learning.task({ skill: props.skill })); freshLesson.value = false; selected.value = result.task; reviewOpen.value = false; reviewed.value = false; unseen.value = true; outsideHelp.value = false; }); }
 async function send() {
   const session = current.value; if (!session) return;
   const draft = takeDraft();
+  let recovered = "";
   await act(async () => {
     // Photos go in the order the learner attached them.
     const input = { studySession: session.session, text: draft.text, channel: draft.ch, attachments: draft.sent.map((item) => item.material), dialogueLength: session.dialogue.length };
@@ -110,10 +155,12 @@ async function send() {
       const saved = !!now && now.session === session.session &&
         now.dialogue.slice(session.dialogue.length).some((item) => item.turn.speaker === "LEARNER" && item.turn.text === draft.text);
       if (saved) draft.sent.forEach(forgetPreview); else draft.restore();
+      // A practice answer waits for no tutor reply, so once it is saved the send has done its work and ends as a success.
+      if (saved && !session.lesson) { reviewed.value = false; recovered = "Your answer was saved."; return; }
       throw problem;
     }
     finally { pending.value = null; }
-  });
+  }, () => recovered);
 }
 function forgetPreview(item: Attachment) { if (item.preview) { URL.revokeObjectURL(item.preview); previews.delete(item.preview); } }
 const attach = useAttachUpload(() => props.course);
@@ -181,11 +228,19 @@ const masteryNote = computed(() => [data.value?.estimate?.basis ?? "No estimate 
   data.value?.explanation?.provisional ? "Provisional: no assessed attempt has counted toward this estimate yet." : "",
   "The mastery estimate is a study aid, not a course grade."].filter(Boolean).join(" "));
 const composerNote = computed(() => current.value?.task ? "Review your complete answer before requesting assessment." : "Grounded in your course materials. Check important details.");
-/** Session identities are time-ordered UUIDs (version 7), whose first 48 bits are the start time. Older ones have no date. */
+/**
+ * Session identities are time-ordered UUIDs (version 7), whose first 48 bits are the start time: the moment the opening
+ * lesson or task was saved. Older ones have no time.
+ */
+function sessionStart(id: string) { return id[14] === "7" ? parseInt(id.replace(/-/g, "").slice(0, 12), 16) : NaN; }
 const tabDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "America/New_York" });
+// The opening's time is when the lesson or task was saved; the read records no separate time for the learner's request.
+const openingTime = computed(() => {
+  const time = current.value ? sessionStart(current.value.session) : NaN;
+  return Number.isFinite(time) ? { label: messageTime(time), iso: new Date(time).toISOString() } : null;
+});
 function sessionDate(id: string) {
-  if (id[14] !== "7") return "";
-  const time = parseInt(id.replace(/-/g, "").slice(0, 12), 16);
+  const time = sessionStart(id);
   return Number.isFinite(time) ? tabDate.format(new Date(time)) : "";
 }
 function assessed(id: string) { return data.value?.cases.some((item) => item.task === id && !!item.judgment) ?? false; }
@@ -211,13 +266,16 @@ function blocks(text: string): { code: boolean; text: string }[] {
   return out.filter((part) => part.code || part.text.trim());
 }
 const SUCCESS = new Set(["INDEPENDENT", "SUPPORTED"]);
-/** The estimate after an assessed attempt and its change, from the explanation's timeline. */
+/** The estimate before and after an assessed attempt, and the change, from the timeline row whose attempt is that case. */
 function attemptChange(assessment: string) {
   const change = data.value?.explanation?.changes.find((row) => row.kind === "ATTEMPT" && row.source === assessment);
   if (!change) return null;
-  const delta = Math.round(change.after - change.before);
-  return { after: `${Math.round(change.after)}%`, delta: delta === 0 ? "No change" : `${delta > 0 ? "+" : "−"}${Math.abs(delta)} ${Math.abs(delta) === 1 ? "point" : "points"}` };
+  const delta = Math.round(change.after) - Math.round(change.before);
+  return { before: `${Math.round(change.before)}%`, after: `${Math.round(change.after)}%`,
+    delta: delta === 0 ? "No change" : `${delta > 0 ? "+" : "−"}${Math.abs(delta)} ${Math.abs(delta) === 1 ? "point" : "points"}` };
 }
+/** Why an assessed attempt did not count toward the estimate, as the timeline gives it, or empty when it counted. */
+function ignoredReason(assessment: string) { return data.value?.explanation?.ignored.find((row) => row.evidence === assessment)?.reason ?? ""; }
 // Under 1240px the rail slides over the lesson; the mastery chip opens it. evidenceOpen keeps its old meaning: the evidence is in view.
 const narrow = ref(false), railChip = ref<HTMLElement | null>(null), railClose = ref<HTMLButtonElement | null>(null);
 let narrowQuery: MediaQueryList | null = null;
@@ -254,9 +312,9 @@ defineExpose({ startPractice });
 watch(selected, (next, previous) => {
   unsent.set(previous, { text: response.value, channel: channel.value, attachments: attachments.value });
   const saved = unsent.get(next); response.value = saved?.text ?? ""; channel.value = saved?.channel ?? "TEXT"; attachments.value = saved?.attachments ?? []; reviewed.value = false;
-  void scrollToLatest();
+  void scrollToLatest(true);
 });
-watch(() => [current.value?.dialogue.length, busy.value], scrollToLatest);
+watch(() => [current.value?.dialogue.length, busy.value], () => { void scrollToLatest(); });
 watch(current, (session) => { speechEdits.value = Object.fromEntries(session?.voice.map((voice) => [voice.turnIndex, voice.text]) ?? []); });
 // Each tutor answer names the model and thinking level that wrote it. The read after it shows which answers are new, and they get that label.
 const answeredBy = ref<Record<string, TutorUsed>>({});
@@ -291,61 +349,75 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
         </div>
         <nav class="tabs" aria-label="Conversations for this skill">
           <button v-for="session in data?.sessions" :key="session.session" type="button" class="tab" :class="{ chosen: !freshLesson && selected === session.session }" :aria-current="!freshLesson && selected === session.session ? 'true' : undefined" :title="session.lesson?.request || (session.status === 'CLOSED' ? 'Submitted work' : 'Independent check')" :disabled="busy || recording" @click="selectSession(session.session)">
-            <span class="tab-square" :class="session.lesson ? 'lesson' : 'practice'" aria-hidden="true" />{{ labels[session.session] }}<span v-if="sessionDate(session.session)" class="tab-date">{{ sessionDate(session.session) }}</span><span v-if="assessed(session.session)" class="tab-done"><span aria-hidden="true">✓</span><span class="sr-only">, assessed</span></span>
+            <span class="tab-square" :class="session.lesson ? 'lesson' : 'practice'" aria-hidden="true" />{{ labels[session.session] }}<span class="tab-meta"><span v-if="sessionDate(session.session)" class="tab-date">{{ sessionDate(session.session) }}<span aria-hidden="true"> · </span></span><span class="sr-only">, </span>{{ turnsLabel(session.dialogue.length) }}</span><span v-if="assessed(session.session)" class="tab-done"><span aria-hidden="true">✓</span><span class="sr-only">, assessed</span></span>
           </button>
           <button type="button" class="new-lesson" :class="{ chosen: freshLesson || !data?.sessions.length }" :disabled="busy || recording" @click="newLesson">+ New conversation</button>
         </nav>
       </header>
-      <div ref="thread" class="chat-thread">
-        <div class="thread-inner">
-          <div v-if="data && !data.track" class="confidence-note">
-            <form @submit.prevent="saveConfidence"><label for="confidence">How confident do you feel?</label><div class="confidence"><input id="confidence" v-model.number="confidence" type="range" min="0" max="100" :disabled="busy" /><output>{{ confidence }}%</output><button :disabled="busy" class="secondary dawn small-button">Set starting point</button></div><p class="hint">A rough estimate is fine. Your practice will refine it.</p></form>
-          </div>
-          <div v-if="!current && data && !pending" class="chat-welcome">
-            <PixelIcon name="leaf" :size="48" /><h2>Let's work through it.</h2><p>{{ data.skill.outcome }}</p>
-            <div class="prompt-choices"><button :disabled="busy" @click="choosePrompt('Explain this skill with a worked example.')">Show me an example</button><button :disabled="busy" @click="choosePrompt('Explain why this method works, using a concrete example.')">Help me understand why</button><button :disabled="busy" @click="choosePrompt('Walk me through guided practice. Ask one question at a time.')">Guide me through practice</button></div>
-          </div>
-          <template v-if="current">
-            <div v-if="current.lesson" class="message from-you"><span class="sr-only">You</span><p class="prose">{{ current.lesson.request }}</p></div>
-            <article class="message from-tutor"><div class="speaker-row"><span class="speaker"><PixelIcon name="leaf" :size="18" /> StillGotIt<span v-if="current.task" class="tag task">Practice task</span></span><ListenButton :message-key="`${current.session}:opening`" :text="current.lesson?.explanation || current.task?.question || ''" :what="current.lesson ? 'lesson' : 'practice question'" describedby="listen-reason" /></div>
-              <div class="prose-blocks"><template v-for="(part, partIndex) in blocks(current.lesson?.explanation || current.task?.question || '')" :key="partIndex"><pre v-if="part.code" class="code-block">{{ part.text }}</pre><p v-else class="prose">{{ part.text }}</p></template></div>
-              <p v-if="answerLabel('session', current.session)" class="tutor-label">{{ answerLabel('session', current.session) }}</p>
-              <SourcesUsed v-if="current.citations.length" :key="current.session" :citations="current.citations" :titles="materialTitles" :id-prefix="`passage-${current.session}`" @open="openSource" />
-            </article>
-            <article v-for="item in current.dialogue" :key="item.turnIndex" class="message" :class="item.turn.speaker === 'LEARNER' ? 'from-you' : 'from-tutor'">
-              <div v-if="item.turn.speaker === 'TUTOR'" class="speaker-row"><span class="speaker"><PixelIcon name="leaf" :size="18" /> StillGotIt<span v-if="item.turn.purpose === 'HINT'" class="tag hint-tag">Hint</span><span v-else-if="item.turn.purpose === 'CORRECTION'" class="tag">Transcript correction</span></span><ListenButton :message-key="`${current.session}:${item.turnIndex}`" :text="item.turn.text" :what="item.turn.purpose === 'HINT' ? 'hint' : 'tutor reply'" describedby="listen-reason" /></div>
-              <template v-else><span class="sr-only">You{{ purposeNote(item.turn.purpose) }}</span><span v-if="purposeNote(item.turn.purpose)" class="tag you-tag" aria-hidden="true">{{ purposeNote(item.turn.purpose).replace(' · ', '') }}</span></template>
-              <div v-if="item.turn.speaker === 'TUTOR'" class="prose-blocks"><template v-for="(part, partIndex) in blocks(item.turn.text)" :key="partIndex"><pre v-if="part.code" class="code-block">{{ part.text }}</pre><p v-else class="prose">{{ part.text }}</p></template></div>
-              <p v-else class="prose">{{ item.turn.text }}</p>
-              <p v-for="(file, fileIndex) in item.turn.media" :key="file.file" class="attachment-label"><span class="attach-thumb" aria-hidden="true" />{{ item.turn.media.length > 1 ? `Attachment ${fileIndex + 1} of ${item.turn.media.length}` : 'Attachment' }} · {{ file.name }}</p><p v-if="answerLabel('turn', current.session, item.turnIndex)" class="tutor-label">{{ answerLabel('turn', current.session, item.turnIndex) }}</p></article>
-            <button v-if="current.lesson && current.dialogue.at(-1)?.turn.speaker === 'LEARNER' && !pending" class="message-action" :disabled="busy || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="retryReply">Retry tutor reply</button>
-            <div v-if="current.task && current.status === 'OPEN' && current.dialogue.some(item => item.turn.speaker === 'LEARNER' && item.turn.purpose === 'RESPONSE')" class="review-step">
-              <button class="secondary dawn" :disabled="busy || recording" :aria-expanded="reviewOpen" @click="reviewOpen = !reviewOpen">{{ reviewOpen ? 'Close review' : 'Review and assess my work' }}</button>
-              <div v-if="reviewOpen" class="attempt-review">
-                <div class="review-title"><h3>Ready for assessment?</h3><InfoBubble text="Review your complete answer before assessment. Your answers to these three questions go with your work, and Assess stays off until you confirm the review." /></div>
-                <div v-for="voice in current.voice" :key="voice.turnIndex" class="transcript"><label :for="`voice-${voice.turnIndex}`">Speech transcript {{ voice.turnIndex + 1 }}</label><textarea :id="`voice-${voice.turnIndex}`" v-model="speechEdits[voice.turnIndex]" rows="3" /><button class="message-action" :disabled="busy" @click="correctTranscript(voice.turnIndex)">Save transcript correction</button></div>
-                <label class="check"><input v-model="unseen" type="checkbox" /><span class="box" aria-hidden="true" />These exact problems are new to me.</label><label class="check"><input v-model="outsideHelp" type="checkbox" /><span class="box" aria-hidden="true" />I used help outside this conversation.</label><label class="check"><input v-model="reviewed" type="checkbox" /><span class="box" aria-hidden="true" />I reviewed my answer and all speech transcripts.</label>
-                <div class="assess-row"><button class="primary dawn" :disabled="busy || !!assessReason" :aria-describedby="assessReason ? 'assess-reason' : undefined" @click="assess">Assess my work</button><p v-if="assessReason" id="assess-reason" class="hint reason">{{ assessReason }}</p></div>
-              </div>
+      <div class="thread-wrap">
+        <div ref="thread" class="chat-thread" tabindex="-1" @scroll.passive="onThreadScroll">
+          <div class="thread-inner">
+            <div v-if="data && !data.track" class="confidence-note">
+              <form @submit.prevent="saveConfidence"><label for="confidence">How confident do you feel?</label><div class="confidence"><input id="confidence" v-model.number="confidence" type="range" min="0" max="100" :disabled="busy" /><output>{{ confidence }}%</output><button :disabled="busy" class="secondary dawn small-button">Set starting point</button></div><p class="hint">A rough estimate is fine. Your practice will refine it.</p></form>
             </div>
-            <button v-if="current.status === 'CLOSED' && !currentCases.some(item => item.judgment)" class="secondary dawn" :disabled="busy || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="assess">Retry saved assessment</button>
-            <article v-for="item in currentCases" :key="item.case" class="assessment">
-              <template v-if="item.judgment">
-                <div class="result-top"><div><p class="eyebrow">Assessment</p><h3 :class="{ success: SUCCESS.has(item.judgment.result) }">{{ resultLabels[item.judgment.result] }}</h3></div><div v-if="attemptChange(item.case)" class="result-figure"><p class="result-pct">{{ attemptChange(item.case)!.after }}</p><p class="result-delta">{{ attemptChange(item.case)!.delta }}</p></div></div>
-                <p class="prose rationale">{{ item.judgment.rationale }}</p>
-                <p v-if="answerLabel('judgment', item.judgment.judgment)" class="tutor-label">{{ answerLabel('judgment', item.judgment.judgment) }}</p>
-                <div class="result-actions"><button v-if="current.status === 'CLOSED'" class="secondary dawn" :disabled="busy || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="startTask">Try a fresh check</button></div>
-                <details class="regrade"><summary>This seems wrong? Review or correct this assessment</summary><label>Reason<textarea v-model="reason" rows="3" /></label><p v-if="!reason.trim()" :id="`reason-needed-${item.case}`" class="hint reason">Write a reason to request a regrade or save a correction.</p><button class="message-action" :disabled="busy || !aiAvailable || !reason.trim()" :aria-describedby="describedBy(!reason.trim() && `reason-needed-${item.case}`, !aiAvailable && 'ai-reason-chat')" @click="requestRegrade(item.case, item.judgment.judgment)">Request regrade</button>
-                  <label>Manual correction<select v-model="correction"><option v-for="(label,value) in resultLabels" :key="value" :value="value">{{ label }}</option></select></label><label class="check"><input v-model="fullGate" type="checkbox" /><span class="box" aria-hidden="true" />All requirements were met in fresh independent work.</label><button class="message-action" :disabled="busy || !reason.trim()" :aria-describedby="reason.trim() ? undefined : `reason-needed-${item.case}`" @click="saveCorrection(item.case, item.judgment.judgment)">Save correction</button><ol><li v-for="judgment in item.history" :key="judgment.judgment">{{ resultLabels[judgment.result] }} · {{ judgment.origin === 'AI' ? 'Tutor' : 'Your correction' }}<p>{{ judgment.rationale }}</p></li></ol></details>
-              </template><p v-else>Your answer is saved. Assessment is pending.</p>
-            </article>
-          </template>
-          <p v-if="busy" class="working" role="status"><PixelIcon name="leaf" :size="18" /> Working on it…</p>
-          <div role="status"><p v-if="notice && !busy" ref="noticeBox" class="notice" tabindex="-1">{{ notice }}</p></div>
-          <div role="alert"><p v-if="error" ref="errorBox" class="error" tabindex="-1">{{ error }}</p></div>
-          <article v-if="pending" class="message from-you pending" aria-live="polite"><span class="sr-only">You</span><p class="prose">{{ pending.text }}</p><p v-for="(name, fileIndex) in pending.files" :key="fileIndex" class="attachment-label"><span class="attach-thumb" aria-hidden="true" />Attachment · {{ name }}</p><p class="sending">Sending…</p></article>
-          <article v-if="pending" class="message from-tutor thinking" aria-hidden="true"><div class="speaker-row"><span class="speaker"><PixelIcon name="leaf" :size="18" /> StillGotIt</span></div><p class="prose dots"><span>·</span><span>·</span><span>·</span></p></article>
+            <div v-if="!current && data && !pending" class="chat-welcome">
+              <PixelIcon name="leaf" :size="48" /><h2>Let's work through it.</h2><p>{{ data.skill.outcome }}</p>
+              <div class="prompt-choices"><button :disabled="busy" @click="choosePrompt('Explain this skill with a worked example.')">Show me an example</button><button :disabled="busy" @click="choosePrompt('Explain why this method works, using a concrete example.')">Help me understand why</button><button :disabled="busy" @click="choosePrompt('Walk me through guided practice. Ask one question at a time.')">Guide me through practice</button></div>
+            </div>
+            <template v-if="current">
+              <!-- The opening: the learner's request, then the lesson or practice task in a card. A divider separates it from the dialogue. -->
+              <div class="opening">
+                <div v-if="current.lesson" class="message from-you"><span class="sr-only">You</span><p class="prose">{{ current.lesson.request }}</p></div>
+                <article class="message from-tutor opening-card" :class="{ latest: !current.dialogue.length }" :title="openingTime?.label">
+                  <div class="speaker-row"><span class="speaker"><span class="avatar"><PixelIcon name="leaf" :size="16" /></span> StillGotIt<span v-if="openingTime" class="sr-only">, <time :datetime="openingTime.iso">{{ openingTime.label }}</time></span><span v-if="current.task" class="tag task">Practice task</span></span></div>
+                  <div class="prose-blocks"><template v-for="(part, partIndex) in blocks(current.lesson?.explanation || current.task?.question || '')" :key="partIndex"><pre v-if="part.code" class="code-block">{{ part.text }}</pre><p v-else class="prose">{{ part.text }}</p></template></div>
+                  <SourcesUsed v-if="current.citations.length" :key="current.session" :citations="current.citations" :titles="materialTitles" :id-prefix="`passage-${current.session}`" @open="openSource" />
+                  <div class="reply-foot"><ReplyMeta :sources="current.citations.length" :tutor="answerLabel('session', current.session)" /><ReplyActions :message-key="`${current.session}:opening`" :text="current.lesson?.explanation || current.task?.question || ''" :what="current.lesson ? 'lesson' : 'practice question'" describedby="listen-reason" /></div>
+                </article>
+              </div>
+              <div v-if="current.dialogue.length || pending" class="thread-divider" role="separator" aria-label="Conversation"><span aria-hidden="true">Conversation</span></div>
+              <article v-for="(item, position) in current.dialogue" :key="item.turnIndex" class="message" :class="[item.turn.speaker === 'LEARNER' ? 'from-you' : 'from-tutor', { latest: position === current.dialogue.length - 1 }]" :title="messageTime(item.turn.at) || undefined">
+                <template v-if="item.turn.speaker === 'TUTOR'">
+                  <div class="speaker-row"><span class="speaker"><span class="avatar"><PixelIcon name="leaf" :size="16" /></span> StillGotIt<span v-if="messageTime(item.turn.at)" class="sr-only">, <time :datetime="item.turn.at">{{ messageTime(item.turn.at) }}</time></span><span v-if="item.turn.purpose === 'HINT'" class="tag hint-tag">Hint</span><span v-else-if="item.turn.purpose === 'CORRECTION'" class="tag">Transcript correction</span></span></div>
+                  <div class="prose-blocks"><template v-for="(part, partIndex) in blocks(item.turn.text)" :key="partIndex"><pre v-if="part.code" class="code-block">{{ part.text }}</pre><p v-else class="prose">{{ part.text }}</p></template></div>
+                </template>
+                <template v-else><span class="sr-only">You{{ purposeNote(item.turn.purpose) }}</span><span v-if="messageTime(item.turn.at)" class="sr-only">, <time :datetime="item.turn.at">{{ messageTime(item.turn.at) }}</time></span><span v-if="purposeNote(item.turn.purpose)" class="tag you-tag" aria-hidden="true">{{ purposeNote(item.turn.purpose).replace(' · ', '') }}</span>
+                  <p class="prose">{{ item.turn.text }}</p></template>
+                <p v-for="(file, fileIndex) in item.turn.media" :key="file.file" class="attachment-label"><span class="attach-thumb" aria-hidden="true" />{{ item.turn.media.length > 1 ? `Attachment ${fileIndex + 1} of ${item.turn.media.length}` : 'Attachment' }} · {{ file.name }}</p>
+                <div v-if="item.turn.speaker === 'TUTOR'" class="reply-foot"><ReplyMeta :seconds="answerSeconds(current.dialogue, item.turnIndex)" :sources="item.turn.citations.length" :tutor="answerLabel('turn', current.session, item.turnIndex)" /><ReplyActions :message-key="`${current.session}:${item.turnIndex}`" :text="item.turn.text" :what="item.turn.purpose === 'HINT' ? 'hint' : 'tutor reply'" describedby="listen-reason" /></div></article>
+              <!-- A lesson question without a reply: the retry sits where the tutor's reply would be. -->
+              <div v-if="current.lesson && current.dialogue.at(-1)?.turn.speaker === 'LEARNER' && !pending" class="retry-row"><span class="avatar"><PixelIcon name="leaf" :size="16" /></span><button class="secondary dawn reply-retry" :disabled="busy || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="retryReply"><span aria-hidden="true">↻</span>Retry tutor reply</button></div>
+              <div v-if="current.task && current.status === 'OPEN' && current.dialogue.some(item => item.turn.speaker === 'LEARNER' && item.turn.purpose === 'RESPONSE')" class="review-step">
+                <button class="secondary dawn" :disabled="busy || recording" :aria-expanded="reviewOpen" @click="reviewOpen = !reviewOpen">{{ reviewOpen ? 'Close review' : 'Review and assess my work' }}</button>
+                <div v-if="reviewOpen" class="attempt-review">
+                  <div class="review-title"><h3>Ready for assessment?</h3><InfoBubble text="Review your complete answer before assessment. Your answers to these three questions go with your work, and Assess stays off until you confirm the review." /></div>
+                  <div v-for="voice in current.voice" :key="voice.turnIndex" class="transcript"><label :for="`voice-${voice.turnIndex}`">Speech transcript {{ voice.turnIndex + 1 }}</label><textarea :id="`voice-${voice.turnIndex}`" v-model="speechEdits[voice.turnIndex]" rows="3" /><button class="message-action" :disabled="busy" @click="correctTranscript(voice.turnIndex)">Save transcript correction</button></div>
+                  <label class="check"><input v-model="unseen" type="checkbox" /><span class="box" aria-hidden="true" />These exact problems are new to me.</label><label class="check"><input v-model="outsideHelp" type="checkbox" /><span class="box" aria-hidden="true" />I used help outside this conversation.</label><label class="check"><input v-model="reviewed" type="checkbox" /><span class="box" aria-hidden="true" />I reviewed my answer and all speech transcripts.</label>
+                  <div class="assess-row"><button class="primary dawn" :disabled="busy || !!assessReason" :aria-describedby="assessReason ? 'assess-reason' : undefined" @click="assess">Assess my work</button><p v-if="assessReason" id="assess-reason" class="hint reason">{{ assessReason }}</p></div>
+                </div>
+              </div>
+              <button v-if="current.status === 'CLOSED' && !currentCases.some(item => item.judgment)" class="secondary dawn" :disabled="busy || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="assess">Retry saved assessment</button>
+              <article v-for="item in currentCases" :key="item.case" class="assessment">
+                <template v-if="item.judgment">
+                  <div class="result-top"><div><p class="eyebrow">Assessment</p><h3 :class="{ success: SUCCESS.has(item.judgment.result) }">{{ resultLabels[item.judgment.result] }}</h3></div><div v-if="attemptChange(item.case)" class="result-figure"><p class="eyebrow">Mastery</p><p class="result-pct"><span aria-hidden="true">{{ attemptChange(item.case)!.before }} → {{ attemptChange(item.case)!.after }}</span><span class="sr-only">from {{ attemptChange(item.case)!.before }} to {{ attemptChange(item.case)!.after }}</span></p><p class="result-delta">{{ attemptChange(item.case)!.delta }}</p></div>
+                    <div v-else-if="ignoredReason(item.case)" class="result-figure unchanged"><p class="eyebrow">Mastery</p><p class="result-same">Did not change the estimate</p><p class="result-delta">{{ ignoredReason(item.case) }}</p></div></div>
+                  <p class="prose rationale">{{ item.judgment.rationale }}</p>
+                  <p v-if="answerLabel('judgment', item.judgment.judgment)" class="tutor-label">{{ answerLabel('judgment', item.judgment.judgment) }}</p>
+                  <div class="result-actions"><button v-if="current.status === 'CLOSED'" class="secondary dawn" :disabled="busy || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="startTask">Try a fresh check</button></div>
+                  <details class="regrade"><summary>This seems wrong? Review or correct this assessment</summary><label>Reason<textarea v-model="reason" rows="3" /></label><p v-if="!reason.trim()" :id="`reason-needed-${item.case}`" class="hint reason">Write a reason to request a regrade or save a correction.</p><button class="message-action" :disabled="busy || !aiAvailable || !reason.trim()" :aria-describedby="describedBy(!reason.trim() && `reason-needed-${item.case}`, !aiAvailable && 'ai-reason-chat')" @click="requestRegrade(item.case, item.judgment.judgment)">Request regrade</button>
+                    <label>Manual correction<select v-model="correction"><option v-for="(label,value) in resultLabels" :key="value" :value="value">{{ label }}</option></select></label><label class="check"><input v-model="fullGate" type="checkbox" /><span class="box" aria-hidden="true" />All requirements were met in fresh independent work.</label><button class="message-action" :disabled="busy || !reason.trim()" :aria-describedby="reason.trim() ? undefined : `reason-needed-${item.case}`" @click="saveCorrection(item.case, item.judgment.judgment)">Save correction</button><ol><li v-for="judgment in item.history" :key="judgment.judgment">{{ resultLabels[judgment.result] }} · {{ judgment.origin === 'AI' ? 'Tutor' : 'Your correction' }}<p>{{ judgment.rationale }}</p></li></ol></details>
+                </template><p v-else>Your answer is saved. Assessment is pending.</p>
+              </article>
+            </template>
+            <div role="status"><p v-if="notice && !busy" ref="noticeBox" class="notice" tabindex="-1">{{ notice }}</p></div>
+            <div role="alert"><p v-if="error" ref="errorBox" class="error" tabindex="-1">{{ error }}</p></div>
+            <article v-if="pending" class="message from-you pending" aria-live="polite"><span class="sr-only">You</span><p class="prose">{{ pending.text }}</p><p v-for="(name, fileIndex) in pending.files" :key="fileIndex" class="attachment-label"><span class="attach-thumb" aria-hidden="true" />Attachment · {{ name }}</p><p class="sending">Sending…</p></article>
+            <article v-if="pending?.reply" class="message from-tutor thinking" aria-hidden="true"><div class="speaker-row"><span class="speaker"><span class="avatar"><PixelIcon name="leaf" :size="16" /></span> StillGotIt</span></div><p class="prose dots"><span>·</span><span>·</span><span>·</span></p><span class="waited">{{ waited }}</span></article>
+            <!-- While the tutor's dots show, they are the visible sign of work; the sentence stays for screen readers. -->
+            <p v-if="busy" class="working" :class="{ 'sr-only': pending?.reply }" role="status"><PixelIcon name="leaf" :size="18" /> Working on it…</p>
+          </div>
         </div>
+        <div v-if="newBelow" class="jump-wrap"><button ref="jumpButton" type="button" class="jump-latest" @click="jumpToLatest">Jump to latest <span aria-hidden="true">↓</span></button></div>
       </div>
       <div class="composer-area">
         <div class="composer-inner">
@@ -424,13 +496,18 @@ button.mastery-chip:hover{border-color:#C9C1F0}
 .tab-square{width:8px;height:8px;flex:none}
 .tab-square.lesson{background:#2F7D9B}
 .tab-square.practice{background:#E3A233}
-.tab-date{font-size:12px;font-weight:500;color:var(--faint)}
+.tab-meta{font-size:12px;font-weight:500;color:var(--faint)}
 .tab-done{font-size:11px;font-weight:800;color:var(--strong)}
 .new-lesson{font-weight:700;color:#4B3FA8}
 .new-lesson:hover:not(:disabled){color:var(--dawn-text)}
 .new-lesson.chosen{box-shadow:inset 0 -3px 0 #8A7EE0}
 /* Thread */
-.chat-thread{flex:1;overflow-y:auto;background:#FFFFFF}
+/* The thread scrolls inside thread-wrap, which also holds the "Jump to latest" pill over its bottom edge. */
+.thread-wrap{position:relative;flex:1;min-height:0;display:flex;flex-direction:column}
+.chat-thread{flex:1;min-height:0;overflow-y:auto;background:#FFFFFF}
+.jump-wrap{position:absolute;left:0;right:0;bottom:14px;z-index:5;display:flex;justify-content:center;pointer-events:none}
+.jump-latest{pointer-events:auto;display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:0 14px;border:0;border-radius:999px;background:#FFFFFF;color:var(--dawn-soft-text);font-size:13px;font-weight:700;box-shadow:0 0 0 1px var(--ring),0 8px 24px rgba(20,20,20,.07);animation:sgRise 240ms ease-out both}
+.jump-latest:hover{background:var(--dawn-soft)}
 .thread-inner{max-width:760px;margin:0 auto;padding:30px 32px 24px}
 .confidence-note{border:1px solid var(--line);padding:16px 20px;border-radius:16px;margin-bottom:24px;background:var(--inset)}
 .confidence-note form{max-width:none}
@@ -445,18 +522,32 @@ button.mastery-chip:hover{border-color:#C9C1F0}
 .prompt-choices{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:24px}
 .prompt-choices button{border:1px solid var(--line);border-radius:999px;background:#FFFFFF;padding:10px 16px;font-size:13px;color:var(--ink)}
 .prompt-choices button:hover:not(:disabled){border-color:rgba(20,20,20,.35)}
-.message{margin:0 0 26px;max-width:100%;font-size:15px;animation:sgRise 240ms ease-out both}
-.from-you{margin-left:auto;margin-bottom:22px;width:fit-content;max-width:82%;padding:14px 18px;background:var(--dawn-soft);border-radius:18px 18px 4px 18px}
+.message{margin:0 0 28px;max-width:100%;font-size:15px;animation:sgRise 240ms ease-out both}
+/* The learner's messages are compact bubbles on the right; the tutor's replies run the full width with no bubble. */
+.from-you{margin-left:auto;margin-bottom:24px;width:fit-content;max-width:70%;padding:10px 15px;background:var(--dawn-soft);border-radius:18px 18px 4px 18px}
 .from-tutor{padding:0}
-.speaker-row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
-.speaker{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:var(--muted)}
+.speaker-row{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.speaker{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:13px;font-weight:700;color:var(--ink)}
+.avatar{flex:none;display:grid;place-items:center;width:28px;height:28px;border-radius:9px;background:var(--dawn-soft)}
+/* The opening is a card, and a labelled rule separates it from the dialogue that follows. */
+.opening-card{margin-bottom:24px;padding:18px 22px 14px;border-radius:18px;background:#FFFFFF;box-shadow:0 0 0 1px var(--ring)}
+.thread-divider{display:flex;align-items:center;gap:12px;margin:0 0 26px;font-family:var(--font-display);font-size:11px;font-weight:500;line-height:1.3;text-transform:uppercase;letter-spacing:1px;color:var(--faint)}
+.thread-divider::before,.thread-divider::after{content:"";flex:1;height:1px;background:var(--card-border)}
+/* Under each tutor answer: the meta line, then Copy and Listen, shown on hover or focus and always under the latest answer. */
+.reply-foot{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;margin-top:12px;min-height:26px}
+.reply-foot .reply-meta{margin:0}
+.reply-foot .reply-actions{margin-left:auto;opacity:0;transition:opacity 120ms}
+.from-tutor:hover .reply-actions,.from-tutor:focus-within .reply-actions,.from-tutor.latest .reply-actions{opacity:1}
+@media (hover:none),(max-width:650px){.reply-foot .reply-actions{opacity:1}}
+.retry-row{display:flex;align-items:center;gap:8px;margin:0 0 28px}
+.reply-retry{min-height:32px;padding:0 12px;font-size:13px}
 .tag{padding:1px 8px;border-radius:999px;background:var(--inset-2);color:var(--soft);font-size:11px;font-weight:700}
 .tag.hint-tag{background:var(--dawn-soft);color:var(--dawn-soft-text)}
 .tag.task{background:#4A775A;color:#FFFFFF}
 .you-tag{display:inline-block;margin-bottom:6px;background:#FFFFFF;color:var(--dawn-soft-text)}
 .prose-blocks{display:flex;flex-direction:column;gap:14px}
 .prose{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.8;font-size:15px;margin:0}
-.from-you .prose{line-height:1.65}
+.from-you .prose{line-height:1.6}
 .code-block{margin:0;padding:14px 16px;border-radius:12px;background:var(--inset);border:1px solid var(--line);font:13px/1.7 var(--font-mono);white-space:pre-wrap;overflow-wrap:anywhere;color:var(--ink)}
 .tutor-label{margin:8px 0 0;font-size:11px;color:var(--faint)}
 .attachment-label{display:inline-flex;align-items:center;gap:8px;margin:10px 0 0;padding:4px 10px 4px 4px;border-radius:8px;background:#FFFFFF;font-size:12px;color:var(--soft)}
@@ -483,9 +574,10 @@ button.mastery-chip:hover{border-color:#C9C1F0}
 .result-top .eyebrow{margin:0 0 4px;font-size:12px}
 .result-top h3{margin:0;font-family:var(--font-display);font-weight:400;font-size:24px;color:var(--ink)}
 .result-top h3.success{color:var(--strong)}
-.result-figure{text-align:right;flex:none}
-.result-pct{margin:0;font-family:var(--font-display);font-size:26px}
-.result-delta{margin:0;font-size:12px;color:var(--muted)}
+.result-figure{text-align:right;flex:none;max-width:45%}
+.result-pct{margin:0;font-family:var(--font-display);font-size:24px;line-height:1.2;white-space:nowrap}
+.result-same{margin:0;font-size:14px;font-weight:700;color:var(--ink)}
+.result-delta{margin:2px 0 0;font-size:12px;color:var(--muted)}
 .rationale{margin:12px 0 0;font-size:14px;line-height:1.7}
 .result-actions{display:flex;gap:16px;margin-top:14px}
 .result-actions .secondary{min-height:36px;font-size:13px}
@@ -499,7 +591,7 @@ button.mastery-chip:hover{border-color:#C9C1F0}
 .composer-inner{max-width:760px;margin:0 auto}
 .composer{border:1px solid var(--line);border-radius:22px;padding:10px 14px 10px 18px;background:#FFFFFF;box-shadow:0 1px 2px rgba(20,20,20,.05),0 10px 30px rgba(20,20,20,.08)}
 .composer:focus-within{border-color:var(--dawn-edge)}
-.composer textarea{border:0;outline:none;width:100%;resize:vertical;min-height:52px;max-height:180px;padding:4px 0;font-family:inherit;font-size:15px;line-height:1.6;background:transparent;color:var(--ink);box-shadow:none}
+.composer textarea{border:0;outline:none;width:100%;resize:none;overflow-y:auto;min-height:52px;max-height:calc(6 * 1.6em + 8px);padding:4px 0;font-family:inherit;font-size:15px;line-height:1.6;background:transparent;color:var(--ink);box-shadow:none}
 .composer-tools{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .input-tools{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
 .composer-right{display:flex;align-items:center;gap:6px}
@@ -535,6 +627,7 @@ button.mastery-chip:hover{border-color:#C9C1F0}
 .message.pending{opacity:.85}
 .sending{margin:4px 0 0;font-size:11px;font-weight:600;color:var(--muted)}
 .thinking .dots{display:inline-flex;gap:3px;font-size:22px;line-height:1;color:var(--muted)}
+.waited{margin-left:10px;font-size:12px;font-weight:600;color:var(--faint);font-variant-numeric:tabular-nums}
 .thinking .dots span{animation:sgDot 1.2s ease-in-out infinite}.thinking .dots span:nth-child(2){animation-delay:.2s}.thinking .dots span:nth-child(3){animation-delay:.4s}
 @keyframes sgDot{0%,80%,100%{opacity:.25;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
 @media (prefers-reduced-motion:reduce){.thinking .dots span{animation:none;opacity:.6}}
@@ -554,5 +647,5 @@ button.mastery-chip:hover{border-color:#C9C1F0}
 @keyframes sgRise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 @keyframes railIn{from{transform:translateX(24px);opacity:0}to{transform:none;opacity:1}}
 @media(max-width:900px){.learn-head{padding:14px 18px 0}.thread-inner{padding:22px 18px 18px}.composer-area{padding:10px 18px 14px}}
-@media(max-width:650px){.learn{height:calc(100dvh - 20px);min-height:520px}.head-title{min-width:0}.learn-head h1{font-size:22px}.sprite-tile{width:44px;height:44px}.heading-action .primary{min-height:42px;padding:0 12px;font-size:13px;white-space:normal}.from-you{max-width:94%}.prose{font-size:14px}.confidence{flex-wrap:wrap}.chat-welcome h2{font-size:29px}}
+@media(max-width:650px){.learn{height:calc(100dvh - 20px);min-height:520px}.head-title{min-width:0}.learn-head h1{font-size:22px}.sprite-tile{width:44px;height:44px}.heading-action .primary{min-height:42px;padding:0 12px;font-size:13px;white-space:normal}.from-you{max-width:85%}.opening-card{padding:16px 16px 12px}.prose{font-size:14px}.confidence{flex-wrap:wrap}.chat-welcome h2{font-size:29px}}
 </style>
