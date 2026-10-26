@@ -120,6 +120,7 @@ form .primary { margin-top: 18px; }
 @keyframes sgSlide { from { opacity: 0; transform: translateX(24px); } }
 @keyframes sgPulse { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
 @keyframes sgDot { 0%, 80%, 100% { opacity: .25; transform: none; } 40% { opacity: 1; transform: translateY(-3px); } }
+@keyframes sgSpin { to { transform: rotate(1turn); } }
 /* The estimate line draws itself from its start to its end. Its path has pathLength="1", so one dash of length 1 is
    the whole line; the dash exists only while the line draws, and the line is solid again afterwards. */
 @keyframes sgDraw { from { stroke-dasharray: 1 1; stroke-dashoffset: 1; } to { stroke-dasharray: 1 1; stroke-dashoffset: 0; } }
