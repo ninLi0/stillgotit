@@ -23,6 +23,8 @@ afterAll(async () => {
 const messages = {
   INVALID_LESSON_CONTENT: "Provide a learning request and explanation.",
   INVALID_LESSON_SOURCES: "Use your readable sources from one course and cite their content.",
+  LESSON_EXPLANATION_UNAVAILABLE: "Choose one of your open lessons that is waiting for its explanation.",
+  INVALID_LESSON_EXPLANATION: "Provide an explanation with references to this lesson's sources.",
   INVALID_TASK_CONTENT: "Provide a practice question and its assessment requirements.",
   INVALID_TASK_SOURCES: "Use your readable sources from one course and cite their content.",
   RESPONSE_SESSION_UNAVAILABLE: "Choose one of your open sessions.",
@@ -90,6 +92,14 @@ const lessonText = {
   request: "Why does the order of a matrix product matter?",
   explanation: "Each entry pairs a row of the left matrix with a column of the right matrix.",
 };
+
+type LessonInput = { owner: string; topic: string; definition: string; materials: readonly string[]; citations: readonly PassageRef[]; request: string; explanation: string };
+/** Saves a lesson from the learner's request, then the tutor's opening explanation, as the Lesson and Reply flows do. */
+async function explainedLesson(tutoring: GroundedTutoring, { citations, explanation, ...requested }: LessonInput) {
+  const { lesson } = await tutoring.requestLesson(requested);
+  await tutoring.explainLesson({ owner: requested.owner, lesson, explanation, citations });
+  return { lesson };
+}
 const taskText = {
   question: "For A = [[1, 2], [3, 4]] and B = [[5, 6], [7, 8]], compute AB and BA. Explain why they differ.",
   criteria: "Both products are correct and the explanation names the row-column pairing. Gate: two fresh products without hints.",
@@ -101,8 +111,14 @@ describe("GroundedTutoring principle", () => {
     const context = await sources(library);
     const material = context.materials[0]!;
 
-    // Lesson: the tutor explains from the learner's sources.
-    const { lesson } = await tutoring.explain({ ...context, ...lessonText });
+    // Lesson: it is saved with the learner's request first, and no question can come before the tutor's opening explanation.
+    const { citations: _cited, ...requested } = context;
+    const { lesson } = await tutoring.requestLesson({ ...requested, request: lessonText.request });
+    expect(await tutoring._lesson({ lesson })).toEqual([{ request: lessonText.request, explanation: "" }]);
+    expect(await tutoring._citations({ session: lesson })).toEqual([]);
+    await refuses(tutoring.respond({ owner: "sam", session: lesson, text: "Is it ready yet?", media: [], channel: "TEXT" }), "RESPONSE_SESSION_UNAVAILABLE");
+    // The tutor explains from the learner's sources.
+    await tutoring.explainLesson({ owner: "sam", lesson, explanation: lessonText.explanation, citations: context.citations });
     const askedAt = tick();
     await tutoring.respond({ owner: "sam", session: lesson, text: "Does a b equal b a for mattresses?", media: [], channel: "VOICE" });
     const correctedAt = tick();
@@ -193,7 +209,7 @@ describe("GroundedTutoring principle", () => {
     const { tutoring, library } = setup();
     const first = await library.add(notes());
     const context = { owner: "sam", topic: "matrix-products", definition: "v1", materials: [first.material], citations: [{ material: first.material, location: "content" }] };
-    const { lesson } = await tutoring.explain({ ...context, ...lessonText });
+    const { lesson } = await explainedLesson(tutoring, { ...context, ...lessonText });
 
     const again = await library.add(notes());
     expect(again).toEqual(first);
@@ -207,8 +223,10 @@ describe("GroundedTutoring principle", () => {
   test("another learner cannot add to, review, or close a learner's sessions", async () => {
     const { tutoring, library } = setup();
     const context = await sources(library);
-    const { lesson } = await tutoring.explain({ ...context, ...lessonText });
+    const { lesson } = await explainedLesson(tutoring, { ...context, ...lessonText });
     const { task } = await tutoring.prepareTask({ ...context, ...taskText, mode: "CHECK", fresh: true });
+    const { citations: _cited, ...requested } = context;
+    const { lesson: waiting } = await tutoring.requestLesson({ ...requested, request: lessonText.request });
     await tutoring.respond({ owner: "sam", session: lesson, text: "Does AB equal BA?", media: [], channel: "VOICE" });
     await tutoring.requestHint({ owner: "sam", task });
     await tutoring.respond({ owner: "sam", session: task, text: "AB is 19 22 43 50.", media: [], channel: "VOICE" });
@@ -225,7 +243,8 @@ describe("GroundedTutoring principle", () => {
     await refuses(tutoring.confirmTranscript({ owner: "leo", session: lesson, turnIndex: 0, text: "Does AB equal BA?" }), "TRANSCRIPT_SESSION_UNAVAILABLE");
     await refuses(tutoring.confirmAttempt({ owner: "leo", task, dialogueLength: 1, unseen: true, outsideHelp: false }), "ATTEMPT_REVIEW_UNAVAILABLE");
     await refuses(tutoring.close({ owner: "leo", session: lesson }), "SESSION_CLOSE_UNAVAILABLE");
-    await refuses(tutoring.explain({ ...leo, citations: context.citations, ...lessonText }), "INVALID_LESSON_SOURCES");
+    await refuses(tutoring.explainLesson({ owner: "leo", lesson: waiting, explanation: lessonText.explanation, citations: context.citations }), "LESSON_EXPLANATION_UNAVAILABLE");
+    await refuses(tutoring.explainLesson({ owner: "leo", lesson: waiting, explanation: lessonText.explanation, citations: leo.citations }), "LESSON_EXPLANATION_UNAVAILABLE");
     await refuses(tutoring.prepareTask({ ...leo, citations: context.citations, ...taskText, mode: "GUIDED", fresh: true }), "INVALID_TASK_SOURCES");
     expect(await savedState()).toEqual(before);
 
@@ -234,7 +253,7 @@ describe("GroundedTutoring principle", () => {
     expect((await tutoring._dialogue({ session: task })).map(({ turn }) => turn.purpose)).toEqual(["RESPONSE", "HINT"]);
     expect(await tutoring._sessions({ owner: "leo", topic: "matrix-products" })).toEqual([]);
     expect((await tutoring._sessions({ owner: "sam", topic: "matrix-products" })).map(({ session }) => session))
-      .toEqual([lesson, task].sort());
+      .toEqual([lesson, task, waiting].sort());
   });
 
   test("refuses blank lesson or task content and invalid sources without creating a session", async () => {
@@ -244,8 +263,10 @@ describe("GroundedTutoring principle", () => {
     const { material: inverses } = await library.add(notes({ importKey: "week-4-notes", title: "Inverses", originals: [] }));
     const before = await savedState();
 
-    await refuses(tutoring.explain({ ...context, ...lessonText, request: " " }), "INVALID_LESSON_CONTENT");
-    await refuses(tutoring.explain({ ...context, ...lessonText, explanation: "" }), "INVALID_LESSON_CONTENT");
+    const { citations: _cited, ...requested } = context;
+    await refuses(tutoring.requestLesson({ ...requested, request: " " }), "INVALID_LESSON_CONTENT");
+    await refuses(tutoring.requestLesson({ ...requested, request: lessonText.request, topic: "" }), "INVALID_LESSON_CONTENT");
+    await refuses(tutoring.requestLesson({ ...requested, request: lessonText.request, definition: "\n" }), "INVALID_LESSON_CONTENT");
     await refuses(tutoring.prepareTask({ ...context, ...taskText, question: "", mode: "CHECK", fresh: true }), "INVALID_TASK_CONTENT");
     await refuses(tutoring.prepareTask({ ...context, ...taskText, criteria: "\n", mode: "CHECK", fresh: true }), "INVALID_TASK_CONTENT");
     await refuses(tutoring.prepareTask({ ...context, ...taskText, mode: "COACH" as unknown as Mode, fresh: true }), "INVALID_TASK_CONTENT");
@@ -264,18 +285,69 @@ describe("GroundedTutoring principle", () => {
       { owner: " " },
     ];
     for (const invalid of invalidSources) {
-      await refuses(tutoring.explain({ ...context, ...lessonText, ...invalid }), "INVALID_LESSON_SOURCES");
       await refuses(tutoring.prepareTask({ ...context, ...taskText, mode: "CHECK", fresh: true, ...invalid }), "INVALID_TASK_SOURCES");
+    }
+    // A lesson is saved before it has citations, so its request is checked only against the material rules. Its
+    // explanation's citations are checked when it is explained (see the next test).
+    const invalidMaterials: { owner?: string; materials?: Material[] }[] = [
+      { materials: [] }, { materials: [material!, material!] }, { materials: [" " as Material] }, { owner: " " },
+    ];
+    for (const invalid of invalidMaterials) {
+      await refuses(tutoring.requestLesson({ ...requested, request: lessonText.request, ...invalid }), "INVALID_LESSON_SOURCES");
     }
     expect(await savedState()).toEqual(before);
     expect(await tutoring._sessions({ owner: "sam", topic: "matrix-products" })).toEqual([]);
+  });
+
+  test("an unexplained lesson refuses dialogue until it takes one valid explanation, only from its owner while open", async () => {
+    const { tutoring, library } = setup();
+    const context = await sources(library);
+    const [material] = context.materials;
+    const { material: inverses } = await library.add(notes({ importKey: "week-4-notes", title: "Inverses", originals: [] }));
+    const { citations, ...requested } = context;
+    const { lesson } = await tutoring.requestLesson({ ...requested, request: lessonText.request });
+    const { task } = await tutoring.prepareTask({ ...context, ...taskText, mode: "GUIDED", fresh: true });
+    const { lesson: closed } = await tutoring.requestLesson({ ...requested, request: "A lesson finished before its explanation arrived." });
+    await tutoring.close({ owner: "sam", session: closed });
+    const before = await savedState();
+
+    // Nothing joins the dialogue before the opening explanation.
+    await refuses(tutoring.respond({ owner: "sam", session: lesson, text: "Why?", media: [], channel: "TEXT" }), "RESPONSE_SESSION_UNAVAILABLE");
+    await refuses(tutoring.answerLesson({ owner: "sam", lesson, text: "Usually not.", citations, channel: "TEXT" }), "LESSON_ANSWER_UNAVAILABLE");
+    // Only the owner's open lesson that is still unexplained takes an explanation.
+    for (const [owner, target] of [["leo", lesson], ["sam", task], ["sam", closed], ["sam", randomUUID() as Session]] as const) {
+      await refuses(tutoring.explainLesson({ owner, lesson: target, explanation: lessonText.explanation, citations }), "LESSON_EXPLANATION_UNAVAILABLE");
+    }
+    // A blank explanation, or citations that break the source rules for the lesson's own materials, are refused.
+    await refuses(tutoring.explainLesson({ owner: "sam", lesson, explanation: " ", citations }), "INVALID_LESSON_EXPLANATION");
+    const invalidCitations: PassageRef[][] = [
+      [], [{ material: inverses, location: "content" }], [{ material: material!, location: " " }], [citations[0]!, citations[0]!],
+    ];
+    for (const invalid of invalidCitations) {
+      await refuses(tutoring.explainLesson({ owner: "sam", lesson, explanation: lessonText.explanation, citations: invalid }), "INVALID_LESSON_EXPLANATION");
+    }
+    expect(await savedState()).toEqual(before);
+    expect(await tutoring._lesson({ lesson })).toEqual([{ request: lessonText.request, explanation: "" }]);
+
+    await tutoring.explainLesson({ owner: "sam", lesson, explanation: lessonText.explanation, citations });
+    expect(await tutoring._lesson({ lesson })).toEqual([lessonText]);
+    expect(await tutoring._citations({ session: lesson })).toEqual([{ citation: citations[0] }]);
+    expect(await tutoring._dialogue({ session: lesson })).toEqual([]);
+    // The explanation is set once.
+    const explained = await savedState();
+    await refuses(tutoring.explainLesson({ owner: "sam", lesson, explanation: "A second opening.", citations }), "LESSON_EXPLANATION_UNAVAILABLE");
+    expect(await savedState()).toEqual(explained);
+    // Now the lesson takes questions and answers.
+    await tutoring.respond({ owner: "sam", session: lesson, text: "Why?", media: [], channel: "TEXT" });
+    await tutoring.answerLesson({ owner: "sam", lesson, text: "Usually not.", citations, channel: "TEXT" });
+    expect((await tutoring._dialogue({ session: lesson })).map(({ turn }) => turn.purpose)).toEqual(["RESPONSE", "EXPLANATION"]);
   });
 
   test("refuses blank or malformed dialogue additions without changing the open sessions", async () => {
     const { tutoring, library } = setup();
     const context = await sources(library);
     const { material: inverses } = await library.add(notes({ importKey: "week-4-notes", title: "Inverses" }));
-    const { lesson } = await tutoring.explain({ ...context, ...lessonText });
+    const { lesson } = await explainedLesson(tutoring, { ...context, ...lessonText });
     const { task } = await tutoring.prepareTask({ ...context, ...taskText, mode: "GUIDED", fresh: true });
     await tutoring.respond({ owner: "sam", session: task, text: "AB is 19 22 43 50.", media: [], channel: "TEXT" });
     await tutoring.giveHint({ owner: "sam", task, text: "Now try BA.", channel: "TEXT" });
@@ -307,9 +379,9 @@ describe("GroundedTutoring principle", () => {
   test("refuses actions on a closed, unknown, or wrong kind of session", async () => {
     const { tutoring, library } = setup();
     const context = await sources(library);
-    const { lesson } = await tutoring.explain({ ...context, ...lessonText });
+    const { lesson } = await explainedLesson(tutoring, { ...context, ...lessonText });
     const { task } = await tutoring.prepareTask({ ...context, ...taskText, mode: "GUIDED", fresh: true });
-    const { lesson: closedLesson } = await tutoring.explain({ ...context, ...lessonText });
+    const { lesson: closedLesson } = await explainedLesson(tutoring, { ...context, ...lessonText });
     await tutoring.close({ owner: "sam", session: closedLesson });
     const { task: closedTask } = await tutoring.prepareTask({ ...context, ...taskText, mode: "GUIDED", fresh: true });
     await tutoring.respond({ owner: "sam", session: closedTask, text: "AB is 19 22 43 50.", media: [], channel: "VOICE" });
@@ -326,6 +398,7 @@ describe("GroundedTutoring principle", () => {
     for (const [session, length] of [[closedLesson, 0], [closedTask, 1], [unknown, 0]] as const) {
       await refuses(tutoring.respond({ owner: "sam", session, text: "A late answer.", media: [], channel: "TEXT" }), "RESPONSE_SESSION_UNAVAILABLE");
       await refuses(tutoring.answerLesson({ owner: "sam", lesson: session, text: "Usually not.", citations: context.citations, channel: "TEXT" }), "LESSON_ANSWER_UNAVAILABLE");
+      await refuses(tutoring.explainLesson({ owner: "sam", lesson: session, explanation: "A late opening.", citations: context.citations }), "LESSON_EXPLANATION_UNAVAILABLE");
       await refuses(tutoring.requestHint({ owner: "sam", task: session }), "HINT_REQUEST_UNAVAILABLE");
       await refuses(tutoring.giveHint({ owner: "sam", task: session, text: "Pair rows with columns.", channel: "TEXT" }), "HINT_TASK_UNAVAILABLE");
       await refuses(tutoring.confirmTranscript({ owner: "sam", session, turnIndex: 0, text: "AB is 19 22 43 50." }), "TRANSCRIPT_SESSION_UNAVAILABLE");

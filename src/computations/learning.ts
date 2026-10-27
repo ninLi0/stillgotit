@@ -151,6 +151,10 @@ export function responseInput({ data, text, channel, attachments, sources }: { d
 }
 export function dialogueIsCurrent({ data, dialogueLength }: { data: StudySession; dialogueLength: number }): boolean { return data.dialogue.length === dialogueLength; }
 export function hasLessonQuestion({ data }: { data: StudySession }): boolean { return Boolean(data.lesson && data.dialogue.at(-1)?.turn.speaker === "LEARNER"); }
+/** A lesson whose explanation is empty is still waiting for the tutor's opening explanation. */
+export function lessonUnexplained({ data }: { data: StudySession }): boolean { return Boolean(data.lesson && !data.lesson.explanation.trim()); }
+/** A lesson waits for the tutor when it is unexplained or its latest turn is a learner question: Reply's two cases. */
+export function lessonAwaitsTutor({ data }: { data: StudySession }): boolean { return lessonUnexplained({ data }) || hasLessonQuestion({ data }); }
 /** The session's kind and the time of its latest dialogue turn, the only time the concept records; null before any turn. */
 export function sessionActivity({ data }: { data: StudySession }): { kind: "LESSON" | "PRACTICE"; lastActive: Date | null } {
   return { kind: data.lesson ? "LESSON" : "PRACTICE", lastActive: data.dialogue.at(-1)?.turn.at ?? null };

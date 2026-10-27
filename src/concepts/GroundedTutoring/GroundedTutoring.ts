@@ -14,14 +14,25 @@ export class GroundedTutoring<Learner extends string = string, Material extends 
     this.sessions = database.collection(`${name.toLowerCase()}.sessions`);
   }
 
-  async explain(input: { owner: Learner; topic: Topic; definition: Definition; request: string; explanation: string; materials: MaterialSet<Material>; citations: PassageSet<Material> }): Promise<{ lesson: Session }> {
-    const value = structuredClone(input);
-    if (!nonblank(value.request) || !nonblank(value.explanation) || !nonblank(value.topic) || !nonblank(value.definition)) throw new refusal.InvalidLessonContent();
-    if (!this.#validSources(value.owner, value.materials, value.citations)) throw new refusal.InvalidLessonSources();
+  /** Saves a lesson with the learner's request before the tutor answers. It stays unexplained until explainLesson. */
+  async requestLesson(input: { owner: Learner; topic: Topic; definition: Definition; request: string; materials: MaterialSet<Material> }): Promise<{ lesson: Session }> {
+    const { owner, topic, definition, request, materials } = structuredClone(input);
+    if (!nonblank(request) || !nonblank(topic) || !nonblank(definition)) throw new refusal.InvalidLessonContent();
+    if (!this.#validMaterials(owner, materials)) throw new refusal.InvalidLessonSources();
     const lesson = timeOrderedId(this.clock()) as Session;
-    await this.sessions.insertOne({ _id: lesson, ...value, materials: [...value.materials], citations: [...value.citations],
+    await this.sessions.insertOne({ _id: lesson, owner, topic, definition, request, explanation: "", materials: [...materials], citations: [],
       kind: "LESSON", status: "OPEN", dialogue: [], checkedVoiceTurns: [], revision: 0 });
     return { lesson };
+  }
+
+  /** Sets the opening explanation and its citations of the owner's open lesson that is still unexplained. */
+  async explainLesson(input: { owner: Learner; lesson: Session; explanation: string; citations: PassageSet<Material> }): Promise<Record<string, never>> {
+    const value = structuredClone(input);
+    return this.#edit(value.owner, value.lesson, "LESSON", refusal.LessonExplanationUnavailable, (record) => {
+      if (!unexplained(record)) throw new refusal.LessonExplanationUnavailable();
+      if (!nonblank(value.explanation) || !this.#validSources(value.owner, record.materials, value.citations)) throw new refusal.InvalidLessonExplanation();
+      record.explanation = value.explanation; record.citations = [...value.citations];
+    });
   }
 
   async prepareTask(input: { owner: Learner; topic: Topic; definition: Definition; question: string; criteria: string; materials: MaterialSet<Material>; citations: PassageSet<Material>; mode: Mode; fresh: boolean }): Promise<{ task: Session }> {
@@ -37,6 +48,8 @@ export class GroundedTutoring<Learner extends string = string, Material extends 
   async respond(input: { owner: Learner; session: Session; text: string; media: MediaList; channel: Channel }): Promise<Record<string, never>> {
     const value = structuredClone(input);
     return this.#edit(value.owner, value.session, undefined, refusal.ResponseSessionUnavailable, (record) => {
+      // A learner question never precedes the opening explanation.
+      if (unexplained(record)) throw new refusal.ResponseSessionUnavailable();
       if (!isMediaList(value.media) || !["TEXT", "VOICE"].includes(value.channel) || typeof value.text !== "string" ||
         (!nonblank(value.text) && !value.media.length) || (value.channel === "VOICE" && !nonblank(value.text))) throw new refusal.InvalidLearnerResponse();
       record.dialogue.push({ speaker: "LEARNER", purpose: "RESPONSE", text: value.text, media: value.media, channel: value.channel, citations: [], at: this.clock() });
@@ -46,9 +59,10 @@ export class GroundedTutoring<Learner extends string = string, Material extends 
   async answerLesson(input: { owner: Learner; lesson: Session; text: string; citations: PassageSet<Material>; channel: Channel }): Promise<Record<string, never>> {
     const value = structuredClone(input);
     const record = await this.sessions.findOne({ _id: value.lesson, owner: value.owner, kind: "LESSON", status: "OPEN" });
-    if (!record) throw new refusal.LessonAnswerUnavailable();
+    if (!record || unexplained(record)) throw new refusal.LessonAnswerUnavailable();
     if (!nonblank(value.text) || !["TEXT", "VOICE"].includes(value.channel) || !this.#validSources(value.owner, record.materials, value.citations)) throw new refusal.InvalidLessonAnswer();
     return this.#edit(value.owner, value.lesson, "LESSON", refusal.LessonAnswerUnavailable, (current) => {
+      if (unexplained(current)) throw new refusal.LessonAnswerUnavailable();
       current.dialogue.push({ speaker: "TUTOR", purpose: "EXPLANATION", text: value.text, media: [], channel: value.channel, citations: value.citations, at: this.clock() });
     });
   }
@@ -185,10 +199,14 @@ export class GroundedTutoring<Learner extends string = string, Material extends 
    * and whether each citation's location exists in its material are checked before the values reach this concept.
    */
   #validSources(owner: Learner, materials: MaterialSet<Material>, citations: PassageSet<Material>): boolean {
-    return nonblank(owner) && Array.isArray(materials) && materials.length > 0 && materials.every(nonblank) && new Set(materials).size === materials.length &&
-      Array.isArray(citations) && citations.length > 0 &&
+    return this.#validMaterials(owner, materials) && Array.isArray(citations) && citations.length > 0 &&
       citations.every((item) => item && nonblank(item.material) && nonblank(item.location) && materials.includes(item.material)) &&
       new Set(citations.map((item) => JSON.stringify(item))).size === citations.length;
+  }
+
+  /** The material rule: a nonblank owner and a nonempty set of distinct, nonblank material identities. */
+  #validMaterials(owner: Learner, materials: MaterialSet<Material>): boolean {
+    return nonblank(owner) && Array.isArray(materials) && materials.length > 0 && materials.every(nonblank) && new Set(materials).size === materials.length;
   }
 
   async #edit(owner: Learner, session: Session, kind: "LESSON" | "PRACTICE" | undefined, Unavailable: new () => Error,
@@ -212,6 +230,9 @@ function timeOrderedId(at: Date): string {
 }
 
 function isTimeOrdered(id: string): boolean { return id[14] === "7"; }
+
+/** A lesson whose explanation is empty is still waiting for the tutor's opening explanation. */
+function unexplained(record: { kind: "LESSON" | "PRACTICE"; explanation?: string }): boolean { return record.kind === "LESSON" && !nonblank(record.explanation); }
 
 /** When a session started, in milliseconds, read from its time-ordered identity; null for an identity that records no time. */
 function startedAt(id: string): number | null { return isTimeOrdered(id) ? parseInt(id.replace(/-/g, "").slice(0, 12), 16) : null; }

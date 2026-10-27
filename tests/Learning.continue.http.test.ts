@@ -6,6 +6,7 @@ import type { CourseTutor } from "../src/host/tutor.ts";
 import { rm } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { resolve } from "node:path";
+import { openLesson } from "./fixtures/open-lesson.ts";
 const ORIGIN = "http://localhost:5173", cleanups: (() => Promise<void>)[] = [];
 afterAll(async () => { for (const cleanup of cleanups.reverse()) await cleanup(); });
 
@@ -78,7 +79,7 @@ test("Continue lists the open lesson and leaves out the submitted task, with eac
   const app = await setup(), { learner, course, skill, confirmed } = await learningFixture(app, "continuer");
   expect(await learner.ok("/learning/continue", { course })).toEqual({ sessions: [] });
 
-  const { lesson } = await learner.ok("/learning/lesson", { skill, request: "Explain why the inner dimensions must match." });
+  const { lesson } = await openLesson(learner.ok, { skill, request: "Explain why the inner dimensions must match." });
   await learner.ok("/learning/confidence", { skill, confidence: 50 });
   // A submitted practice attempt closes its session, so it is not something to continue.
   const { task: submitted } = await learner.ok("/learning/task", { skill });
@@ -103,7 +104,7 @@ test("Continue lists the open lesson and leaves out the submitted task, with eac
   expect((await learner.ok("/learning/continue", { course })).sessions.map((row: { studySession: string; kind: string }) => [row.studySession, row.kind]))
     .toEqual([[lesson, "LESSON"], [open, "PRACTICE"]]);
 
-  // An archived skill has no study page, so its open lesson is not listed.
+  // An archived skill has no study page, so its open lesson is not listed, even one still waiting for its explanation.
   const other = await confirmed("Transposes");
   const { lesson: archivedLesson } = await learner.ok("/learning/lesson", { skill: other, request: "Explain transposes." });
   expect((await learner.ok("/learning/continue", { course })).sessions.map((row: { studySession: string }) => row.studySession)).toEqual([lesson, open, archivedLesson]);

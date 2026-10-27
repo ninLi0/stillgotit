@@ -7,6 +7,14 @@ export class InvalidLessonSources extends Error {
   readonly code = "INVALID_LESSON_SOURCES";
   constructor() { super("Use your readable sources from one course and cite their content."); this.name = "InvalidLessonSources"; }
 }
+export class LessonExplanationUnavailable extends Error {
+  readonly code = "LESSON_EXPLANATION_UNAVAILABLE";
+  constructor() { super("Choose one of your open lessons that is waiting for its explanation."); this.name = "LessonExplanationUnavailable"; }
+}
+export class InvalidLessonExplanation extends Error {
+  readonly code = "INVALID_LESSON_EXPLANATION";
+  constructor() { super("Provide an explanation with references to this lesson's sources."); this.name = "InvalidLessonExplanation"; }
+}
 export class InvalidTaskContent extends Error {
   readonly code = "INVALID_TASK_CONTENT";
   constructor() { super("Provide a practice question and its assessment requirements."); this.name = "InvalidTaskContent"; }

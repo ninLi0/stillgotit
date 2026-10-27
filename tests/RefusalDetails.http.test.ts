@@ -169,8 +169,10 @@ test("a refusal reaches the browser and native callers with its sentence, and an
   expect(signedOut.headers.get("Cache-Control")).toBe("no-store");
 
   // The tutor's recorded reason replaces Generating's general sentence over HTTP; a native caller gets the general one.
-  expect(await maya.post("/learning/lesson", { skill: maya.skill, request: "Explain products." })).toEqual({ status: 400, body: { error: "INVALID_REQUEST", detail: TUTOR_REASON } });
-  expect(await maya.native("/learning/lesson", { skill: maya.skill, request: "Explain products." }))
+  // A lesson is saved before the tutor is asked, so the failure comes from Reply's request for its opening explanation.
+  const { lesson } = await maya.ok("/learning/lesson", { skill: maya.skill, request: "Explain products." });
+  expect(await maya.post("/learning/reply", { studySession: lesson })).toEqual({ status: 400, body: { error: "INVALID_REQUEST", detail: TUTOR_REASON } });
+  expect(await maya.native("/learning/reply", { studySession: lesson }))
     .toEqual({ ok: false, error: { kind: "domain", value: "GENERATION_FAILED", detail: GENERATION_FAILED } });
   // Admission's own sentence still answers before the concept is reached.
   expect(await maya.post("/learning/task", { skill: maya.skill }))

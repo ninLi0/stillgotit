@@ -13,6 +13,14 @@ async function notes() {
   return library.add({ owner: "sam", importKey: "lesson", scope: "math", title: "Matrices", locator: "lesson", content: "Rows multiply columns.", originals: [], origin: "COURSE" });
 }
 
+type LessonInput = { owner: string; topic: string; definition: string; materials: readonly string[]; citations: readonly { material: string; location: string }[]; request: string; explanation: string };
+/** Saves a lesson from the learner's request, then the tutor's opening explanation, as the Lesson and Reply flows do. */
+async function explainedLesson(tutoring: GroundedTutoring, { citations, explanation, ...requested }: LessonInput) {
+  const { lesson } = await tutoring.requestLesson(requested);
+  await tutoring.explainLesson({ owner: requested.owner, lesson, explanation, citations });
+  return { lesson };
+}
+
 async function setup() {
   const name = `Tutoring_${crypto.randomUUID()}`;
   const tutoring = new GroundedTutoring(connection.db, name);
@@ -25,7 +33,7 @@ async function setup() {
 describe("Grounded tutoring sessions", () => {
   test("lesson follow-ups keep sources and a fixed definition", async () => {
     const { tutoring, context } = await setup();
-    const { lesson } = await tutoring.explain({ ...context, request: "Show an example.", explanation: "Match each row to each column." });
+    const { lesson } = await explainedLesson(tutoring, { ...context, request: "Show an example.", explanation: "Match each row to each column." });
     await tutoring.respond({ owner: "sam", session: lesson, text: "Why does order matter?", media: [], channel: "TEXT" });
     await tutoring.answerLesson({ owner: "sam", lesson, text: "Changing the order changes which rows and columns are paired.", citations: context.citations, channel: "TEXT" });
     expect(await tutoring._lesson({ lesson })).toHaveLength(1);
@@ -64,10 +72,14 @@ describe("Grounded tutoring sessions", () => {
     // tests/Learning.http.test.ts covers another learner's material on the course endpoints.
     const { tutoring, task, context } = await setup();
     const { material: other } = await notes();
-    await expect(tutoring.explain({ ...context, request: "Explain", explanation: "Example", citations: [{ material: other, location: "content" }] })).rejects.toMatchObject({ code: "INVALID_LESSON_SOURCES" });
-    await expect(tutoring.explain({ ...context, request: "Explain", explanation: "Example", citations: [{ ...context.citations[0]!, location: " " }] })).rejects.toMatchObject({ code: "INVALID_LESSON_SOURCES" });
+    const { citations: _cited, ...requested } = context;
+    const { lesson } = await tutoring.requestLesson({ ...requested, request: "Explain" });
+    await expect(tutoring.explainLesson({ owner: "sam", lesson, explanation: "Example", citations: [{ material: other, location: "content" }] })).rejects.toMatchObject({ code: "INVALID_LESSON_EXPLANATION" });
+    await expect(tutoring.explainLesson({ owner: "sam", lesson, explanation: "Example", citations: [{ ...context.citations[0]!, location: " " }] })).rejects.toMatchObject({ code: "INVALID_LESSON_EXPLANATION" });
+    await expect(tutoring.explainLesson({ owner: "other", lesson, explanation: "Example", citations: context.citations })).rejects.toMatchObject({ code: "LESSON_EXPLANATION_UNAVAILABLE" });
     await expect(tutoring.respond({ owner: "other", session: task, text: "Change", media: [], channel: "TEXT" })).rejects.toMatchObject({ code: "RESPONSE_SESSION_UNAVAILABLE" });
     expect(await tutoring._dialogue({ session: task })).toEqual([]);
+    expect(await tutoring._lesson({ lesson })).toEqual([{ request: "Explain", explanation: "" }]);
   });
 
   test("competing session objects append without losing responses; a new instance reads them", async () => {
@@ -85,12 +97,12 @@ describe("Grounded tutoring sessions", () => {
     const { material } = await notes();
     const context = { owner: "sam", topic: "matrix-products", definition: "v1", materials: [material], citations: [{ material, location: "content" }] };
     const lessonText = { request: "Show an example.", explanation: "Match each row to each column." };
-    const { lesson: first } = await tutoring.explain({ ...context, ...lessonText });
+    const { lesson: first } = await explainedLesson(tutoring, { ...context, ...lessonText });
     // A lesson saved before identities were time-ordered. Its random identity sorts after every new one.
     const sessions = connection.db.collection<{ _id: string }>(`${name.toLowerCase()}.sessions`), legacy = "ffffffff-ffff-4fff-bfff-ffffffffffff";
     await sessions.insertOne({ ...(await sessions.findOne({ _id: first }))!, _id: legacy });
     now += 60_000; const { task } = await tutoring.prepareTask({ ...context, question: "Solve two new matrix products.", criteria: "Correct products.", mode: "CHECK", fresh: true });
-    now += 60_000; const { lesson: second } = await tutoring.explain({ ...context, ...lessonText });
+    now += 60_000; const { lesson: second } = await explainedLesson(tutoring, { ...context, ...lessonText });
     expect([first, task, second].every((id) => /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(id))).toBe(true);
     expect((await tutoring._study({ owner: "sam", topic: "matrix-products" })).sessions.map(({ session }): string => session)).toEqual([legacy, first, task, second]);
   });
@@ -101,12 +113,12 @@ describe("Grounded tutoring sessions", () => {
     const { material } = await notes();
     const context = { owner: "sam", topic: "products", definition: "v1", materials: [material], citations: [{ material, location: "content" }] };
     const lessonText = { request: "Show an example.", explanation: "Match each row to each column." };
-    const { lesson: older } = await tutoring.explain({ ...context, ...lessonText });
+    const { lesson: older } = await explainedLesson(tutoring, { ...context, ...lessonText });
     now += 60_000; const { task } = await tutoring.prepareTask({ ...context, topic: "dimensions", question: "Check two pairs.", criteria: "Correct checks.", mode: "CHECK", fresh: true });
-    now += 60_000; const { lesson: newer } = await tutoring.explain({ ...context, ...lessonText });
+    now += 60_000; const { lesson: newer } = await explainedLesson(tutoring, { ...context, ...lessonText });
     // Another topic and another owner are left out.
-    await tutoring.explain({ ...context, topic: "transposes", ...lessonText });
-    await tutoring.explain({ ...context, owner: "alex", ...lessonText });
+    await explainedLesson(tutoring, { ...context, topic: "transposes", ...lessonText });
+    await explainedLesson(tutoring, { ...context, owner: "alex", ...lessonText });
     // A session saved before identities recorded the time, with no turn, comes last.
     const sessions = connection.db.collection<{ _id: string }>(`${name.toLowerCase()}.sessions`), legacy = "00000000-0000-4000-8000-000000000000";
     await sessions.insertOne({ ...(await sessions.findOne({ _id: older }))!, _id: legacy });

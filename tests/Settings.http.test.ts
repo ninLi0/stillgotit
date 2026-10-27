@@ -9,6 +9,7 @@ import type { CourseTutor } from "../src/host/tutor.ts";
 import type { TutorChoice } from "../src/tutor-types.ts";
 import type { HomeView } from "../src/computations/home-view.ts";
 import type { User } from "../src/concepts/Registering/Registering.ts";
+import { openLesson } from "./fixtures/open-lesson.ts";
 const ORIGIN = "http://localhost:5173", cleanups: (() => Promise<void>)[] = [];
 afterAll(async () => { for (const cleanup of cleanups.reverse()) await cleanup(); });
 
@@ -145,7 +146,7 @@ test("Gemini 4 Argon is offered at Low, Medium, and High, refuses Minimal, and i
   for (const level of ["LOW", "MEDIUM", "HIGH"] as const) {
     const choice: TutorChoice = { model: ARGON, level };
     expect(await learner.ok("/settings/tutor/choose", choice)).toEqual(settings(choice, "SAVED"));
-    expect(await learner.ok("/learning/lesson", { skill: learner.skill, request: "Explain products." })).toEqual({ lesson: expect.any(String), tutor: choice });
+    expect(await openLesson(learner.ok, { skill: learner.skill, request: "Explain products." })).toEqual({ lesson: expect.any(String), tutor: choice });
     expect(app.sent.at(-1)).toEqual({ kind: "LESSON", choice });
   }
   // Minimal is not one of Argon's levels: it is refused with the design's sentence, and the earlier choice stays.
@@ -203,7 +204,7 @@ test("TutorStatus is SAVED, RETIRED when the saved model or level is no longer o
   expect(await learner.ok("/settings/tutor/clear")).toEqual(settings(DEFAULT, "DEFAULT"));
 }, 15_000);
 
-test("each of the nine tutor flows sends the learner's choice and returns it as tutor", async () => {
+test("each tutor flow, including a lesson's opening, sends the learner's choice and returns it as tutor", async () => {
   const app = await setup(), learner = await app.learner();
   const sentLast = () => app.sent.at(-1)!.choice;
   // Nothing chosen: the default model at its default level.
@@ -213,9 +214,11 @@ test("each of the nine tutor flows sends the learner's choice and returns it as 
 
   await learner.ok("/settings/tutor/choose", LITE_HIGH);
   expect(await learner.ok("/courses/skills/suggest", { material: learner.material })).toMatchObject({ tutor: LITE_HIGH });
+  // Lesson saves the request and asks no tutor, so it returns no tutor; Reply asks for the opening and returns it.
   const lessonResult = await learner.ok("/learning/lesson", { skill: learner.skill, request: "Explain products." });
-  expect(lessonResult).toEqual({ lesson: expect.any(String), tutor: LITE_HIGH });
+  expect(lessonResult).toEqual({ lesson: expect.any(String) });
   const { lesson } = lessonResult;
+  expect(await learner.ok("/learning/reply", { studySession: lesson })).toEqual({ tutor: LITE_HIGH });
   expect(await learner.ok("/learning/question", { studySession: lesson, text: "Why does order matter?", channel: "TEXT", attachments: [], dialogueLength: 0 })).toEqual({ tutor: LITE_HIGH });
   // A failed reply keeps the saved question for Reply.
   app.failNext("REPLY");
@@ -254,9 +257,11 @@ test("each of the nine tutor flows sends the learner's choice and returns it as 
 test("a RETIRED choice is declined at admission, before the command's own check and before any write", async () => {
   const app = await setup(), learner = await app.learner(), review = { reviewed: true, unseen: true, outsideHelp: false };
   // Study state for every command: a lesson with an unanswered question, a judged attempt, a closed unjudged attempt, and an open task with work.
-  const { lesson } = await learner.ok("/learning/lesson", { skill: learner.skill, request: "Explain products." });
+  const { lesson } = await openLesson(learner.ok, { skill: learner.skill, request: "Explain products." });
   app.failNext("REPLY");
   await learner.post("/learning/question", { studySession: lesson, text: "Why?", channel: "TEXT", attachments: [], dialogueLength: 0 });
+  // A lesson whose opening explanation never arrived, which Reply would ask for.
+  const { lesson: waiting } = await learner.ok("/learning/lesson", { skill: learner.skill, request: "Explain transposes." });
   const { task: judgedTask } = await learner.ok("/learning/task", { skill: learner.skill });
   await learner.ok("/learning/respond", { studySession: judgedTask, text: "Work", channel: "TEXT", attachments: [], dialogueLength: 0 });
   await learner.ok("/learning/assess", { studySession: judgedTask, dialogueLength: 1, ...review });
@@ -277,6 +282,7 @@ test("a RETIRED choice is declined at admission, before the command's own check 
     ["/learning/task", { skill: learner.skill }],
     ["/learning/question", { studySession: lesson, text: "Another question", channel: "TEXT", attachments: [], dialogueLength: await learner.dialogueLength(lesson) }],
     ["/learning/reply", { studySession: lesson }],
+    ["/learning/reply", { studySession: waiting }],
     ["/learning/hint", { studySession: open }],
     ["/learning/assess", { studySession: open, dialogueLength: 1, ...review }],
     ["/learning/retry", { studySession: unjudged }],
@@ -307,13 +313,14 @@ test("choosing does not wait for a running lesson, which keeps the pair it prepa
   await learner.ok("/settings/tutor/choose", PRO_LOW);
   const entered = Promise.withResolvers<void>(), release = Promise.withResolvers<void>();
   app.duringGeneration(async () => { entered.resolve(); await release.promise; });
-  const running = learner.post("/learning/lesson", { skill: learner.skill, request: "Explain products." });
+  const { lesson } = await learner.ok("/learning/lesson", { skill: learner.skill, request: "Explain products." });
+  const running = learner.post("/learning/reply", { studySession: lesson });
   await entered.promise;
-  // The learner lock is held by the lesson, but saving a choice does not take it.
+  // The learner lock is held by the lesson's opening, but saving a choice does not take it.
   expect(await learner.ok("/settings/tutor/choose", LITE_HIGH)).toEqual(settings(LITE_HIGH, "SAVED"));
   release.resolve();
-  expect(await running).toEqual({ status: 200, body: { lesson: expect.any(String), tutor: PRO_LOW } });
-  expect(await learner.ok("/learning/lesson", { skill: learner.skill, request: "Again." })).toMatchObject({ tutor: LITE_HIGH });
+  expect(await running).toEqual({ status: 200, body: { tutor: PRO_LOW } });
+  expect(await openLesson(learner.ok, { skill: learner.skill, request: "Again." })).toMatchObject({ tutor: LITE_HIGH });
   expect(app.sent.map(({ choice }) => choice)).toEqual([PRO_LOW, LITE_HIGH]);
 }, 30_000);
 
@@ -380,11 +387,12 @@ test("saving the home view does not wait for a running lesson", async () => {
   const app = await setup(), learner = await app.learner();
   const entered = Promise.withResolvers<void>(), release = Promise.withResolvers<void>();
   app.duringGeneration(async () => { entered.resolve(); await release.promise; });
-  const running = learner.post("/learning/lesson", { skill: learner.skill, request: "Explain products." });
+  const { lesson } = await learner.ok("/learning/lesson", { skill: learner.skill, request: "Explain products." });
+  const running = learner.post("/learning/reply", { studySession: lesson });
   await entered.promise;
-  // The learner lock is held by the lesson, but saving and reading the view do not take it.
+  // The learner lock is held by the lesson's opening, but saving and reading the view do not take it.
   expect(await learner.ok("/settings/view/set", { view: "tasks" })).toEqual({ view: "tasks" });
   expect(await learner.ok("/settings/view")).toEqual({ view: "tasks" });
   release.resolve();
-  expect(await running).toEqual({ status: 200, body: { lesson: expect.any(String), tutor: DEFAULT } });
+  expect(await running).toEqual({ status: 200, body: { tutor: DEFAULT } });
 }, 30_000);

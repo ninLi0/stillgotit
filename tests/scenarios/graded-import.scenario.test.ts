@@ -11,6 +11,7 @@ import type { Gemini, GeminiPart } from "../../src/host/gemini.ts";
 import type { ExtractContext, ExtractedRow } from "../../src/tutor-types.ts";
 import type { User } from "../../src/concepts/Registering/Registering.ts";
 import { refusalDetail } from "../../src/host/http-policy.ts";
+import { openLesson } from "../fixtures/open-lesson.ts";
 
 /*
  * The journey in the graded-import brief, end to end through HTTP. One learner imports a returned midterm into a course with two
@@ -369,7 +370,7 @@ describe("Import graded coursework as evidence", () => {
     expect(((await learner.ok("/courses/read", { course })).skills as { skill: string; title: string }[]).find((row) => row.skill === drafted)?.title).toBe(draft.title);
     expect(app.calls.length).toBe(asked);
     // A lesson on Products teaches from the course notes and never sends the graded work.
-    await learner.ok("/learning/lesson", { skill: products, request: "Explain why the order of the factors matters." });
+    await openLesson(learner.ok, { skill: products, request: "Explain why the order of the factors matters." });
     expect(app.calls.length).toBe(asked + 1);
     const lesson = JSON.stringify(app.calls.at(-1)!.parts);
     expect(lesson).toContain(notes);

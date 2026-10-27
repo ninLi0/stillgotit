@@ -125,10 +125,18 @@ async function startJourney() {
   const maya = await learner(), sam = await learner();
   expect(await sam.ok("/settings/tutor/choose", LITE_HIGH)).toEqual(record(LITE_HIGH, "SAVED"));
 
-  /** Asks for a lesson and returns the reply with the Google calls it caused. */
+  /**
+   * Asks for a lesson as the study page does, with the Google calls it caused. Lesson saves the request and asks no tutor;
+   * Reply then asks the tutor for the opening explanation. `reply` is what the page has once both answer: the saved lesson
+   * and the tutor that explained it, or the first refusal. `extra` goes with both requests.
+   */
   async function lesson(who: typeof maya, extra: Record<string, unknown> = {}) {
     const before = google.calls.length;
-    const reply = await who.post("/learning/lesson", { skill: who.skill, request: "Explain matrix products.", ...extra });
+    const started = await who.post("/learning/lesson", { skill: who.skill, request: "Explain matrix products.", ...extra });
+    if (started.status !== 200) return { reply: started, sent: google.calls.slice(before) };
+    expect(started.body).toEqual({ lesson: expect.any(String) });
+    const opening = await who.post("/learning/reply", { studySession: started.body.lesson, ...extra });
+    const reply = opening.status === 200 ? { status: 200, body: { lesson: started.body.lesson, ...opening.body } } : opening;
     return { reply, sent: google.calls.slice(before) };
   }
   /** What Sam's settings show after one of Maya's changes. */
@@ -198,6 +206,7 @@ async function restartServer(input: { database: string; listed: string[]; maya: 
     out.samSees = await post(input.sam.session, "/settings/tutor");
     out.chosen = await post(input.maya.session, "/settings/tutor/choose", input.again);
     out.lesson = await post(input.maya.session, "/learning/lesson", { skill: input.maya.skill, request: "Explain matrix products." });
+    out.opening = await post(input.maya.session, "/learning/reply", { studySession: out.lesson.body.lesson });
     out.sent = generated();
     await runtime.gateway.beginDrain();
     await connection.client.close();
@@ -350,7 +359,8 @@ describe("model-picker: one learner's journey through HTTP, a second learner bes
     expect(restarted.samSees).toEqual({ status: 200, body: { settings: { models: offered, choice: LITE_HIGH, status: "SAVED", defaultChoice: fallback } } });
     // Choosing another model replaces the RETIRED choice, and the next lesson goes to it.
     expect(restarted.chosen).toEqual({ status: 200, body: { settings: { models: offered, choice: FLASH_HIGH, status: "SAVED", defaultChoice: fallback } } });
-    expect(restarted.lesson).toEqual({ status: 200, body: { lesson: expect.any(String), tutor: FLASH_HIGH } });
+    expect(restarted.lesson).toEqual({ status: 200, body: { lesson: expect.any(String) } });
+    expect(restarted.opening).toEqual({ status: 200, body: { tutor: FLASH_HIGH } });
     expect(restarted.sent).toEqual([[address("gemini-3.8-flash"), { thinkingLevel: "high" }]]);
     await samLooks("Maya chose again on the restarted server");
   }, 60_000);

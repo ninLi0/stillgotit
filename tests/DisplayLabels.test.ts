@@ -65,7 +65,7 @@ describe("Error messages", () => {
   });
 
   test("technical details written by the browser client are replaced with a plain message", () => {
-    expect(failureText({ error: "BAD_JSON", detail: "Invalid JSON response from /learning/lesson (status 524)." }))
+    expect(failureText({ error: "BAD_JSON", detail: "Invalid JSON response from /learning/reply (status 524)." }))
       .toBe("The server did not answer. Check your connection and try again. Your saved work is still there.");
   });
 });

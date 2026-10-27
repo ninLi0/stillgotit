@@ -170,9 +170,12 @@ Defined in [GroundedTutoring](../design/concepts/GroundedTutoring.md), line 1.
 
 #### Actions
 
-- `explain(owner: Learner, topic: Topic, definition: Definition, request: String, explanation: String, materials: MaterialSet, citations: PassageSet) : returns (lesson: Session)`
+- `requestLesson(owner: Learner, topic: Topic, definition: Definition, request: String, materials: MaterialSet) : returns (lesson: Session)`
   - Refuses `INVALID_LESSON_CONTENT`: Provide a learning request and explanation.
   - Refuses `INVALID_LESSON_SOURCES`: Use your readable sources from one course and cite their content.
+- `explainLesson(owner: Learner, lesson: Session, explanation: String, citations: PassageSet) : returns ()`
+  - Refuses `LESSON_EXPLANATION_UNAVAILABLE`: Choose one of your open lessons that is waiting for its explanation.
+  - Refuses `INVALID_LESSON_EXPLANATION`: Provide an explanation with references to this lesson's sources.
 - `prepareTask(owner: Learner, topic: Topic, definition: Definition, question: String, criteria: String, materials: MaterialSet, citations: PassageSet, mode: Mode, fresh: Flag) : returns (task: Session)`
   - Refuses `INVALID_TASK_CONTENT`: Provide a practice question and its assessment requirements.
   - Refuses `INVALID_TASK_SOURCES`: Use your readable sources from one course and cite their content.
@@ -449,7 +452,7 @@ Concrete types:
 
 ## Computations
 
-- `attemptIsReady(data: GroundedTutoring.StudyRecord, dialogueLength: Number, reviewed: Flag, unseen: Flag, outsideHelp: Flag) : Flag` — [Learning computations](../design/compositions/LearningComputations.md), line 105.
+- `attemptIsReady(data: GroundedTutoring.StudyRecord, dialogueLength: Number, reviewed: Flag, unseen: Flag, outsideHelp: Flag) : Flag` — [Learning computations](../design/compositions/LearningComputations.md), line 111.
 - `beginAllowed(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows, skill: SkillMapping.Skill, urgent: Flag) : Flag` — [Daily planning flows](../design/compositions/Planning.md), line 114.
 - `carriedEstimate(tracks: MasteryEstimating.ProgressRows, skill: SkillMapping.Skill, current: SkillMapping.Version) : CarriedEstimate` — [Courses, materials, and skills](../design/compositions/Courses.md), line 58.
 - `choiceOffered(choice: TutorChoice) : Flag` — [Settings](../design/compositions/Settings.md), line 44.
@@ -460,7 +463,7 @@ Concrete types:
 - `defaultChoice() : TutorChoice` — [Settings](../design/compositions/Settings.md), line 32.
 - `defaultHomeView() : HomeView` — [Settings](../design/compositions/Settings.md), line 148.
 - `dialogueIsCurrent(data: GroundedTutoring.StudyRecord, dialogueLength: Number) : Flag` — [Learning computations](../design/compositions/LearningComputations.md), line 24.
-- `estimateTimeline(explanation?: MasteryEstimating.EstimateExplanation, tracks: MasteryEstimating.ProgressRows) : EstimateTimeline` — [Learning computations](../design/compositions/LearningComputations.md), line 86.
+- `estimateTimeline(explanation?: MasteryEstimating.EstimateExplanation, tracks: MasteryEstimating.ProgressRows) : EstimateTimeline` — [Learning computations](../design/compositions/LearningComputations.md), line 92.
 - `evidenceAttribution(origin: AssessmentReviewing.Origin, rationale: String) : String` — [P2 learning journey](../design/stages/materials.md), line 136.
 - `evidenceUpdate(data: AssessmentReviewing.CaseRecord, tracks: MasteryEstimating.ProgressRows) : EvidenceUpdate` — [Learning computations](../design/compositions/LearningComputations.md), line 27.
 - `extractRequest(selected: Library.SourceRecords, skills: SkillMapping.SkillMapRows) : TutorRequest` — [Importing graded work](../design/compositions/Importing.md), line 112.
@@ -478,10 +481,12 @@ Concrete types:
 - `hasLessonQuestion(data: GroundedTutoring.StudyRecord) : Flag` — [Learning computations](../design/compositions/LearningComputations.md), line 39.
 - `homeViewOffered(view: String) : Flag` — [Settings](../design/compositions/Settings.md), line 142.
 - `itemOrder(day: Date, candidate: StudyPlanning.Candidate) : String` — [Daily planning flows](../design/compositions/Planning.md), line 117.
-- `itemSubject(candidate: StudyPlanning.Candidate) : ItemSubject` — [Learning computations](../design/compositions/LearningComputations.md), line 42.
+- `itemSubject(candidate: StudyPlanning.Candidate) : ItemSubject` — [Learning computations](../design/compositions/LearningComputations.md), line 48.
 - `leftAloneDays(explanation: MasteryEstimating.EstimateExplanation, at: DateTime) : LeftAloneDays` — [Shared learning reads](../design/compositions/LearningReads.md), line 107.
 - `leftAlonePath(explanation: MasteryEstimating.EstimateExplanation, at: DateTime, u0: Number, v1: Number, v3: Number, v7: Number, v14: Number, v30: Number, v60: Number, v90: Number) : LeftAlonePath` — [Shared learning reads](../design/compositions/LearningReads.md), line 110.
-- `lessonRequest(selected: Library.SourceRecords, context: SkillContext, request: String) : TutorRequest` — [Learning computations](../design/compositions/LearningComputations.md), line 45.
+- `lessonAwaitsTutor(data: GroundedTutoring.StudyRecord) : Flag` — [Learning computations](../design/compositions/LearningComputations.md), line 45.
+- `lessonRequest(selected: Library.SourceRecords, context: SkillContext, request: String) : TutorRequest` — [Learning computations](../design/compositions/LearningComputations.md), line 51.
+- `lessonUnexplained(data: GroundedTutoring.StudyRecord) : Flag` — [Learning computations](../design/compositions/LearningComputations.md), line 42.
 - `levelSupported(model: String, level: String) : Flag` — [Settings](../design/compositions/Settings.md), line 38.
 - `memoryCurve(at: DateTime, explanation: MasteryEstimating.EstimateExplanation, review: DateTime, reviewValue: Number, v1: Number, v3: Number, v7: Number, v14: Number, v30: Number, v60: Number, v90: Number) : MemoryCurve` — [Shared learning reads](../design/compositions/LearningReads.md), line 104.
 - `memoryInstants(at: DateTime) : SampleInstants` — [Shared learning reads](../design/compositions/LearningReads.md), line 98.
@@ -489,31 +494,31 @@ Concrete types:
 - `offeredChoice(model: String, level: String) : TutorChoice` — [Settings](../design/compositions/Settings.md), line 41.
 - `offeredHomeView(view: String) : HomeView` — [Settings](../design/compositions/Settings.md), line 145.
 - `offeredTreeKind(kind: String) : TreeKind` — [Courses, materials, and skills](../design/compositions/Courses.md), line 85.
-- `planDetail(schedule: StudyPlanning.ScheduleValue) : PlanDetail` — [Learning computations](../design/compositions/LearningComputations.md), line 48.
-- `planRequest(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows, schedule: StudyPlanning.ScheduleValue) : ReviewProposal` — [Learning computations](../design/compositions/LearningComputations.md), line 51.
+- `planDetail(schedule: StudyPlanning.ScheduleValue) : PlanDetail` — [Learning computations](../design/compositions/LearningComputations.md), line 54.
+- `planRequest(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows, schedule: StudyPlanning.ScheduleValue) : ReviewProposal` — [Learning computations](../design/compositions/LearningComputations.md), line 57.
 - `prerequisiteSet(prerequisites: SkillList) : SkillMapping.SkillSet` — [Courses, materials, and skills](../design/compositions/Courses.md), line 67.
 - `prerequisiteToPractice(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows, skill: SkillMapping.Skill) : PrerequisiteChoice` — [Request admission](../design/compositions/LearningAccess.md), line 50.
-- `prerequisitesReady(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows, skill: SkillMapping.Skill) : Flag` — [Learning computations](../design/compositions/LearningComputations.md), line 56.
-- `progressRows(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows) : SkillProgress` — [Learning computations](../design/compositions/LearningComputations.md), line 59.
+- `prerequisitesReady(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows, skill: SkillMapping.Skill) : Flag` — [Learning computations](../design/compositions/LearningComputations.md), line 62.
+- `progressRows(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows) : SkillProgress` — [Learning computations](../design/compositions/LearningComputations.md), line 65.
 - `recentSession(data: GroundedTutoring.StudyRecord, skillTitle: String) : RecentSession` — [Shared learning reads](../design/compositions/LearningReads.md), line 60.
 - `referenceCurve(v0: Number, v1: Number, v3: Number, v7: Number, v14: Number, v30: Number, v60: Number, v90: Number) : ReferenceCurve` — [Shared learning reads](../design/compositions/LearningReads.md), line 95.
 - `requestChoice(request: TutorRequest) : TutorChoice` — [Settings](../design/compositions/Settings.md), line 87.
-- `responseInput(data: GroundedTutoring.StudyRecord, text: String, channel: GroundedTutoring.Channel, attachments: AttachmentList, sources: Library.SourceRecords) : ResponseInput` — [Learning computations](../design/compositions/LearningComputations.md), line 62.
-- `reviewApproved(reviewed: Flag, unseen: Flag, outsideHelp: Flag) : Flag` — [Learning computations](../design/compositions/LearningComputations.md), line 65.
+- `responseInput(data: GroundedTutoring.StudyRecord, text: String, channel: GroundedTutoring.Channel, attachments: AttachmentList, sources: Library.SourceRecords) : ResponseInput` — [Learning computations](../design/compositions/LearningComputations.md), line 68.
+- `reviewApproved(reviewed: Flag, unseen: Flag, outsideHelp: Flag) : Flag` — [Learning computations](../design/compositions/LearningComputations.md), line 71.
 - `reviewInstant(at: DateTime, explanation: MasteryEstimating.EstimateExplanation) : DateTime` — [Shared learning reads](../design/compositions/LearningReads.md), line 101.
-- `selectSkill(skills: SkillMapping.SkillMapRows, skill: SkillMapping.Skill) : SkillContext` — [Learning computations](../design/compositions/LearningComputations.md), line 68.
-- `selectSkillMaterials(context: SkillContext) : GroundedTutoring.MaterialSet` — [Learning computations](../design/compositions/LearningComputations.md), line 71.
-- `selectSources(sources: Library.SourceRecords, materials: GroundedTutoring.MaterialSet) : SourceSelection` — [Learning computations](../design/compositions/LearningComputations.md), line 74.
+- `selectSkill(skills: SkillMapping.SkillMapRows, skill: SkillMapping.Skill) : SkillContext` — [Learning computations](../design/compositions/LearningComputations.md), line 74.
+- `selectSkillMaterials(context: SkillContext) : GroundedTutoring.MaterialSet` — [Learning computations](../design/compositions/LearningComputations.md), line 77.
+- `selectSources(sources: Library.SourceRecords, materials: GroundedTutoring.MaterialSet) : SourceSelection` — [Learning computations](../design/compositions/LearningComputations.md), line 80.
 - `sessionActivity(data: GroundedTutoring.StudyRecord) : SessionActivity` — [Shared learning reads](../design/compositions/LearningReads.md), line 36.
-- `sessionMaterials(data: GroundedTutoring.StudyRecord) : GroundedTutoring.MaterialSet` — [Learning computations](../design/compositions/LearningComputations.md), line 77.
-- `sessionRequest(selected: Library.SourceRecords, data: GroundedTutoring.StudyRecord, kind: String) : TutorRequest` — [Learning computations](../design/compositions/LearningComputations.md), line 80.
-- `sessionSubject(identity: SessionIdentity) : SessionOwner` — [Learning computations](../design/compositions/LearningComputations.md), line 108.
+- `sessionMaterials(data: GroundedTutoring.StudyRecord) : GroundedTutoring.MaterialSet` — [Learning computations](../design/compositions/LearningComputations.md), line 83.
+- `sessionRequest(selected: Library.SourceRecords, data: GroundedTutoring.StudyRecord, kind: String) : TutorRequest` — [Learning computations](../design/compositions/LearningComputations.md), line 86.
+- `sessionSubject(identity: SessionIdentity) : SessionOwner` — [Learning computations](../design/compositions/LearningComputations.md), line 114.
 - `singleMaterial(material: Library.Material) : SkillMapping.MaterialSet` — [P2 learning journey](../design/stages/materials.md), line 133.
-- `studyDetail(context: SkillContext, tracks: MasteryEstimating.ProgressRows, sessions: GroundedTutoring.StudyRecords, cases: AssessmentReviewing.CaseRecords) : StudyDetail` — [Learning computations](../design/compositions/LearningComputations.md), line 83.
+- `studyDetail(context: SkillContext, tracks: MasteryEstimating.ProgressRows, sessions: GroundedTutoring.StudyRecords, cases: AssessmentReviewing.CaseRecords) : StudyDetail` — [Learning computations](../design/compositions/LearningComputations.md), line 89.
 - `studyTopics(skills: SkillMapping.SkillMapRows) : TopicList` — [Shared learning reads](../design/compositions/LearningReads.md), line 57.
-- `submissionInput(data: GroundedTutoring.StudyRecord, unseen: Flag, outsideHelp: Flag) : SubmissionInput` — [Learning computations](../design/compositions/LearningComputations.md), line 96.
-- `suggestRequest(selected: Library.SourceRecords) : TutorRequest` — [Learning computations](../design/compositions/LearningComputations.md), line 99.
-- `taskRequest(selected: Library.SourceRecords, context: SkillContext, sessions: GroundedTutoring.StudyRecords) : TutorRequest` — [Learning computations](../design/compositions/LearningComputations.md), line 102.
+- `submissionInput(data: GroundedTutoring.StudyRecord, unseen: Flag, outsideHelp: Flag) : SubmissionInput` — [Learning computations](../design/compositions/LearningComputations.md), line 102.
+- `suggestRequest(selected: Library.SourceRecords) : TutorRequest` — [Learning computations](../design/compositions/LearningComputations.md), line 105.
+- `taskRequest(selected: Library.SourceRecords, context: SkillContext, sessions: GroundedTutoring.StudyRecords) : TutorRequest` — [Learning computations](../design/compositions/LearningComputations.md), line 108.
 - `treeKindOffered(kind: String) : Flag` — [Courses, materials, and skills](../design/compositions/Courses.md), line 82.
 - `tutorCatalog() : TutorCatalog` — [Settings](../design/compositions/Settings.md), line 29.
 - `tutorStatus(saved: Flag, offered: Flag) : String` — [Settings](../design/compositions/Settings.md), line 47.
@@ -558,7 +563,7 @@ Authored path: `Courses.OwnedCourse`.
 ### (owner) owns study skill (skill)
 
 Authored path: `Reads.OwnedSkill`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 71.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 91.
 - Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 3.
 - Covered by [Progress reactions](../design/compositions/Progress.md), line 37.
 
@@ -585,7 +590,8 @@ Authored path: `Reads.OwnedSession`.
 ### (owner) can change session (studySession)
 
 Authored path: `Reads.OpenSession`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 30.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 25.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 50.
 - Covered by [Request admission](../design/compositions/LearningAccess.md), line 17.
 - Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 3.
 - Covered by [Progress reactions](../design/compositions/Progress.md), line 7.
@@ -601,7 +607,7 @@ Authored path: `Reads.OpenSession`.
 ### (owner) can refresh routine reviews in (course)
 
 Authored path: `Reads.CanReplan`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 71.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 91.
 - Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 70.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 37.
@@ -618,7 +624,8 @@ Authored path: `Reads.CanReplan`.
 ### (owner) can study confirmed (skill)
 
 Authored path: `Reads.ActiveSkill`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 58.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 18.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 78.
 - Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 3.
 
 ```view
@@ -629,6 +636,7 @@ Authored path: `Reads.ActiveSkill`.
 ### (owner) can use open session (studySession) with its sources
 
 Authored path: `Reads.SessionSources`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 26.
 - Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 5.
 
 ```view
@@ -642,7 +650,7 @@ Authored path: `Reads.SessionSources`.
 ### (owner) has an activity in progress
 
 Authored path: `Planning.ActivityInProgress`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 71.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 91.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 17.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 27.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 35.
@@ -748,7 +756,7 @@ Authored path: `Courses.OwnedSkill`.
 ### (owner) owns assessment (assessment)
 
 Authored path: `Reads.OwnedCase`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 108.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 128.
 - Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 3.
 
 ```view
@@ -761,7 +769,7 @@ Authored path: `Reads.OwnedCase`.
 ### (owner) owns practice or imported assessment (assessment)
 
 Authored path: `Reads.OwnedAnyCase`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 42.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 62.
 - Covered by [Request admission](../design/compositions/LearningAccess.md), line 20.
 
 ```view
@@ -803,7 +811,7 @@ assessment (assessment) needs evidence for (owner) — inputs (owner, assessment
 ### review inputs for (owner) in (course)
 
 Authored path: `Reads.PlanContext`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 71.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 91.
 - Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 70.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 11.
 - Covered by [Progress reactions](../design/compositions/Progress.md), line 35.
@@ -834,6 +842,7 @@ the activity in progress of (owner) — inputs (owner); outputs (course, courseT
 ### the current context of (skill) for (owner)
 
 Authored path: `Reads.SkillContext`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 19.
 - Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 7.
 
 ```view
@@ -903,7 +912,7 @@ the memory curve of (skill) at (definition) for (owner) at (at) — inputs (owne
 ### the tutor choice that applies to (owner)
 
 Authored path: `Settings.TutorStatus`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 112.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 132.
 - Covered by [Settings](../design/compositions/Settings.md), line 55.
 
 ```view
@@ -981,20 +990,21 @@ Former "admit a transcript correction in (studySession)" — inputs (owner, stud
 ### admit a tutor reply in (studySession)
 
 Authored path: `Access.ReplyReady`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 31.
 - Covered by [Request admission](../design/compositions/LearningAccess.md), line 14.
 
 ```former
 Former "admit a tutor reply in (studySession)" — inputs (owner, studySession); bindings (data); promises at most one record — forms:
   a record of
     where view "(owner) can use open session (studySession) with its sources" with (owner, studySession) has (data)
-    where hasLessonQuestion (data)
+    where lessonAwaitsTutor (data)
     allowed: true
 ```
 
 ### admit a tutor request for (owner)
 
 Authored path: `Settings.TutorReady`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 112.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 132.
 - Covered by [Request admission](../design/compositions/LearningAccess.md), line 7.
 - Covered by [Settings](../design/compositions/Settings.md), line 91.
 
@@ -1034,7 +1044,7 @@ Former "admit an estimate adjustment for (owner) and (skill)" — inputs (owner,
 ### admit finishing lesson (studySession)
 
 Authored path: `Access.FinishReady`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 34.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 54.
 - Covered by [Request admission](../design/compositions/LearningAccess.md), line 17.
 
 ```former
@@ -3882,8 +3892,8 @@ then
 ### Learning.Adjust
 
 Authored path: `Learning.Adjust`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 55.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 134.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 75.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 154.
 
 ```reaction
 when RequestBoundary.request (adjustmentKey, path: "/learning/adjust", reason, requestId, session, skill, value)
@@ -3894,8 +3904,8 @@ then
 ### Learning.Adjust:active#2
 
 Authored path: `Learning.Adjust`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 55.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 134.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 75.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 154.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Adjust
@@ -3909,8 +3919,8 @@ then
 ### Learning.Adjust:active:planned#3
 
 Authored path: `Learning.Adjust`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 55.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 134.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 75.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 154.
 
 ```reaction
 when MasteryEstimating.adjust (adjustmentKey, definition, learner: owner, reason, subject: skill, value, adjustment), asked by Learning.Adjust:active#2
@@ -3933,8 +3943,8 @@ then
 ### Learning.Adjust:active:unplanned#3
 
 Authored path: `Learning.Adjust`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 55.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 134.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 75.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 154.
 
 ```reaction
 when MasteryEstimating.adjust (adjustmentKey, definition, learner: owner, reason, subject: skill, value, adjustment), asked by Learning.Adjust:active#2
@@ -3952,8 +3962,8 @@ then
 ### Learning.Adjust:active:waiting#3
 
 Authored path: `Learning.Adjust`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 55.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 134.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 75.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 154.
 
 ```reaction
 when MasteryEstimating.adjust (adjustmentKey, definition, learner: owner, reason, subject: skill, value, adjustment), asked by Learning.Adjust:active#2
@@ -3972,8 +3982,8 @@ then
 ### Learning.Adjust:missing#2
 
 Authored path: `Learning.Adjust`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 55.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 134.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 75.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 154.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Adjust
@@ -3987,8 +3997,8 @@ then
 ### Learning.Adjust:missing:planned#3
 
 Authored path: `Learning.Adjust`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 55.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 134.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 75.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 154.
 
 ```reaction
 when RequestBoundary.respond (detail: "Choose one of your confirmed skills before adjusting its estimate.", error: "SKILL_UNAVAILABLE", requestId), asked by Learning.Adjust:missing#2
@@ -4012,8 +4022,8 @@ then
 ### Learning.Adjust:missing:unplanned#3
 
 Authored path: `Learning.Adjust`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 55.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 134.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 75.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 154.
 
 ```reaction
 when RequestBoundary.respond (detail: "Choose one of your confirmed skills before adjusting its estimate.", error: "SKILL_UNAVAILABLE", requestId), asked by Learning.Adjust:missing#2
@@ -4032,8 +4042,8 @@ then
 ### Learning.Adjust:missing:waiting#3
 
 Authored path: `Learning.Adjust`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 55.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 134.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 75.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 154.
 
 ```reaction
 when RequestBoundary.respond (detail: "Choose one of your confirmed skills before adjusting its estimate.", error: "SKILL_UNAVAILABLE", requestId), asked by Learning.Adjust:missing#2
@@ -4053,8 +4063,8 @@ then
 ### Learning.Assess
 
 Authored path: `Learning.Assess`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 40.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 130.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 60.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 150.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -4066,8 +4076,8 @@ then
 ### Learning.Assess:missing#2
 
 Authored path: `Learning.Assess`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 40.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 130.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 60.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 150.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -4082,8 +4092,8 @@ then
 ### Learning.Assess:missing#3
 
 Authored path: `Learning.Assess`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 40.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 130.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 60.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 150.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -4102,8 +4112,8 @@ then
 ### Learning.Assess:missing#4
 
 Authored path: `Learning.Assess`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 40.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 130.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 60.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 150.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -4124,8 +4134,8 @@ then
 ### Learning.Assess:missing#5
 
 Authored path: `Learning.Assess`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 40.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 130.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 60.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 150.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -4139,8 +4149,8 @@ then
 ### Learning.Assess:missing#6
 
 Authored path: `Learning.Assess`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 40.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 130.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 60.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 150.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -4157,8 +4167,8 @@ then
 ### Learning.Assess:missing#7
 
 Authored path: `Learning.Assess`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 40.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 130.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 60.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 150.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -4175,8 +4185,8 @@ then
 ### Learning.Assess:ready#2
 
 Authored path: `Learning.Assess`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 40.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 130.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 60.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 150.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -4191,8 +4201,8 @@ then
 ### Learning.Assess:ready#3
 
 Authored path: `Learning.Assess`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 40.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 130.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 60.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 150.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -4210,8 +4220,8 @@ then
 ### Learning.Assess:ready#4
 
 Authored path: `Learning.Assess`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 40.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 130.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 60.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 150.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -4232,8 +4242,8 @@ then
 ### Learning.Assess:ready#5
 
 Authored path: `Learning.Assess`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 40.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 130.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 60.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 150.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -4247,8 +4257,8 @@ then
 ### Learning.Assess:ready#6
 
 Authored path: `Learning.Assess`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 40.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 130.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 60.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 150.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -4265,8 +4275,8 @@ then
 ### Learning.Assess:ready#7
 
 Authored path: `Learning.Assess`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 40.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 130.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 60.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 150.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -4284,7 +4294,7 @@ then
 
 Authored path: `Learning.Confidence`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 5.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 121.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 141.
 
 ```reaction
 when RequestBoundary.request (confidence, path: "/learning/confidence", requestId, session, skill)
@@ -4296,7 +4306,7 @@ then
 
 Authored path: `Learning.Confidence`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 5.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 121.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 141.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Confidence
@@ -4312,7 +4322,7 @@ then
 
 Authored path: `Learning.Confidence`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 5.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 121.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 141.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Confidence
@@ -4327,7 +4337,7 @@ then
 
 Authored path: `Learning.Confidence`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 5.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 121.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 141.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Confidence
@@ -4343,7 +4353,7 @@ then
 
 Authored path: `Learning.Confidence`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 5.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 121.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 141.
 
 ```reaction
 when MasteryEstimating.initialize (basis: "SELF_REPORTED", confidence, definition, learner: owner, subject: skill, track), asked by Learning.Confidence:new#2
@@ -4357,8 +4367,8 @@ then
 
 Authored path: `Learning.Correct`.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 42.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 132.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 62.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 152.
 
 ```reaction
 when RequestBoundary.request (basedOn, case, gateMet, path: "/learning/correct", reason, requestId, result, session)
@@ -4370,8 +4380,8 @@ then
 
 Authored path: `Learning.Correct`.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 42.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 132.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 62.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 152.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Correct
@@ -4387,8 +4397,8 @@ then
 
 Authored path: `Learning.Correct`.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 42.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 132.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 62.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 152.
 
 ```reaction
 when AssessmentReviewing.revise (author: owner, basedOn, case, gateMet, origin: "MANUAL", rationale: reason, result, judgment), asked by Learning.Correct:imported#2
@@ -4406,8 +4416,8 @@ then
 
 Authored path: `Learning.Correct`.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 42.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 132.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 62.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 152.
 
 ```reaction
 when AssessmentReviewing.revise (author: owner, basedOn, case, gateMet, origin: "MANUAL", rationale: reason, result, judgment), asked by Learning.Correct:imported#2
@@ -4424,8 +4434,8 @@ then
 
 Authored path: `Learning.Correct`.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 42.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 132.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 62.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 152.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Correct
@@ -4441,8 +4451,8 @@ then
 
 Authored path: `Learning.Correct`.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 42.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 132.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 62.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 152.
 
 ```reaction
 when RequestBoundary.respond (error: "IMPORTED_GATE_UNAVAILABLE", requestId), asked by Learning.Correct:importedGate#2
@@ -4461,8 +4471,8 @@ then
 
 Authored path: `Learning.Correct`.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 42.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 132.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 62.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 152.
 
 ```reaction
 when RequestBoundary.respond (error: "IMPORTED_GATE_UNAVAILABLE", requestId), asked by Learning.Correct:importedGate#2
@@ -4480,8 +4490,8 @@ then
 
 Authored path: `Learning.Correct`.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 42.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 132.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 62.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 152.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Correct
@@ -4496,8 +4506,8 @@ then
 
 Authored path: `Learning.Correct`.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 42.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 132.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 62.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 152.
 
 ```reaction
 when RequestBoundary.respond (error: "REVISION_CASE_UNAVAILABLE", requestId), asked by Learning.Correct:missing#2
@@ -4516,8 +4526,8 @@ then
 
 Authored path: `Learning.Correct`.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 42.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 132.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 62.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 152.
 
 ```reaction
 when RequestBoundary.respond (error: "REVISION_CASE_UNAVAILABLE", requestId), asked by Learning.Correct:missing#2
@@ -4535,8 +4545,8 @@ then
 
 Authored path: `Learning.Correct`.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 42.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 132.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 62.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 152.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Correct
@@ -4551,8 +4561,8 @@ then
 
 Authored path: `Learning.Correct`.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 42.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 132.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 62.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 152.
 
 ```reaction
 when AssessmentReviewing.revise (author: owner, basedOn, case, gateMet, origin: "MANUAL", rationale: reason, result, judgment), asked by Learning.Correct:practice#2
@@ -4570,8 +4580,8 @@ then
 
 Authored path: `Learning.Correct`.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 42.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 132.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 62.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 152.
 
 ```reaction
 when AssessmentReviewing.revise (author: owner, basedOn, case, gateMet, origin: "MANUAL", rationale: reason, result, judgment), asked by Learning.Correct:practice#2
@@ -4587,8 +4597,8 @@ then
 ### Learning.FinishLesson
 
 Authored path: `Learning.FinishLesson`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 27.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 129.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 47.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 149.
 
 ```reaction
 when RequestBoundary.request (path: "/learning/finish", requestId, session, studySession)
@@ -4599,8 +4609,8 @@ then
 ### Learning.FinishLesson:missing#2
 
 Authored path: `Learning.FinishLesson`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 27.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 129.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 47.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 149.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.FinishLesson
@@ -4614,8 +4624,8 @@ then
 ### Learning.FinishLesson:owned#2
 
 Authored path: `Learning.FinishLesson`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 27.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 129.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 47.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 149.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.FinishLesson
@@ -4630,8 +4640,8 @@ then
 ### Learning.FinishLesson:owned#3
 
 Authored path: `Learning.FinishLesson`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 27.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 129.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 47.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 149.
 
 ```reaction
 when GroundedTutoring.close (owner, session: studySession), asked by Learning.FinishLesson:owned#2
@@ -4644,8 +4654,8 @@ then
 ### Learning.FinishLesson:practice#2
 
 Authored path: `Learning.FinishLesson`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 27.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 129.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 47.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 149.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.FinishLesson
@@ -4661,7 +4671,7 @@ then
 
 Authored path: `Learning.Hint`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 127.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 147.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -4674,7 +4684,7 @@ then
 
 Authored path: `Learning.Hint`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 127.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 147.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -4690,7 +4700,7 @@ then
 
 Authored path: `Learning.Hint`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 127.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 147.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -4713,7 +4723,7 @@ then
 
 Authored path: `Learning.Hint`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 127.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 147.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -4728,7 +4738,7 @@ then
 
 Authored path: `Learning.Hint`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 127.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 147.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -4745,7 +4755,7 @@ then
 
 Authored path: `Learning.Hint`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 127.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 147.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -4763,7 +4773,7 @@ then
 
 Authored path: `Learning.Hint`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 127.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 147.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -4779,7 +4789,7 @@ then
 
 Authored path: `Learning.Hint`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 127.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 147.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -4795,7 +4805,7 @@ then
 
 Authored path: `Learning.Hint`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 127.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 147.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -4816,7 +4826,7 @@ then
 
 Authored path: `Learning.Hint`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 127.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 147.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -4831,7 +4841,7 @@ then
 
 Authored path: `Learning.Hint`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 127.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 147.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -4848,7 +4858,7 @@ then
 
 Authored path: `Learning.Hint`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 127.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 147.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -4866,7 +4876,7 @@ then
 
 Authored path: `Learning.Hint`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 127.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 147.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -4882,7 +4892,8 @@ then
 
 Authored path: `Learning.Lesson`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 7.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 122.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 15.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 142.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -4895,7 +4906,8 @@ then
 
 Authored path: `Learning.Lesson`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 7.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 122.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 15.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 142.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -4911,100 +4923,45 @@ then
 
 Authored path: `Learning.Lesson`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 7.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 122.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 15.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 142.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
 when RequestBoundary.respond (error: "SKILL_UNAVAILABLE", requestId), asked by Learning.Lesson:missing#2
 where
   earlier, Sessioning.use (session, subject: owner), asked by Learning.Lesson
-  view "the tutor choice that applies to (owner)" with (owner) has (choice, status)
-  status is among ["SAVED", "DEFAULT"]
   earlier, RequestBoundary.request (path: "/learning/lesson", request, requestId, session, skill)
-  view "(owner) can study confirmed (skill)" with (owner, skill)
+  view "(owner) can study confirmed (skill)" with (owner, skill) has (definition)
   view "the current context of (skill) for (owner)" with (owner, skill) has (context, sources)
   materials is selectSkillMaterials (context)
-  (selected, valid: true) is selectSources (materials, sources)
-  draft is lessonRequest (context, request, selected)
-  prepared is withChoice (choice, request: draft)
+  (valid: true) is selectSources (materials, sources)
 then
-  TutorGenerating.generate (owner, request: prepared)
+  GroundedTutoring.requestLesson (definition, materials, owner, request, topic: skill)
 ```
 
 ### Learning.Lesson:missing#4
 
 Authored path: `Learning.Lesson`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 7.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 122.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 15.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 142.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
-when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Lesson:missing#3
-where
-  earlier, Sessioning.use (session, subject: owner), asked by Learning.Lesson
-then
-  Sessioning.use (session)
-```
-
-### Learning.Lesson:missing:changed#5
-
-Authored path: `Learning.Lesson`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 7.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 122.
-- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
-
-```reaction
-when Sessioning.use (session, subject: owner), asked by Learning.Lesson:missing#4
+when GroundedTutoring.requestLesson (definition, materials, owner, request, topic: skill, lesson), asked by Learning.Lesson:missing#3
 where
   earlier, RequestBoundary.respond (error: "SKILL_UNAVAILABLE", requestId), asked by Learning.Lesson:missing#2
-  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Lesson:missing#3
-  (definition) is generationDefinition (request: prepared)
-  earlier, RequestBoundary.request (path: "/learning/lesson", request, requestId, session, skill)
-  no view "(owner) can study confirmed (skill)" with (owner, skill) has (definition)
 then
-  RequestBoundary.respond (error: "SKILL_CHANGED", requestId)
-```
-
-### Learning.Lesson:missing:current#5
-
-Authored path: `Learning.Lesson`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 7.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 122.
-- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
-
-```reaction
-when Sessioning.use (session, subject: owner), asked by Learning.Lesson:missing#4
-where
-  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Lesson:missing#3
-  (definition) is generationDefinition (request: prepared)
-  (citations, materials, text: explanation) is generationFields (answer)
-  earlier, RequestBoundary.request (path: "/learning/lesson", request, requestId, session, skill)
-  view "(owner) can study confirmed (skill)" with (owner, skill) has (definition)
-then
-  GroundedTutoring.explain (citations, definition, explanation, materials, owner, request, topic: skill)
-```
-
-### Learning.Lesson:missing:current#6
-
-Authored path: `Learning.Lesson`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 7.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 122.
-- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
-
-```reaction
-when GroundedTutoring.explain (citations, definition, explanation, materials, owner, request, topic: skill, lesson), asked by Learning.Lesson:missing:current#5
-where
-  earlier, RequestBoundary.respond (error: "SKILL_UNAVAILABLE", requestId), asked by Learning.Lesson:missing#2
-  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Lesson:missing#3
-then
-  RequestBoundary.respond (lesson, requestId, tutor: former "the tutor choice that (request) carried" with (request: prepared))
+  RequestBoundary.respond (lesson, requestId)
 ```
 
 ### Learning.Lesson:ready#2
 
 Authored path: `Learning.Lesson`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 7.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 122.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 15.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 142.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -5020,98 +4977,43 @@ then
 
 Authored path: `Learning.Lesson`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 7.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 122.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 15.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 142.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Lesson:ready#2
 where
-  view "the tutor choice that applies to (owner)" with (owner) has (choice, status)
-  status is among ["SAVED", "DEFAULT"]
   earlier, RequestBoundary.request (path: "/learning/lesson", request, requestId, session, skill)
-  view "(owner) can study confirmed (skill)" with (owner, skill)
+  view "(owner) can study confirmed (skill)" with (owner, skill) has (definition)
   view "the current context of (skill) for (owner)" with (owner, skill) has (context, sources)
   materials is selectSkillMaterials (context)
-  (selected, valid: true) is selectSources (materials, sources)
-  draft is lessonRequest (context, request, selected)
-  prepared is withChoice (choice, request: draft)
+  (valid: true) is selectSources (materials, sources)
 then
-  TutorGenerating.generate (owner, request: prepared)
+  GroundedTutoring.requestLesson (definition, materials, owner, request, topic: skill)
 ```
 
 ### Learning.Lesson:ready#4
 
 Authored path: `Learning.Lesson`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 7.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 122.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 15.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 142.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
-when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Lesson:ready#3
+when GroundedTutoring.requestLesson (definition, materials, owner, request, topic: skill, lesson), asked by Learning.Lesson:ready#3
 where
-  earlier, Sessioning.use (session, subject: owner), asked by Learning.Lesson
-then
-  Sessioning.use (session)
-```
-
-### Learning.Lesson:ready:changed#5
-
-Authored path: `Learning.Lesson`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 7.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 122.
-- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
-
-```reaction
-when Sessioning.use (session, subject: owner), asked by Learning.Lesson:ready#4
-where
-  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Lesson:ready#3
-  (definition) is generationDefinition (request: prepared)
-  earlier, RequestBoundary.request (path: "/learning/lesson", request, requestId, session, skill)
-  no view "(owner) can study confirmed (skill)" with (owner, skill) has (definition)
-then
-  RequestBoundary.respond (error: "SKILL_CHANGED", requestId)
-```
-
-### Learning.Lesson:ready:current#5
-
-Authored path: `Learning.Lesson`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 7.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 122.
-- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
-
-```reaction
-when Sessioning.use (session, subject: owner), asked by Learning.Lesson:ready#4
-where
-  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Lesson:ready#3
-  (definition) is generationDefinition (request: prepared)
-  (citations, materials, text: explanation) is generationFields (answer)
-  earlier, RequestBoundary.request (path: "/learning/lesson", request, requestId, session, skill)
-  view "(owner) can study confirmed (skill)" with (owner, skill) has (definition)
-then
-  GroundedTutoring.explain (citations, definition, explanation, materials, owner, request, topic: skill)
-```
-
-### Learning.Lesson:ready:current#6
-
-Authored path: `Learning.Lesson`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 7.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 122.
-- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
-
-```reaction
-when GroundedTutoring.explain (citations, definition, explanation, materials, owner, request, topic: skill, lesson), asked by Learning.Lesson:ready:current#5
-where
-  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Lesson:ready#3
   earlier, RequestBoundary.request (path: "/learning/lesson", request, requestId, session, skill)
 then
-  RequestBoundary.respond (lesson, requestId, tutor: former "the tutor choice that (request) carried" with (request: prepared))
+  RequestBoundary.respond (lesson, requestId)
 ```
 
 ### Learning.Progress
 
 Authored path: `Learning.Progress`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 5.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 120.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 140.
 
 ```reaction
 when RequestBoundary.request (course, path: "/learning/progress", requestId, session)
@@ -5123,7 +5025,7 @@ then
 
 Authored path: `Learning.Progress`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 5.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 120.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 140.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Progress
@@ -5138,7 +5040,7 @@ then
 
 Authored path: `Learning.Progress`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 5.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 120.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 140.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Progress
@@ -5153,7 +5055,7 @@ then
 
 Authored path: `Learning.Question`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 125.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 145.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -5166,7 +5068,7 @@ then
 
 Authored path: `Learning.Question`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 125.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 145.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -5182,7 +5084,7 @@ then
 
 Authored path: `Learning.Question`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 125.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 145.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -5205,7 +5107,7 @@ then
 
 Authored path: `Learning.Question`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 125.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 145.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -5220,7 +5122,7 @@ then
 
 Authored path: `Learning.Question`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 125.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 145.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -5237,7 +5139,7 @@ then
 
 Authored path: `Learning.Question`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 125.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 145.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -5255,7 +5157,7 @@ then
 
 Authored path: `Learning.Question`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 125.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 145.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -5271,7 +5173,7 @@ then
 
 Authored path: `Learning.Question`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 125.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 145.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -5291,7 +5193,7 @@ then
 
 Authored path: `Learning.Question`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 125.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 145.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -5312,7 +5214,7 @@ then
 
 Authored path: `Learning.Question`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 125.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 145.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -5327,7 +5229,7 @@ then
 
 Authored path: `Learning.Question`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 125.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 145.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -5344,7 +5246,7 @@ then
 
 Authored path: `Learning.Question`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 125.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 145.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -5362,7 +5264,7 @@ then
 
 Authored path: `Learning.Question`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 125.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 145.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -5379,7 +5281,7 @@ then
 Authored path: `Learning.Read`.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 46.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 5.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 119.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 139.
 
 ```reaction
 when RequestBoundary.request (path: "/learning/read", requestId, session, skill)
@@ -5392,7 +5294,7 @@ then
 Authored path: `Learning.Read`.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 46.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 5.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 119.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 139.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Read
@@ -5409,7 +5311,7 @@ then
 Authored path: `Learning.Read`.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 46.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 5.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 119.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 139.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Read
@@ -5426,8 +5328,8 @@ then
 
 Authored path: `Learning.Regrade`.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 106.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 133.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 126.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 153.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -5440,8 +5342,8 @@ then
 
 Authored path: `Learning.Regrade`.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 106.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 133.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 126.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 153.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -5457,8 +5359,8 @@ then
 
 Authored path: `Learning.Regrade`.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 106.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 133.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 126.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 153.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -5484,8 +5386,8 @@ then
 
 Authored path: `Learning.Regrade`.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 106.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 133.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 126.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 153.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -5500,8 +5402,8 @@ then
 
 Authored path: `Learning.Regrade`.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 106.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 133.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 126.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 153.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -5518,8 +5420,8 @@ then
 
 Authored path: `Learning.Regrade`.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 106.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 133.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 126.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 153.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -5536,8 +5438,8 @@ then
 
 Authored path: `Learning.Regrade`.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 106.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 133.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 126.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 153.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -5553,8 +5455,8 @@ then
 
 Authored path: `Learning.Regrade`.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 106.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 133.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 126.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 153.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -5580,8 +5482,8 @@ then
 
 Authored path: `Learning.Regrade`.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 106.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 133.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 126.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 153.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -5596,8 +5498,8 @@ then
 
 Authored path: `Learning.Regrade`.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 106.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 133.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 126.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 153.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -5614,8 +5516,8 @@ then
 
 Authored path: `Learning.Regrade`.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 106.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 133.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 126.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 153.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -5632,8 +5534,8 @@ then
 
 Authored path: `Learning.Regrade`.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 106.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 133.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 126.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 153.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -5651,8 +5553,8 @@ then
 
 Authored path: `Learning.Regrade`.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 106.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 133.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 126.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 153.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -5676,8 +5578,8 @@ then
 
 Authored path: `Learning.Regrade`.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 106.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 133.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 126.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 153.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -5692,8 +5594,8 @@ then
 
 Authored path: `Learning.Regrade`.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 106.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 133.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 126.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 153.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -5711,8 +5613,8 @@ then
 
 Authored path: `Learning.Regrade`.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 106.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 133.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 126.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 153.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -5728,7 +5630,7 @@ then
 ### Learning.ReplanAfterAdjustment
 
 Authored path: `Learning.ReplanAfterAdjustment`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 68.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 88.
 
 ```reaction
 when MasteryEstimating.adjust (learner: owner, subject: skill)
@@ -5746,7 +5648,8 @@ then
 
 Authored path: `Learning.Reply`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 126.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 23.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 146.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 135.
 
@@ -5760,7 +5663,8 @@ then
 
 Authored path: `Learning.Reply`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 126.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 23.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 146.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 135.
 
@@ -5773,11 +5677,157 @@ then
   RequestBoundary.respond (error: "SESSION_UNAVAILABLE", requestId)
 ```
 
-### Learning.Reply:missing#3
+### Learning.Reply:missing:opening#3
 
 Authored path: `Learning.Reply`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 126.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 23.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 146.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 135.
+
+```reaction
+when RequestBoundary.respond (error: "SESSION_UNAVAILABLE", requestId), asked by Learning.Reply:missing#2
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Learning.Reply
+  view "the tutor choice that applies to (owner)" with (owner) has (choice, status)
+  status is among ["SAVED", "DEFAULT"]
+  earlier, RequestBoundary.request (path: "/learning/reply", requestId, session, studySession)
+  view "(owner) can use open session (studySession) with its sources" with (owner, studySession) has (data, sources)
+  lessonUnexplained (data)
+  view "(owner) can change session (studySession)" with (owner, studySession) has (skill)
+  GroundedTutoring._lesson (lesson: studySession) has (request)
+  view "the current context of (skill) for (owner)" with (owner, skill) has (context)
+  materials is sessionMaterials (data)
+  (selected, valid: true) is selectSources (materials, sources)
+  draft is lessonRequest (context, request, selected)
+  prepared is withChoice (choice, request: draft)
+then
+  TutorGenerating.generate (owner, request: prepared)
+```
+
+### Learning.Reply:missing:opening#4
+
+Authored path: `Learning.Reply`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 11.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 23.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 146.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 135.
+
+```reaction
+when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Reply:missing:opening#3
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Learning.Reply
+then
+  Sessioning.use (session)
+```
+
+### Learning.Reply:missing:opening:closed#5
+
+Authored path: `Learning.Reply`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 11.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 23.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 146.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 135.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Reply:missing:opening#4
+where
+  earlier, RequestBoundary.respond (error: "SESSION_UNAVAILABLE", requestId), asked by Learning.Reply:missing#2
+  earlier, RequestBoundary.request (path: "/learning/reply", requestId, session, studySession)
+  no view "(owner) can change session (studySession)" with (owner, studySession)
+then
+  RequestBoundary.respond (error: "SESSION_CHANGED", requestId)
+```
+
+### Learning.Reply:missing:opening:explained#5
+
+Authored path: `Learning.Reply`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 11.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 23.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 146.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 135.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Reply:missing:opening#4
+where
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Reply:missing:opening#3
+  (citations, text) is generationFields (answer)
+  earlier, RequestBoundary.request (path: "/learning/reply", requestId, session, studySession)
+  view "(owner) can change session (studySession)" with (owner, studySession)
+  GroundedTutoring._sessionData (session: studySession) has (data: latest)
+  lessonUnexplained (data: latest)
+then
+  GroundedTutoring.explainLesson (citations, explanation: text, lesson: studySession, owner)
+```
+
+### Learning.Reply:missing:opening:explained#6
+
+Authored path: `Learning.Reply`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 11.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 23.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 146.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 135.
+
+```reaction
+when GroundedTutoring.explainLesson (citations, explanation: text, lesson: studySession, owner), asked by Learning.Reply:missing:opening:explained#5
+where
+  earlier, RequestBoundary.respond (error: "SESSION_UNAVAILABLE", requestId), asked by Learning.Reply:missing#2
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Reply:missing:opening#3
+then
+  RequestBoundary.respond (requestId, tutor: former "the tutor choice that (request) carried" with (request: prepared))
+```
+
+### Learning.Reply:missing:opening:open#5
+
+Authored path: `Learning.Reply`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 11.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 23.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 146.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 135.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Reply:missing:opening#4
+where
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Reply:missing:opening#3
+  (citations, text) is generationFields (answer)
+  earlier, RequestBoundary.request (path: "/learning/reply", requestId, session, studySession)
+  view "(owner) can change session (studySession)" with (owner, studySession)
+  GroundedTutoring._sessionData (session: studySession) has (data: latest)
+  hasLessonQuestion (data: latest)
+then
+  GroundedTutoring.answerLesson (channel: "TEXT", citations, lesson: studySession, owner, text)
+```
+
+### Learning.Reply:missing:opening:open#6
+
+Authored path: `Learning.Reply`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 11.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 23.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 146.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 135.
+
+```reaction
+when GroundedTutoring.answerLesson (channel: "TEXT", citations, lesson: studySession, owner, text), asked by Learning.Reply:missing:opening:open#5
+where
+  earlier, RequestBoundary.respond (error: "SESSION_UNAVAILABLE", requestId), asked by Learning.Reply:missing#2
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Reply:missing:opening#3
+then
+  RequestBoundary.respond (requestId, tutor: former "the tutor choice that (request) carried" with (request: prepared))
+```
+
+### Learning.Reply:missing:question#3
+
+Authored path: `Learning.Reply`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 11.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 23.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 146.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 135.
 
@@ -5798,32 +5848,34 @@ then
   TutorGenerating.generate (owner, request: prepared)
 ```
 
-### Learning.Reply:missing#4
+### Learning.Reply:missing:question#4
 
 Authored path: `Learning.Reply`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 126.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 23.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 146.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 135.
 
 ```reaction
-when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Reply:missing#3
+when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Reply:missing:question#3
 where
   earlier, Sessioning.use (session, subject: owner), asked by Learning.Reply
 then
   Sessioning.use (session)
 ```
 
-### Learning.Reply:missing:closed#5
+### Learning.Reply:missing:question:closed#5
 
 Authored path: `Learning.Reply`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 126.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 23.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 146.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 135.
 
 ```reaction
-when Sessioning.use (session, subject: owner), asked by Learning.Reply:missing#4
+when Sessioning.use (session, subject: owner), asked by Learning.Reply:missing:question#4
 where
   earlier, RequestBoundary.respond (error: "SESSION_UNAVAILABLE", requestId), asked by Learning.Reply:missing#2
   earlier, RequestBoundary.request (path: "/learning/reply", requestId, session, studySession)
@@ -5832,38 +5884,82 @@ then
   RequestBoundary.respond (error: "SESSION_CHANGED", requestId)
 ```
 
-### Learning.Reply:missing:open#5
+### Learning.Reply:missing:question:explained#5
 
 Authored path: `Learning.Reply`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 126.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 23.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 146.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 135.
 
 ```reaction
-when Sessioning.use (session, subject: owner), asked by Learning.Reply:missing#4
+when Sessioning.use (session, subject: owner), asked by Learning.Reply:missing:question#4
 where
-  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Reply:missing#3
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Reply:missing:question#3
   (citations, text) is generationFields (answer)
   earlier, RequestBoundary.request (path: "/learning/reply", requestId, session, studySession)
   view "(owner) can change session (studySession)" with (owner, studySession)
+  GroundedTutoring._sessionData (session: studySession) has (data: latest)
+  lessonUnexplained (data: latest)
+then
+  GroundedTutoring.explainLesson (citations, explanation: text, lesson: studySession, owner)
+```
+
+### Learning.Reply:missing:question:explained#6
+
+Authored path: `Learning.Reply`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 11.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 23.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 146.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 135.
+
+```reaction
+when GroundedTutoring.explainLesson (citations, explanation: text, lesson: studySession, owner), asked by Learning.Reply:missing:question:explained#5
+where
+  earlier, RequestBoundary.respond (error: "SESSION_UNAVAILABLE", requestId), asked by Learning.Reply:missing#2
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Reply:missing:question#3
+then
+  RequestBoundary.respond (requestId, tutor: former "the tutor choice that (request) carried" with (request: prepared))
+```
+
+### Learning.Reply:missing:question:open#5
+
+Authored path: `Learning.Reply`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 11.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 23.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 146.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 135.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Reply:missing:question#4
+where
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Reply:missing:question#3
+  (citations, text) is generationFields (answer)
+  earlier, RequestBoundary.request (path: "/learning/reply", requestId, session, studySession)
+  view "(owner) can change session (studySession)" with (owner, studySession)
+  GroundedTutoring._sessionData (session: studySession) has (data: latest)
+  hasLessonQuestion (data: latest)
 then
   GroundedTutoring.answerLesson (channel: "TEXT", citations, lesson: studySession, owner, text)
 ```
 
-### Learning.Reply:missing:open#6
+### Learning.Reply:missing:question:open#6
 
 Authored path: `Learning.Reply`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 126.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 23.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 146.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 135.
 
 ```reaction
-when GroundedTutoring.answerLesson (channel: "TEXT", citations, lesson: studySession, owner, text), asked by Learning.Reply:missing:open#5
+when GroundedTutoring.answerLesson (channel: "TEXT", citations, lesson: studySession, owner, text), asked by Learning.Reply:missing:question:open#5
 where
   earlier, RequestBoundary.respond (error: "SESSION_UNAVAILABLE", requestId), asked by Learning.Reply:missing#2
-  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Reply:missing#3
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Reply:missing:question#3
 then
   RequestBoundary.respond (requestId, tutor: former "the tutor choice that (request) carried" with (request: prepared))
 ```
@@ -5872,7 +5968,8 @@ then
 
 Authored path: `Learning.Reply`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 126.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 23.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 146.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 135.
 
@@ -5885,11 +5982,155 @@ then
   Sessioning.use (session)
 ```
 
-### Learning.Reply:ready#3
+### Learning.Reply:ready:opening#3
 
 Authored path: `Learning.Reply`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 126.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 23.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 146.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 135.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Reply:ready#2
+where
+  view "the tutor choice that applies to (owner)" with (owner) has (choice, status)
+  status is among ["SAVED", "DEFAULT"]
+  earlier, RequestBoundary.request (path: "/learning/reply", requestId, session, studySession)
+  view "(owner) can use open session (studySession) with its sources" with (owner, studySession) has (data, sources)
+  lessonUnexplained (data)
+  view "(owner) can change session (studySession)" with (owner, studySession) has (skill)
+  GroundedTutoring._lesson (lesson: studySession) has (request)
+  view "the current context of (skill) for (owner)" with (owner, skill) has (context)
+  materials is sessionMaterials (data)
+  (selected, valid: true) is selectSources (materials, sources)
+  draft is lessonRequest (context, request, selected)
+  prepared is withChoice (choice, request: draft)
+then
+  TutorGenerating.generate (owner, request: prepared)
+```
+
+### Learning.Reply:ready:opening#4
+
+Authored path: `Learning.Reply`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 11.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 23.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 146.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 135.
+
+```reaction
+when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Reply:ready:opening#3
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Learning.Reply
+then
+  Sessioning.use (session)
+```
+
+### Learning.Reply:ready:opening:closed#5
+
+Authored path: `Learning.Reply`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 11.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 23.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 146.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 135.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Reply:ready:opening#4
+where
+  earlier, RequestBoundary.request (path: "/learning/reply", requestId, session, studySession)
+  no view "(owner) can change session (studySession)" with (owner, studySession)
+then
+  RequestBoundary.respond (error: "SESSION_CHANGED", requestId)
+```
+
+### Learning.Reply:ready:opening:explained#5
+
+Authored path: `Learning.Reply`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 11.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 23.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 146.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 135.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Reply:ready:opening#4
+where
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Reply:ready:opening#3
+  (citations, text) is generationFields (answer)
+  earlier, RequestBoundary.request (path: "/learning/reply", requestId, session, studySession)
+  view "(owner) can change session (studySession)" with (owner, studySession)
+  GroundedTutoring._sessionData (session: studySession) has (data: latest)
+  lessonUnexplained (data: latest)
+then
+  GroundedTutoring.explainLesson (citations, explanation: text, lesson: studySession, owner)
+```
+
+### Learning.Reply:ready:opening:explained#6
+
+Authored path: `Learning.Reply`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 11.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 23.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 146.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 135.
+
+```reaction
+when GroundedTutoring.explainLesson (citations, explanation: text, lesson: studySession, owner), asked by Learning.Reply:ready:opening:explained#5
+where
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Reply:ready:opening#3
+  earlier, RequestBoundary.request (path: "/learning/reply", requestId, session, studySession)
+then
+  RequestBoundary.respond (requestId, tutor: former "the tutor choice that (request) carried" with (request: prepared))
+```
+
+### Learning.Reply:ready:opening:open#5
+
+Authored path: `Learning.Reply`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 11.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 23.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 146.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 135.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Reply:ready:opening#4
+where
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Reply:ready:opening#3
+  (citations, text) is generationFields (answer)
+  earlier, RequestBoundary.request (path: "/learning/reply", requestId, session, studySession)
+  view "(owner) can change session (studySession)" with (owner, studySession)
+  GroundedTutoring._sessionData (session: studySession) has (data: latest)
+  hasLessonQuestion (data: latest)
+then
+  GroundedTutoring.answerLesson (channel: "TEXT", citations, lesson: studySession, owner, text)
+```
+
+### Learning.Reply:ready:opening:open#6
+
+Authored path: `Learning.Reply`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 11.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 23.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 146.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 135.
+
+```reaction
+when GroundedTutoring.answerLesson (channel: "TEXT", citations, lesson: studySession, owner, text), asked by Learning.Reply:ready:opening:open#5
+where
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Reply:ready:opening#3
+  earlier, RequestBoundary.request (path: "/learning/reply", requestId, session, studySession)
+then
+  RequestBoundary.respond (requestId, tutor: former "the tutor choice that (request) carried" with (request: prepared))
+```
+
+### Learning.Reply:ready:question#3
+
+Authored path: `Learning.Reply`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 11.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 23.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 146.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 135.
 
@@ -5909,32 +6150,34 @@ then
   TutorGenerating.generate (owner, request: prepared)
 ```
 
-### Learning.Reply:ready#4
+### Learning.Reply:ready:question#4
 
 Authored path: `Learning.Reply`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 126.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 23.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 146.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 135.
 
 ```reaction
-when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Reply:ready#3
+when TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Reply:ready:question#3
 where
   earlier, Sessioning.use (session, subject: owner), asked by Learning.Reply
 then
   Sessioning.use (session)
 ```
 
-### Learning.Reply:ready:closed#5
+### Learning.Reply:ready:question:closed#5
 
 Authored path: `Learning.Reply`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 126.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 23.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 146.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 135.
 
 ```reaction
-when Sessioning.use (session, subject: owner), asked by Learning.Reply:ready#4
+when Sessioning.use (session, subject: owner), asked by Learning.Reply:ready:question#4
 where
   earlier, RequestBoundary.request (path: "/learning/reply", requestId, session, studySession)
   no view "(owner) can change session (studySession)" with (owner, studySession)
@@ -5942,37 +6185,81 @@ then
   RequestBoundary.respond (error: "SESSION_CHANGED", requestId)
 ```
 
-### Learning.Reply:ready:open#5
+### Learning.Reply:ready:question:explained#5
 
 Authored path: `Learning.Reply`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 126.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 23.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 146.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 135.
 
 ```reaction
-when Sessioning.use (session, subject: owner), asked by Learning.Reply:ready#4
+when Sessioning.use (session, subject: owner), asked by Learning.Reply:ready:question#4
 where
-  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Reply:ready#3
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Reply:ready:question#3
   (citations, text) is generationFields (answer)
   earlier, RequestBoundary.request (path: "/learning/reply", requestId, session, studySession)
   view "(owner) can change session (studySession)" with (owner, studySession)
+  GroundedTutoring._sessionData (session: studySession) has (data: latest)
+  lessonUnexplained (data: latest)
+then
+  GroundedTutoring.explainLesson (citations, explanation: text, lesson: studySession, owner)
+```
+
+### Learning.Reply:ready:question:explained#6
+
+Authored path: `Learning.Reply`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 11.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 23.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 146.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 135.
+
+```reaction
+when GroundedTutoring.explainLesson (citations, explanation: text, lesson: studySession, owner), asked by Learning.Reply:ready:question:explained#5
+where
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Reply:ready:question#3
+  earlier, RequestBoundary.request (path: "/learning/reply", requestId, session, studySession)
+then
+  RequestBoundary.respond (requestId, tutor: former "the tutor choice that (request) carried" with (request: prepared))
+```
+
+### Learning.Reply:ready:question:open#5
+
+Authored path: `Learning.Reply`.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 11.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 23.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 146.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
+- Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 135.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Learning.Reply:ready:question#4
+where
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Reply:ready:question#3
+  (citations, text) is generationFields (answer)
+  earlier, RequestBoundary.request (path: "/learning/reply", requestId, session, studySession)
+  view "(owner) can change session (studySession)" with (owner, studySession)
+  GroundedTutoring._sessionData (session: studySession) has (data: latest)
+  hasLessonQuestion (data: latest)
 then
   GroundedTutoring.answerLesson (channel: "TEXT", citations, lesson: studySession, owner, text)
 ```
 
-### Learning.Reply:ready:open#6
+### Learning.Reply:ready:question:open#6
 
 Authored path: `Learning.Reply`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 126.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 23.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 146.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 135.
 
 ```reaction
-when GroundedTutoring.answerLesson (channel: "TEXT", citations, lesson: studySession, owner, text), asked by Learning.Reply:ready:open#5
+when GroundedTutoring.answerLesson (channel: "TEXT", citations, lesson: studySession, owner, text), asked by Learning.Reply:ready:question:open#5
 where
-  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Reply:ready#3
+  earlier, TutorGenerating.generate (owner, request: prepared, answer), asked by Learning.Reply:ready:question#3
   earlier, RequestBoundary.request (path: "/learning/reply", requestId, session, studySession)
 then
   RequestBoundary.respond (requestId, tutor: former "the tutor choice that (request) carried" with (request: prepared))
@@ -5982,7 +6269,7 @@ then
 
 Authored path: `Learning.Respond`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 124.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 144.
 
 ```reaction
 when RequestBoundary.request (attachments, channel, dialogueLength, path: "/learning/respond", requestId, session, studySession, text)
@@ -5994,7 +6281,7 @@ then
 
 Authored path: `Learning.Respond`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 124.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 144.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Respond
@@ -6009,7 +6296,7 @@ then
 
 Authored path: `Learning.Respond`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 124.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 144.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Respond
@@ -6027,7 +6314,7 @@ then
 
 Authored path: `Learning.Respond`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 124.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 144.
 
 ```reaction
 when GroundedTutoring.respond (channel, media, owner, session: studySession, text), asked by Learning.Respond:ready#2
@@ -6040,8 +6327,8 @@ then
 ### Learning.RetryAssessment
 
 Authored path: `Learning.RetryAssessment`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 40.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 131.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 60.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 151.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -6053,8 +6340,8 @@ then
 ### Learning.RetryAssessment:missing#2
 
 Authored path: `Learning.RetryAssessment`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 40.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 131.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 60.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 151.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -6069,8 +6356,8 @@ then
 ### Learning.RetryAssessment:missing#3
 
 Authored path: `Learning.RetryAssessment`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 40.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 131.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 60.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 151.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -6092,8 +6379,8 @@ then
 ### Learning.RetryAssessment:missing#4
 
 Authored path: `Learning.RetryAssessment`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 40.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 131.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 60.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 151.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -6107,8 +6394,8 @@ then
 ### Learning.RetryAssessment:missing#5
 
 Authored path: `Learning.RetryAssessment`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 40.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 131.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 60.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 151.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -6125,8 +6412,8 @@ then
 ### Learning.RetryAssessment:missing#6
 
 Authored path: `Learning.RetryAssessment`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 40.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 131.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 60.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 151.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -6142,8 +6429,8 @@ then
 ### Learning.RetryAssessment:ready#2
 
 Authored path: `Learning.RetryAssessment`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 40.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 131.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 60.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 151.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -6158,8 +6445,8 @@ then
 ### Learning.RetryAssessment:ready#3
 
 Authored path: `Learning.RetryAssessment`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 40.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 131.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 60.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 151.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -6180,8 +6467,8 @@ then
 ### Learning.RetryAssessment:ready#4
 
 Authored path: `Learning.RetryAssessment`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 40.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 131.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 60.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 151.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -6195,8 +6482,8 @@ then
 ### Learning.RetryAssessment:ready#5
 
 Authored path: `Learning.RetryAssessment`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 40.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 131.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 60.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 151.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -6213,8 +6500,8 @@ then
 ### Learning.RetryAssessment:ready#6
 
 Authored path: `Learning.RetryAssessment`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 40.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 131.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 60.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 151.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -6232,8 +6519,8 @@ then
 Authored path: `Learning.Suggest`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 27.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 110.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 135.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 130.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 155.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 130.
 
@@ -6248,8 +6535,8 @@ then
 Authored path: `Learning.Suggest`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 27.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 110.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 135.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 130.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 155.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 130.
 
@@ -6268,8 +6555,8 @@ then
 Authored path: `Learning.Suggest`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 27.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 110.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 135.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 130.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 155.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 130.
 
@@ -6298,8 +6585,8 @@ then
 Authored path: `Learning.Suggest`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 27.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 110.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 135.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 130.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 155.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 130.
 
@@ -6316,8 +6603,8 @@ then
 Authored path: `Learning.Suggest`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 27.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 110.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 135.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 130.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 155.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 130.
 
@@ -6336,8 +6623,8 @@ then
 Authored path: `Learning.Suggest`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 27.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 110.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 135.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 130.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 155.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 130.
 
@@ -6358,8 +6645,8 @@ then
 Authored path: `Learning.Suggest`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 27.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 110.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 135.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 130.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 155.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 130.
 
@@ -6388,8 +6675,8 @@ then
 Authored path: `Learning.Suggest`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 27.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 110.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 135.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 130.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 155.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 130.
 
@@ -6406,8 +6693,8 @@ then
 Authored path: `Learning.Suggest`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 27.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 110.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 135.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 130.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 155.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 130.
 
@@ -6426,8 +6713,8 @@ then
 Authored path: `Learning.Suggest`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 27.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 110.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 135.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 130.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 155.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 130.
 
@@ -6445,8 +6732,8 @@ then
 Authored path: `Learning.Suggest`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 27.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 110.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 135.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 130.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 155.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 130.
 
@@ -6475,8 +6762,8 @@ then
 Authored path: `Learning.Suggest`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 27.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 110.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 135.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 130.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 155.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 130.
 
@@ -6493,8 +6780,8 @@ then
 Authored path: `Learning.Suggest`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 27.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 110.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 135.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 130.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 155.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 130.
 
@@ -6513,8 +6800,8 @@ then
 Authored path: `Learning.Suggest`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 27.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 110.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 135.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 130.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 155.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 130.
 
@@ -6535,8 +6822,8 @@ then
 Authored path: `Learning.Suggest`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 27.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 110.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 135.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 130.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 155.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 130.
 
@@ -6564,8 +6851,8 @@ then
 Authored path: `Learning.Suggest`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 27.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 110.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 135.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 130.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 155.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 130.
 
@@ -6582,8 +6869,8 @@ then
 Authored path: `Learning.Suggest`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 27.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 21.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 110.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 135.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 130.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 155.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 130.
 
@@ -6601,7 +6888,7 @@ then
 
 Authored path: `Learning.Task`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 7.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 123.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 143.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -6614,7 +6901,7 @@ then
 
 Authored path: `Learning.Task`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 7.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 123.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 143.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -6630,7 +6917,7 @@ then
 
 Authored path: `Learning.Task`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 7.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 123.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 143.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -6657,7 +6944,7 @@ then
 
 Authored path: `Learning.Task`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 7.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 123.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 143.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -6672,7 +6959,7 @@ then
 
 Authored path: `Learning.Task`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 7.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 123.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 143.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -6691,7 +6978,7 @@ then
 
 Authored path: `Learning.Task`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 7.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 123.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 143.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -6710,7 +6997,7 @@ then
 
 Authored path: `Learning.Task`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 7.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 123.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 143.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -6726,7 +7013,7 @@ then
 
 Authored path: `Learning.Task`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 7.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 123.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 143.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -6742,7 +7029,7 @@ then
 
 Authored path: `Learning.Task`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 7.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 123.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 143.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -6768,7 +7055,7 @@ then
 
 Authored path: `Learning.Task`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 7.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 123.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 143.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -6783,7 +7070,7 @@ then
 
 Authored path: `Learning.Task`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 7.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 123.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 143.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -6801,7 +7088,7 @@ then
 
 Authored path: `Learning.Task`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 7.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 123.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 143.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -6820,7 +7107,7 @@ then
 
 Authored path: `Learning.Task`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 7.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 123.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 143.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 117.
 
 ```reaction
@@ -6836,7 +7123,7 @@ then
 
 Authored path: `Learning.Transcript`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 128.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 148.
 
 ```reaction
 when RequestBoundary.request (path: "/learning/transcript", requestId, session, studySession, text, turnIndex)
@@ -6848,7 +7135,7 @@ then
 
 Authored path: `Learning.Transcript`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 128.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 148.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Transcript
@@ -6863,7 +7150,7 @@ then
 
 Authored path: `Learning.Transcript`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 128.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 148.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Learning.Transcript
@@ -6878,7 +7165,7 @@ then
 
 Authored path: `Learning.Transcript`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 11.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 128.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 148.
 
 ```reaction
 when GroundedTutoring.confirmTranscript (owner, session: studySession, text, turnIndex), asked by Learning.Transcript:owned#2
@@ -8521,7 +8808,7 @@ then
 ### Reads.Continue
 
 Authored path: `Reads.Continue`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 36.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 56.
 - Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 25.
 - Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 41.
 
@@ -8534,7 +8821,7 @@ then
 ### Reads.Continue:missing#2
 
 Authored path: `Reads.Continue`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 36.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 56.
 - Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 25.
 - Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 41.
 
@@ -8550,7 +8837,7 @@ then
 ### Reads.Continue:owned#2
 
 Authored path: `Reads.Continue`.
-- Covered by [Learning flows](../design/compositions/Learning.md), line 36.
+- Covered by [Learning flows](../design/compositions/Learning.md), line 56.
 - Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 25.
 - Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 41.
 

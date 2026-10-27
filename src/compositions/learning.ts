@@ -37,6 +37,18 @@ const sessionTutorRequest = (owner: symbol, studySession: symbol, kind: "REPLY" 
   ...usingTutorChoice(owner, draft, choice, status, prepared),
 ] as const;
 /**
+ * Conditions that prepare the opening explanation of an unexplained lesson from the request it was saved with, the
+ * current context of its skill, and the materials saved with the lesson, which must still be among the learner's sources
+ * in its course. The learner's tutor choice is added last.
+ */
+const openingTutorRequest = (owner: symbol, studySession: symbol, { data, sources, skill, context, request, materials, selected, draft, choice, status, prepared }:
+  Symbols<"data" | "sources" | "skill" | "context" | "request" | "materials" | "selected" | "draft" | "choice" | "status" | "prepared">) => [
+  R.SessionSources({ owner, studySession }).is({ data, sources }), C.lessonUnexplained({ data }), R.OpenSession({ owner, studySession }).is({ skill }),
+  Tutoring._lesson({ lesson: studySession }).is({ request }), R.SkillContext({ owner, skill }).is({ context }), compute(C.sessionMaterials, { data }, materials),
+  compute(C.selectSources, { sources, materials }, { selected, valid: true }), compute(C.lessonRequest, { selected, context, request }, draft),
+  ...usingTutorChoice(owner, draft, choice, status, prepared),
+] as const;
+/**
  * Conditions that prepare a grading request for a saved case from its work, the materials saved with its session, and the
  * learner's sources in its course. Assess, RetryAssessment, and Regrade share them; each reads the case its own way first.
  */
@@ -79,22 +91,18 @@ const Confidence = endpoint("/learning/confidence", ({ session, skill, confidenc
     where(no(R.ActiveSkill({ owner, skill }))).then(respond({ error: "SKILL_UNAVAILABLE" })).named("missing"),
   ), options);
 
-const Lesson = endpoint("/learning/lesson", ({ session, skill, request, owner, definition, context, sources, materials, selected, draft, choice, status, prepared, answer, explanation, citations, lesson }) => receive({ session, skill, request })
+// The lesson is saved with the learner's request before any tutor work, so the request is kept when the tutor is slow or
+// fails. The page then asks Reply for the opening explanation, and Reply retries it after a failure.
+const Lesson = endpoint("/learning/lesson", ({ session, skill, request, owner, definition, context, sources, materials, lesson }) => receive({ session, skill, request })
   .then(Sessioning.use({ session }).responds({ subject: owner }))
   .then(
     where(R.ActiveSkill({ owner, skill })).then(useAgain(session, owner)).named("ready"),
     where(no(R.ActiveSkill({ owner, skill }))).then(respond({ error: "SKILL_UNAVAILABLE" })).named("missing"),
   )
-  .then(where(R.ActiveSkill({ owner, skill }), R.SkillContext({ owner, skill }).is({ context, sources }),
-    compute(C.selectSkillMaterials, { context }, materials), compute(C.selectSources, { sources, materials }, { selected, valid: true }),
-    compute(C.lessonRequest, { selected, context, request }, draft), ...usingTutorChoice(owner, draft, choice, status, prepared))
-    .then(AI.generate({ owner, request: prepared }).responds({ answer })))
-  .then(Sessioning.use({ session }).responds({ subject: owner }))
-  .then(...afterTutor(() => R.ActiveSkill({ owner, skill }).is({ definition }), "SKILL_CHANGED",
-    (...held) => where(...held, compute(C.generationFields, { answer }, { text: explanation, citations, materials }))
-      .then(Tutoring.explain({ owner, topic: skill, definition, request, explanation, materials, citations }).responds({ lesson }))
-      .then(respond({ lesson, tutor: Settings.SentTutor({ request: prepared }) })),
-    () => [compute(C.generationDefinition, { request: prepared }, { definition })])), options);
+  .then(where(R.ActiveSkill({ owner, skill }).is({ definition }), R.SkillContext({ owner, skill }).is({ context, sources }),
+    compute(C.selectSkillMaterials, { context }, materials), compute(C.selectSources, { sources, materials }, { valid: true }))
+    .then(Tutoring.requestLesson({ owner, topic: skill, definition, request, materials }).responds({ lesson }))
+    .then(respond({ lesson }))), options);
 const Task = endpoint("/learning/task", ({ session, skill, owner, definition, context, skills, tracks, sources, materials, selected, sessions, draft, choice, status, prepared, answer, question, citations, criteria, task }) => receive({ session, skill })
   .then(Sessioning.use({ session }).responds({ subject: owner }))
   .then(
@@ -134,18 +142,33 @@ const Question = endpoint("/learning/question", ({ session, studySession, text, 
     (...held) => where(...held, compute(C.generationFields, { answer }, { text: reply, citations }))
       .then(Tutoring.answerLesson({ owner, lesson: studySession, text: reply, citations, channel: "TEXT" }).responds({}))
       .then(respond({ tutor: Settings.SentTutor({ request: prepared }) })))), options);
-const Reply = endpoint("/learning/reply", ({ session, studySession, owner, data, materials, sources, selected, draft, choice, status, prepared, answer, text, citations }) => receive({ session, studySession })
+// Reply asks the tutor for what an open lesson is waiting for: the opening explanation of an unexplained lesson, or the
+// answer to an unanswered learner question. The two cases exclude each other, because an unexplained lesson has no
+// dialogue. After the tutor answers, the lesson is read again to record the answer as what it was asked for; the learner
+// lock keeps the lesson unchanged meanwhile, and the concept refuses an explanation for a lesson that already has one.
+const Reply = endpoint("/learning/reply", ({ session, studySession, owner, data, skill, context, request, materials, sources, selected, draft, choice, status, prepared, answer, latest, text, citations }) => receive({ session, studySession })
   .then(Sessioning.use({ session }).responds({ subject: owner })).then(
     where(R.OpenSession({ owner, studySession })).then(useAgain(session, owner)).named("ready"),
     where(no(R.OpenSession({ owner, studySession }))).then(respond({ error: "SESSION_UNAVAILABLE" })).named("missing"),
   )
-  .then(where(...sessionTutorRequest(owner, studySession, "REPLY", { data, sources, materials, selected, draft, choice, status, prepared }), C.hasLessonQuestion({ data }))
-    .then(AI.generate({ owner, request: prepared }).responds({ answer })))
+  .then(
+    where(...openingTutorRequest(owner, studySession, { data, sources, skill, context, request, materials, selected, draft, choice, status, prepared }))
+      .then(AI.generate({ owner, request: prepared }).responds({ answer })).named("opening"),
+    where(...sessionTutorRequest(owner, studySession, "REPLY", { data, sources, materials, selected, draft, choice, status, prepared }), C.hasLessonQuestion({ data }))
+      .then(AI.generate({ owner, request: prepared }).responds({ answer })).named("question"),
+  )
   .then(Sessioning.use({ session }).responds({ subject: owner }))
-  .then(...afterTutor(() => R.OpenSession({ owner, studySession }), "SESSION_CHANGED",
-    (...held) => where(...held, compute(C.generationFields, { answer }, { text, citations }))
-      .then(Tutoring.answerLesson({ owner, lesson: studySession, text, citations, channel: "TEXT" }).responds({}))
-      .then(respond({ tutor: Settings.SentTutor({ request: prepared }) })))), options);
+  .then(
+    where(R.OpenSession({ owner, studySession }), Tutoring._sessionData({ session: studySession }).is({ data: latest }), C.lessonUnexplained({ data: latest }),
+      compute(C.generationFields, { answer }, { text, citations }))
+      .then(Tutoring.explainLesson({ owner, lesson: studySession, explanation: text, citations }).responds({}))
+      .then(respond({ tutor: Settings.SentTutor({ request: prepared }) })).named("explained"),
+    ...afterTutor(() => R.OpenSession({ owner, studySession }), "SESSION_CHANGED",
+      (...held) => where(...held, Tutoring._sessionData({ session: studySession }).is({ data: latest }), C.hasLessonQuestion({ data: latest }),
+        compute(C.generationFields, { answer }, { text, citations }))
+        .then(Tutoring.answerLesson({ owner, lesson: studySession, text, citations, channel: "TEXT" }).responds({}))
+        .then(respond({ tutor: Settings.SentTutor({ request: prepared }) }))),
+  ), options);
 const Hint = endpoint("/learning/hint", ({ session, studySession, owner, data, sources, materials, selected, draft, choice, status, prepared, answer, text }) => receive({ session, studySession })
   .then(Sessioning.use({ session }).responds({ subject: owner })).then(
     where(R.OpenSession({ owner, studySession })).then(Tutoring.requestHint({ owner, task: studySession }).responds({})).named("ready"),

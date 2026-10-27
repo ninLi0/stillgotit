@@ -57,13 +57,16 @@ const tutor: Pick<CourseTutor, "suggest" | "generate"> = live ? new CourseTutor(
   catch (error) { console.log(`Live provider request failed after ${Math.round(performance.now() - started)} ms (${error instanceof Error ? error.message : "unknown error"}).`); throw error; }
 } }, new MaterialFiles()) : fixtureTutor;
 // STILLGOTIT_TEST_FAIL_REPLIES=1 fails every lesson reply after the question is saved, to check how the browser recovers.
-const failReplies = process.env.STILLGOTIT_TEST_FAIL_REPLIES === "1";
+// STILLGOTIT_TEST_FAIL_OPENINGS=1 likewise fails every lesson's opening explanation after the lesson is saved with its
+// request. The canned tutor otherwise answers the opening, which Reply asks for, with its `explanation` answer below.
+const failReplies = process.env.STILLGOTIT_TEST_FAIL_REPLIES === "1", failOpenings = process.env.STILLGOTIT_TEST_FAIL_OPENINGS === "1";
 // STILLGOTIT_TEST_REPLY_DELAY_MS=4000 makes each canned answer wait that many milliseconds (at most 60000), so the
 // interface's waiting state, such as the composer's loading ring, stays on screen long enough to check.
 const replyDelay = Math.min(60_000, Math.max(0, Number(process.env.STILLGOTIT_TEST_REPLY_DELAY_MS) || 0));
-const testTutor: Pick<CourseTutor, "suggest" | "generate"> = failReplies || replyDelay ? { suggest: (...args) => tutor.suggest(...args), generate: async (...args: Parameters<CourseTutor["generate"]>) => {
+const testTutor: Pick<CourseTutor, "suggest" | "generate"> = failReplies || failOpenings || replyDelay ? { suggest: (...args) => tutor.suggest(...args), generate: async (...args: Parameters<CourseTutor["generate"]>) => {
   if (replyDelay) await Bun.sleep(replyDelay);
   if (failReplies && args[2].startsWith("Answer the latest learner question")) throw new Error("Test interruption: the tutor's reply was lost.");
+  if (failOpenings && args[2].startsWith("Explain the selected skill")) throw new Error("Test interruption: the lesson's opening was lost.");
   return tutor.generate(...args);
 } } : tutor;
 const runtime = await createRuntime({ database: db, provider, providerOrigin: origin, publicOrigin: origin, tutor: testTutor, gemini });

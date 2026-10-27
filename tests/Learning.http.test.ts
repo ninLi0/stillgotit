@@ -8,6 +8,7 @@ import type { CourseTutor } from "../src/host/tutor.ts";
 import { rm } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { resolve } from "node:path";
+import { openLesson } from "./fixtures/open-lesson.ts";
 const ORIGIN = "http://localhost:5173", cleanups: (() => Promise<void>)[] = [];
 afterAll(async () => { for (const cleanup of cleanups.reverse()) await cleanup(); });
 
@@ -76,7 +77,7 @@ test("P2 journey starts empty, imports, confirms, learns, reviews voice, assesse
   const { skill } = await learner.ok("/courses/skills/propose", { proposalKey: crypto.randomUUID(), unit, ...imported, ...suggestion.skills[0] });
   await learner.ok("/courses/skills/confirm", { skill });
   await learner.ok("/learning/confidence", { skill, confidence: 50 });
-  const { lesson } = await learner.ok("/learning/lesson", { skill, request: "Explain why the dimensions matter." });
+  const { lesson } = await openLesson(learner.ok, { skill, request: "Explain why the dimensions matter." });
   await learner.ok("/learning/question", { studySession: lesson, text: "Why is order important?", channel: "TEXT", dialogueLength: 0 });
   const answered = await learner.ok("/learning/read", { skill });
   expect(answered.sessions[0].dialogue.at(-1).turn.speaker).toBe("TUTOR");
@@ -231,28 +232,107 @@ test("readiness, ownership and stale dialogue are refused before generation or m
   expect((await learner.ok("/learning/read", { skill })).sessions[0].dialogue).toHaveLength(0);
 }, 15_000);
 
-test("provider work cannot save a lesson for changed requirements or an expired session", async () => {
+test("a lesson is saved from its request before any tutor call, and Reply then adds its opening explanation", async () => {
+  const app = await setup(), { learner, user, skill } = await learningFixture(app, "request-first");
+  const { lesson } = await learner.ok("/learning/lesson", { skill, request: "Explain why the dimensions matter." });
+  // The tutor has not been asked, and the lesson already holds the request, with no explanation or citations yet.
+  expect(app.generated).toBe(0);
+  const waiting = (await learner.ok("/learning/read", { skill })).sessions;
+  expect(waiting).toHaveLength(1);
+  expect(waiting[0]).toMatchObject({ session: lesson, status: "OPEN", lesson: { request: "Explain why the dimensions matter.", explanation: "" }, citations: [], dialogue: [] });
+  expect(await app.runtime.application.concepts.GroundedTutoring._sessions({ owner: user, topic: skill })).toHaveLength(1);
+
+  const answered = await learner.ok("/learning/reply", { studySession: lesson });
+  expect(answered).toEqual({ tutor: { model: expect.any(String), level: expect.any(String) } });
+  expect(app.generated).toBe(1);
+  const explained = (await learner.ok("/learning/read", { skill })).sessions[0];
+  expect(explained).toMatchObject({ session: lesson, lesson: { request: "Explain why the dimensions matter.", explanation: "Match a row to a column. The inner dimensions must match." }, dialogue: [] });
+  expect(explained.citations).toHaveLength(1);
+}, 15_000);
+
+test("a failed opening leaves the lesson waiting with its request; questions are refused until a retried Reply explains it", async () => {
+  const app = await setup(), { learner, skill } = await learningFixture(app, "failed-opening");
+  const { lesson } = await learner.ok("/learning/lesson", { skill, request: "Teach me" });
+  app.duringGeneration(async () => { throw new Error("Fixture provider interruption"); });
+  expect(await learner.post("/learning/reply", { studySession: lesson })).toMatchObject({ status: 400,
+    body: { error: "INVALID_REQUEST", detail: "The tutor could not produce a usable answer. Try again. Your saved work is still available." } });
+  const waiting = (await learner.ok("/learning/read", { skill })).sessions;
+  expect(waiting).toMatchObject([{ session: lesson, status: "OPEN", lesson: { request: "Teach me", explanation: "" }, citations: [], dialogue: [] }]);
+
+  // No question can come before the opening explanation, and the refused question asks no tutor.
+  const asked = app.generated;
+  expect(await learner.post("/learning/question", { studySession: lesson, text: "Are you there?", dialogueLength: 0 })).toMatchObject({ status: 400,
+    body: { detail: "Choose one of your open sessions." } });
+  expect(await learner.post("/learning/respond", { studySession: lesson, text: "Are you there?", dialogueLength: 0 })).toMatchObject({ status: 400 });
+  expect(app.generated).toBe(asked);
+  expect((await learner.ok("/learning/read", { skill })).sessions[0].dialogue).toEqual([]);
+
+  // The retry is another Reply, which explains the lesson. The lesson then takes questions.
+  await learner.ok("/learning/reply", { studySession: lesson });
+  expect((await learner.ok("/learning/read", { skill })).sessions[0].lesson.explanation).toBe("Match a row to a column. The inner dimensions must match.");
+  await learner.ok("/learning/question", { studySession: lesson, text: "Why must they match?", dialogueLength: 0 });
+  expect((await learner.ok("/learning/read", { skill })).sessions[0].dialogue.map((item: { turn: { speaker: string } }) => item.turn.speaker)).toEqual(["LEARNER", "TUTOR"]);
+}, 15_000);
+
+test("Reply is refused for an explained lesson whose latest turn is the tutor's", async () => {
+  const app = await setup(), { learner, skill } = await learningFixture(app, "nothing-to-reply");
+  const { lesson } = await openLesson(learner.ok, { skill, request: "Teach me" });
+  const asked = app.generated;
+  // A second Reply right after the opening has nothing to answer.
+  expect(await learner.post("/learning/reply", { studySession: lesson })).toMatchObject({ status: 400,
+    body: { error: "INVALID_REQUEST", detail: "Send a question in an open lesson before asking for a reply." } });
+  // So does a Reply after the tutor answered the learner's question.
+  await learner.ok("/learning/question", { studySession: lesson, text: "Why must they match?", dialogueLength: 0 });
+  expect(await learner.post("/learning/reply", { studySession: lesson })).toMatchObject({ status: 400,
+    body: { detail: "Send a question in an open lesson before asking for a reply." } });
+  expect(app.generated).toBe(asked + 1);
+  const saved = (await learner.ok("/learning/read", { skill })).sessions[0];
+  expect(saved.lesson.explanation).toBe("Match a row to a column. The inner dimensions must match.");
+  expect(saved.dialogue).toHaveLength(2);
+}, 15_000);
+
+test("provider work keeps the requested lesson when requirements change, and saves no opening for an expired session", async () => {
   const app = await setup(), { learner, user, skill } = await learningFixture(app, "slow-provider");
+  // A lesson is never assessed, so a requirements change while the tutor writes the opening does not discard it. The lesson
+  // keeps the requirements version it was requested under.
+  const { lesson } = await learner.ok("/learning/lesson", { skill, request: "Teach me" });
+  const [requested] = await app.runtime.application.concepts.GroundedTutoring._session({ session: lesson });
   app.duringGeneration(async () => {
     const changed = await app.runtime.application.concepts.SkillMapping.reviseDefinition({ owner: user, skill, outcome: "A revised outcome", gate: "A revised gate" });
     expect(changed).not.toHaveProperty("error");
   });
-  expect((await learner.post("/learning/lesson", { skill, request: "Teach me" })).status).toBe(409);
-  expect((await learner.ok("/learning/read", { skill })).sessions).toHaveLength(0);
+  await learner.ok("/learning/reply", { studySession: lesson });
+  const [explained] = await app.runtime.application.concepts.GroundedTutoring._session({ session: lesson });
+  expect(explained!.definition).toBe(requested!.definition);
+  expect((await app.runtime.application.concepts.GroundedTutoring._lesson({ lesson }))[0]!.explanation).not.toBe("");
+  // A sign-in that expires while the tutor works saves no opening; the lesson keeps its request and waits for a retry.
+  const { lesson: second } = await learner.ok("/learning/lesson", { skill, request: "Teach me again" });
   app.duringGeneration(async () => {
     await app.connection.db.collection("sessioning.sessions").updateMany({}, { $set: { expiresAt: new Date(0) } });
   });
-  expect((await learner.post("/learning/lesson", { skill, request: "Teach me again" })).status).toBe(401);
-  expect(await app.runtime.application.concepts.GroundedTutoring._sessions({ owner: user, topic: skill })).toEqual([]);
+  expect((await learner.post("/learning/reply", { studySession: second })).status).toBe(401);
+  expect(await app.runtime.application.concepts.GroundedTutoring._lesson({ lesson: second })).toEqual([{ request: "Teach me again", explanation: "" }]);
+}, 15_000);
+
+test("a closed lesson saves no opening that arrives after it closed", async () => {
+  const app = await setup(), { learner, user, skill } = await learningFixture(app, "closed-opening");
+  const { lesson } = await learner.ok("/learning/lesson", { skill, request: "Teach me" });
+  app.duringGeneration(async () => {
+    expect(await app.runtime.application.concepts.GroundedTutoring.close({ owner: user, session: lesson })).toEqual({});
+  });
+  expect(await learner.post("/learning/reply", { studySession: lesson })).toMatchObject({ status: 409 });
+  expect(await app.runtime.application.concepts.GroundedTutoring._lesson({ lesson })).toEqual([{ request: "Teach me", explanation: "" }]);
 }, 15_000);
 
 test("a tutor response beyond the framework's default 30-second wait still saves and returns", async () => {
   const app = await setup(), { learner, skill } = await learningFixture(app, "delayed-provider");
-  app.duringGeneration(() => new Promise((resolve) => setTimeout(resolve, 31_000)));
   const { lesson } = await learner.ok("/learning/lesson", { skill, request: "Teach me" });
+  app.duringGeneration(() => new Promise((resolve) => setTimeout(resolve, 31_000)));
+  await learner.ok("/learning/reply", { studySession: lesson });
   const saved = await learner.ok("/learning/read", { skill });
   expect(saved.sessions).toHaveLength(1);
   expect(saved.sessions[0].session).toBe(lesson);
+  expect(saved.sessions[0].lesson.explanation).not.toBe("");
 }, 60_000);
 
 test("engine callers receive a refusal when practice is not ready", async () => {
@@ -310,11 +390,12 @@ test("HTTP and native learning requests share the learner lock without blocking 
   if ("error" in signedIn) throw new Error("Test session was refused");
   const entered = Promise.withResolvers<void>(), release = Promise.withResolvers<void>();
   app.duringGeneration(async () => { entered.resolve(); await release.promise; });
-  const lesson = learner.post("/learning/lesson", { skill, request: "Teach me" });
+  const { lesson } = await learner.ok("/learning/lesson", { skill, request: "Teach me" });
+  const opening = learner.post("/learning/reply", { studySession: lesson });
   await entered.promise;
   const queued = app.runtime.gateway.invoke("/learning/confidence", { session: signedIn.session, skill, confidence: 50 }, { timeoutMs: 3000 });
   release.resolve();
-  expect(await lesson).toMatchObject({ status: 200 });
+  expect(await opening).toMatchObject({ status: 200 });
   expect(await queued).toMatchObject({ ok: true });
   expect((await learner.ok("/learning/read", { skill })).sessions).toHaveLength(1);
 }, 15_000);
