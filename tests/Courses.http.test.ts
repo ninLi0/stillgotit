@@ -9,6 +9,7 @@ import { MasteryEstimating } from "../src/concepts/MasteryEstimating/MasteryEsti
 import { createRuntime } from "../src/host/runtime.ts";
 import type { CourseTutor } from "../src/host/tutor.ts";
 import { connectMongo, localMongoUri } from "../src/storage/mongo.ts";
+import { R, daysBetween, gradeOf, leftAlone, review, seed } from "./fixtures/fsrs.ts";
 
 const ORIGIN = "http://localhost:5173", DAY = 86_400_000, cleanups: (() => Promise<void>)[] = [];
 // Learning.md, "Refusal sentences": a material that is not the learner's own in this course.
@@ -274,7 +275,11 @@ test("ReviseSkill saves a new version, keeps the old one readable, and starts it
     { track: original, definition: first, initialConfidence: 60, startingBasis: "SELF_REPORTED", initializedAt: startedAt },
     { track: expect.any(String), definition: revised.version, initialConfidence: expect.any(Number), startingBasis: "PREVIOUS_DEFINITION", initializedAt: revisedAt },
   ]);
-  expect(tracks[1]!.initialConfidence).toBeCloseTo(55 * 2 ** (-6 / 60), 9);
+  // The slip came at the start, so it was a same-day review of the memory that 60 seeds. From there the 55 fades
+  // with the stability that review left, over the six days to the revision.
+  const slipped = review(seed(60), gradeOf("SLIP"), 0);
+  expect(tracks[1]!.initialConfidence).toBeCloseTo(55 * R(daysBetween(revisedAt, startedAt), slipped.stability), 9);
+  expect(tracks[1]!.initialConfidence).toBeLessThan(55);
   // Evidence is not copied: the earlier track keeps its input, and the new track has none.
   expect((await app.concepts.MasteryEstimating._inputs({ track: original })).map((input) => input.evidence)).toEqual([evidence]);
   expect(await app.concepts.MasteryEstimating._inputs({ track: tracks[1]!.track })).toEqual([]);
@@ -396,7 +401,7 @@ test("RepairRevisedTrack starts a missing track on the next course read, and rep
     expect.objectContaining({ definition: revised!.version, startingBasis: "PREVIOUS_DEFINITION", initializedAt: now }),
   ]);
   // The carried value is the earlier track's estimate measured at that read, five days after it started.
-  expect(repaired[1]!.initialConfidence).toBeCloseTo(80 * 2 ** (-5 / 60), 9);
+  expect(repaired[1]!.initialConfidence).toBeCloseTo(leftAlone(80, 5), 9);
   for (let read = 0; read < 3; read++) await learner.ok("/courses/read", { course });
   await Promise.all([learner.ok("/courses/read", { course }), learner.ok("/courses/read", { course })]);
   expect(await app.concepts.MasteryEstimating._tracks({ learner: learner.user, subject: skill })).toEqual(repaired);

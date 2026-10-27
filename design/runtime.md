@@ -80,9 +80,9 @@ Successful assessments and revisions trigger evidence reactions. Each one reads 
 
 ## Review planning
 
-Study dates use the `America/New_York` time zone, and mastery decay uses elapsed time. A declared pure computation proposes candidate activities and a digest of the context from query snapshots. Before activating a plan, StudyPlanning also compares its own saved budget, date, and work records.
+Study dates use the `America/New_York` time zone, and mastery forgetting uses elapsed time. A declared pure computation proposes candidate activities and a digest of the context from query snapshots. Before activating a plan, StudyPlanning also compares its own saved budget, date, and work records.
 
-The planner proposes ten-minute activities across seven days. The first independent success suggests a review the next day. Independent work on later days stretches the gap to three days and then seven. A slip or a gap in understanding resets it. Candidate keys stay the same while the same work and window still apply. The plan also shows work that does not fit.
+The planner proposes ten-minute activities across seven days. After independent success the review falls on the FSRS due day, the stability in days that MasteryEstimating computes from the evidence, so each success that holds up stretches the gap. After a slip, a gap in understanding, or supported work, the review is the next day. Candidate keys stay the same while the same work and window still apply. The plan also shows work that does not fit.
 
 Changes to the budget, an exam, confidence, effective evidence, a manual adjustment, or an activity's outcome (finished, stopped, or missed) request a new plan. A separate reaction activates the proposal only after the concept and context checks pass. Refreshing waits while an activity is in progress. Starting an activity checks its current requirements and prerequisites. Finishing a timed activity records the actual time but does not create assessment evidence, and a missed activity does not change mastery directly.
 

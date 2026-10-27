@@ -560,7 +560,7 @@ export type StillGotItWire = {
     output: {
       "asOf": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["memoryInstants"]["fn"]>>, ["d0"]>>;
       "policy": {
-        "halfLifeDays": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_policy"]>>>, ["halfLifeDays"]>>;
+        "desiredRetention": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_policy"]>>>, ["desiredRetention"]>>;
         "policy": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_policy"]>>>, ["policy"]>>;
         "readinessDays": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_policy"]>>>, ["readinessDays"]>>;
         "reference": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["referenceCurve"]["fn"]>>, []>>;
@@ -1482,7 +1482,7 @@ export type StillGotItHttp = {
     output: {
       "asOf": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["memoryInstants"]["fn"]>>, ["d0"]>>;
       "policy": {
-        "halfLifeDays": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_policy"]>>>, ["halfLifeDays"]>>;
+        "desiredRetention": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_policy"]>>>, ["desiredRetention"]>>;
         "policy": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_policy"]>>>, ["policy"]>>;
         "readinessDays": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["MasteryEstimating"]["_policy"]>>>, ["readinessDays"]>>;
         "reference": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["referenceCurve"]["fn"]>>, []>>;

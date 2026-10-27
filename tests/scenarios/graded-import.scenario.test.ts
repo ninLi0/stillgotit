@@ -6,6 +6,7 @@ import { createRuntime } from "../../src/host/runtime.ts";
 import { MemoryProvider } from "../../src/concepts/Federating/provider.ts";
 import { connectMongo, localMongoUri } from "../../src/storage/mongo.ts";
 import { pdf, png } from "../fixtures/office.ts";
+import { R, daysBetween, gradeOf, review, seed } from "../fixtures/fsrs.ts";
 import type { Gemini, GeminiPart } from "../../src/host/gemini.ts";
 import type { ExtractContext, ExtractedRow } from "../../src/tutor-types.ts";
 import type { User } from "../../src/concepts/Registering/Registering.ts";
@@ -116,8 +117,12 @@ const confirmRow = (row: ExtractedRow, choice: { skill?: string; result?: Extrac
 /** A calendar date written YYYY-MM-DD, moved by whole days. */
 const shift = (day: string, days: number) => new Date(Date.parse(`${day}T12:00:00Z`) + days * DAY).toISOString().slice(0, 10);
 const newYorkDate = (at: number | string) => new Date(at).toLocaleDateString("en-CA", { timeZone: ZONE });
-/** MasteryEstimating's decay: time without practice halves an estimate every 60 days. */
-const decayed = (value: number, from: string, to: number) => value * 2 ** (-(to - Date.parse(from)) / DAY / 60);
+/**
+ * The estimate at `to` of a track seeded by `confidence` whose replay starts with one review at `from`, which moved the estimate
+ * to `value`. The review comes 0 days after the start, and from then on the estimate fades along the memory the review left.
+ */
+const faded = (confidence: number, signal: "INDEPENDENT" | "SLIP", value: number, from: string, to: number) =>
+  value * R(daysBetween(to, Date.parse(from)), review(seed(confidence), gradeOf(signal), 0).stability);
 
 type Judgment = { judgment: string; revision: number; result: string; gateMet: boolean; rationale: string; origin: string };
 type CaseData = { case: string; author: string; subject: string; task: string | null; help: string; fresh: boolean; performedAt: string; judgment: Judgment;
@@ -278,11 +283,11 @@ describe("Import graded coursework as evidence", () => {
   test("Each confirmed question becomes an imported assessment case whose judgment updates that skill's mastery as of the performance date.", async () => {
     // MasteryEstimating replays a track from its oldest informative evidence when that is older than the track's start. The reported
     // confidence, 50, is therefore the estimate on the performance date. The result moves it there (Independent work without the full
-    // gate raises it to 60; a Slip lowers it by 5), and the days since then without practice lower it with a 60-day half-life.
+    // gate raises it to 60; a Slip lowers it by 5), and the days since then without practice lower it along the memory that result left.
     const expected = [
       { skill: products, assessment: first, row: rows[0]!, signal: "INDEPENDENT", moved: 60 },
       { skill: dimensions, assessment: second, row: rows[1]!, signal: "SLIP", moved: 45 },
-    ];
+    ] as const;
     for (const { skill, assessment, row, signal, moved } of expected) {
       expect(beforeImport[skill === products ? "products" : "dimensions"].estimate?.value).toBeCloseTo(50, 2);
       const read = await readSkill(skill), at = Date.now(), performedAt = read.cases[0]!.performedAt;
@@ -290,7 +295,7 @@ describe("Import graded coursework as evidence", () => {
       expect(newYorkDate(performedAt)).toBe(performedOn);
       expect(read.track?.inputs).toMatchObject([{ evidence: assessment, revision: 1, performedAt, signal, fresh: true, gateMet: false }]);
       expect(read.estimate?.basis).toContain("1 assessed attempt(s) affect this estimate.");
-      expect(read.estimate?.value).toBeCloseTo(decayed(moved, performedAt, at), 2);
+      expect(read.estimate?.value).toBeCloseTo(faded(50, signal, moved, performedAt, at), 2);
     }
   }, LIMIT);
 

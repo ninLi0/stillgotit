@@ -4,6 +4,7 @@ import { Budgeting, type Candidate, type CutValue } from "../src/concepts/Budget
 import { beginAllowed, coveredSkillsConfirmed, cutKey, itemOrder, planRequest, urgentExamItem } from "../src/computations/learning.ts";
 import type { Schedule, SkillRows, Tracks } from "../src/learning-data.ts";
 import { connectMongo, localMongoUri } from "../src/storage/mongo.ts";
+import { DAY, daysBetween, gradeOf, review, seed } from "./fixtures/fsrs.ts";
 
 // Planning rules in design/compositions/Planning.md, "Exam preparation in proposals", checked on plain values.
 const TODAY = "2026-11-02";
@@ -20,9 +21,22 @@ function skill(id: string, overrides: Partial<SkillRow> = {}): SkillRow {
   return { skill: id, title: `Skill ${id}`, current: `${id}-v1`, status: "CONFIRMED", unit: "unit", course: "course",
     outcome: "An outcome", gate: "A gate", materials: ["material"], prerequisites: [], ...overrides };
 }
-function track(row: SkillRow, inputs: Track["inputs"] = [], estimate: Track["estimate"] = { value: 40, basis: "Provisional", ready: false }): Track {
+// The study date planRequest gives an instant.
+const studyDate = (instant: Date) => instant.toLocaleDateString("en-CA", { timeZone: "America/New_York" });
+/** The FSRS memory after replaying the fixture's informative inputs from a starting confidence of 40, with the tests' own formulas. */
+function memoryOf(inputs: Track["inputs"], start: Date) {
+  let memory = seed(40), reference = start;
+  for (const input of inputs) {
+    if (input.signal === "UNCERTAIN" || (!input.fresh && (input.signal === "INDEPENDENT" || input.signal === "SUPPORTED"))) continue;
+    memory = review(memory, gradeOf(input.signal), daysBetween(input.performedAt, reference));
+    reference = input.performedAt;
+  }
+  return { stability: memory.stability, due: new Date(reference.getTime() + memory.stability * DAY) };
+}
+function track(row: SkillRow, inputs: Track["inputs"] = [], estimate: { value: number; basis: string; ready: boolean } = { value: 40, basis: "Provisional", ready: false },
+  start = at(addDays(TODAY, -30))): Track {
   return { track: `track-${row.skill}`, subject: row.skill, definition: row.current, initialConfidence: 40, startingBasis: "SELF_REPORTED",
-    initializedAt: at(addDays(TODAY, -30)), inputs, estimate, adjustments: [] };
+    initializedAt: start, inputs, estimate: { ...estimate, ...memoryOf(inputs, start) }, adjustments: [] };
 }
 function independent(evidence: string, day: string, revision = 1): Track["inputs"][number] {
   return { input: `input-${evidence}`, evidence, revision, performedAt: at(day), signal: "INDEPENDENT", fresh: true, gateMet: true, attribution: "AI assessment" };
@@ -73,12 +87,14 @@ describe("planRequest", () => {
   });
 
   test("a review that falls on or after the exam date stays routine maintenance", () => {
-    // Two independent successes on different days set a three-day interval: the next review is after tomorrow's exam.
+    // An independent success a day after the start is due once its stability in days has passed, which is after tomorrow's exam.
     const a = skill("a"), examDay = addDays(TODAY, 1);
-    const inputs = [independent("first", addDays(TODAY, -3)), independent("second", addDays(TODAY, -1))];
-    const result = planRequest({ skills: [a], tracks: [track(a, inputs, { value: 95, basis: "Ready", ready: true })], schedule: schedule({ exams: [exam("quiz", examDay, ["a"])] }) });
+    const inputs = [independent("first", addDays(TODAY, -1))];
+    const memory = review(seed(40), 3, 1), dueDay = studyDate(new Date(at(addDays(TODAY, -1)).getTime() + memory.stability * DAY));
+    expect(dueDay > examDay && dueDay <= addDays(TODAY, 6)).toBe(true);
+    const result = planRequest({ skills: [a], tracks: [track(a, inputs, { value: 95, basis: "Ready", ready: true }, at(addDays(TODAY, -2)))], schedule: schedule({ exams: [exam("quiz", examDay, ["a"])] }) });
     expect(result.horizonEnd).toBe(addDays(TODAY, 6));
-    expect(result.candidates).toEqual([expect.objectContaining({ key: `${prefix(a, "second", 1)}${addDays(TODAY, 2)}`, earliestDay: addDays(TODAY, 2), deadlineRefs: [],
+    expect(result.candidates).toEqual([expect.objectContaining({ key: `${prefix(a, "first", 1)}${dueDay}`, earliestDay: dueDay, deadlineRefs: [],
       reason: "A later fresh check will test retention." })]);
   });
 
@@ -105,11 +121,13 @@ describe("planRequest", () => {
     const finishedLatest = work(`${prefix(b)}${addDays(TODAY, -3)}:exam:midterm`, b, "b-v1");
     const finishedOlder = work(`c:c-v1:old-case:1:${addDays(TODAY, -6)}:exam:midterm`, c, "c-v1");
     const plans = [plan("ACTIVE", [[oldVersion, "STOPPED"], [finishedLatest, "DONE"], [finishedOlder, "DONE"]])];
-    const tracks = [track(c, [independent("new-case", addDays(TODAY, -2))])];
-    // c's latest evidence is newer than its finished exam activity, and one success sets a one-day interval.
+    const tracks = [track(c, [independent("new-case", addDays(TODAY, -2))], undefined, at(addDays(TODAY, -3)))];
+    // c's latest evidence is newer than its finished exam activity, and that success is due before the exam.
+    const dueDay = studyDate(new Date(at(addDays(TODAY, -2)).getTime() + review(seed(40), 3, 1).stability * DAY));
+    expect(dueDay > TODAY && dueDay < examDay).toBe(true);
     const result = planRequest({ skills: [a, b, c], tracks, schedule: schedule({ exams: [exam("midterm", examDay, ["a", "b", "c"])], plans }) });
     const keys = result.candidates.map((candidate) => candidate.key);
-    expect(keys).toEqual([oldVersion.key, `${prefix(a)}${TODAY}:exam:midterm`, `${prefix(c, "new-case", 1)}${TODAY}:exam:midterm`]);
+    expect(keys).toEqual([oldVersion.key, `${prefix(a)}${TODAY}:exam:midterm`, `${prefix(c, "new-case", 1)}${dueDay}:exam:midterm`]);
   });
 
   test("on the exam day no new exam work is made, carried work stays, and reviews are routine", () => {

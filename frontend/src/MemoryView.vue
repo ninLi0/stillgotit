@@ -6,10 +6,10 @@ import MemoryShaped from "./MemoryShaped.vue";
 import PixelIcon from "./PixelIcon.vue";
 import { api, unwrap } from "./api.ts";
 import { arrivalStyle, useBoxWidth } from "./box-width.ts";
-import { KIND_MARKS, KIND_NAMES, valueY, type ChartPoint } from "./estimate-chart.ts";
+import { KIND_MARKS, KIND_NAMES, type ChartPoint } from "./estimate-chart.ts";
 import { changeText, kindLabel, type SkillData } from "./evidence-text.ts";
 import { planDay, sessionLabels } from "./labels.ts";
-import { DEFAULT_LINE, HORIZON, THRESHOLD_LINE, dayX, layoutDefault, reviewOrder, standing } from "./memory-chart.ts";
+import { DEFAULT_LINE, HORIZON, THRESHOLD_LINE, layoutDefault, reviewOrder, standing } from "./memory-chart.ts";
 import { MARKS, stageOf } from "./pixel-art.ts";
 import type { StillGotItHttp } from "../../generated/wire.ts";
 
@@ -34,6 +34,8 @@ onMounted(load);
 
 const policy = computed(() => data.value?.policy ?? null);
 const threshold = computed(() => policy.value?.reviewThreshold ?? 70);
+/** The retention at which a review is due, as a whole percent: 90 under the current policy. */
+const retention = computed(() => Math.round((policy.value?.desiredRetention ?? 0.9) * 100));
 const skills = computed<MemorySkill[]>(() => data.value?.skills ?? []);
 function percent(value: number) { return `${Math.round(value)}%`; }
 function days(count: number) { return `${count} ${count === 1 ? "day" : "days"}`; }
@@ -43,15 +45,8 @@ const introBox = ref<HTMLElement | null>(null);
 const introWidth = useBoxWidth(introBox, 360);
 const arrives = arrivalStyle();
 const intro = computed(() => policy.value ? layoutDefault(policy.value.reference, threshold.value, introWidth.value) : null);
-/** The reference curve's value at the half-life, when the read sampled that day: "so 100% today is 50% in 60 days". */
-const halfway = computed(() => {
-  const p = policy.value, point = p?.reference.find((row) => row.days === p.halfLifeDays);
-  return point && point.days <= HORIZON ? point : null;
-});
-const halfPoint = computed(() => {
-  const l = intro.value, h = halfway.value;
-  return l && h ? { x: dayX(h.days, l.frame.inner.left, l.frame.inner.right), y: valueY(h.value) } : null;
-});
+/** The reference curve's last answered day, for the sentence "so 100% today is N% in 90 days". */
+const farthest = computed(() => policy.value?.reference.filter((row) => row.days <= HORIZON).at(-1) ?? null);
 
 // ---- Your skills ----
 const curves = computed<CurveSkill[]>(() => skills.value.flatMap((s) => (s.estimate === null || !s.projection ? [] : [{
@@ -64,9 +59,9 @@ const highlighted = computed(() => (hoveredRow.value ? [hoveredRow.value] : flag
 const rows = computed(() => reviewOrder(skills.value));
 function dayText(row: MemorySkill) {
   const state = standing(row);
-  if (state === "DUE") return { text: "Due now", detail: `Below ${threshold.value}% today` };
+  if (state === "DUE") return { text: "Due now", detail: `Retention under ${retention.value}%` };
   if (state === "COMING") return { text: `By ${planDay(row.reviewBy!.at)}`, detail: `In ${days(row.reviewBy!.days)}` };
-  if (state === "HOLDS") return { text: `Holds past ${HORIZON} days`, detail: "" };
+  if (state === "HOLDS") return { text: `By ${planDay(row.reviewBy!.at)}`, detail: `More than ${HORIZON} days away` };
   return { text: "No starting point yet", detail: "" };
 }
 
@@ -113,9 +108,8 @@ const summary = computed(() => {
     : gap < 0 ? `The changes below have left it ${-gap} ${gap === -1 ? "point" : "points"} below that.`
     : evidence.value.some((row) => row.mark !== "time") ? "It is where time alone would have left it." : "Nothing but time has moved it yet.";
   const state = standing(s);
-  const third = state === "DUE" ? `It is already below ${threshold.value}%, so it is due for review.`
-    : state === "COMING" ? `Without practice it falls below ${threshold.value}% on ${planDay(s.reviewBy!.at)}, in ${days(s.reviewBy!.days)}.`
-    : `Without practice it stays at ${threshold.value}% or above for more than ${HORIZON} days.`;
+  const third = state === "DUE" ? `Its retention has already fallen to ${retention.value}%, so it is due for review.`
+    : `Without practice its retention falls to ${retention.value}% on ${planDay(s.reviewBy!.at)}, in ${days(s.reviewBy!.days)}, so review it by then.`;
   return [first, second, third];
 });
 </script>
@@ -136,9 +130,9 @@ const summary = computed(() => {
       <!-- 1. The default curve: what every estimate does without practice. -->
       <section class="card memory-card intro" aria-labelledby="intro-heading">
         <h2 id="intro-heading" class="display card-title">The default curve</h2>
-        <p class="lead">Without practice, an estimate falls along this curve. It halves every {{ policy.halfLifeDays }} days<template v-if="halfway">, so 100% today is {{ percent(halfway.value) }} in {{ days(halfway.days) }}</template>.</p>
-        <p class="lead">Below {{ threshold }}%, a skill no longer counts as ready, so the day it would cross that line is the day to review it by.</p>
-        <p class="lead">Practice that goes well lifts the estimate, and the fall starts again from the new value. A slip or a gap lowers it.</p>
+        <p class="lead">Without practice, an estimate follows the forgetting curve of FSRS, a spaced repetition model. It falls fastest at first and more slowly as the memory grows stable<template v-if="farthest">, so 100% today is {{ percent(farthest.value) }} in {{ days(farthest.days) }}</template>.</p>
+        <p class="lead">The day to review a skill by is the day its memory's retention falls to {{ retention }}%. Below {{ threshold }}%, a skill no longer counts as ready.</p>
+        <p class="lead">Practice that goes well lifts the estimate and makes the memory last longer, and the fall starts again from the new value. A slip or a gap lowers it.</p>
         <figure class="intro-chart" aria-labelledby="intro-heading">
           <div ref="introBox" class="chart-box" :style="{ height: `${intro?.frame.height ?? 154}px` }">
             <svg v-if="intro" class="chart-svg" :width="intro.frame.width" :height="intro.frame.height" :viewBox="`0 0 ${intro.frame.width} ${intro.frame.height}`" shape-rendering="crispEdges" aria-hidden="true" focusable="false">
@@ -147,12 +141,8 @@ const summary = computed(() => {
               <text class="tick" :x="intro.frame.plot.left - 6" :y="intro.frame.plot.top + 4" text-anchor="end">100%</text>
               <text v-for="t in intro.ticks" :key="`tick-${t.value}`" class="tick" :x="intro.frame.plot.left - 6" :y="t.y + 4" text-anchor="end">{{ t.value }}%</text>
               <path class="threshold" :d="`M ${intro.frame.plot.left} ${intro.threshold.y + 0.5} H ${intro.frame.plot.right}`" :stroke="THRESHOLD_LINE" />
-              <text class="threshold-label halo" :x="intro.frame.plot.right" :y="intro.threshold.y - 5" text-anchor="end">Review below {{ threshold }}%</text>
+              <text class="threshold-label halo" :x="intro.frame.plot.right" :y="intro.threshold.y - 5" text-anchor="end">Not ready below {{ threshold }}%</text>
               <path class="line" :d="intro.path" :stroke="DEFAULT_LINE" pathLength="1" />
-              <g v-if="halfPoint && halfway" class="arrive" :style="arrives(intro.reach.get(halfway.days) ?? 1)">
-                <rect class="half-dot" :x="halfPoint.x - 3" :y="halfPoint.y - 3" width="6" height="6" :fill="DEFAULT_LINE" />
-                <text class="half-label halo" :x="halfPoint.x - 7" :y="halfPoint.y + 15" text-anchor="end">Half after {{ days(halfway.days) }}</text>
-              </g>
               <text v-if="intro.end" class="end arrive" :style="arrives(1)" :x="intro.end.x + 8" :y="intro.end.y + 4">{{ percent(intro.end.value) }}</text>
               <text v-for="d in intro.days" :key="d.days" class="day" :x="d.x" :y="intro.frame.axisY" :text-anchor="d.days === 0 ? 'start' : d.days === HORIZON ? 'end' : 'middle'">{{ d.days === 0 ? "Start" : `${d.days} days` }}</text>
             </svg>
@@ -169,7 +159,7 @@ const summary = computed(() => {
       <section class="card memory-card skills" aria-labelledby="skills-heading">
         <h2 id="skills-heading" class="display card-title">Your skills</h2>
         <template v-if="curves.length">
-          <p class="lead">Each line is one skill's estimate from today if you do not practise it. A flag marks the day it would fall below {{ threshold }}%.</p>
+          <p class="lead">Each line is one skill's estimate from today if you do not practise it. A flag marks its review day, when its retention falls to {{ retention }}%.</p>
           <MemoryCurves :skills="curves" :reference="policy.reference" :threshold="threshold" :as-of="data.asOf" :active="highlighted" labelledby="skills-heading" @highlight="flagged = $event" />
         </template>
         <div v-else-if="skills.length" class="empty">
@@ -273,7 +263,7 @@ const summary = computed(() => {
 .rule { fill: var(--ring); }
 .tick, .day { font-size: 11px; fill: var(--muted); }
 .threshold { fill: none; stroke-width: 1; stroke-dasharray: 4 3; }
-.threshold-label, .half-label { font-size: 11px; font-weight: 600; fill: var(--soft); }
+.threshold-label { font-size: 11px; font-weight: 600; fill: var(--soft); }
 .halo { paint-order: stroke; stroke: var(--card); stroke-width: 3px; stroke-linejoin: round; }
 .end { font-size: 12px; font-weight: 700; fill: var(--ink); }
 .line { fill: none; stroke-width: 2; stroke-linecap: square; stroke-linejoin: miter; animation: sgDraw var(--dur-draw) var(--ease-enter); }

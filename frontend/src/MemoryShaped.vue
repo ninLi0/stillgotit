@@ -34,7 +34,7 @@ function spoken(point: ChartPoint) {
 }
 const reviewText = computed(() => {
   const f = layout.value.flag;
-  return f ? `Review by ${planDay(dayAt(f.days).toISOString())}: below ${props.threshold}% in ${f.days} ${f.days === 1 ? "day" : "days"}` : "";
+  return f ? `Review by ${planDay(dayAt(f.days).toISOString())}, in ${f.days} ${f.days === 1 ? "day" : "days"}` : "";
 });
 // The date row: the starting point's day on the left when there is room for it, "Today" at the split, and the last
 // projected day on the right.
@@ -58,7 +58,7 @@ const active = computed(() => (dismissed.value ? null : hovered.value ?? focused
 const tip = computed(() => {
   const l = layout.value;
   if (active.value === "flag" && l.flag) {
-    return { title: `Review by ${short.format(dayAt(l.flag.days))}`, lines: [`Below ${props.threshold}% in ${l.flag.days} ${l.flag.days === 1 ? "day" : "days"}`], below: true,
+    return { title: `Review by ${short.format(dayAt(l.flag.days))}`, lines: [`In ${l.flag.days} ${l.flag.days === 1 ? "day" : "days"}`], below: true,
       style: { left: `${Math.min(Math.max(l.flag.x, 84), l.frame.width - 84)}px`, top: `${l.flag.y + 10}px` } };
   }
   const marker = l.markers.find((m) => m.index === active.value);
@@ -96,7 +96,7 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", outside, true)
         <text v-for="t in layout.ticks" :key="`tick-${t.value}`" class="tick" :x="layout.frame.plot.left - 6" :y="t.y + 4" text-anchor="end">{{ t.value }}%</text>
         <rect class="today" :x="layout.split" :y="layout.frame.plot.top - 4" width="1" :height="layout.frame.plot.bottom - layout.frame.plot.top + 4" />
         <path class="threshold" :d="`M ${layout.frame.plot.left} ${layout.threshold.y + 0.5} H ${layout.frame.plot.right}`" :stroke="THRESHOLD_LINE" />
-        <text class="threshold-label halo" :x="layout.frame.plot.right" :y="layout.threshold.y - 5" text-anchor="end">Review below {{ threshold }}%</text>
+        <text class="threshold-label halo" :x="layout.frame.plot.right" :y="layout.threshold.y - 5" text-anchor="end">Not ready below {{ threshold }}%</text>
         <path class="alone" :d="layout.leftAlone" :stroke="DEFAULT_LINE" />
         <path class="line" :d="layout.path" :stroke="PAL.m" pathLength="1" />
         <g v-for="m in layout.markers" :key="m.index" class="marker" :class="{ on: active === m.index }" :transform="`translate(${m.x - 5} ${m.y - 5})`">

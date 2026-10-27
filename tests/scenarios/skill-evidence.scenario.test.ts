@@ -9,6 +9,7 @@ import type { CourseTutor } from "../../src/host/tutor.ts";
 import { failureText } from "../../frontend/src/api.ts";
 import { planDay, sourceLabel } from "../../frontend/src/labels.ts";
 import { PendingAdjustment } from "../../frontend/src/pending-adjustment.ts";
+import { R, daysBetween, gradeOf, leftAlone, review, seed } from "../fixtures/fsrs.ts";
 
 // One learner's journey through the brief "Evidence behind each skill's estimate", end to end through HTTP.
 // The tests run in order and share one application, so each step starts where the previous one ended.
@@ -22,7 +23,9 @@ const LESSON_TEXT = "# Matrix multiplication\nMultiply rows by columns. Inner di
 // A complete one-pixel PNG, so the importer treats each upload as a photo.
 const PNG = new Uint8Array(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64"));
 const READABLE_DAY = /^(Mon|Tue|Wed|Thu|Fri|Sat|Sun), (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{1,2}$/;
-const decay = (value: number, days: number) => value * 2 ** (-days / 60);
+// Confidence 60 seeds the memory, and the scenario's one attempt is a Good review of it; the instants are ISO strings from Read.
+const stabilityAfterAttempt = (start: string, attempt: string) =>
+  review(seed(60), gradeOf("INDEPENDENT"), daysBetween(Date.parse(attempt), Date.parse(start))).stability;
 
 type Runtime = Awaited<ReturnType<typeof createRuntime>>;
 type Change = { at: string; kind: string; source: string; before: number; after: number; decay: number; days: number; reason: string };
@@ -130,7 +133,7 @@ describe("Evidence behind each skill's estimate", () => {
     expect(data.explanation.start).toMatchObject({ confidence: 60, startingBasis: "SELF_REPORTED" });
     // Only time has changed the estimate so far.
     expect(data.explanation.changes.map((change: Change) => change.kind)).toEqual(["TIME"]);
-    expect(data.explanation.changes[0].after).toBeCloseTo(decay(60, 1), 3);
+    expect(data.explanation.changes[0].after).toBeCloseTo(leftAlone(60, daysBetween(Date.parse(data.explanation.changes[0].at), Date.parse(data.explanation.start.at))), 3);
     expect(data.explanation.provisional).toBe(true);
     expect(data.explanation.basis).toContain("Started from your reported confidence.");
     expect(data.explanation.basis).toContain("No scored evidence yet; this estimate is provisional.");
@@ -151,10 +154,11 @@ describe("Evidence behind each skill's estimate", () => {
     expect(timeline.start).toMatchObject({ confidence: 60, startingBasis: "SELF_REPORTED" });
     // The attempt row names the assessed case, folds in the day of decay before it, and shows what the attempt did.
     expect(attempt).toMatchObject({ source: assessed.case, after: 95, days: 1, reason: "" });
-    expect(attempt!.before).toBeCloseTo(decay(60, 1), 3);
-    // The time row shows how three days without practice lowered the estimate.
+    expect(attempt!.before).toBeCloseTo(leftAlone(60, daysBetween(Date.parse(attempt!.at), Date.parse(timeline.start.at))), 3);
+    // The time row shows how three days without practice lowered the estimate, at the stability the attempt left.
     expect(time).toMatchObject({ source: "", before: 95, days: 3, reason: "" });
-    expect(time!.after).toBeCloseTo(decay(95, 3), 3);
+    const stability = stabilityAfterAttempt(timeline.start.at, attempt!.at);
+    expect(time!.after).toBeCloseTo(95 * R(daysBetween(Date.parse(time!.at), Date.parse(attempt!.at)), stability), 3);
     expect(timeline).toMatchObject({ ignored: [], provisional: false });
     expect(timeline.basis).toContain("1 assessed attempt(s) affect this estimate.");
 
@@ -186,7 +190,8 @@ describe("Evidence behind each skill's estimate", () => {
     expect(changes.map((change) => change.kind)).toEqual(["ATTEMPT", "ADJUSTMENT", "TIME"]);
     // The adjustment row carries the learner's reason and the new value.
     expect(changes[1]).toMatchObject({ source: adjustment, reason, after: 40, days: 3 });
-    expect(changes[1]!.before).toBeCloseTo(decay(95, 3), 3);
+    const stability = stabilityAfterAttempt(data.explanation.start.at, changes[0]!.at);
+    expect(changes[1]!.before).toBeCloseTo(95 * R(daysBetween(Date.parse(changes[1]!.at), Date.parse(changes[0]!.at)), stability), 3);
     expect(data.estimate.value).toBeCloseTo(40, 3);
     // An adjustment is not practice: the concept's readiness sentence says fresh work is still needed.
     const [estimate] = await app.concepts.MasteryEstimating._estimate({ learner: user, subject: skill, definition, at: new Date(changes[2]!.at) });
