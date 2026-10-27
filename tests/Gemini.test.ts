@@ -36,9 +36,9 @@ test("a structured request uses generateContent, the key header, the model, and 
     const { calls, gemini } = fake();
     const parts = [{ text: "Source text" }, { inlineData: { mimeType: "application/pdf", data: "JVBERi0=" } }];
     expect(await gemini().json("Follow these rules.", parts, schema)).toEqual({ answer: "grounded" });
-    expect(DEFAULT_MODEL).toBe("gemini-3.8-flash");
+    expect(DEFAULT_MODEL).toBe("gemini-4-argon");
     const [call] = calls;
-    expect(call!.url).toBe("https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent");
+    expect(call!.url).toBe("https://generativelanguage.googleapis.com/v1beta/models/gemini-4-argon:generateContent");
     expect(call!.url).not.toContain(KEY);
     expect(call!.init.method).toBe("POST");
     expect(call!.init.headers).toEqual({ "Content-Type": "application/json", "x-goog-api-key": KEY });

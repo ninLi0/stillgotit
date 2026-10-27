@@ -43,7 +43,7 @@ Reads.Continue at /learning/continue
 
 ## Conversations in the sidebar
 
-The sidebar lists the learner's latest conversations in the course, open or closed, so the learner can go back to any of them from any page. [Recent](reaction:Reads.Recent) answers that list.
+The sidebar lists the learner's latest conversations in the course, open or closed, so the learner can go back to any of them from any page. It is the only list of conversations, since the lesson page shows one conversation at a time, and its "+ New conversation" starts one in the open skill without a read. [Recent](reaction:Reads.Recent) answers that list.
 
 - When the request arrives with a course, `Sessioning.use` turns the session into the acting learner, as for Continue.
 - Where [OwnedCourse](view:Courses.OwnedCourse) holds for that learner and course, the endpoint answers `sessions` with [RecentStudy](former:Reads.RecentStudy).
