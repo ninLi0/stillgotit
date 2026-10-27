@@ -7,6 +7,8 @@ export type Exam = PlanRead["exams"][number];
 export type Proposal = PlanRead["proposal"][number];
 export type ProposalItem = PlanRead["proposalItems"][number];
 export type Cut = PlanRead["cuts"][number]["cut"];
+/** The learner's activity in progress, in any of their courses. While it lasts, no plan of the learner can change. */
+export type Blocking = PlanRead["blocking"][number];
 export type CourseRead = StillGotItHttp["/courses/read"]["output"];
 export type CourseSkill = CourseRead["skills"][number];
 export type CourseUnit = CourseRead["units"][number];
@@ -53,6 +55,20 @@ export function settle<T extends object>(result: T): Exclude<T, { error: unknown
 /** Text for any failure: the PlanningFailure's sentence, or the transport message for a fault thrown by the browser. */
 export function failureMessage(problem: unknown): string {
   return problem instanceof PlanningFailure ? problem.message : errorMessage("NETWORK_ERROR");
+}
+
+// A refusal carries only its code and a general sentence, so the planner names the activity from the plan read. The
+// course is named only when the activity is in another course than `course`, the one on screen.
+const reviewOf = (blocking: Blocking, course: string) => `the review of ${blocking.skillTitle}${blocking.course === course ? "" : ` in ${blocking.courseTitle}`}`;
+
+/** Why the plan cannot change now: the activity in progress to finish or stop first. */
+export function blockingSentence(blocking: Blocking, course: string): string {
+  return `Finish or stop ${reviewOf(blocking, course)} first.`;
+}
+
+/** After a saved change, why the plan has not updated yet. */
+export function waitingSentence(blocking: Blocking, course: string): string {
+  return `Your plan will update when you finish or stop ${reviewOf(blocking, course)}.`;
 }
 
 /** Whole days from `today` to `day`, both calendar days such as "2026-10-23". */

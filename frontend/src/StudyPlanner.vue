@@ -3,8 +3,8 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch 
 import { api } from "./api.ts";
 import { planDay, planDayLabel } from "./labels.ts";
 import { focusedControl, restoreFocus } from "./focus.ts";
-import { beginRefusal, daysUntil, examProblem, examRefusal, failureMessage, PlanningFailure, removeRefusal, sentences, settle, tradeoffRefusal,
-  type CourseSkill, type CourseUnit, type ExamInput, type PlanRead } from "./planning.ts";
+import { beginRefusal, blockingSentence, daysUntil, examProblem, examRefusal, failureMessage, PlanningFailure, removeRefusal, sentences, settle, tradeoffRefusal,
+  waitingSentence, type CourseSkill, type CourseUnit, type ExamInput, type PlanRead } from "./planning.ts";
 import PlannerExams from "./PlannerExams.vue";
 import TradeoffPanel from "./TradeoffPanel.vue";
 import PlanSea from "./PlanSea.vue";
@@ -14,7 +14,8 @@ import InfoBubble from "./InfoBubble.vue";
 // Where an error appears: the planner's message area, beside the next activity, or beside the exam form.
 type Place = "top" | "activity" | "exams";
 const props = defineProps<{ course: string; revision: number }>();
-const emit = defineEmits<{ select: [skill: string] }>();
+// openPlan asks the workspace to switch to that course and show its Plan view.
+const emit = defineEmits<{ select: [skill: string]; openPlan: [course: string] }>();
 const current = shallowRef<PlanRead | null>(null), skills = shallowRef<CourseSkill[]>([]), units = shallowRef<CourseUnit[]>([]);
 const minutes = ref(30), actualMinutes = ref(10), note = ref(""), busy = ref(false), error = ref(""), errorPlace = ref<Place>("top"), notice = ref("");
 const noticeBox = ref<HTMLElement | null>(null), errorBox = ref<HTMLElement | null>(null), activityErrorBox = ref<HTMLElement | null>(null), settings = ref<HTMLDialogElement | null>(null);
@@ -34,7 +35,11 @@ const startReason = computed(() => {
   const left = data.value?.budget?.remainingMinutes;
   return typeof left === "number" && next.candidate.minutes > left ? `This review needs about ${next.candidate.minutes} minutes and ${Math.max(0, Math.round(left))} are left today. Raise your daily budget or update the plan.` : "";
 });
-const updateReason = computed(() => data.value?.next?.status === "IN_PROGRESS" ? "Finish or stop the current review first." : "");
+// An activity in progress in any of the learner's courses keeps every plan from changing. The plan read names it.
+const blocking = computed(() => current.value?.blocking[0] ?? null);
+const elsewhere = computed(() => blocking.value && blocking.value.course !== props.course ? blocking.value : null);
+const updateReason = computed(() => blocking.value ? blockingSentence(blocking.value, props.course)
+  : data.value?.next?.status === "IN_PROGRESS" ? "Finish or stop the current review first." : "");
 const addExamReason = computed(() => !data.value?.preferences ? sentences.examBudget
   : skills.value.some((skill) => skill.status === "CONFIRMED") ? "" : "Confirm a skill first. An exam covers confirmed skills.");
 // A cut names omitted work by its candidate key. Show that activity when a plan lists it, else the skill, else a plain label.
@@ -61,26 +66,33 @@ async function act(place: Place, action: () => Promise<string | void>) {
   }
 }
 // Runs a change. A bare refusal is explained from a fresh read; any other failure still re-reads, since a lost answer may
-// follow a saved change. `also` reads anything else the explanation needs.
-async function change<T>(send: () => Promise<T>, explain: () => string, also: () => Promise<unknown> = async () => {}): Promise<T> {
+// follow a saved change. `also` reads anything else the explanation needs. For a change the planning concept refuses
+// during any activity (`blockable`), a refusal after which the fresh read names an activity in progress is explained by it.
+async function change<T>(send: () => Promise<T>, explain: () => string, { also = async () => {}, blockable = false }: { also?: () => Promise<unknown>; blockable?: boolean } = {}): Promise<T> {
   try { return await send(); } catch (problem) {
     const failed = await reread();
+    if (blockable && !failed && problem instanceof PlanningFailure && blocking.value) throw new PlanningFailure(blockingSentence(blocking.value, props.course));
     if (!(problem instanceof PlanningFailure && problem.bare)) throw problem;
     if (failed) throw failed;
     await also().catch(() => {});
     throw new PlanningFailure(explain());
   }
 }
-// With a waiting proposal the plan has not changed yet, so the message says so.
-const planOutcome = (saved: string) => proposal.value ? `${saved} A proposed plan is waiting for your decision.` : `${saved} Your plan is updated.`;
-function examOutcome(saved: string, result: { refreshed: boolean; notice?: string }) { return result.refreshed ? planOutcome(saved) : `${saved} ${result.notice ?? sentences.refreshPending}`; }
+// During an activity the plan waits for it, and with a waiting proposal it has not changed yet, so the message says so.
+function planOutcome(saved: string) {
+  if (blocking.value) return `${saved} ${waitingSentence(blocking.value, props.course)}`;
+  return proposal.value ? `${saved} A proposed plan is waiting for your decision.` : `${saved} Your plan is updated.`;
+}
+function examOutcome(saved: string, result: { refreshed: boolean; notice?: string }) {
+  return result.refreshed || blocking.value ? planOutcome(saved) : `${saved} ${result.notice ?? sentences.refreshPending}`;
+}
 // The first load is silent. After Try again the button is gone, so a message takes focus.
 async function load(loaded = "") { await act("top", async () => { await Promise.all([read(), readCourse()]); return loaded; }); }
 async function save() { await act("top", async () => { settle(await api.planning.configure({ course: props.course, dailyMinutes: minutes.value, focusNote: note.value })); await read(); return planOutcome("Daily budget saved."); }); }
 async function start() {
   const next = data.value?.next; if (!next) return;
   await act("activity", async () => {
-    await change(async () => settle(await api.planning.begin({ course: props.course, item: next.item })), () => beginRefusal(next.item, data.value!));
+    await change(async () => settle(await api.planning.begin({ course: props.course, item: next.item })), () => beginRefusal(next.item, data.value!), { blockable: true });
     emit("select", next.candidate.subject); await read();
     return "Review started. Come back here to record your time when you finish.";
   });
@@ -88,14 +100,19 @@ async function start() {
 async function finish() { const item = data.value?.next?.item, spent = actualMinutes.value; if (item) await act("top", async () => { settle(await api.planning.finish({ course: props.course, item, actualMinutes: spent })); await read(); return `Review finished. ${spent} minutes recorded.`; }); }
 async function stop() { const item = data.value?.next?.item, spent = actualMinutes.value; if (item) await act("top", async () => { settle(await api.planning.stop({ course: props.course, item, actualMinutes: spent })); await read(); return `Stopped for now. ${spent} minutes recorded.`; }); }
 async function miss() { const item = data.value?.next?.item; if (item) await act("top", async () => { settle(await api.planning.miss({ course: props.course, item })); await read(); return "Marked as missed. This does not lower your mastery estimate."; }); }
-async function propose() { await act("top", async () => { settle(await api.planning.propose({ course: props.course })); await read(); return proposal.value ? "A proposed plan is waiting for your decision." : "Plan updated from your progress."; }); }
+async function propose() {
+  await act("top", async () => {
+    await change(async () => settle(await api.planning.propose({ course: props.course })), () => "The plan did not update. Try again.", { blockable: true });
+    await read(); return proposal.value ? "A proposed plan is waiting for your decision." : "Plan updated from your progress.";
+  });
+}
 // The page checks the concept's exam rules first, because an HTTP refusal does not carry its reason.
 async function saveExam(input: ExamInput) {
   await act("exams", async () => {
     const problem = examProblem(input, data.value, skills.value);
     if (problem) throw new PlanningFailure(problem);
     const result = await change(async () => settle(await api.planning.exams.set({ course: props.course, date: input.date, covered: input.covered })),
-      () => examRefusal(input, current.value!, skills.value), readCourse);
+      () => examRefusal(input, current.value!, skills.value), { also: readCourse });
     await read(); examsPanel.value?.close();
     return examOutcome("Exam saved.", result);
   });
@@ -225,8 +242,10 @@ watch(() => props.revision, () => Promise.all([read(), readCourse()]).catch((pro
     <section v-if="data?.preferences" class="week-card" aria-label="This week">
     <div class="week-bar">
       <p v-if="data.budget" class="budget">{{ Math.round(data.budget.remainingMinutes) }} min left today <span>· {{ Math.round(data.budget.spentMinutes) }} min recorded</span></p><span v-else />
-      <div class="update-wrap"><button class="secondary ocean update-plan" :disabled="busy || !!updateReason" :aria-describedby="updateReason ? 'update-reason' : undefined" @click="propose">Update plan</button><p v-if="updateReason" id="update-reason" class="hint reason">{{ updateReason }}</p></div>
+      <div class="update-wrap"><button class="secondary ocean update-plan" :disabled="busy || !!updateReason" :aria-describedby="updateReason ? 'update-reason' : undefined" @click="propose">Update plan</button><p v-if="updateReason && !elsewhere" id="update-reason" class="hint reason">{{ updateReason }}</p></div>
     </div>
+    <!-- An activity in another course cannot be finished from here, so its reason stays visible with a way to that course's plan. -->
+    <p v-if="elsewhere" class="blocked"><span id="update-reason">{{ updateReason }}</span><button type="button" class="link-button" @click="emit('openPlan', elsewhere.course)">Open {{ elsewhere.courseTitle }}'s plan</button></p>
     <div class="week-scroll">
       <div class="voyage">
       <PlanSea class="sea" :exam-day="examIndex" :exam-title="seaExam ? 'Exam' : undefined" :exam-date="seaExam?.label" :width="seaGeo.width || undefined" :height="seaGeo.height || undefined" :centers="seaGeo.centers" :horizon="seaGeo.horizon" />
@@ -297,6 +316,7 @@ watch(() => props.revision, () => Promise.all([read(), readCourse()]).catch((pro
 .budget{margin:0;font-size:13px;font-weight:700}
 .budget span{font-weight:500;color:var(--muted)}
 .update-plan{min-height:34px;padding:0 14px;font-size:13px}
+.blocked{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:baseline;gap:4px 12px;margin:8px 4px 0;font-size:13px;color:var(--muted);text-align:right}
 .week-scroll{overflow-x:auto;margin-top:10px;padding-bottom:4px}
 .voyage{position:relative;border-radius:22px;overflow:hidden;border:1px solid var(--sea-line);background:var(--sea)}
 .sea{position:absolute;left:0;top:0;height:100%;border:0;border-radius:0}

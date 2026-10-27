@@ -16,6 +16,14 @@ const WAITING = "Your plan will update when you finish or stop your current acti
 export const ActivityInProgress = view("(owner) has an activity in progress", ({ owner }, {}, { course }) => where(
   Mapping._courses({ owner }).is({ course }), Planning._next({ owner, scope: course }).is({ status: "IN_PROGRESS" }),
 )).holds();
+/**
+ * The learner's activity in progress, in whichever of their courses it is: the course and its title, the item, and the
+ * title of the item's skill. The planning concept allows one activity in progress per learner, so there is at most one.
+ */
+export const BlockingActivity = view("the activity in progress of (owner)", ({ owner }, { course, courseTitle, item, skillTitle }, { candidate, skill }) => where(
+  Mapping._courses({ owner }).is({ course, title: courseTitle }), Planning._next({ owner, scope: course }).is({ item, candidate, status: "IN_PROGRESS" }),
+  compute(C.itemSubject, { candidate }, { skill }), Mapping._skill({ skill }).is({ title: skillTitle }),
+)).optional();
 /** The item is the learner's, its skill is confirmed with the item's version, and its prerequisites are ready unless it is urgent exam preparation. */
 export const StartAllowed = view("(owner) may start (item) in (course)", ({ owner, course, item }, {}, { candidate, skill, definition, skills, tracks, schedule, urgent }) => where(
   Planning._item({ item }).is({ owner, scope: course, candidate }), compute(C.itemSubject, { candidate }, { skill, definition }),
@@ -24,6 +32,9 @@ export const StartAllowed = view("(owner) may start (item) in (course)", ({ owne
   C.beginAllowed({ skills, tracks, skill, urgent }),
 )).holds();
 
+// A list of at most one record, so the plan read can carry it in any course of the learner.
+export const Blocking = former("the activity in progress that keeps the plans of (owner) from changing", ({ owner }, { course, courseTitle, item, skillTitle }) =>
+  each(BlockingActivity({ owner }).is({ course, courseTitle, item, skillTitle })).arranged(item).form({ course, courseTitle, item, skillTitle }));
 export const Exams = former("the active exams for (owner) in (course)", ({ owner, course }, { exam, date, covered }) =>
   each(Planning._deadlines({ owner, scope: course }).is({ deadline: exam, date, covered, active: true })).arranged(date).form({ exam, date, covered }));
 export const PendingProposal = former("the proposal awaiting confirmation for (owner) in (course)", ({ owner, course }, {
@@ -48,7 +59,8 @@ export const PendingCuts = former("the cuts of the proposal awaiting confirmatio
 const Read = endpoint("/planning/read", ({ session, course, owner }) => receive({ session, course })
   .then(Sessioning.use({ session }).responds({ subject: owner })).then(
     where(Courses.OwnedCourse({ owner, course })).then(respond({ data: R.PlanData({ owner, course }), exams: Exams({ owner, course }),
-      proposal: PendingProposal({ owner, course }), proposalItems: PendingItems({ owner, course }), cuts: PendingCuts({ owner, course }) })).named("owned"),
+      proposal: PendingProposal({ owner, course }), proposalItems: PendingItems({ owner, course }), cuts: PendingCuts({ owner, course }),
+      blocking: Blocking({ owner }) })).named("owned"),
     where(no(Courses.OwnedCourse({ owner, course }))).then(courseUnavailable()).named("missing"),
   ), options);
 const Configure = endpoint("/planning/configure", ({ session, course, dailyMinutes, focusNote, owner, preferences }) => receive({ session, course, dailyMinutes, focusNote })
@@ -57,18 +69,20 @@ const Configure = endpoint("/planning/configure", ({ session, course, dailyMinut
     where(no(Courses.OwnedCourse({ owner, course }))).then(courseUnavailable()).named("missing"),
   ).afterFlowSettles().then(where(Courses.OwnedCourse({ owner, course }), Planning._preferences({ owner, scope: course }).is({ preferences, dailyMinutes, focusNote }))
     .then(respond({ preferences }))), options);
-// When CanReplan fails for an owned course, the endpoint answers the planning concept's own refusal for that reason. The
-// ready branch only uses the session again; the replan stage repeats CanReplan because it follows every branch, so the
-// refusal branches end there and the settled answer below follows only the replan.
+// When the replan cannot be made for an owned course, the endpoint answers the planning concept's own refusal for that
+// reason without asking the concept. The ready branch only uses the session again; the replan stage repeats its conditions
+// because it follows every branch, so the refusal branches end there and the settled answer below follows only the replan.
+// The engine keeps only the code of an answer, so the plan read names the activity that blocks the replan (Blocking).
 const Propose = endpoint("/planning/propose", ({ session, course, owner, candidates, horizonEnd, basis, explanation, plan }) => receive({ session, course })
   .then(Sessioning.use({ session }).responds({ subject: owner })).then(
-    where(R.CanReplan({ owner, course })).then(Sessioning.use({ session }).responds({ subject: owner })).named("ready"),
+    where(R.CanReplan({ owner, course }), no(ActivityInProgress({ owner }))).then(Sessioning.use({ session }).responds({ subject: owner })).named("ready"),
     where(Courses.OwnedCourse({ owner, course }), no(Planning._preferences({ owner, scope: course })))
       .then(respond({ error: "PLAN_PREFERENCES_UNAVAILABLE" })).named("budget"),
     where(Courses.OwnedCourse({ owner, course }), Planning._preferences({ owner, scope: course }), Planning._next({ owner, scope: course }).is({ status: "IN_PROGRESS" }))
       .then(respond({ error: "PLAN_SESSION_IN_PROGRESS" })).named("busy"),
+    where(R.CanReplan({ owner, course }), ActivityInProgress({ owner })).then(respond({ error: "PLAN_SESSION_IN_PROGRESS" })).named("elsewhere"),
     where(no(Courses.OwnedCourse({ owner, course }))).then(courseUnavailable()).named("missing"),
-  ).then(where(R.CanReplan({ owner, course }), R.PlanContext({ owner, course }).is({ candidates, horizonEnd, basis, explanation }))
+  ).then(where(R.CanReplan({ owner, course }), no(ActivityInProgress({ owner })), R.PlanContext({ owner, course }).is({ candidates, horizonEnd, basis, explanation }))
     .then(Planning.replan({ owner, scope: course, candidates, horizonEnd, basis, explanation, workloadComplete: false }).responds({})))
   // The plan proposed in this flow is either still awaiting the learner or now active.
   .afterFlowSettles().then(
@@ -158,4 +172,4 @@ const DeclineTradeoffs = endpoint("/planning/tradeoffs/decline", ({ session, cou
   ), options);
 
 export const composition = { Read, Configure, Propose, Begin, Finish, Stop, Miss, SetExam, RemoveExam, ReplanAfterExam, ReplanAfterExamRemoval, ConfirmTradeoffs, DeclineTradeoffs,
-  ActivityInProgress, StartAllowed, Exams, PendingProposal, PendingItems, PendingCuts };
+  ActivityInProgress, BlockingActivity, StartAllowed, Blocking, Exams, PendingProposal, PendingItems, PendingCuts };

@@ -853,6 +853,12 @@ export type StillGotItWire = {
       "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
     };
     output: {
+      "blocking": {
+        "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_next"]>[0], ["scope"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_courses"]>>>, ["course"]>]>>;
+        "courseTitle": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_courses"]>>>, ["title"]>>;
+        "item": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_next"]>>>, ["item"]>>;
+        "skillTitle": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_skill"]>>>, ["title"]>>;
+      }[];
       "cuts": {
         "cut": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["cutKey"]["fn"]>[0], ["cut"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_cuts"]>>>, ["cut"]>]>>;
       }[];
@@ -1757,6 +1763,12 @@ export type StillGotItHttp = {
       "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_map"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_deadlines"]>[0], ["scope"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_plans"]>[0], ["scope"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_schedule"]>[0], ["scope"]>]>>;
     };
     output: {
+      "blocking": {
+        "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_next"]>[0], ["scope"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_courses"]>>>, ["course"]>]>>;
+        "courseTitle": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_courses"]>>>, ["title"]>>;
+        "item": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_next"]>>>, ["item"]>>;
+        "skillTitle": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_skill"]>>>, ["title"]>>;
+      }[];
       "cuts": {
         "cut": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["cutKey"]["fn"]>[0], ["cut"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["_cuts"]>>>, ["cut"]>]>>;
       }[];

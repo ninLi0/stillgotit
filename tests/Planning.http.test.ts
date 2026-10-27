@@ -33,6 +33,7 @@ interface PlanRead {
     locallyCurrent: boolean; contextCurrent: boolean; sessionInProgress: boolean }[];
   proposalItems: { item: string; candidate: Candidate; day: string }[];
   cuts: { cut: Cut }[];
+  blocking: { course: string; courseTitle: string; item: string; skillTitle: string }[];
 }
 
 async function setup() {
@@ -360,6 +361,40 @@ test("an activity elsewhere keeps the plan until it ends; finishing or stopping 
   read = await kai.read(algebra.course);
   expect([read.exams, read.proposal, read.cuts]).toEqual([[], [], []]);
   expect(read.data.plan!.items.every(({ candidate }) => candidate.deadlineRefs.length === 0)).toBe(true);
+}, 60_000);
+
+test("a refresh during an activity in another course is refused, and every plan read names that activity, its skill, and its course", async () => {
+  const app = await setup(), ivy = await app.learner("blocked-ivy");
+  const physics = await ivy.course("Physics", ["Forces"]);
+  const algebra = await ivy.course("Linear algebra", ["Vectors"]);
+  await ivy.ok("/planning/configure", { course: physics.course, dailyMinutes: 30 });
+  await ivy.ok("/planning/configure", { course: algebra.course, dailyMinutes: 30 });
+  const physicsPlan = await ivy.read(physics.course), algebraPlan = await ivy.read(algebra.course);
+  expect([physicsPlan.blocking, algebraPlan.blocking]).toEqual([[], []]);
+
+  const review = physicsPlan.data.next!;
+  expect(review.candidate.subject).toBe(physics.skills[0]);
+  await ivy.ok("/planning/begin", { course: physics.course, item: review.item });
+  const blocking = [{ course: physics.course, courseTitle: "Physics", item: review.item, skillTitle: "Forces" }];
+
+  // Refreshing algebra is refused with the planning concept's code and sentence, and the algebra plan stays.
+  expect(await ivy.direct("/planning/propose", { course: algebra.course })).toEqual(refusedBy("PLAN_SESSION_IN_PROGRESS"));
+  expect(await ivy.native("/planning/propose", { course: algebra.course }))
+    .toEqual({ ok: false, error: { kind: "domain", value: "PLAN_SESSION_IN_PROGRESS", detail: message(concept.PlanSessionInProgress) } });
+  expect(await ivy.post("/planning/propose", { course: algebra.course })).toEqual(refused(message(concept.PlanSessionInProgress)));
+  // The refusal carries only its code, so the plan read names the activity. It is the same in both courses.
+  const read = await ivy.read(algebra.course);
+  expect(read.data.plan!.plan).toBe(algebraPlan.data.plan!.plan);
+  expect(read.blocking).toEqual(blocking);
+  expect((await ivy.read(physics.course)).blocking).toEqual(blocking);
+  // In the activity's own course, the busy refusal answers the same code.
+  expect(await ivy.direct("/planning/propose", { course: physics.course })).toEqual(refusedBy("PLAN_SESSION_IN_PROGRESS"));
+
+  // Once the activity ends, nothing blocks, and the refresh is made.
+  await ivy.ok("/planning/finish", { course: physics.course, item: review.item, actualMinutes: 10 });
+  expect((await ivy.read(algebra.course)).blocking).toEqual([]);
+  const { plan } = await ivy.ok("/planning/propose", { course: algebra.course }) as { plan: string };
+  expect((await ivy.read(algebra.course)).data.plan!.plan).toBe(plan);
 }, 60_000);
 
 test("an activity in one course does not refuse a budget, a missed activity, or an adjustment in another; finishing refreshes both", async () => {
