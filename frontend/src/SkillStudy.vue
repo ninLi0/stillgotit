@@ -23,6 +23,7 @@ import { listenUnavailable, stopSpeaking } from "./speech.ts";
 import type { StillGotItHttp } from "../../generated/wire.ts";
 import { answerKey, newAnswers, takeTutor, tutorLabel, tutorPick, tutorSettings, type TutorUsed } from "./tutor-choice.ts";
 import { sessionRequest, takeSession } from "./continue-session.ts";
+import { pendingOpening, trackOpening, type PendingOpening } from "./pending-openings.ts";
 import { useSlidingMark } from "./sliding-mark.ts";
 type SkillData = StillGotItHttp["/learning/read"]["output"]["data"];
 type StudySession = SkillData["sessions"][number];
@@ -83,14 +84,15 @@ async function act(work: () => Promise<void>, success: string | (() => string) =
 // While the tutor answers, the message leaves the box and waits in the thread. The box stays open, so the
 // learner can write the next message meanwhile. A failure puts the message back, before anything written since.
 // `reply` says whether the tutor answers it: a lesson question does, while a practice answer is only saved.
-const pending = ref<{ text: string; files: string[]; reply: boolean } | null>(null);
+// `since` is when the wait began, for a page that shows a wait another page started (see followOpening).
+const pending = ref<{ text: string; files: string[]; reply: boolean; since?: number } | null>(null);
 // The tutor's place shows how long the learner has waited, in whole seconds. It stops when the answer lands.
 const waitStarted = ref(0), waitNow = ref(0);
 let waitTicker: ReturnType<typeof setInterval> | undefined;
 watch(pending, (now) => {
   clearInterval(waitTicker); waitTicker = undefined;
   if (!now?.reply) return;
-  waitStarted.value = waitNow.value = Date.now();
+  waitNow.value = Date.now(); waitStarted.value = now.since ?? waitNow.value;
   waitTicker = setInterval(() => { waitNow.value = Date.now(); }, 1000);
 });
 const waited = computed(() => secondsLabel(Math.floor((waitNow.value - waitStarted.value) / 1000)));
@@ -108,21 +110,22 @@ function takeDraft() {
 /**
  * The lesson is saved with the learner's request at once, before the tutor answers, so leaving the page or a failed
  * answer never loses it: the page shows the saved request and the sidebar lists the lesson while the tutor's dots wait.
- * The opening explanation is then asked for with Reply. If saving fails, the draft comes back; once the lesson is saved,
- * the draft is its request, and a failed opening leaves "Retry tutor reply" in the thread.
+ * The opening explanation is then asked for with Reply, recorded as on its way so that a page made again meanwhile waits
+ * for it too. If saving fails, the draft comes back; once the lesson is saved, the draft is its request, and a failed
+ * opening leaves "Retry tutor reply" in the thread.
  */
 async function startLesson() {
-  const draft = takeDraft();
+  const draft = takeDraft(), skill = props.skill, request = draft.text.trim();
   await act(async () => {
     let saved = false;
     try {
-      const result = unwrap(await api.learning.lesson({ skill: props.skill, request: draft.text.trim() }));
+      const result = unwrap(await api.learning.lesson({ skill, request }));
       saved = true;
       // What the learner wrote while the lesson was being prepared stays in the box of the lesson it now belongs to.
       if (selected.value !== result.lesson) carryDraft = true;
       freshLesson.value = false; selected.value = result.lesson;
       await load(); emit("changed");
-      await timedAnswer(async () => unwrap(await api.learning.reply({ studySession: result.lesson })));
+      await timedAnswer(() => trackOpening(skill, result.lesson, request, async () => unwrap(await api.learning.reply({ studySession: result.lesson }))));
     }
     catch (problem) { if (!saved) draft.restore(); throw problem; }
     finally { pending.value = null; }
@@ -242,7 +245,14 @@ async function assess() {
 }
 async function saveConfidence() { await act(async () => { unwrap(await api.learning.confidence({ skill: props.skill, confidence: confidence.value })); }, "Starting point saved. You can now check your understanding."); }
 async function requestHint() { const active = current.value; if (active) await act(async () => { await timedAnswer(async () => unwrap(await api.learning.hint({ studySession: active.session }))); }); }
-async function retryReply() { const active = current.value; if (active) await act(async () => { await timedAnswer(async () => unwrap(await api.learning.reply({ studySession: active.session }))); }); }
+async function retryReply() {
+  const active = current.value, skill = props.skill;
+  if (!active) return;
+  const ask = async () => unwrap(await api.learning.reply({ studySession: active.session }));
+  // A retried opening is on its way like the first one, so a page made again meanwhile waits for it too.
+  const opening = active.lesson && unexplained.value ? active.lesson.request : null;
+  await act(async () => { await timedAnswer(() => opening !== null ? trackOpening(skill, active.session, opening, ask) : ask()); });
+}
 /**
  * Finishing closes the lesson for good, so it leaves Home's Continue card. Its conversation stays here to read. A message
  * still in the box would be lost with the box, so the learner sends or clears it first; the refusal shows in the alert area.
@@ -390,8 +400,30 @@ watch(() => props.skill, (skill) => {
   paneSource.value = null; paneOpener = null;
   // An unanswered adjustment from before a reload is shown at once, so the learner can see it and send it again.
   evidenceOpen.value = !!new PendingAdjustment(sessionStore(), skill).read();
-  act(load);
+  const waiting = pendingOpening(skill);
+  if (waiting) followOpening(waiting); else act(load);
 }, { immediate: true });
+/**
+ * A study page made again while its skill's new lesson waits for its opening (the shell drops older study pages, and
+ * switching courses drops them all) shows that lesson's request with the tutor's dots and the time waited so far. The
+ * page cannot read the skill meanwhile: the server takes one request at a time from a learner, and the opening's request
+ * keeps that turn while the tutor writes. When it settles, the page reads the skill: the lesson has its explanation, or
+ * the failure shows with "Retry tutor reply". The opening's meta line gets the time from asking to answering and the
+ * model that wrote it.
+ */
+function followOpening(waiting: PendingOpening) {
+  // The lesson was named by the server's answer to the lesson request, so it is one of this learner's sessions.
+  freshLesson.value = false; selected.value = waiting.lesson as StudySession["session"];
+  pending.value = { text: waiting.request, files: [], reply: true, since: waiting.since };
+  void act(async () => {
+    try {
+      const answer = await waiting.done as { tutor?: TutorUsed } | undefined, key = answerKey("session", waiting.lesson);
+      measured.value[key] = Math.round((Date.now() - waiting.since) / 1000);
+      if (answer?.tutor) answeredBy.value[key] = answer.tutor;
+    }
+    finally { pending.value = null; }
+  });
+}
 watch(() => props.initialDraft, (draft) => { void applyDraft(draft); }, { immediate: true });
 // Home's Continue card names a session of this skill. A page that has not loaded yet shows it once loaded; a loaded page
 // switches to it when the current step finishes, and reads again if the session is newer than what it has.
