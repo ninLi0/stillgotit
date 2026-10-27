@@ -46,13 +46,15 @@ export const MOON = { glow: "#2A3456", face: "#F1EDDA", rim: "#D4CFB7", crater: 
 export const STARS = { bright: "#F4F1DE", faint: "#8D93B0" } as const;
 /** Moonlit white, for the sails, stripes and buoys that are white by day and must still show at sea. */
 export const MOONLIT = "#C3CCD9";
+/** The Plan sea's clouds by night, a step darker than the other scenes' night clouds, so the moon and stars lead. */
+export const NIGHT_CLOUD = { body: "#2C3552", shade: "#252D49" } as const;
 
 export function isNight(): boolean { return currentTheme.value === "dark"; }
 
 /** `day` in the light theme and `night` in the dark one. */
 export function dayOrNight(day: string, night: string): string { return isNight() ? night : day; }
 
-const chosen = new Set([...Object.values(NIGHT), ...Object.values(LEAVES), ...Object.values(MOON), ...Object.values(STARS), MOONLIT]);
+const chosen = new Set([...Object.values(NIGHT), ...Object.values(LEAVES), ...Object.values(MOON), ...Object.values(STARS), ...Object.values(NIGHT_CLOUD), MOONLIT]);
 const cache = new Map<string, string>();
 
 /** A scene color as the current theme shows it. Night colors chosen here pass through unchanged, so a scene can mix
@@ -89,16 +91,16 @@ export function towardNight(hex: string): string {
  * only where that cell still shows one of the night sky's bands, so stars never cover the moon, a cloud, a tree or the
  * land. `cell` is one cell's size in device pixels; the stars stay put, so the scene keeps them until it draws again.
  */
-export function scatterStars(ctx: CanvasRenderingContext2D, cell: number, columns: number, rows: number, seed: number) {
+export function scatterStars(ctx: CanvasRenderingContext2D, cell: number, columns: number, rows: number, seed: number, area = 12000) {
   if (!isNight() || columns < 1 || rows < 1) return;
   let state = seed >>> 0;
   const random = () => { state = (state + 0x6D2B79F5) >>> 0; let t = state; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
   const width = ctx.canvas.width, height = ctx.canvas.height;
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  // About one star for every 12,000 square CSS pixels of the area given, most of them faint.
+  // About one star for every `area` square CSS pixels of the sky given (12,000 unless a scene asks for more), most of them faint.
   const ratio = (typeof window === "undefined" ? 1 : window.devicePixelRatio) || 1;
-  const count = Math.max(5, Math.round((columns * cell / ratio) * (rows * cell / ratio) / 12000));
+  const count = Math.max(5, Math.round((columns * cell / ratio) * (rows * cell / ratio) / area));
   for (let i = 0; i < count; i++) {
     const x = Math.floor(random() * columns), y = Math.floor(random() * rows), bright = random() < 0.25;
     const left = Math.round(x * cell), top = Math.round(y * cell), w = Math.round((x + 1) * cell) - left, h = Math.round((y + 1) * cell) - top;
