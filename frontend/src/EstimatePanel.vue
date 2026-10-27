@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from "vue";
 import EstimateChart from "./EstimateChart.vue";
+import InfoBubble from "./InfoBubble.vue";
 import PixelIcon from "./PixelIcon.vue";
 import { api, errorMessage, failureText } from "./api.ts";
 import { KIND_MARKS, KIND_NAMES, type ChartPoint } from "./estimate-chart.ts";
@@ -134,7 +135,7 @@ const ignoredRows = computed(() => (props.data.explanation?.ignored ?? []).map((
   return { key: `${index}:${row.evidence}`, reason: row.reason, date: item ? dateParts(item.performedAt) : null,
     name: [caseName(item) || "An attempt", result(item)].filter(Boolean).join(" · ") };
 }));
-// The readiness sentence above often repeats the explanation's basis sentence. Show it once.
+// The estimate's basis sentence, behind the ⓘ beside "Evidence", often repeats the explanation's basis sentence. Show it once.
 const basisText = computed(() => {
   const basis = props.data.explanation?.basis.trim() ?? "";
   return basis && basis !== props.data.estimate?.basis.trim() ? basis : "";
@@ -157,7 +158,7 @@ const chartPoints = computed<ChartPoint[]>(() => {
     <div class="estimate-top">
       <div class="estimate-figure">
         <h2 id="estimate-heading" class="eyebrow rail-title">Evidence<span class="sr-only"> · {{ data.estimate ? `${percent(data.estimate.value)} estimated mastery` : 'No estimate yet' }}</span></h2>
-        <p v-if="data.estimate" class="readiness">{{ data.estimate.basis }}</p>
+        <InfoBubble v-if="data.estimate" class="head-info" label="About this estimate" :text="data.estimate.basis" />
       </div>
       <button v-if="data.track" type="button" class="adjust-toggle" :aria-expanded="adjustOpen" aria-controls="adjust-form" :disabled="sending" @click="toggleAdjust">Adjust estimate</button>
     </div>
@@ -184,8 +185,7 @@ const chartPoints = computed<ChartPoint[]>(() => {
     <template v-if="data.explanation">
       <h3 id="estimate-chart-heading">Estimate over time</h3>
       <EstimateChart :points="chartPoints" :provisional="data.explanation.provisional" labelledby="estimate-chart-heading" />
-      <h3>How the estimate got here</h3>
-      <p v-if="basisText" class="basis">{{ basisText }}</p>
+      <div class="section-head"><h3>How the estimate got here</h3><InfoBubble v-if="basisText" class="head-info" label="About this history" :text="basisText" /></div>
       <p v-if="data.explanation.provisional" class="basis"><span class="provisional">Provisional</span>No assessed attempt has counted toward this estimate yet.</p>
       <!-- One row per change: the date, the kind's mark, a plain sentence with its timing, and the values, which the
            sentence also says, so screen readers skip the values column. -->
@@ -241,10 +241,15 @@ const chartPoints = computed<ChartPoint[]>(() => {
 <style scoped>
 /* The Evidence card of the Learn rail (design/revamp/README.md): a lavender rail with square nodes. */
 .estimate-panel{font-size:13px;overflow-wrap:anywhere}
-.estimate-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
-.estimate-figure{min-width:0}
+.estimate-top{position:relative;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.estimate-figure{min-width:0;display:flex;align-items:center;gap:2px}
 .rail-title{color:var(--estimate-eyebrow)}
-.readiness{margin:8px 0 0;color:var(--soft);font-size:12px;line-height:1.5}
+/* An ⓘ beside a heading holds the longer explanation. Its negative margin keeps the row's height, and its bubble opens
+   under the whole row, across the panel's width, so the narrow rail never cuts it off. */
+.estimate-panel .head-info{position:static;margin:-6px 0}
+.head-info :deep(.info-bubble){left:0;right:0;width:auto}
+.section-head{position:relative;display:flex;align-items:center;gap:2px;margin:16px 0 6px}
+.section-head h3{margin:0}
 .adjust-toggle{flex:none;border:0;border-radius:999px;background:var(--dawn-soft);color:var(--dawn-soft-text);padding:4px 10px;font-size:12px;font-weight:700;white-space:nowrap}
 .adjust-toggle:hover:not(:disabled){background:var(--dawn-nav)}
 .adjust-form{max-width:none;margin:12px 0 6px;padding:12px;background:var(--lesson-rail);border:1px solid var(--lesson-card-ring);border-radius:14px}

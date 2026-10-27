@@ -76,7 +76,7 @@ async function act(work: () => Promise<void>, success: string | (() => string) =
     restoreFocus(previous, () => (error.value ? errorBox.value : noticeBox.value) ?? (composerInput.value?.disabled === false ? composerInput.value : heading.value));
   }
 }
-// While the tutor answers, the message leaves the box and waits in the thread as "Sending". The box stays open, so the
+// While the tutor answers, the message leaves the box and waits in the thread. The box stays open, so the
 // learner can write the next message meanwhile. A failure puts the message back, before anything written since.
 // `reply` says whether the tutor answers it: a lesson question does, while a practice answer is only saved.
 const pending = ref<{ text: string; files: string[]; reply: boolean } | null>(null);
@@ -538,7 +538,7 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
             </template>
             <div role="status"><p v-if="notice && !busy" ref="noticeBox" class="notice" tabindex="-1">{{ notice }}</p></div>
             <div role="alert"><p v-if="error" ref="errorBox" class="error" tabindex="-1">{{ error }}</p></div>
-            <article v-if="pending" class="message from-you pending" aria-live="polite"><span class="sr-only">You</span><MarkdownText class="prose" kind="message" :text="pending.text" /><p v-for="(name, fileIndex) in pending.files" :key="fileIndex" class="attachment-label"><span class="attach-thumb" aria-hidden="true" />Attachment · {{ name }}</p><p class="sending">Sending…</p></article>
+            <article v-if="pending" class="message from-you pending" aria-live="polite"><span class="sr-only">You</span><MarkdownText class="prose" kind="message" :text="pending.text" /><p v-for="(name, fileIndex) in pending.files" :key="fileIndex" class="attachment-label"><span class="attach-thumb" aria-hidden="true" />Attachment · {{ name }}</p></article>
             <article v-if="pending?.reply" class="message from-tutor thinking" aria-hidden="true"><div class="speaker-row"><span class="speaker"><span class="avatar"><PixelIcon name="leaf" :size="16" /></span> StillGotIt</span></div><p class="prose dots"><span>·</span><span>·</span><span>·</span></p><span class="waited">{{ waited }}</span></article>
             <!-- While the tutor's dots show, they are the visible sign of work; the sentence stays for screen readers. -->
             <p v-if="busy" class="working" :class="{ 'sr-only': pending?.reply }" role="status"><PixelIcon name="leaf" :size="18" /> Working on it…</p>
@@ -777,7 +777,6 @@ button.mastery-chip:hover{border-color:var(--lesson-chip-hover)}
 .rail-x{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;padding:0;border:0;border-radius:10px;background:var(--lesson-rail-edge);color:var(--ink);font-size:15px;line-height:1}
 .rail-x:hover{background:var(--lesson-tile-edge)}
 .message.pending{opacity:.85}
-.sending{margin:4px 0 0;font-size:11px;font-weight:600;color:var(--muted)}
 .thinking .dots{display:inline-flex;gap:3px;font-size:22px;line-height:1;color:var(--muted)}
 .waited{margin-left:10px;font-size:12px;font-weight:600;color:var(--faint);font-variant-numeric:tabular-nums}
 /* The three dots rise and brighten one after another, a sixth of a beat apart. */
