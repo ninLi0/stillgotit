@@ -20,6 +20,7 @@ The main colors and the font names are tokens at the top of [frontend/src/style.
   - 24 px for the title on the Home scene card and the planner's trade-off headline.
   - 22 px for section titles, such as "Materials", "This week" on Plan, "Course forest", and the Manage skills heading.
   - 20 px for the brand in the sidebar and for each day's date on the Plan sea calendar.
+  - 18 px for the unit titles in Manage skills, such as "Matrix multiplication", and for its "Archived" heading. Under them, each skill's row has a 15 px title and a 13 px outcome, and the blocks inside an open skill are named by eyebrows.
   - 13 px for the plank signs under the grove's trees and over the exam flag on Home's scene card, and 11 px for eyebrows, such as "FRIDAY, OCTOBER 23 · NEXT UP · 12 MIN" on the scene card.
 - **Instrument Sans carries everything a learner reads at length or presses.** Body text is 15 px, buttons are 14 or 15 px at weight 700, and the sidebar's navigation rows are 15 px. Big percentages are 30 to 34 px at weight 700 with −1 px letter spacing: the selected skill's estimate on Home, the course average in the Forest view, and "Your mastery" in the lesson's rail.
 - **Numbers use tabular figures.** `font-variant-numeric: tabular-nums` is set on the whole page, so every digit has the same width. Percentages line up in the Tasks list, on the grove's plank signs ("5 skills · 58%"), in the Forest view's topic list, and in the evidence timeline.
@@ -36,7 +37,7 @@ The main colors and the font names are tokens at the top of [frontend/src/style.
   | --- | --- | --- | --- | --- | --- | --- |
   | Meadow | Home, the Forest view, sign-in, Settings | `#8FD3A6` | `#0E3A22` | `#55AE77` | `#E7F6EC` | Start review on the scene card, Open lesson, Back to desk, Sign in with Commons, the chosen Home view tile in Settings |
   | Ocean | Plan | `#86CDE9` | `#08344D` | `#43A2CB` | `#E2F3FA` | Start review and Finish review, Confirm changes on a trade-off, Save exam, Update plan |
-  | Sand | Materials | `#F5C98E` | `#4A2A08` | `#D5964B` | `#FCEFD9` | + Add material, Confirm · add a leaf, Find skills, Import graded work, the buttons in Manage skills |
+  | Sand | Materials | `#F5C98E` | `#4A2A08` | `#D5964B` | `#FCEFD9` | + Add material, Confirm · add a leaf, Find skills, Import graded work, the one main action in each block of Manage skills |
   | Dawn | The lesson, the Memory view | `#B9B0F5` | `#21185A` | `#8A7EE0` | `#EEEBFF` | Check my understanding, Assess, Save adjustment, the learner's own messages, Open on the Memory view |
 
 - **Coral marks what needs attention now.** Coral (`#C35124`) fills the sidebar's badge on Materials, which counts the suggested skills waiting for review. The pixel flag planted beside a leaf that is due today keeps the lighter coral `#D9663A`, because it is art, not text. Coral's wash and text (`#FBE6DC` and `#A8412F`) form the Due today pill in the Tasks list and every error message, and the wash marks exam preparation in the Plan calendar.
