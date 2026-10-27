@@ -10,7 +10,8 @@ import { currentTheme } from "./theme.ts";
 // is a rock island with a striped lighthouse. The WhaleLife whale swims from today toward the lighthouse.
 // The canvas holds the sky, the sun and the sea bands, which stay still. Everything that moves is an SVG sprite over it
 // on an eased loop (scene-motion.ts): the clouds and the wave glints drift, the boat and the buoys bob, the lamp
-// breathes, and the whale crosses on a slow arc. Under prefers-reduced-motion every sprite stays where it is drawn.
+// breathes, and the whale crosses, rising toward the horizon and drawn smaller near it. Under prefers-reduced-motion
+// every sprite stays where it is drawn.
 // `centers` are the day columns' horizontal centres in CSS pixels, measured by the planner, so every mark sits over its column.
 const props = defineProps<{ examDay: number | null; examTitle?: string; examDate?: string; width?: number; height?: number; centers?: number[]; horizon?: number }>();
 const U = 4, HEIGHT = 136;
@@ -65,9 +66,21 @@ const ISLAND: CellRect[] = [
 ];
 const LAMP: CellRect[] = [{ x: -1, y: -13, w: 3, h: 2, fill: "#F3CD7A" }];
 const BEAMS: CellRect[] = [{ x: -12, y: -13, w: 10, h: 1, fill: "#F6E7B6" }, { x: 3, y: -13, w: 10, h: 1, fill: "#F6E7B6" }];
-// The whale, mirrored to face right at 2px per unit, and its spout.
-const WHALE_PX = WHALE.map(([x, y, w, h, fill]) => ({ x: (26 - x - w) * 2, y: y * 2, width: w * 2, height: h * 2, fill }));
-const SPOUT_PX = [[17, -4, 2, 3], [15, -6, 2, 2], [19, -6, 2, 2]].map(([x, y, w, h]) => ({ x: x! * 2, y: y! * 2, width: w! * 2, height: h! * 2, fill: "#E3F4FA" }));
+// The whale, mirrored to face right, and its spout, drawn twice: at 2 px per unit for the deeper half of its path and at
+// 1 px per unit for the half nearer the horizon. The scale is only ever a whole number of pixels per unit, and the
+// smaller copy is moved by whole pixels so both copies share the whale's centre, unit (11, 7). Each dives 4 px per unit
+// of scale.
+const WHALE_CENTRE = [11, 7] as const;
+function whaleCopy(key: string, px: 1 | 2) {
+  const fit = (x: number, y: number, w: number, h: number) => ({ x: x * px, y: y * px, width: w * px, height: h * px });
+  return {
+    key, at: `translate(${WHALE_CENTRE[0] * (2 - px)} ${WHALE_CENTRE[1] * (2 - px)})`,
+    body: WHALE.map(([x, y, w, h, fill]) => ({ ...fit(26 - x - w, y, w, h), fill })),
+    spout: [[17, -4, 2, 3], [15, -6, 2, 2], [19, -6, 2, 2]].map(([x, y, w, h]) => ({ ...fit(x!, y!, w!, h!), fill: "#E3F4FA" })),
+    dive: { "--reach-y": `${4 * px}px`, "--period-y": "3.5s", "--delay-y": "0s" },
+  };
+}
+const WHALES = [whaleCopy("near", 2), whaleCopy("far", 1)];
 
 const scene = computed(() => {
   const { W, H, Hz, cx } = geo.value, exam = examAt.value, c0 = cx(0), target = cx(exam ?? 6);
@@ -130,14 +143,15 @@ const scene = computed(() => {
   const boat = sprite("boat", bx, by, U, lit(BOAT), { x: 1, seconds: 2.9, y: 3, ySeconds: 1.8 });
   const wake = { at: `translate(${bx * U} ${by * U})`, rects: toPixels(WAKE, U) };
   // The whale crosses from today toward the lighthouse on the loop curve at about 4 px a second on average (about 6 at
-  // its fastest, mid-crossing), fading in at the start and out at the end. On the way it dives 8 px and surfaces every
-  // 7 seconds, and spouts as it surfaces.
-  const depth = props.horizon === undefined ? 11 : Math.max(11, Math.round((H - Hz) * 0.5));
+  // its fastest, mid-crossing), fading in at the start and out at the end. It starts near the bottom of the sea and
+  // rises in a straight line until it swims just under the horizon (its place one cell under it), and it is drawn at
+  // 2 px per unit until it is halfway up, then at 1 px (sgWhaleNear, sgWhaleFar in style.css). On the way it dives and
+  // surfaces every 7 seconds, and spouts as it surfaces.
+  const depth = props.horizon === undefined ? 11 : Math.max(11, H - Hz - 9), rise = depth - 1;
   const span = Math.max(10, target - c0 - 22), seconds = Math.min(180, Math.max(16, (span * U) / 4));
   const whale = {
     at: `translate(${(c0 + 8) * U} ${(Hz + depth) * U})`,
-    swim: { "--reach-x": `${span * U}px`, "--period-x": `${Math.round(seconds * 10) / 10}s`, "--delay-x": `${-Math.round(seconds * 3) / 10}s` },
-    dive: { "--reach-y": "8px", "--period-y": "3.5s", "--delay-y": "0s" },
+    swim: { "--reach-x": `${span * U}px`, "--reach-y": `${-rise * U}px`, "--period-x": `${Math.round(seconds * 10) / 10}s`, "--delay-x": `${-Math.round(seconds * 3) / 10}s` },
   };
   return { clouds, waves, buoys, ripples, island, boat, wake, whale };
 });
@@ -209,6 +223,17 @@ onBeforeUnmount(() => { observer?.disconnect(); });
       <svg class="sprites" :width="geo.W * U" :height="geo.H * U" shape-rendering="crispEdges" aria-hidden="true" focusable="false">
         <g v-for="s in scene.clouds" :key="s.key" :transform="s.at"><g class="drift" :style="s.motion"><rect v-for="(r, i) in s.rects" :key="i" v-bind="r" /></g></g>
         <g v-for="g in scene.waves" :key="g.key" class="drift" :style="g.motion"><path v-for="p in g.paths" :key="p.fill" :d="p.d" :fill="p.fill" /></g>
+        <!-- The whale swims under the buoys, the boat and the island, which float at the horizon in front of it. -->
+        <g :transform="scene.whale.at">
+          <g class="swim" :style="scene.whale.swim">
+            <g v-for="w in WHALES" :key="w.key" :class="`whale-${w.key}`" :transform="w.at">
+              <g class="dive" :style="w.dive">
+                <rect v-for="(r, i) in w.body" :key="i" v-bind="r" :fill="sceneColor(r.fill)" />
+                <g class="spout"><rect v-for="(r, i) in w.spout" :key="i" v-bind="r" :fill="sceneColor(r.fill)" /></g>
+              </g>
+            </g>
+          </g>
+        </g>
         <g v-for="s in scene.buoys" :key="s.key" :transform="s.at"><g class="drift" :style="s.motion"><rect v-for="(r, i) in s.rects" :key="i" v-bind="r" /></g></g>
         <g v-for="s in scene.ripples" :key="s.key" :transform="s.at"><rect v-for="(r, i) in s.rects" :key="i" v-bind="r" /></g>
         <g v-if="scene.island" :transform="scene.island.at" :style="scene.island.motion">
@@ -218,14 +243,6 @@ onBeforeUnmount(() => { observer?.disconnect(); });
         </g>
         <g :transform="scene.boat.at"><g class="drift" :style="scene.boat.motion"><rect v-for="(r, i) in scene.boat.rects" :key="i" v-bind="r" /></g></g>
         <g :transform="scene.wake.at"><rect v-for="(r, i) in scene.wake.rects" :key="i" v-bind="r" /></g>
-        <g :transform="scene.whale.at">
-          <g class="swim" :style="scene.whale.swim">
-            <g class="dive" :style="scene.whale.dive">
-              <rect v-for="(r, i) in WHALE_PX" :key="i" v-bind="r" :fill="sceneColor(r.fill)" />
-              <g class="spout"><rect v-for="(r, i) in SPOUT_PX" :key="i" v-bind="r" :fill="sceneColor(r.fill)" /></g>
-            </g>
-          </g>
-        </g>
       </svg>
       <span v-if="signStyle" class="sea-sign" :style="signStyle" aria-hidden="true"><span class="sign-title">{{ examTitle || 'Exam' }}</span><span class="sign-date">{{ examDate }}</span></span>
       <span v-if="labelled" class="sea-you" :style="youStyle" aria-hidden="true">You · today</span>
@@ -241,8 +258,11 @@ canvas{position:absolute;left:0;top:0;image-rendering:pixelated}
 /* The lamp and its beam share one breath, set by the island's --period-x. */
 .lamp{animation:sgLamp var(--period-x) var(--ease-loop) var(--delay-x) infinite alternate}
 .beam{animation:sgBeam var(--period-x) var(--ease-loop) var(--delay-x) infinite alternate}
-/* The whale's crossing, its dives, and the spout that shows each time it surfaces (style.css, sgSwim, sgDive, sgSpout). */
-.swim{transform:translateX(round(var(--drift-x),var(--snap,1px)));animation:sgSwim var(--period-x) var(--ease-loop) var(--delay-x) infinite}
+/* The whale's crossing and rise, its dives, and the spout that shows each time it surfaces (style.css, sgSwim, sgDive,
+   sgSpout). Halfway through the crossing the 2 px whale gives way to the 1 px one, in one step (sgWhaleNear, sgWhaleFar). */
+.swim{transform:translate(round(var(--drift-x),var(--snap,1px)),round(var(--drift-y),var(--snap,1px)));animation:sgSwim var(--period-x) var(--ease-loop) var(--delay-x) infinite}
+.whale-near{animation:sgWhaleNear var(--period-x) step-end var(--delay-x) infinite}
+.whale-far{opacity:0;animation:sgWhaleFar var(--period-x) step-end var(--delay-x) infinite}
 .dive{transform:translateY(round(var(--drift-y),var(--snap,1px)));animation:sgDive var(--period-y) var(--ease-loop) var(--delay-y) infinite alternate}
 .spout{animation:sgSpout calc(var(--period-y) * 2) var(--ease-loop) var(--delay-y) infinite}
 .sea-sign{position:absolute;transform:translate(-50%,-100%);display:flex;flex-direction:column;align-items:center;padding:3px 9px 4px;background:var(--plank);box-shadow:inset 0 -2px 0 var(--plank-edge),0 0 0 2px var(--plank-ring);white-space:nowrap;pointer-events:none}

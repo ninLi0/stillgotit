@@ -4,7 +4,7 @@ import InfoBubble from "./InfoBubble.vue";
 import PixelIcon from "./PixelIcon.vue";
 import TopicTree from "./TopicTree.vue";
 import { STAGE_LABELS, type Stage } from "./pixel-art.ts";
-import { CELL, GROUND, HEIGHT, PLOT, average, drawGrove, growGrove, leafNear, shiftGrove, treeAt, type GroveLeaf, type GroveTopic } from "./GroveScene.ts";
+import { CELL, GROUND, HEIGHT, PLOT, SIGN_ROOM, average, drawGrove, growGrove, leafNear, shiftGrove, treeAt, type GroveLeaf, type GroveTopic, type GroveTree } from "./GroveScene.ts";
 import { scatterStars } from "./scene-palette.ts";
 import { currentTheme } from "./theme.ts";
 
@@ -13,8 +13,10 @@ import { currentTheme } from "./theme.ts";
 // keyboard and with a screen reader. `units` names the topics and the tree kind chosen for each, `due` lists the
 // skills due today, and `courseId` keys the saved design seed; all three are optional. Selecting a tree or its sign
 // picks out its topic, and the topic's tree appears under the grove with "Change tree" (design/visual-design.md,
-// "Tree kinds"). Each tree shows its portrait, a full canopy of its kind, until the pointer is over it or one of its
-// leaves or its sign has focus; then it opens to show its leaves. Where nothing can hover, every tree shows its leaves.
+// "Tree kinds"); a "Change tree" control under the sign of a selected or hovered tree opens the same picker. Each tree
+// shows its portrait, a full canopy of its kind, and opens to show its leaves while the pointer is over it. A tree the
+// learner selects stays open until they select another tree or open ground: selecting the tree, its sign or one of its
+// leaves, "Show on tree", or keyboard focus on its sign or a leaf. Where nothing can hover, a tap selects and opens.
 const props = defineProps<{
   skills: { skill: string; title: string; status: string; mastery?: number; unit?: string }[];
   selected: string | null;
@@ -24,7 +26,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ select: [skill: string]; plant: [] }>();
 
-const INFO = "Each topic grows its own tree. Each confirmed skill is a leaf that grows as you master it: bud, sprout, leaf, then blossom. A coral flag means it’s due today. Select a leaf to see the skill, or select a tree or its sign to change what kind of tree it is.";
+const INFO = "Each topic grows its own tree. Each confirmed skill is a leaf that grows as you master it: bud, sprout, leaf, then blossom. A coral flag means it’s due today. Select a tree to keep it open and a leaf to see the skill. “Change tree” under a tree’s sign picks what kind of tree it is.";
 const legend = computed<Stage[]>(() => props.due === undefined ? ["bud", "sprout", "leaf", "full", "bloom"] : ["bud", "sprout", "leaf", "full", "bloom", "flag"]);
 
 // Topics in course order, then any skill whose unit the `units` list does not name.
@@ -83,6 +85,9 @@ function plankCells(title: string, meta: string) {
 }
 const grown = computed(() => { void fontsVersion.value; return growGrove(topics.value, design.value, plankCells); });
 
+// The grove on Home has a strip of extra soil under the signs, where the "Change tree" control sits.
+const ROWS = HEIGHT + SIGN_ROOM;
+
 // Measured size of the scroll area; the grove fills it and scrolls when it is wider.
 const scroller = ref<HTMLElement | null>(null), canvas = ref<HTMLCanvasElement | null>(null);
 const containerWidth = ref(0), dpr = ref(1);
@@ -96,27 +101,44 @@ const leaves = computed(() => placed.value.grove.trees.flatMap((tree) => tree.le
 const hover = ref<string | null>(null), focused = ref<string | null>(null);
 const hot = computed(() => hover.value ?? focused.value);
 
-// Which trees show their skills rather than their portrait, by tree key.
-const hoverTree = ref<string | null>(null), focusTree = ref<string | null>(null);
+// The picked-out topic, chosen by selecting its tree or its sign; selecting the sign again, or open ground, lets go.
+// Only topics the course names can change their tree, so a tree of unnamed skills cannot be picked out.
+const named = computed(() => new Set((props.units ?? []).map((unit) => unit.unit)));
+const picked = ref<string | null>(null);
+const pickedTopic = computed(() => topics.value.find((topic) => topic.id === picked.value && named.value.has(topic.id)) ?? null);
+
+// Which trees show their skills rather than their portrait, by tree key: the selected tree (`held`), which stays open
+// until the learner selects another tree or open ground, the trees of the picked-out topic, and, as a preview, the
+// tree under the pointer and the tree whose sign or leaf has focus.
+const hoverTree = ref<string | null>(null), focusTree = ref<string | null>(null), held = ref<string | null>(null);
 const leafTree = computed(() => new Map(placed.value.grove.trees.flatMap((tree) => tree.leaves.map((leaf) => [leaf.skill.skill, tree.key] as const))));
 const hoverless = typeof window !== "undefined" && window.matchMedia ? window.matchMedia("(hover: none)") : null;
 const reduced = typeof window !== "undefined" && window.matchMedia ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
 const touch = ref(hoverless?.matches ?? false);
-function hoverChanged() { touch.value = hoverless?.matches ?? false; }
-const openTrees = computed<ReadonlySet<string> | "all">(() => {
-  if (touch.value) return "all";
+function hoverChanged() { touch.value = hoverless?.matches ?? false; if (touch.value) onLeave(); }
+const openTrees = computed<ReadonlySet<string>>(() => {
   const keys = new Set<string>();
-  const leafKey = hot.value ? leafTree.value.get(hot.value) : undefined;
-  if (leafKey) keys.add(leafKey);
-  if (hoverTree.value) keys.add(hoverTree.value);
-  if (focusTree.value) keys.add(focusTree.value);
+  for (const key of [held.value, hoverTree.value, focusTree.value, hot.value ? leafTree.value.get(hot.value) : undefined]) if (key) keys.add(key);
+  for (const tree of placed.value.grove.trees) if (tree.unit === picked.value) keys.add(tree.key);
   return keys;
 });
-const openKey = computed(() => openTrees.value === "all" ? "all" : [...openTrees.value].sort().join(" "));
+const openKey = computed(() => [...openTrees.value].sort().join(" "));
+const treeOf = (key: string | null | undefined) => key ? placed.value.grove.trees.find((tree) => tree.key === key) : undefined;
+/** Keyboard focus keeps the tree open after the focus moves on. */
+function hold(key: string | undefined) { if (key) held.value = key; }
+/** Selecting a leaf, here or elsewhere, selects its tree, and a topic picked out on another tree lets go. */
+function selectTree(key: string | undefined) {
+  if (!key) return;
+  held.value = key;
+  if (picked.value !== null && picked.value !== treeOf(key)?.unit) picked.value = null;
+}
+// The "Change tree" control shows under the sign of the selected tree, the picked-out topic's trees and the tree under
+// the pointer, for the topics the course names.
+const changeable = (tree: GroveTree) => named.value.has(tree.unit) && (held.value === tree.key || picked.value === tree.unit || hoverTree.value === tree.key);
 // The tag names the leaf under the pointer or focus, or else the selected one, while its tree shows its skills.
 const tagLeaf = computed<GroveLeaf | undefined>(() => {
-  const id = hot.value ?? props.selected, open = openTrees.value, key = id ? leafTree.value.get(id) : undefined;
-  if (!id || !key || (open !== "all" && !open.has(key))) return undefined;
+  const id = hot.value ?? props.selected, key = id ? leafTree.value.get(id) : undefined;
+  if (!id || !key || !openTrees.value.has(key)) return undefined;
   return leaves.value.find((leaf) => leaf.skill.skill === id);
 });
 const percent = (skill: GroveLeaf["skill"]) => skill.mastery === undefined ? "new" : `${Math.round(skill.mastery)}%`;
@@ -137,7 +159,7 @@ watch(tagLeaf, async () => { await nextTick(); tagWidth.value = tagEl.value?.off
 
 function draw() {
   if (!canvas.value) return;
-  drawGrove(canvas.value, placed.value.grove, placed.value.cssWidth, dpr.value, props.selected, hot.value, openTrees.value);
+  drawGrove(canvas.value, placed.value.grove, placed.value.cssWidth, dpr.value, props.selected, hot.value, openTrees.value, ROWS);
   const ctx = canvas.value.getContext("2d");
   if (ctx) scatterStars(ctx, CELL * dpr.value, Math.ceil(placed.value.cssWidth / CELL), GROUND, 7);
 }
@@ -161,38 +183,61 @@ watch(openKey, () => {
   over.classList.add("fading");
 });
 
-// Hit-testing happens in cell space: the nearest leaf within about five cells.
-function leafAtPointer(event: MouseEvent) {
+// Hit-testing happens in cell space: the nearest leaf within about five cells. The pointer is followed over the whole
+// stage, so moving from a tree down to its sign and its "Change tree" control keeps the tree open: a sign or control
+// names its tree, and under the grass line the soil belongs to the tree above it.
+function cellAt(event: MouseEvent) {
   const box = (event.currentTarget as HTMLElement).getBoundingClientRect();
-  return leafNear(placed.value.grove, (event.clientX - box.left) / CELL, (event.clientY - box.top) / CELL);
-}
-function treeAtPointer(event: MouseEvent) {
-  const box = (event.currentTarget as HTMLElement).getBoundingClientRect(), tree = treeAt(placed.value.grove, (event.clientX - box.left) / CELL, (event.clientY - box.top) / CELL);
-  return tree && named.value.has(tree.unit) ? tree : null;
+  return { x: (event.clientX - box.left) / CELL, y: (event.clientY - box.top) / CELL };
 }
 const pointing = ref(false);
 function onMove(event: MouseEvent) {
-  const id = leafAtPointer(event)?.skill.skill ?? null;
+  // Where nothing can hover, a tap's stray mouse events would leave a tree open, so only taps open trees there.
+  if (touch.value) return;
+  const { x, y } = cellAt(event), grove = placed.value.grove;
+  const sign = event.target instanceof Element ? event.target.closest("[data-tree]")?.getAttribute("data-tree") ?? null : null;
+  const id = sign ? null : leafNear(grove, x, y)?.skill.skill ?? null;
   if (id !== hover.value) hover.value = id;
-  const box = (event.currentTarget as HTMLElement).getBoundingClientRect();
-  const tree = (id ? leafTree.value.get(id) : undefined) ?? treeAt(placed.value.grove, (event.clientX - box.left) / CELL, (event.clientY - box.top) / CELL)?.key ?? null;
+  const tree = sign ?? (id ? leafTree.value.get(id) : undefined) ?? treeAt(grove, x, Math.min(y, GROUND))?.key ?? null;
   if (tree !== hoverTree.value) hoverTree.value = tree;
-  pointing.value = !!id || !!treeAtPointer(event);
+  pointing.value = !!id || !!treeAt(grove, x, y);
 }
 function onLeave() { hover.value = null; hoverTree.value = null; pointing.value = false; }
 function onClick(event: MouseEvent) {
-  const leaf = leafAtPointer(event);
-  if (leaf) { emit("select", leaf.skill.skill); return; }
-  const tree = treeAtPointer(event);
-  picked.value = tree ? tree.unit : null;
+  const { x, y } = cellAt(event), leaf = leafNear(placed.value.grove, x, y), key = leaf ? leafTree.value.get(leaf.skill.skill) : undefined;
+  // A tap on a closed tree opens it first, so a tap never selects a leaf the learner cannot see yet.
+  if (leaf && key && (!touch.value || openTrees.value.has(key))) { selectTree(key); emit("select", leaf.skill.skill); return; }
+  // A tree, or open ground, which lets go of the selected tree and the picked-out topic.
+  const tree = treeOf(key) ?? treeAt(placed.value.grove, x, y);
+  held.value = tree?.key ?? null;
+  picked.value = tree && named.value.has(tree.unit) ? tree.unit : null;
+}
+function togglePicked(tree: GroveTree) {
+  if (picked.value !== tree.unit) { picked.value = tree.unit; held.value = tree.key; return; }
+  picked.value = null;
+  if (treeOf(held.value)?.unit === tree.unit) held.value = null;
 }
 
-// The picked-out topic, chosen by selecting its tree or its sign; selecting the sign again, or open ground, lets go.
-// Only topics the course names can change their tree, so a tree of unnamed skills cannot be picked out.
-const named = computed(() => new Set((props.units ?? []).map((unit) => unit.unit)));
-const picked = ref<string | null>(null);
-const pickedTopic = computed(() => topics.value.find((topic) => topic.id === picked.value && named.value.has(topic.id)) ?? null);
-function togglePicked(unit: string) { picked.value = picked.value === unit ? null : unit; }
+// The "Change tree" control picks out its topic, so the topic's tree appears under the grove, and opens its picker.
+const topicTree = ref<InstanceType<typeof TopicTree> | null>(null);
+async function changeTree(tree: GroveTree) {
+  picked.value = tree.unit; held.value = tree.key;
+  await nextTick();
+  topicTree.value?.openPicker();
+}
+// A pixel paintbrush, 7 cells square, drawn in the control's text color.
+const BRUSH = "M6 0h1v1H6zM5 1h1v1H5zM4 2h1v1H4zM2 3h2v1H2zM1 4h3v1H1zM0 5h3v1H0zM0 6h2v1H0z";
+
+// "Show on tree" (`show`), and any other change of the selected skill, selects the skill's tree as soon as its leaf is
+// on the grove: a skill confirmed a moment ago is selected before its leaf arrives.
+const waiting = ref<string | null>(null);
+function show(skill: string | null | undefined) { waiting.value = skill ?? null; }
+watch(() => props.selected, show, { immediate: true });
+watch([waiting, leafTree], () => {
+  const key = waiting.value ? leafTree.value.get(waiting.value) : undefined;
+  if (key) { waiting.value = null; selectTree(key); }
+}, { immediate: true });
+defineExpose({ show });
 
 // When the selection changes from elsewhere (for example "Show on tree"), scroll its leaf into view.
 watch([() => props.selected, placed], async () => {
@@ -238,29 +283,33 @@ onBeforeUnmount(() => {
       </div>
     </header>
     <div ref="scroller" class="grove-scroll">
-      <div class="grove-stage" role="group" aria-label="Each leaf is a confirmed skill. Select one to see it." :style="{ width: `${placed.cssWidth}px`, height: `${HEIGHT * CELL}px` }">
-        <canvas ref="canvas" aria-hidden="true" :style="{ width: `${placed.cssWidth}px`, height: `${HEIGHT * CELL}px`, cursor: pointing ? 'pointer' : 'default' }"
-          @mousemove="onMove" @mouseleave="onLeave" @click="onClick" />
-        <canvas ref="fade" class="grove-fade" aria-hidden="true" :style="{ width: `${placed.cssWidth}px`, height: `${HEIGHT * CELL}px` }" />
+      <div class="grove-stage" role="group" aria-label="Each leaf is a confirmed skill. Select one to see it." :style="{ width: `${placed.cssWidth}px`, height: `${ROWS * CELL}px` }"
+        @mousemove="onMove" @mouseleave="onLeave">
+        <canvas ref="canvas" aria-hidden="true" :style="{ width: `${placed.cssWidth}px`, height: `${ROWS * CELL}px`, cursor: pointing ? 'pointer' : 'default' }" @click="onClick" />
+        <canvas ref="fade" class="grove-fade" aria-hidden="true" :style="{ width: `${placed.cssWidth}px`, height: `${ROWS * CELL}px` }" />
         <div v-for="tree in placed.grove.trees" :key="`leaves-${tree.key}`" role="group" :aria-label="`${tree.title}, ${tree.meta}`">
-          <button v-if="named.has(tree.unit)" type="button" class="plank" :class="{ on: picked === tree.unit }" :aria-pressed="picked === tree.unit"
-            :aria-label="`Topic ${tree.title}, ${tree.meta}`" :style="{ left: `${tree.cx * CELL}px`, top: `${(GROUND + 4) * CELL}px`, maxWidth: '280px' }" @click="togglePicked(tree.unit)"
-            @focus="focusTree = tree.key" @blur="focusTree = null">
+          <button v-if="named.has(tree.unit)" type="button" class="plank" :class="{ on: picked === tree.unit }" :aria-pressed="picked === tree.unit" :data-tree="tree.key"
+            :aria-label="`Topic ${tree.title}, ${tree.meta}`" :style="{ left: `${tree.cx * CELL}px`, top: `${(GROUND + 4) * CELL}px`, maxWidth: '280px' }" @click="togglePicked(tree)"
+            @focus="focusTree = tree.key; hold(tree.key)" @blur="focusTree = null">
             <span class="plank-title">{{ tree.title }}</span><span class="plank-meta">{{ tree.meta }}</span>
           </button>
           <span v-else class="plank" aria-hidden="true" :style="{ left: `${tree.cx * CELL}px`, top: `${(GROUND + 4) * CELL}px`, maxWidth: '280px' }">
             <span class="plank-title">{{ tree.title }}</span><span class="plank-meta">{{ tree.meta }}</span>
           </span>
+          <button v-if="changeable(tree)" type="button" class="change-tree" aria-haspopup="dialog" :aria-label="`Change tree for ${tree.title}`" :data-tree="tree.key"
+            :style="{ left: `${tree.cx * CELL}px`, top: `${(GROUND + 4) * CELL + 46}px` }" @click="changeTree(tree)">
+            <svg class="change-glyph" width="14" height="14" viewBox="0 0 7 7" shape-rendering="crispEdges" aria-hidden="true" focusable="false"><path :d="BRUSH" fill="currentColor" /></svg>Change tree
+          </button>
           <button v-for="leaf in tree.leaves" :key="leaf.skill.skill" type="button" class="leaf-button" :aria-label="leafLabel(leaf.skill)" :aria-pressed="selected === leaf.skill.skill"
             :style="{ left: `${(leaf.x - 5) * CELL}px`, top: `${(leaf.y - 5) * CELL}px` }"
-            @click="emit('select', leaf.skill.skill)" @focus="focused = leaf.skill.skill" @blur="focused = null" />
+            @click="selectTree(tree.key); emit('select', leaf.skill.skill)" @focus="focused = leaf.skill.skill; hold(tree.key)" @blur="focused = null" />
         </div>
         <span v-if="tagLeaf" ref="tagEl" class="leaf-tag" aria-hidden="true" :style="tagStyle">{{ tagLeaf.skill.title }}<span class="leaf-tag-pct">{{ percent(tagLeaf.skill) }}</span></span>
         <button type="button" class="plant-plot" :style="{ left: `${placed.grove.plot * CELL}px`, top: `${(GROUND - PLOT) * CELL}px`, width: `${PLOT * CELL}px`, height: `${PLOT * CELL}px` }"
           @click="emit('plant')">+ Plant a topic</button>
       </div>
     </div>
-    <div v-if="pickedTopic" :key="pickedTopic.id" class="grove-topic"><TopicTree :unit="pickedTopic.id" :topic="pickedTopic.title" :chosen="pickedTopic.kind ?? null" /></div>
+    <div v-if="pickedTopic" :key="pickedTopic.id" class="grove-topic"><TopicTree ref="topicTree" :unit="pickedTopic.id" :topic="pickedTopic.title" :chosen="pickedTopic.kind ?? null" /></div>
     <div v-if="!leafCount && $slots.empty" class="grove-empty"><slot name="empty" /></div>
   </section>
 </template>
@@ -292,6 +341,12 @@ button.plank:hover { background: var(--plank-hover); }
 .plank-meta { font: 600 12px/15px var(--font-body); color: var(--plank-soft); font-variant-numeric: tabular-nums; }
 /* Leaf buttons sit over their leaves for keyboard and screen-reader use; the pointer goes through to the canvas. */
 .leaf-button { position: absolute; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 6px; background: transparent; pointer-events: none; }
+/* "Change tree" under the sign of a selected or hovered tree, in the scene's label style, opens the tree picker. */
+.change-tree { position: absolute; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; border: 0; border-radius: 0;
+  background: var(--scene-label); color: var(--meadow-label); font: 400 11px/1 var(--font-display); letter-spacing: 1px; text-transform: uppercase; white-space: nowrap;
+  animation: sgFade var(--dur-quick) var(--ease-enter) both; }
+.change-tree:hover { background: var(--scene-card); }
+.change-glyph { flex: none; }
 .leaf-tag { position: absolute; z-index: 2; display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 8px; background: var(--tip); color: var(--tip-text);
   font-size: 12px; font-weight: 600; line-height: 1.3; white-space: nowrap; pointer-events: none; box-shadow: 0 6px 14px rgb(var(--shadow) / .2); font-variant-numeric: tabular-nums; }
 .leaf-tag-pct { color: var(--tag-accent); }
