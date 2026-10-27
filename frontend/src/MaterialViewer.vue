@@ -417,8 +417,9 @@ onBeforeUnmount(() => {
           <MaterialMedia :key="page.key" class="media-view" :material="materialId" :file="page.file" :location="mediaLocations[page.file]" />
         </div>
 
-        <!-- Everything else scales with CSS zoom from its design width. -->
-        <div v-else class="stage" :style="{ zoom: scale }">
+        <!-- Everything else scales with CSS zoom from its design width. In page-only mode a document's text instead
+             fills the narrow pane at full size, so it stays readable. -->
+        <div v-else class="stage" :class="{ fluid: pageOnly && !isPaged(page.kind) }" :style="pageOnly && !isPaged(page.kind) ? undefined : { zoom: scale }">
           <article v-if="page.kind === 'slides'" class="slide" :class="{ flash: flashPage === page.key, dense: slideDense }">
             <template v-if="slideLines.length">
               <p class="slide-title">{{ slideLines[0] }}</p>
@@ -587,6 +588,8 @@ onBeforeUnmount(() => {
 .viewer.page-only { display: flex; flex-direction: column; min-height: 0; height: 100%; }
 .page-only .toolbar { justify-content: center; }
 .page-only .body, .page-only .state { flex: 1; min-height: 0; height: auto; }
+.stage.fluid { width: auto; max-width: 580px; }
+.stage.fluid .doc { width: auto; padding: 28px 30px; }
 
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 </style>
