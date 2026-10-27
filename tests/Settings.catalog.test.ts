@@ -35,14 +35,14 @@ describe("tutor catalog", () => {
     expect(TUTOR_MODELS[0]!.levels).toHaveLength(4);
   });
 
-  test("GEMINI_MODEL names the default after trimming and removing models/, and gemini-3.8-flash is the default when it is unset", () => {
-    expect(configuredModelName(undefined)).toBe("gemini-3.8-flash");
-    expect(configuredModelName("")).toBe("gemini-3.8-flash");
+  test("GEMINI_MODEL names the default after trimming and removing models/, and gemini-4-argon is the default when it is unset", () => {
+    expect(configuredModelName(undefined)).toBe("gemini-4-argon");
+    expect(configuredModelName("")).toBe("gemini-4-argon");
     expect(configuredModelName("  models/gemini-3.1-pro-preview ")).toBe("gemini-3.1-pro-preview");
     // The default choice is the default model at that model's own default level.
     const entry = table.find((row) => row.model === configured)!;
     expect(defaultChoice({})).toEqual({ model: configured, level: entry.defaultLevel });
-    if (process.env.GEMINI_MODEL === undefined) expect(defaultChoice({})).toEqual({ model: "gemini-3.8-flash", level: "MEDIUM" });
+    if (process.env.GEMINI_MODEL === undefined) expect(defaultChoice({})).toEqual({ model: "gemini-4-argon", level: "MEDIUM" });
   });
 
   test("validation matches model names and levels exactly, including case", () => {
