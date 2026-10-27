@@ -234,7 +234,7 @@ watch(() => props.revision, () => Promise.all([read(), readCourse()]).catch((pro
         <li v-for="day in week" :key="day.day" class="day" :class="{ today: day.index === 0, exam: !!day.exam }" :aria-label="day.index === 0 ? `Today, ${day.label}` : day.label">
           <div class="day-top"><span class="dow" aria-hidden="true">{{ day.dow }}</span><span class="date" aria-hidden="true">{{ day.date }}</span></div>
           <div class="horizon" aria-hidden="true" />
-          <div v-if="!day.exam" class="load"><MasteryCells :value="loadPct(day.total)" :cells="6" on="var(--load-on)" off="var(--load-off)" :height="5" :label="`${day.total} of ${budgetMinutes} minutes planned`" /><span class="load-text">{{ day.total }} of {{ budgetMinutes }} min</span></div>
+          <div v-if="!day.exam" class="load"><MasteryCells :value="loadPct(day.total)" :cells="6" on="var(--exam)" off="var(--plank-today)" :height="5" :label="`${day.total} of ${budgetMinutes} minutes planned`" /><span class="load-text">{{ day.total }} of {{ budgetMinutes }} min</span></div>
           <div v-else class="exam-mark"><span class="exam-title"><PixelIcon name="lighthouse" :size="22" /> Exam</span><span class="exam-covers">Covers {{ day.exam.covered.length }} {{ day.exam.covered.length === 1 ? 'skill' : 'skills' }}</span></div>
           <ul v-if="day.items.length" class="items">
             <li v-for="item in day.items" :key="item.item" class="item" :class="[kindOf(item), { next: data.next?.item === item.item, done: item.status === 'DONE', missed: item.status === 'MISSED' || item.status === 'REPLACED', deferring: deferring.has(item.item) }]">
@@ -302,16 +302,18 @@ watch(() => props.revision, () => Promise.all([read(), readCourse()]).catch((pro
 .sea{position:absolute;left:0;top:0;height:100%;border:0;border-radius:0}
 .week{position:relative;z-index:1;list-style:none;margin:0;padding:26px 12px 16px;display:grid;grid-template-columns:repeat(7,minmax(128px,1fr));gap:10px}
 .day{display:flex;flex-direction:column;align-items:stretch;gap:8px;min-height:300px;min-width:0;padding:6px;border-radius:14px;color:var(--plank-ink)}
-.day.today{background:var(--today-column);box-shadow:inset 0 0 0 2px var(--today-ring)}
+/* Today's column is washed lighter on the water by the sea itself; here its plank gets a light outer edge. */
 .day-top{align-self:flex-start;display:flex;align-items:baseline;gap:8px;padding:3px 10px 4px;background:var(--plank);box-shadow:inset 0 -2px 0 var(--plank-edge),0 0 0 2px var(--plank-ring)}
-.day.today .day-top{background:var(--plank-today);box-shadow:inset 0 -2px 0 var(--plank-today-edge),0 0 0 2px var(--plank-ring)}
+.day.today .day-top{background:var(--plank-today);box-shadow:inset 0 -2px 0 var(--plank-today-edge),0 0 0 2px var(--plank-ring),0 0 0 4px var(--today-ring)}
 .day.exam .day-top{background:var(--exam);color:var(--on-fill);box-shadow:inset 0 -2px 0 var(--exam-edge),0 0 0 2px var(--exam-ring)}
 .dow{font-family:var(--font-display);font-size:11px;letter-spacing:1px;text-transform:uppercase}
 .date{font-family:var(--font-display);font-size:20px;line-height:1}
-.horizon{height:58px;flex:none}
-.load{display:flex;flex-direction:column;gap:4px;padding:6px 8px;border-radius:8px;background:var(--load-ground)}
+/* Each day is one signpost: a post runs from the date plank down to the minutes board that hangs under it. */
+.horizon{position:relative;height:58px;flex:none}
+.horizon::before{content:"";position:absolute;left:10px;top:-6px;bottom:-10px;width:4px;background:var(--plank-edge);box-shadow:0 0 0 2px var(--plank-ring)}
+.load{position:relative;display:flex;flex-direction:column;gap:4px;padding:6px 8px;background:var(--plank);box-shadow:inset 0 -2px 0 var(--plank-edge),0 0 0 2px var(--plank-ring)}
 .load :deep(.mastery-cells){max-width:none}
-.load-text{font-size:11px;font-weight:600;color:var(--load-text)}
+.load-text{font-size:11px;font-weight:600;color:var(--plank-ink)}
 .exam-mark{display:flex;flex-direction:column;gap:2px;padding:6px 8px;border-radius:8px;background:var(--exam);color:var(--on-fill)}
 .exam-title{display:flex;align-items:center;gap:6px;font-family:var(--font-display);font-size:18px}
 .exam-covers{font-size:11px;font-weight:600;opacity:.9}

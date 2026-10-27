@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { rng, WHALE } from "./pixel-art.ts";
 import { cloudDrift, cloudRects, driftStyle, snapStyle, sprite, toPixels, type CellRect, type Sprite } from "./scene-motion.ts";
-import { MOON, MOONLIT, dayOrNight, isNight, scatterStars, sceneColor } from "./scene-palette.ts";
+import { MOON, MOONLIT, NIGHT_CLOUD, STARS, dayOrNight, isNight, scatterStars, sceneColor } from "./scene-palette.ts";
 import { currentTheme } from "./theme.ts";
 
 // The Plan sea (design/revamp/README.md): a pixel canvas, 4px cells, one column per day of the week grid below.
@@ -41,8 +41,23 @@ const BOAT: CellRect[] = [
   ...Array.from({ length: 8 }, (_, r): CellRect => ({ x: 1, y: -9 + r, w: Math.floor(r * 0.7) + 1, h: 1, fill: WHITE })),
   { x: 0, y: -10, w: 1, h: 1, fill: "#E3A233" },
 ];
-// The water line under the boat stays put and is drawn over the hull, so the boat dips into it as it bobs.
-const WAKE: CellRect[] = [{ x: -6, y: 2, w: 13, h: 1, fill: "#80CBE6" }];
+// The sea's tones from the crest down to the deepest band. The six bands use the last six, lightest at the horizon;
+// a wave stroke takes a tone two steps lighter than its band, and today's column is washed one step lighter.
+const WATER = ["#D6F0F8", "#BDE6F4", "#9BD7EC", "#80CBE6", "#66BEDF", "#4FAFD6", "#3A9CC8", "#2D88B6"];
+/** The first row of each sea band: thin bands near the horizon, deeper ones below, as the sea recedes. */
+function seaBands(Hz: number, H: number): number[] {
+  const weights = [1, 1, 2, 2, 3, 4], depth = H - Hz;
+  let acc = 0;
+  return weights.map((w) => { const top = Hz + Math.round((acc * depth) / 13); acc += w; return top; });
+}
+// The wave line the boat sits on stays put and is drawn over the hull, so the boat dips into it as it bobs; a bow
+// splash in front and a short wake behind.
+const WAKE: CellRect[] = [
+  { x: -6, y: 2, w: 13, h: 1, fill: "#BDE6F4" }, { x: 6, y: 1, w: 2, h: 1, fill: "#D6F0F8" },
+  { x: -10, y: 2, w: 3, h: 1, fill: "#D6F0F8" }, { x: -13, y: 3, w: 3, h: 1, fill: "#BDE6F4" }, { x: -16, y: 2, w: 2, h: 1, fill: "#BDE6F4" },
+];
+// A two-cell ripple ring around each buoy, drawn over its keel so the buoy dips into it.
+const RIPPLE: CellRect[] = [{ x: -4, y: 2, w: 2, h: 1, fill: "#BDE6F4" }, { x: 3, y: 2, w: 2, h: 1, fill: "#BDE6F4" }, { x: -2, y: 3, w: 5, h: 1, fill: "#BDE6F4" }];
 const ISLAND: CellRect[] = [
   { x: -8, y: 3, w: 17, h: 3, fill: "#8E9BA2" }, { x: -6, y: 1, w: 13, h: 2, fill: "#AEBAC0" },
   ...Array.from({ length: 12 }, (_, r): CellRect => ({ x: -1, y: -11 + r, w: 3, h: 1, fill: Math.floor(r / 2) % 2 ? CORAL : WHITE })),
@@ -59,27 +74,51 @@ const scene = computed(() => {
   // By night the sails, stripes and buoys are moonlit rather than the clouds' grey (scene-palette.ts).
   const lit = (rects: readonly CellRect[]) => rects.map((r) => (r.fill === WHITE ? { ...r, fill: dayOrNight(WHITE, MOONLIT) } : r));
   // Clouds sit where the seed puts them (the same places as before) and drift a few dozen pixels each way.
+  // By night there are half as many clouds, and they are darker, lit only faintly by the moon.
+  const night = isNight(), cloudFill = (r: CellRect) => ({ ...r, fill: r.fill === WHITE ? dayOrNight(WHITE, NIGHT_CLOUD.body) : dayOrNight(r.fill, NIGHT_CLOUD.shade) });
   const clouds: Sprite[] = [], R = rng(21), M = rng(121);
   for (let i = 0; i < Math.max(3, Math.floor(W / 50)); i++) {
     const cw = 8 + Math.floor(R() * 10), x = Math.floor(R() * W) - 15, y = 2 + Math.floor(R() * Math.round(Hz * 0.5)), { drift, shift } = cloudDrift(M, U);
-    clouds.push(sprite(`cloud-${i}`, x - shift, y, U, cloudRects(cw, "#EEF6F9", 2, 5), drift));
+    if (night && i % 2) continue;
+    clouds.push(sprite(`cloud-${i}`, x - shift, y, U, cloudRects(cw, "#EEF6F9", 2, 5).map(cloudFill), drift));
   }
-  // Wave glints: the same scattered pairs of light cells as before, in two layers, the even rows and the odd rows,
-  // that sway one cell to and fro in opposite directions. Each layer is one path per color; it reaches a cell past
-  // each edge so the sway never shows a gap.
-  const glints = [0, 1].map((parity) => {
-    let light = "", dark = "";
-    for (let y = Hz + 1; y < H; y++) {
-      if (y % 2 !== parity) continue;
-      for (let x = -2; x < W + 2; x++) if ((((x + y * 7) % 19) + 19) % 19 === 0) { light += `M${x * U} ${y * U}h${U}v${U}h-${U}z`; dark += `M${(x + 1) * U} ${y * U}h${U}v${U}h-${U}z`; }
+  // Wave strokes, seeded so they stay put: short and close together near the horizon, longer and sparser deeper down,
+  // each up to three tones lighter than its band, and a few with a crest of the lightest tone. By night a narrow column of
+  // short moonlit strokes runs down from under the moon. The strokes fall in two layers that sway one cell to and fro
+  // in opposite directions; each layer is one path per color and reaches past each edge so the sway never shows a gap.
+  const tops = seaBands(Hz, H), bandAt = (y: number) => { let i = 0; while (i + 1 < tops.length && y >= tops[i + 1]!) i++; return i; };
+  const layers = [new Map<string, string>(), new Map<string, string>()];
+  const stroke = (layer: number, fill: string, x: number, y: number, w: number) => { const m = layers[layer]!; m.set(fill, `${m.get(fill) ?? ""}M${x * U} ${y * U}h${w * U}v${U}h-${w * U}z`); };
+  const V = rng(55);
+  for (let y = Hz + 1; y < H; y++) {
+    const d = (y - Hz) / Math.max(1, H - Hz), band = bandAt(y);
+    if (V() < 0.45) continue;
+    const n = Math.round((V() * 2 * W) / (26 + 48 * d));
+    for (let k = 0; k < n; k++) {
+      const len = 1 + Math.round(d * 2) + Math.floor(V() * (2 + 3 * d)), x = Math.floor(V() * (W + 6)) - 3, layer = V() < 0.5 ? 0 : 1;
+      stroke(layer, WATER[Math.max(1, band - 1)]!, x, y, len);
+      if (len >= 3 && V() < 0.3) stroke(layer, WATER[Math.max(0, band - 2)]!, x + Math.floor(len / 2) - (len >= 5 ? 1 : 0), y - 1, len >= 5 ? 2 : 1);
     }
-    return { key: `glints-${parity}`, light, dark, motion: driftStyle({ x: U, seconds: 3.2, phase: parity * 0.5 }) };
-  });
-  // Buoys on the other days, each bobbing and swaying a little out of step with its neighbours.
-  const buoys: Sprite[] = [];
+  }
+  if (night) {
+    const P = rng(77), mx = moonAt().x;
+    for (let y = Hz + 1; y < Hz + Math.round((H - Hz) * 0.75); y++) {
+      if (P() < 0.35) continue;
+      const spread = 1 + Math.round(((y - Hz) / Math.max(1, H - Hz)) * 3), len = 1 + Math.floor(P() * 3);
+      stroke(P() < 0.5 ? 0 : 1, P() < 0.25 ? MOON.rim : STARS.faint, mx - spread + Math.floor(P() * (2 * spread + 1)) - (len >> 1), y, len);
+    }
+  }
+  const waves = layers.map((m, layer) => ({
+    key: `waves-${layer}`, paths: [...m].map(([fill, d]) => ({ fill: sceneColor(fill), d })), motion: driftStyle({ x: U, seconds: 3.2, phase: layer * 0.5 }),
+  }));
+  // Buoys on the other days, each bobbing and swaying a little out of step with its neighbours, in a still ripple ring.
+  // With the day columns over the sea, the markers float in the open water between the horizon and the minutes boards.
+  const float = props.horizon === undefined ? 0 : -2;
+  const buoys: Sprite[] = [], ripples: { key: string; at: string; rects: ReturnType<typeof toPixels> }[] = [];
   for (let i = 1; i <= 6; i++) {
     if (i === exam) continue;
-    buoys.push(sprite(`buoy-${i}`, cx(i), Hz + 6, U, lit(BUOY), { x: 1, seconds: 2.3, phase: (i * 0.29) % 1, y: 3, ySeconds: 1.4 + (i % 3) * 0.25, yPhase: (i * 0.17) % 1 }));
+    buoys.push(sprite(`buoy-${i}`, cx(i), Hz + 6 + float, U, lit(BUOY), { x: 1, seconds: 2.3, phase: (i * 0.29) % 1, y: 3, ySeconds: 1.4 + (i % 3) * 0.25, yPhase: (i * 0.17) % 1 }));
+    ripples.push({ key: `ripple-${i}`, at: `translate(${cx(i) * U} ${(Hz + 6 + float) * U})`, rects: toPixels(RIPPLE, U) });
   }
   // The exam day's island and lighthouse; its lamp breathes and its beam fades in as the lamp brightens.
   const island = exam === null ? null : {
@@ -87,7 +126,7 @@ const scene = computed(() => {
     motion: driftStyle({ seconds: 1.5 }),
   };
   // Today's sailboat. On an exam day that is today, the boat sits just left of the island.
-  const bx = exam === 0 ? c0 - 12 : c0, by = Hz + 7;
+  const bx = exam === 0 ? c0 - 12 : c0, by = Hz + 7 + float;
   const boat = sprite("boat", bx, by, U, lit(BOAT), { x: 1, seconds: 2.9, y: 3, ySeconds: 1.8 });
   const wake = { at: `translate(${bx * U} ${by * U})`, rects: toPixels(WAKE, U) };
   // The whale crosses from today toward the lighthouse on the loop curve at about 4 px a second on average (about 6 at
@@ -100,12 +139,19 @@ const scene = computed(() => {
     swim: { "--reach-x": `${span * U}px`, "--period-x": `${Math.round(seconds * 10) / 10}s`, "--delay-x": `${-Math.round(seconds * 3) / 10}s` },
     dive: { "--reach-y": "8px", "--period-y": "3.5s", "--delay-y": "0s" },
   };
-  return { clouds, glints, buoys, island, boat, wake, whale };
+  return { clouds, waves, buoys, ripples, island, boat, wake, whale };
 });
+
+/** Where the sun, or the moon, sits. Over the day columns it sits high between today and tomorrow, above the planks,
+ * where it shows on a phone too; on its own it sits in the middle of the sky. */
+function moonAt() {
+  const { W, Hz, cx } = geo.value;
+  return props.horizon === undefined ? { x: Math.round(W * 0.5), y: Math.round(Hz * 0.45), r: 17, face: 5 } : { x: Math.round((cx(0) + cx(1)) / 2), y: 4, r: 10, face: 4 };
+}
 
 function draw() {
   const cv = canvas.value; if (!cv) return;
-  const { W, H, Hz } = geo.value, ratio = window.devicePixelRatio || 1;
+  const { W, H, Hz, cx } = geo.value, ratio = window.devicePixelRatio || 1;
   if (cv.width !== W * U * ratio || cv.height !== H * U * ratio) { cv.width = W * U * ratio; cv.height = H * U * ratio; }
   cv.style.width = `${W * U}px`; cv.style.height = `${H * U}px`;
   const ctx = cv.getContext("2d"); if (!ctx) return;
@@ -115,14 +161,29 @@ function draw() {
   // Sky in solid bands and the sun, or the moon by night.
   const sky = ["#D3EAF4", "#DCEFF6", "#E6F4F7", "#F0F7F3"], bh = Math.ceil(Hz / sky.length);
   sky.forEach((c, i) => rect(0, i * bh, W, bh, c));
-  // With day planks in the sky, the sun sits high at the right, clear of them.
-  const sunX = props.horizon === undefined ? Math.round(W * 0.5) : W - 11, sunY = props.horizon === undefined ? Math.round(Hz * 0.45) : 6;
-  for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) { const q = dx * dx + dy * dy; if (q <= 17) cell(sunX + dx, sunY + dy, q <= 5 ? dayOrNight("#F3CD7A", MOON.face) : dayOrNight("#F9E3A8", MOON.rim)); }
-  if (isNight()) { cell(sunX + 1, sunY - 1, MOON.crater); cell(sunX - 2, sunY + 1, MOON.crater); }
-  // Sea in solid bands; its glints are sprites.
-  const sea = ["#9BD7EC", "#80CBE6", "#66BEDF", "#4FAFD6", "#3A9CC8", "#2D88B6"], sh = Math.ceil((H - Hz) / sea.length);
-  sea.forEach((c, i) => rect(0, Hz + i * sh, W, sh, c));
-  scatterStars(ctx, U * ratio, W, Hz, 21);
+  // The sun, or by night the moon in a faint glow, high in the sky and clear of the day planks.
+  const sun = moonAt();
+  for (let dy = -5; dy <= 5; dy++) for (let dx = -5; dx <= 5; dx++) {
+    const q = dx * dx + dy * dy;
+    if (q <= sun.r) cell(sun.x + dx, sun.y + dy, q <= sun.face ? dayOrNight("#F3CD7A", MOON.face) : dayOrNight("#F9E3A8", MOON.rim));
+    else if (isNight() && q <= sun.r + 8 && sun.y + dy >= 0) cell(sun.x + dx, sun.y + dy, MOON.glow);
+  }
+  if (isNight()) { cell(sun.x + 1, sun.y - 1, MOON.crater); cell(sun.x - 2, sun.y + 1, MOON.crater); }
+  // Sea in solid bands that lighten toward the horizon, with a dithered row where each band meets the next. Today's
+  // column is washed one tone lighter, its edges dithered. The wave strokes are sprites.
+  const tops = seaBands(Hz, H);
+  const paint = (x0: number, x1: number, lift: number) => {
+    tops.forEach((top, i) => rect(x0, top, x1 - x0, (tops[i + 1] ?? H) - top, WATER[i + 2 - lift]!));
+    for (let i = 1; i < tops.length; i++) { const y = tops[i]! - 1; for (let x = x0; x < x1; x++) if ((x + y) % 2 === 0) cell(x, y, WATER[i + 2 - lift]!); }
+  };
+  paint(0, W, 0);
+  const cs = props.centers ?? [];
+  if (props.horizon !== undefined && cs.length >= 2) {
+    const c0 = cx(0), hw = Math.max(4, Math.floor((cs[1]! - cs[0]! - 10) / 2 / U)), lift = (y: number) => { let i = 0; while (i + 1 < tops.length && y >= tops[i + 1]!) i++; return WATER[i + 1]!; };
+    paint(c0 - hw, c0 + hw, 1);
+    for (let y = Hz; y < H; y++) cell(y % 2 ? c0 + hw : c0 - hw - 1, y, lift(y));
+  }
+  scatterStars(ctx, U * ratio, W, Hz, 21, 4000);
 }
 
 function measure() {
@@ -147,8 +208,9 @@ onBeforeUnmount(() => { observer?.disconnect(); });
       <canvas ref="canvas" aria-hidden="true" />
       <svg class="sprites" :width="geo.W * U" :height="geo.H * U" shape-rendering="crispEdges" aria-hidden="true" focusable="false">
         <g v-for="s in scene.clouds" :key="s.key" :transform="s.at"><g class="drift" :style="s.motion"><rect v-for="(r, i) in s.rects" :key="i" v-bind="r" /></g></g>
-        <g v-for="g in scene.glints" :key="g.key" class="drift" :style="g.motion"><path :d="g.light" :fill="sceneColor('#D6F0F8')" /><path :d="g.dark" :fill="sceneColor('#BDE6F4')" /></g>
+        <g v-for="g in scene.waves" :key="g.key" class="drift" :style="g.motion"><path v-for="p in g.paths" :key="p.fill" :d="p.d" :fill="p.fill" /></g>
         <g v-for="s in scene.buoys" :key="s.key" :transform="s.at"><g class="drift" :style="s.motion"><rect v-for="(r, i) in s.rects" :key="i" v-bind="r" /></g></g>
+        <g v-for="s in scene.ripples" :key="s.key" :transform="s.at"><rect v-for="(r, i) in s.rects" :key="i" v-bind="r" /></g>
         <g v-if="scene.island" :transform="scene.island.at" :style="scene.island.motion">
           <rect v-for="(r, i) in scene.island.rects" :key="i" v-bind="r" />
           <g class="beam"><rect v-for="(r, i) in scene.island.beams" :key="i" v-bind="r" /></g>
