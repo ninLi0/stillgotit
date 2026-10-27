@@ -11,6 +11,7 @@ import MasteryCells from "./MasteryCells.vue";
 import MarkdownText from "./MarkdownText.vue";
 import InfoBubble from "./InfoBubble.vue";
 import SourcePreview from "./SourcePreview.vue";
+import SourcePane from "./SourcePane.vue";
 import { stageOf } from "./pixel-art.ts";
 import type { OpenSource } from "./revamp-types.ts";
 import { api, unwrap } from "./api.ts";
@@ -304,9 +305,63 @@ watch([() => (freshLesson.value || !data.value?.sessions.length ? "new" : select
   ([, count], [, before]) => { void tabLine.place(count > 0 && before > 0); });
 async function toggleRail() { evidenceOpen.value = !evidenceOpen.value; await nextTick(); if (evidenceOpen.value) railClose.value?.focus(); }
 async function closeRail() { evidenceOpen.value = false; await nextTick(); railChip.value?.focus(); }
-// A cited source, from a reply's passage or the rail's Taught from list, opens in a preview on this page.
-const sourcePreview = ref<InstanceType<typeof SourcePreview> | null>(null);
-function openSource(source: OpenSource) { void sourcePreview.value?.open(source); }
+// A cited source, from a reply's passage or the rail's Taught from list, opens on this page. On wide screens it opens in
+// a pane beside the conversation that takes the rail's place (the mastery chip then opens the rail over the lesson, as
+// on narrow screens); on narrow screens it opens in a dialog. Both show only the file at the cited place.
+const sourcePreview = ref<InstanceType<typeof SourcePreview> | null>(null), sourcePane = ref<InstanceType<typeof SourcePane> | null>(null);
+const paneSource = shallowRef<OpenSource | null>(null);
+const railOver = computed(() => narrow.value || !!paneSource.value);
+let paneOpener: HTMLElement | null = null;
+/**
+ * Keeps the conversation in place while the pane opens or closes and the messages reflow to a new width: the control
+ * that opened the source, or else the first message in view, stays at the same height. Returns the step to run after the
+ * change. The browser's own scroll anchoring is paused meanwhile, so the two do not both move the thread.
+ */
+function holdThreadPlace(opener: HTMLElement | null): () => void {
+  const box = thread.value;
+  if (!box) return () => undefined;
+  const top = () => box.getBoundingClientRect().top;
+  const anchor = opener && box.contains(opener) ? opener
+    : [...box.querySelectorAll<HTMLElement>(".message, .thread-divider")].find((element) => element.getBoundingClientRect().bottom > top()) ?? null;
+  if (!anchor) return () => undefined;
+  const before = anchor.getBoundingClientRect().top - top();
+  box.style.overflowAnchor = "none";
+  return () => {
+    if (anchor.isConnected) box.scrollTop += anchor.getBoundingClientRect().top - top() - before;
+    requestAnimationFrame(() => { box.style.overflowAnchor = ""; });
+  };
+}
+async function openSource(source: OpenSource) {
+  if (narrow.value) { void sourcePreview.value?.open(source); return; }
+  // Another source opened while the pane is open replaces its content, and focus later returns to that source's control.
+  // Focus inside the pane is never an opener, so the one remembered stays.
+  const active = document.activeElement, pane = sourcePane.value?.element;
+  if (!(active instanceof Node && pane?.contains(active))) paneOpener = active instanceof HTMLElement && active !== document.body ? active : null;
+  const keep = holdThreadPlace(paneOpener);
+  paneSource.value = source; evidenceOpen.value = false;
+  await nextTick();
+  keep();
+  sourcePane.value?.focus();
+}
+/** Closes the pane and gives the rail its column back. Focus returns to the opener unless the learner is leaving. */
+async function closePane(returnFocus = true) {
+  if (!paneSource.value) return;
+  const back = paneOpener, keep = holdThreadPlace(back);
+  paneSource.value = null; paneOpener = null; evidenceOpen.value = false;
+  await nextTick();
+  keep();
+  if (returnFocus && back?.isConnected && back.getClientRects().length) back.focus();
+}
+function paneToMaterials(source: OpenSource) { void closePane(false); emit("open-source", source); }
+// A window narrowed while the pane is open shows the same source in the dialog instead.
+watch(narrow, (now) => {
+  const shown = paneSource.value;
+  if (!now || !shown) return;
+  const back = paneOpener;
+  paneSource.value = null; paneOpener = null;
+  if (back?.isConnected) back.focus();
+  void sourcePreview.value?.open(shown);
+});
 /** A draft from elsewhere starts a new conversation with the message box filled in and focused. It is not sent. */
 async function applyDraft(draft: string | undefined) {
   if (!draft) return;
@@ -318,6 +373,7 @@ async function applyDraft(draft: string | undefined) {
 }
 watch(() => props.skill, (skill) => {
   selected.value = ""; data.value = null; response.value = ""; attachments.value = []; reviewed.value = false;
+  paneSource.value = null; paneOpener = null;
   // An unanswered adjustment from before a reload is shown at once, so the learner can see it and send it again.
   evidenceOpen.value = !!new PendingAdjustment(sessionStore(), skill).read();
   act(load);
@@ -402,7 +458,7 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
 </script>
 
 <template>
-  <section class="learn" :class="{ narrow, 'rail-open': evidenceOpen }" :aria-busy="busy">
+  <section class="learn" :class="{ narrow, 'rail-over': railOver, 'source-open': !!paneSource && !narrow, 'rail-open': evidenceOpen }" :aria-busy="busy">
     <div class="learn-main">
       <header class="learn-head">
         <div class="head-row">
@@ -415,7 +471,7 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
             </div>
           </div>
           <div class="head-actions">
-            <button v-if="narrow" ref="railChip" type="button" class="mastery-chip" :aria-expanded="evidenceOpen" aria-controls="learn-rail" :aria-label="`${estimateText || 'No estimate yet'}. ${evidenceOpen ? 'Hide' : 'Show'} mastery and evidence`" @click="toggleRail">
+            <button v-if="railOver" ref="railChip" type="button" class="mastery-chip" :aria-expanded="evidenceOpen" aria-controls="learn-rail" :aria-label="`${estimateText || 'No estimate yet'}. ${evidenceOpen ? 'Hide' : 'Show'} mastery and evidence`" @click="toggleRail">
               <span class="chip-top"><strong>{{ pctText }}</strong><span>mastery</span></span><MasteryCells :value="pct" :cells="7" :height="4" label="" aria-hidden="true" />
             </button>
             <div v-else class="mastery-chip static" role="img" :aria-label="estimateText || 'No estimate yet'"><span class="chip-top"><strong>{{ pctText }}</strong><span>mastery</span></span><MasteryCells :value="pct" :cells="7" :height="4" label="" aria-hidden="true" /></div>
@@ -521,9 +577,9 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
         </div>
       </div>
     </div>
-    <div v-if="narrow" class="rail-backdrop" :hidden="!evidenceOpen" aria-hidden="true" @click="closeRail" />
-    <aside id="learn-rail" class="rail" aria-label="Mastery, goal, evidence and sources" :hidden="narrow && !evidenceOpen ? true : undefined" @keydown.esc.stop="narrow && closeRail()">
-      <div v-if="narrow" class="rail-close"><span class="rail-title">Mastery and evidence</span><button ref="railClose" type="button" class="rail-x" aria-label="Close mastery and evidence" @click="closeRail"><span aria-hidden="true">✕</span></button></div>
+    <div v-if="railOver" class="rail-backdrop" :hidden="!evidenceOpen" aria-hidden="true" @click="closeRail" />
+    <aside id="learn-rail" class="rail" aria-label="Mastery, goal, evidence and sources" :hidden="railOver && !evidenceOpen ? true : undefined" @keydown.esc.stop="railOver && closeRail()">
+      <div v-if="railOver" class="rail-close"><span class="rail-title">Mastery and evidence</span><button ref="railClose" type="button" class="rail-x" aria-label="Close mastery and evidence" @click="closeRail"><span aria-hidden="true">✕</span></button></div>
       <section class="rail-card">
         <div class="rail-head"><p class="eyebrow rail-eyebrow">Your mastery</p><InfoBubble :text="masteryNote" label="About your mastery estimate" /></div>
         <div class="mastery-row"><span class="sprite-tile green"><PixelIcon :sprite="stage" :size="35" /></span><div class="mastery-figure"><strong>{{ pctText }}</strong><MasteryCells :value="pct" :cells="10" /></div></div>
@@ -542,6 +598,7 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
         <SourcesUsed :citations="railCitations" :titles="materialTitles" id-prefix="rail-source" variant="rail" @open="openSource" />
       </section>
     </aside>
+    <SourcePane v-if="paneSource && !narrow" ref="sourcePane" class="learn-source" :source="paneSource" :titles="materialTitles" @close="closePane()" @open-materials="paneToMaterials" />
     <SourcePreview ref="sourcePreview" :titles="materialTitles" @open-materials="emit('open-source', $event)" @ask="applyDraft($event.question)" />
   </section>
 </template>
@@ -549,7 +606,10 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
 <style scoped>
 .learn{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 312px;height:calc(100dvh - 28px);min-height:560px;background:var(--card)}
 .learn.narrow{grid-template-columns:minmax(0,1fr)}
-.learn-main{display:flex;flex-direction:column;min-width:0;min-height:0}
+/* A cited source opens in a pane that takes the rail's column, wider than the rail, while the rail moves over the lesson. */
+.learn.source-open{grid-template-columns:minmax(0,1fr) min(46%,620px)}
+.learn-main{display:flex;flex-direction:column;min-width:0;min-height:0;grid-column:1;grid-row:1}
+.learn-source{grid-column:2;grid-row:1}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
 /* Header */
 .learn-head{padding:18px 28px 0;background:var(--card);border-bottom:1px solid var(--lesson-head-line)}
@@ -708,13 +768,14 @@ button.mastery-chip:hover{border-color:var(--lesson-chip-hover)}
 .finished-message .secondary{min-height:38px;font-size:13px}
 /* Rail */
 .rail{border-left:1px solid var(--lesson-rail-edge);background:var(--lesson-rail);overflow-y:auto;overflow-x:hidden;padding:16px 14px;display:flex;flex-direction:column;gap:10px;min-height:0}
-/* On narrow screens the rail slides in over the lesson on the move curve and its backdrop fades in. Where the browser
-   can keep a hidden element drawn while it transitions (transition-behavior: allow-discrete), both also leave the same
-   way; elsewhere they disappear at once. These rules name the rail as the lesson's own child (.narrow > .rail): the
+/* On narrow screens, and while a source pane holds the rail's column, the rail slides in over the lesson on the move
+   curve and its backdrop fades in. Where the browser can keep a hidden element drawn while it transitions
+   (transition-behavior: allow-discrete), both also leave the same way; elsewhere they disappear at once. These rules
+   name the rail as the lesson's own child (.rail-over > .rail): the
    Taught from list's root also has the class "rail" and this component's scope, and must not become a second overlay. */
-.narrow>.rail{position:absolute;top:0;right:0;bottom:0;width:312px;max-width:100%;z-index:20;box-shadow:-12px 0 32px rgb(var(--shadow) / .12);animation:sgSlide var(--dur-move) var(--ease-move);transition:transform var(--dur-move) var(--ease-move),opacity var(--dur-move) var(--ease-move),display var(--dur-move) allow-discrete}
+.rail-over>.rail{position:absolute;top:0;right:0;bottom:0;width:312px;max-width:100%;z-index:20;box-shadow:-12px 0 32px rgb(var(--shadow) / .12);animation:sgSlide var(--dur-move) var(--ease-move);transition:transform var(--dur-move) var(--ease-move),opacity var(--dur-move) var(--ease-move),display var(--dur-move) allow-discrete}
 .rail[hidden]{display:none}
-.narrow>.rail[hidden]{transform:translateX(24px);opacity:0}
+.rail-over>.rail[hidden]{transform:translateX(24px);opacity:0}
 .rail-backdrop{position:absolute;inset:0;z-index:19;background:var(--rail-shade);animation:sgFade var(--dur-move) var(--ease-move);transition:opacity var(--dur-move) var(--ease-move),display var(--dur-move) allow-discrete}
 .rail-backdrop[hidden]{display:none;opacity:0;pointer-events:none}
 .rail-close{position:sticky;top:-16px;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:8px;margin:-16px -14px 0;padding:12px 12px 8px 16px;background:var(--lesson-rail)}

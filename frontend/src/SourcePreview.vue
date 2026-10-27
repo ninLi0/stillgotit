@@ -4,9 +4,10 @@ import MaterialViewer from "./MaterialViewer.vue";
 import { placeLabel } from "./locations.ts";
 import type { AskAboutPage, OpenSource } from "./revamp-types.ts";
 
-// A cited source previewed in place on the lesson page: a dialog holding the Materials viewer, opened at the cited
-// place and highlighting it as Materials does. "Open in Materials" leaves for the full page. Focus moves to the dialog
-// when it opens and returns to the control that opened it when it closes.
+// A cited source previewed in place on the lesson page on narrow screens (wide screens use SourcePane.vue beside the
+// conversation): a dialog holding the viewer in its page-only mode, opened at the cited place and showing only the file
+// there. "Open in Materials" leaves for the full page. Focus moves to the dialog when it opens and returns to the
+// control that opened it when it closes.
 const props = defineProps<{ titles: Record<string, string> }>();
 const emit = defineEmits<{ "open-materials": [source: OpenSource]; ask: [request: AskAboutPage] }>();
 const dialog = ref<HTMLDialogElement | null>(null), source = shallowRef<OpenSource | null>(null);
@@ -52,15 +53,17 @@ defineExpose({ open });
         <button type="button" class="quiet open-materials" @click="openMaterials">Open in Materials</button>
         <button type="button" class="preview-close" aria-label="Close the preview" @click="close"><span aria-hidden="true">✕</span></button>
       </header>
-      <MaterialViewer :key="`${source.material}\n${source.location}`" :material="source.material" :title="props.titles[source.material] ?? ''" :skills="[]" :initial-location="source.location" @ask="ask" />
+      <MaterialViewer :key="`${source.material}\n${source.location}`" class="preview-page" mode="page" :material="source.material" :title="props.titles[source.material] ?? ''" :skills="[]" :initial-location="source.location" @ask="ask" />
     </template>
   </dialog>
 </template>
 
 <style scoped>
 /* The app's dialog: white, 22 px corners, a soft shadow over a dimmed page; style.css scales it in as it opens. */
-.source-preview { border: 0; border-radius: 22px; padding: 20px 22px 22px; width: min(960px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow-y: auto; box-shadow: 0 20px 50px rgb(var(--shadow) / .18); color: var(--ink); background: var(--card); }
+.source-preview { border: 0; border-radius: 22px; padding: 20px 22px 22px; width: min(720px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow-y: auto; box-shadow: 0 20px 50px rgb(var(--shadow) / .18); color: var(--ink); background: var(--card); }
 .source-preview::backdrop { background: var(--backdrop); }
+/* The page-only viewer fills the dialog's height, so the dialog keeps one size from page to page. */
+.preview-page { height: min(720px, calc(100dvh - 150px)); min-height: 320px; }
 .preview-head { display: flex; align-items: flex-start; gap: 8px 16px; flex-wrap: wrap; margin-bottom: 14px; }
 .preview-heading { flex: 1; min-width: 200px; }
 .preview-heading .eyebrow { margin-bottom: 4px; }
