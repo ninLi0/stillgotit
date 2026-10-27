@@ -5,10 +5,10 @@ $ vue-tsc --noEmit -p frontend/tsconfig.json
 $ vite build --config frontend/vite.config.ts
 vite v8.3.4 building client environment for production...
 transforming...
-[plugin rolldown:vite-resolve] Module "node:util" has been externalized for browser compatibility, imported by "/Users/ericni/6.1040/projects/stillgotit/node_modules/@mit-sdg/sync-engine/dist/engine/utils/runtime.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
-[plugin rolldown:vite-resolve] Module "node:crypto" has been externalized for browser compatibility, imported by "/Users/ericni/6.1040/projects/stillgotit/node_modules/@mit-sdg/sync-engine/dist/engine/utils/runtime.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
-[plugin rolldown:vite-resolve] Module "node:crypto" has been externalized for browser compatibility, imported by "/Users/ericni/6.1040/projects/stillgotit/node_modules/@mit-sdg/sync-engine/dist/engine/reactions/concepts/concept-spec.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
-[plugin rolldown:vite-resolve] Module "node:timers" has been externalized for browser compatibility, imported by "/Users/ericni/6.1040/projects/stillgotit/node_modules/@mit-sdg/sync-engine/dist/engine/reactions/runtime/batching.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[plugin rolldown:vite-resolve] Module "node:util" has been externalized for browser compatibility, imported by "node_modules/@mit-sdg/sync-engine/dist/engine/utils/runtime.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[plugin rolldown:vite-resolve] Module "node:crypto" has been externalized for browser compatibility, imported by "node_modules/@mit-sdg/sync-engine/dist/engine/utils/runtime.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[plugin rolldown:vite-resolve] Module "node:crypto" has been externalized for browser compatibility, imported by "node_modules/@mit-sdg/sync-engine/dist/engine/reactions/concepts/concept-spec.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+[plugin rolldown:vite-resolve] Module "node:timers" has been externalized for browser compatibility, imported by "node_modules/@mit-sdg/sync-engine/dist/engine/reactions/runtime/batching.js". See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
 ✓ 316 modules transformed.
 rendering chunks...
 computing gzip size...

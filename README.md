@@ -8,6 +8,7 @@ StillGotIt helps college students learn the skills in a course and keep them aft
 - **Demo video:** [a narrated walk through the main journey](PASTE_VIDEO_URL)
 - **P4 status:** [docs/P4.md](docs/P4.md) covers what changed since P3, how the work was checked, the tests of the deployed app, how to prepare a user test, and the known limits.
 - **Design document:** [docs/design-document.md](docs/design-document.md) summarizes how the final design differs from the P1 concept design and the P3 visual design, with links to the commits.
+- **Design notebook:** [the running record of design decisions](https://github.com/ninLi0/6.1040/blob/main/design-notebook.md) from E1 to P4, kept in the course repository.
 - **Earlier status pages:** [P3, the beta](docs/P3.md), and [P2, the alpha](docs/P2.md).
 - **Design:** the [design index](design/README.md) lists every design document and links each concept to its code. The main parts are:
   - the [concept specifications](design/concepts/), one file per concept;
@@ -79,7 +80,7 @@ bunx --no-install sync-engine check-design design/concepts/*.md design/compositi
 
 - `bun run generate` rewrites the generated read-back of the design, `generated/stillgotit.md`, and the typed HTTP contract, `generated/wire.ts`, from the code. Run it after changing a concept, an endpoint, or a reaction, because `bun run check` fails while these files are out of date.
 - `bun run check` compares each concept's code with its specification, confirms that the generated files are current, and type-checks the server and the interface. It reports 13 concepts because the app uses Preferring twice. It also reports 83 advisories, and the [diagnostic review](design/advisory-review.md) explains their two kinds.
-- `bun test --timeout 15000`, which `bun run test` also runs, runs 1,078 tests in 95 files in about three minutes on an idle machine. Each test file creates its own database, named `stillgotit_test_<id>`, and drops it when it finishes, so the tests never touch the app's data. A run that is interrupted leaves its database behind; when many pile up, the local MongoDB container runs out of open files and every suite fails, so run `bun run db:clean` to drop the leftovers (`bun scripts/drop-test-databases.ts --list` only counts them).
+- `bun test --timeout 15000`, which `bun run test` also runs, runs 1,078 tests in 95 files in three to four minutes on an idle machine. Each test file creates its own database, named `stillgotit_test_<id>`, and drops it when it finishes, so the tests never touch the app's data. A run that is interrupted leaves its database behind; when many pile up, the local MongoDB container runs out of open files and every suite fails, so run `bun run db:clean` to drop the leftovers (`bun scripts/drop-test-databases.ts --list` only counts them).
 - `bun run build` builds the interface into `frontend/dist`.
 - The last command checks the form of the concept specifications, the compositions, and the application stage. The other files in `design/stages/` are earlier stages that bind the same types as `materials.md`, so check each of them on its own; checked together, they report duplicate bindings.
 

@@ -1,5 +1,7 @@
 # P2 diagnostic review
 
+> This review was written in P2 against sync-engine 1.1.0, when the checker reported 40 advisories. P3 moved the project to sync-engine 1.2.0 (`d312f88`), and in P4 the checker reports 83: 66 answer-coverage warnings and 17 list-order notices. They are the same two kinds described below, the checker has not been patched or suppressed in either version, and the counts and the pinned version named in the rest of this page are P2's.
+
 The pinned sync-engine 1.1.0 checker reports 40 advisories: 36 warnings about answer coverage and four notices about list order. These are two categories, not 40 separate confirmed failures.
 
 ## Answer coverage: 36 warnings
@@ -27,7 +29,7 @@ The notice remains because this checker version tests for an `order` property on
 
 Application requests use HTTP or the exported runtime gateway. Both check admission before dispatch. The raw assembled invoker stays internal and assumes these checks have passed. Some invalid calls that bypass the gateway can still time out. Adding refusal paths for those raw calls is outside this P2 change.
 
-Keep `@mit-sdg/sync-engine` and `@mit-sdg/sync-engine-http` pinned at 1.1.0. Do not patch, upgrade, or suppress the checker for these notices. All 40 advisories remain visible. Tests verify the guarded entry paths and stable list order.
+At P2, `@mit-sdg/sync-engine` and `@mit-sdg/sync-engine-http` stayed pinned at 1.1.0, with the checker neither patched nor suppressed, so all 40 advisories remained visible. P3 upgraded both to 1.2.0 without changing that policy. Tests verify the guarded entry paths and stable list order.
 
 ## Evidence
 
