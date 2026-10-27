@@ -394,14 +394,8 @@ async function startPractice() {
   if (refusal) { notice.value = ""; error.value = refusal; await nextTick(); errorBox.value?.focus(); return; }
   await startTask();
 }
-/** The sidebar's "+ New conversation": a new conversation here, once the current step finishes, with the box focused. */
-function newConversation() {
-  const start = async () => { newLesson(); await nextTick(); composerInput.value?.focus(); };
-  if (!busy.value && !recording.value) { void start(); return; }
-  const stop = watch([busy, recording], ([working, speaking]) => { if (!working && !speaking) { stop(); void start(); } });
-}
 watch(() => current.value?.session ?? null, (session) => emit("session", props.skill, session), { immediate: true });
-defineExpose({ startPractice, newConversation });
+defineExpose({ startPractice });
 // Each conversation keeps its own unsent message. A lesson that has just started keeps the box as it is (carryDraft).
 let carryDraft = false;
 watch(selected, (next, previous) => {

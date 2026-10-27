@@ -76,7 +76,7 @@ The charts add no colors; each one comes from the palette above or from `pixel-a
 
 ### The lesson's conversation
 
-- **Conversations stay in the sidebar.** Under the views, the sidebar lists the learner's latest conversations in the course, as ChatGPT lists recent chats. "+ New conversation" comes first, in the dawn text color, and starts a conversation in the open skill, or opens Home's tree when no skill is open. The rows follow, grouped under Today, Yesterday, Earlier this week (since Monday), and Earlier by the day of their last activity in New York time, newest first and at most 40. Each row is the conversation's title in 14 px (a lesson's opening request, shortened, or "Practice · " and the skill), and under it the skill's name and a short time such as "3 h" in the tabs' 12 px meta style, in muted grey so it stays above 4.5:1 on every row background. A small dawn square marks a conversation that is still open. The conversation on screen sits in a dawn capsule (`#DEDAFF`), the shape the views' capsules have. The list scrolls on its own between the views and the sidebar's foot, which holds the Today card and Settings. On phones it folds behind a "Conversations" button with the number of conversations, which opens the list below it like a drawer and closes again once a row is chosen.
+- **Conversations stay in the sidebar.** Under the views, the sidebar lists the learner's latest conversations in the course, as ChatGPT lists recent chats. It is a history list: a new conversation starts from the lesson's tab strip, not from the sidebar. The rows are grouped under Today, Yesterday, Earlier this week (since Monday), and Earlier by the day of their last activity in New York time, newest first and at most 40. Each row is the conversation's title in 14 px (a lesson's opening request, shortened, or "Practice · " and the skill), and under it the skill's name and a short time such as "3 h" in the tabs' 12 px meta style, in muted grey so it stays above 4.5:1 on every row background. A small dawn square marks a conversation that is still open. The conversation on screen sits in a dawn capsule (`#DEDAFF`), the shape the views' capsules have. The list scrolls on its own between the views and the sidebar's foot, which holds the Today card and Settings. On phones it folds behind a "Conversations" button with the number of conversations, which opens the list below it like a drawer and closes again once a row is chosen.
 - **Tabs name each conversation.** Above the thread, each tab shows the conversation's kind and number ("Lesson 2", "Practice 1"), the day it started, and how many turns it has, such as "Oct 25 · 4 turns", with ✓ once it is assessed.
 - **The opening is a card.** The tutor's lesson, or the practice task, sits in a white card with a ring, below the learner's request. A rule labelled "Conversation", in the eyebrow style, separates it from the dialogue that follows.
 - **The learner's messages are bubbles; the tutor's replies are not.** The learner's messages are compact dawn bubbles (`#EEEBFF`) on the right, at most 70% of the thread's width (85% on phones). The tutor's replies run the full width without a bubble: a first line with the leaf in a small dawn tile and "StillGotIt", then the reply at 15 px with a 1.8 line height, and code in mono blocks.
@@ -131,7 +131,7 @@ Text should reach 4.5:1 against its background, and outlines and cells that carr
 | Ink on the sidebar capsules `#C6EAD1`, `#C3E6F4`, `#FADFB5`, `#D9D4FA` | The selected row in the sidebar | 13.99:1, 13.87:1, 14.16:1, 12.82:1 |
 | Ink and muted on the dawn capsule `#DEDAFF` | The title and meta line of the conversation on screen | 13.55:1, 4.75:1 |
 | Muted `#5F5F5C` on `#F1F1EE` | A conversation's meta line under the pointer | 5.66:1 |
-| `#3B2F8F` on white, and on the dawn capsule | "+ New conversation", and the square that marks an open conversation (3:1 needed) | 10.56:1, 7.83:1 |
+| `#3B2F8F` on white, and on the dawn capsule | The square that marks an open conversation (3:1 needed) | 10.56:1, 7.83:1 |
 | `#3B2F8F` on white, and on `#EEEBFF` | A review day in the Memory view's Review by list, and on a row brought forward | 10.56:1, 9.03:1 |
 | Muted `#5F5F5C` on `#EEEBFF` | A skill's topic and "In 27 days" on a row brought forward | 5.48:1 |
 | White on `#1E6F96` | The exam day's plank on Plan | 5.57:1 |
@@ -218,7 +218,6 @@ These are the ratios for the same pairs in the dark theme, with the pairs that m
 | `#E9C38C` on `#342716` | Sand secondary buttons | 8.74:1 |
 | `#C7BFF8` on `#25213E` | Dawn secondary buttons | 8.96:1 |
 | Ink on the sidebar capsules `#2A4A36`, `#1F4456`, `#4A3820` | The selected row in the sidebar | 8.31:1, 8.77:1, 9.44:1 |
-| `#D2CCFA` on `#221F38` | The open lesson under Home in the sidebar | 10.41:1 |
 | White on `#1E6F96` | The exam day's plank on Plan | 5.57:1 |
 | `#F3A588` on `#3B2119` | Error messages and the Due today pill | 7.44:1 |
 | `#EAC57B` on `#382E17` | The New pill | 8.13:1 |
