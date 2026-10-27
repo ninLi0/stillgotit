@@ -27,7 +27,7 @@ describe("responseInput", () => {
 
 describe("estimateTimeline", () => {
   const explanation = (changes: EstimateExplanation["changes"], extra: Partial<EstimateExplanation> = {}): EstimateExplanation => ({
-    policy: "fsrs-1", initialConfidence: 60, startingBasis: "PREVIOUS_DEFINITION", replayStart: start,
+    policy: "fsrs-2", initialConfidence: 60, startingBasis: "PREVIOUS_DEFINITION", replayStart: start,
     evidence: [{ evidence: "case-1", revision: 1 }, { evidence: "case-2", revision: 1 }], ignored: [{ evidence: "case-2", reason: "Too little evidence to change the score." }],
     changes, value: 0, ready: false, basis: "The concept's own sentence.",
     // The memory state is not part of the timeline; these stand-in values are the seed a confidence of 60 gives.
