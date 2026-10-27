@@ -6,7 +6,7 @@ Help learners understand and practice a topic using sources they can inspect.
 
 ## Principle
 
-A learner selects course material and starts a lesson with a free question or a study button. The tutor explains from those sources. The learner asks follow-up questions by voice and can correct transcription errors. The lesson can close without a transcript approval step. Later, the learner completes an independent practice task. A requested hint is recorded as help. The learner reviews the task's voice transcripts together before submitting work for assessment. The saved record preserves the requirements, sources, responses, and assistance used.
+A learner selects course material and starts a lesson with a free question or a study button. The lesson is saved with that request before the tutor answers, so the request is kept even when the tutor is slow or fails. The tutor then explains from those sources, and the explanation becomes the lesson's opening. The learner asks follow-up questions by voice and can correct transcription errors. The lesson can close without a transcript approval step. Later, the learner completes an independent practice task. A requested hint is recorded as help. The learner reviews the task's voice transcripts together before submitting work for assessment. The saved record preserves the requirements, sources, responses, and assistance used.
 
 ## Types
 
@@ -71,8 +71,9 @@ a set of Practice Sessions with
   a hintRequested Flag
 Rule: each session is in exactly one of Lesson Sessions or Practice Sessions. A lesson means a member of Lesson Sessions; a task means a member of Practice Sessions.
 Rule: an owner's open lesson or task must exist, have that owner and kind, and have status OPEN. An unknown session belongs to no owner.
-Rule: the source rules hold when the owner is not blank, the materials are a nonempty set of distinct identities, and the citations are nonempty and distinct, each naming one of those materials and a nonblank location. Ownership of the materials and their belonging to one scope are checked by the application before a session is created, and the location of each citation is checked by the host against the material's readable renditions before the answer reaches this concept.
-Rule: session sources, topic, definition, and opening content never change. Dialogue is append-only while OPEN. CLOSED sessions cannot change.
+Rule: the material rules hold when the owner is not blank and the materials are a nonempty set of distinct identities. The source rules hold when the material rules hold and the citations are nonempty and distinct, each naming one of those materials and a nonblank location. Ownership of the materials and their belonging to one scope are checked by the application before a session is created, and the location of each citation is checked by the host against the material's readable renditions before the answer reaches this concept.
+Rule: a lesson whose explanation is empty is unexplained: it is waiting for the tutor's opening explanation, and its citations are empty. An unexplained lesson takes its explanation and opening citations once, with explainLesson. Its dialogue stays empty until then: respond and answerLesson refuse it, so a learner question never precedes the opening explanation.
+Rule: session sources, topic, definition, and opening content never change, except that an unexplained lesson's empty explanation and citations are set once. Dialogue is append-only while OPEN. CLOSED sessions cannot change.
 Rule: dialogue indices are zero-based and remain stable. checkedVoiceTurns contains only indices of learner RESPONSE turns with channel VOICE. The effective transcript is the latest CORRECTION for that response, or its original text when there is no correction.
 Rule: ordinary lessons need no transcript confirmation. Assessment requires every voice response in the task to have its effective transcript confirmed. Closing a session alone does not submit work for assessment.
 Rule: the tutor adds turns to a task only as hints. Any tutor message in a task is recorded as a HINT, even when it is phrased as a question.
@@ -85,17 +86,29 @@ Rule: blank text is empty or contains only whitespace. New identities are unique
 ## Actions
 
 ```actions
-explain(owner: Learner, topic: Topic, definition: Definition, request: String, explanation: String, materials: MaterialSet, citations: PassageSet) : returns (lesson: Session)
-  where request or explanation is blank
+requestLesson(owner: Learner, topic: Topic, definition: Definition, request: String, materials: MaterialSet) : returns (lesson: Session)
+  where request, topic, or definition is blank
   then
     refuses INVALID_LESSON_CONTENT "Provide a learning request and explanation."
-  where request and explanation are not blank and the source rules do not hold
+  where request, topic, and definition are not blank and the material rules do not hold
   then
     refuses INVALID_LESSON_SOURCES "Use your readable sources from one course and cite their content."
-  where request and explanation are not blank and the source rules hold
+  where request, topic, and definition are not blank and the material rules hold
   then
-    create lesson in Lesson Sessions with owner, topic, definition, materials, citations, request, explanation, status OPEN, and empty dialogue and checkedVoiceTurns
+    create lesson in Lesson Sessions with owner, topic, definition, materials, request, an empty explanation, empty citations, status OPEN, and empty dialogue and checkedVoiceTurns
     returns lesson
+
+explainLesson(owner: Learner, lesson: Session, explanation: String, citations: PassageSet) : returns ()
+  where lesson is not owner's open lesson, or it is not unexplained
+  then
+    refuses LESSON_EXPLANATION_UNAVAILABLE "Choose one of your open lessons that is waiting for its explanation."
+  where lesson is owner's open unexplained lesson, and (explanation is blank or the source rules do not hold for its materials and these citations)
+  then
+    refuses INVALID_LESSON_EXPLANATION "Provide an explanation with references to this lesson's sources."
+  where lesson is owner's open unexplained lesson, explanation is not blank, and the source rules hold for its materials and these citations
+  then
+    set the lesson's explanation to explanation and its citations to citations
+    returns
 
 prepareTask(owner: Learner, topic: Topic, definition: Definition, question: String, criteria: String, materials: MaterialSet, citations: PassageSet, mode: Mode, fresh: Flag) : returns (task: Session)
   where question or criteria is blank
@@ -110,25 +123,25 @@ prepareTask(owner: Learner, topic: Topic, definition: Definition, question: Stri
     returns task
 
 respond(owner: Learner, session: Session, text: String, media: MediaList, channel: Channel) : returns ()
-  where session does not belong to owner or is not OPEN
+  where session does not belong to owner, is not OPEN, or is an unexplained lesson
   then
     refuses RESPONSE_SESSION_UNAVAILABLE "Choose one of your open sessions."
-  where session belongs to owner and is OPEN, and ((text is blank and media is empty) or (channel is VOICE and text is blank))
+  where session belongs to owner, is OPEN, and is not an unexplained lesson, and ((text is blank and media is empty) or (channel is VOICE and text is blank))
   then
     refuses INVALID_LEARNER_RESPONSE "Provide a response. Spoken responses need a transcript."
-  where session belongs to owner and is OPEN, (text is not blank or media is not empty), and (channel is TEXT or text is not blank)
+  where session belongs to owner, is OPEN, and is not an unexplained lesson, (text is not blank or media is not empty), and (channel is TEXT or text is not blank)
   then
     append a learner RESPONSE with text, media, channel, empty citations, time now, and no correction target
     returns
 
 answerLesson(owner: Learner, lesson: Session, text: String, citations: PassageSet, channel: Channel) : returns ()
-  where lesson is not owner's open lesson
+  where lesson is not owner's open lesson, or it is unexplained
   then
     refuses LESSON_ANSWER_UNAVAILABLE "Choose one of your open lessons."
-  where lesson is owner's open lesson, and (text is blank or the source rules do not hold for its materials and these citations)
+  where lesson is owner's open explained lesson, and (text is blank or the source rules do not hold for its materials and these citations)
   then
     refuses INVALID_LESSON_ANSWER "Provide an explanation with references to this lesson's sources."
-  where lesson is owner's open lesson, text is not blank, and the source rules hold for its materials and these citations
+  where lesson is owner's open explained lesson, text is not blank, and the source rules hold for its materials and these citations
   then
     append a tutor EXPLANATION with text, channel, citations, empty media, time now, and no correction target
     returns
@@ -207,7 +220,7 @@ _session(session: Session) : optional (owner: Learner, topic: Topic, definition:
   Returns the session's owner, topic, requirements version, and status. Returns no row for an unknown session.
 
 _lesson(lesson: Session) : optional (request: String, explanation: String)
-  Returns a lesson's opening request and explanation. Returns no row for an unknown session or a practice task.
+  Returns a lesson's opening request and explanation. The explanation is empty while the lesson is unexplained. Returns no row for an unknown session or a practice task.
 
 _task(task: Session) : optional (question: String, criteria: String, mode: Mode, fresh: Flag, hintRequested: Flag)
   Returns a task's saved question, criteria, mode, freshness, and pending hint request. Returns no row for an unknown session or a lesson.
@@ -216,7 +229,7 @@ _sources(session: Session) : many (material: Material)
   Returns the session's material references, ordered by material identity. Returns no rows for an unknown session.
 
 _citations(session: Session) : many (citation: PassageRef)
-  Returns the opening citations, ordered by material identity and then location. Returns no rows for an unknown session. Later citations remain in dialogue turns.
+  Returns the opening citations, ordered by material identity and then location. Returns no rows for an unknown session or an unexplained lesson. Later citations remain in dialogue turns.
 
 _dialogue(session: Session) : many (turnIndex: Number, turn: DialogueTurn)
   Returns all turns in increasing index order, including original speech transcripts, corrections, and hints. Returns no rows for an unknown session or empty dialogue.

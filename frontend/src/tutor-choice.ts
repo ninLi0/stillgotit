@@ -6,7 +6,7 @@ export type TutorSettings = StillGotItHttp["/settings/tutor"]["output"]["setting
 export type TutorModel = TutorSettings["models"][number];
 export type TutorLevel = TutorModel["levels"][number];
 /** The model and thinking level that wrote one tutor answer. */
-export type TutorUsed = StillGotItHttp["/learning/lesson"]["output"]["tutor"];
+export type TutorUsed = StillGotItHttp["/learning/reply"]["output"]["tutor"];
 type SkillData = StillGotItHttp["/learning/read"]["output"]["data"];
 
 /**
@@ -82,13 +82,22 @@ export function answerKey(kind: "session" | "turn" | "judgment", ...parts: (stri
 }
 
 /**
- * The answers in `next` that `previous` did not have: new lessons and practice tasks, new tutor turns (replies and
- * hints), and new tutor judgments. The learner's own turns and corrections are never tutor answers.
+ * Whether a session has its opening from the tutor: a practice task always does, and a lesson once its opening
+ * explanation is saved. A lesson is saved with the learner's request first, so it can be read before its opening arrives.
+ */
+function hasOpening(session: { lesson?: { explanation: string } | null }): boolean {
+  return !session.lesson || !!session.lesson.explanation.trim();
+}
+
+/**
+ * The answers in `next` that `previous` did not have: new lesson openings and practice tasks, new tutor turns (replies
+ * and hints), and new tutor judgments. A lesson's opening is new when its explanation arrives, which can be after the
+ * lesson itself appeared. The learner's own turns and corrections are never tutor answers.
  */
 export function newAnswers(previous: SkillData, next: SkillData): string[] {
   const seen = new Set<string>();
   for (const session of previous.sessions) {
-    seen.add(answerKey("session", session.session));
+    if (hasOpening(session)) seen.add(answerKey("session", session.session));
     for (const item of session.dialogue) seen.add(answerKey("turn", session.session, item.turnIndex));
   }
   for (const item of previous.cases) {
@@ -98,7 +107,7 @@ export function newAnswers(previous: SkillData, next: SkillData): string[] {
   const found: string[] = [];
   const add = (key: string) => { if (!seen.has(key)) found.push(key); };
   for (const session of next.sessions) {
-    add(answerKey("session", session.session));
+    if (hasOpening(session)) add(answerKey("session", session.session));
     for (const item of session.dialogue) if (item.turn.speaker === "TUTOR") add(answerKey("turn", session.session, item.turnIndex));
   }
   for (const item of next.cases) if (item.judgment?.origin === "AI") add(answerKey("judgment", item.judgment.judgment));

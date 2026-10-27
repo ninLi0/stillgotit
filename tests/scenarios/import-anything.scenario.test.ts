@@ -200,12 +200,17 @@ async function confirmedSkill(material: string, title: string): Promise<string> 
   await maya.ok("/courses/skills/confirm", { skill });
   return skill as string;
 }
-/** Asks for a lesson whose answer cites `location`, and returns the answer and the provider request it made. */
-async function lessonCiting(skill: string, location: string) {
+/**
+ * Asks for a lesson whose opening explanation cites `location`, as the study page does: Lesson saves the request and asks
+ * no tutor, and Reply asks the tutor for the opening. `retry` names a saved lesson whose opening failed, so only Reply is
+ * sent again. Returns the lesson, Reply's answer, and the provider requests it made.
+ */
+async function lessonCiting(skill: string, location: string, retry?: string) {
   behaviour.cite = location;
+  const lesson: string = retry ?? (await maya.ok("/learning/lesson", { skill, request: "Explain this part of my material." })).lesson;
   const before = app.google.generations().length;
-  const result = await maya.post("/learning/lesson", { skill, request: "Explain this part of my material." });
-  return { result, calls: app.google.generations().slice(before) };
+  const result = await maya.post("/learning/reply", { studySession: lesson });
+  return { lesson, result, calls: app.google.generations().slice(before) };
 }
 const partsOf = (call: GeminiCall) => call.body!.contents[0].parts as Part[];
 const attachedTo = (call: GeminiCall) => partsOf(call).filter((part) => part.inlineData || part.fileData);
@@ -381,15 +386,19 @@ describe("Import anything the tutor model can read", () => {
     expect(attachedTo(again.calls[0]!)).toEqual([{ fileData: { mimeType: "application/pdf", fileUri: record!.uri } }]);
     expect(app.google.uploads).toHaveLength(1);
 
-    // Gemini reports its copy gone: the learner is told in the app's voice, nothing is saved, and the reference is forgotten.
+    // Gemini reports its copy gone: the learner is told in the app's voice, nothing from the answer is saved, and the
+    // reference is forgotten. The lesson itself was saved with its request before the tutor was asked, and it waits for its
+    // opening explanation.
     const lessons = (await sessionsOf(large.skill)).length;
     behaviour.tutorFailure = googleError(403, { status: "PERMISSION_DENIED", message: "You do not have permission to access the File file2 or it may not exist." });
-    expect((await lessonCiting(large.skill, `${l}/page/1`)).result).toEqual({ status: 400, body: { error: "INVALID_REQUEST", detail: COPY_EXPIRED } });
-    expect(await sessionsOf(large.skill)).toHaveLength(lessons);
+    const failed = await lessonCiting(large.skill, `${l}/page/1`);
+    expect(failed.result).toEqual({ status: 400, body: { error: "INVALID_REQUEST", detail: COPY_EXPIRED } });
+    expect(await sessionsOf(large.skill)).toHaveLength(lessons + 1);
+    expect((await sessionsOf(large.skill)).at(-1)).toMatchObject({ citations: [], lesson: { request: "Explain this part of my material.", explanation: "" } });
     expect(await references().countDocuments()).toBe(0);
 
-    // Trying again uploads the file again and references the new copy.
-    const retried = await lessonCiting(large.skill, `${l}/page/1`);
+    // Trying again asks for the same lesson's opening, uploads the file again, and references the new copy.
+    const retried = await lessonCiting(large.skill, `${l}/page/1`, failed.lesson);
     expect(retried.result.status).toBe(200);
     expect(app.google.uploads).toHaveLength(2);
     const [replacement] = await references().find().toArray();
@@ -409,7 +418,9 @@ describe("Import anything the tutor model can read", () => {
     for (const [item, location] of refused) {
       const before = await sessionsOf(item.skill);
       expect((await lessonCiting(item.skill, location)).result, location).toEqual({ status: 400, body: { error: "INVALID_REQUEST", detail: UNUSABLE } });
-      expect(await sessionsOf(item.skill)).toEqual(before);
+      // Nothing from the refused answer is saved: the new lesson keeps only its request and waits for its explanation.
+      expect(await sessionsOf(item.skill), location).toEqual([...before,
+        expect.objectContaining({ citations: [], lesson: expect.objectContaining({ explanation: "" }), dialogue: [] })]);
     }
   }, JOURNEY_MS);
 

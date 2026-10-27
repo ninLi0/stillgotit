@@ -6,6 +6,7 @@ import type { CourseTutor } from "../src/host/tutor.ts";
 import { rm } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { resolve } from "node:path";
+import { openLesson } from "./fixtures/open-lesson.ts";
 const ORIGIN = "http://localhost:5173", cleanups: (() => Promise<void>)[] = [];
 afterAll(async () => { for (const cleanup of cleanups.reverse()) await cleanup(); });
 
@@ -81,8 +82,9 @@ const listed = (answer: { sessions: { studySession: string }[] }) => answer.sess
 test("the owner finishes an open lesson: it reads as closed with its dialogue, leaves Continue, and cannot be finished or used again", async () => {
   const app = await setup(), { learner, user, course, skill } = await learningFixture(app, "finisher");
   await learner.ok("/learning/confidence", { skill, confidence: 50 });
-  const { lesson } = await learner.ok("/learning/lesson", { skill, request: "Explain why the inner dimensions must match." });
+  const { lesson } = await openLesson(learner.ok, { skill, request: "Explain why the inner dimensions must match." });
   await learner.ok("/learning/question", { studySession: lesson, text: "So a 2×3 matrix times a 3×2 matrix works?", dialogueLength: 0 });
+  // The other lesson is still waiting for its opening explanation. It can be continued and finished like any lesson.
   const { lesson: other } = await learner.ok("/learning/lesson", { skill, request: "Explain why order matters." });
   expect(listed(await learner.ok("/learning/continue", { course }))).toEqual([lesson, other]);
   const before = await learner.ok("/learning/read", { skill });

@@ -26,8 +26,10 @@ const ResponseReady = former("admit learner work in (studySession)", ({ owner, s
 const QuestionReady = former("admit a question in (studySession)", ({ owner, studySession, text, channel, attachments, dialogueLength }, { data, sources, currentDialogue }) => where(
   ...learnerWork(owner, studySession, { text, channel, attachments, dialogueLength, data, sources, currentDialogue }), Tutoring._lesson({ lesson: studySession }),
 ).form({ allowed: true })).optional();
+// Reply asks for an unexplained lesson's opening or for the answer to an unanswered question; lessonAwaitsTutor holds in
+// exactly those two cases, which the endpoint states with lessonUnexplained and hasLessonQuestion.
 const ReplyReady = former("admit a tutor reply in (studySession)", ({ owner, studySession }, { data }) => where(
-  R.SessionSources({ owner, studySession }).is({ data }), C.hasLessonQuestion({ data }),
+  R.SessionSources({ owner, studySession }).is({ data }), C.lessonAwaitsTutor({ data }),
 ).form({ allowed: true })).optional();
 const HintReady = former("admit requested help in (studySession)", ({ owner, studySession }) => where(
   R.OpenSession({ owner, studySession }), Tutoring._task({ task: studySession }),

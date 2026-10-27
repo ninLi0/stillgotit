@@ -20,6 +20,16 @@ describe("Which answers get a tutor label", () => {
     expect(choice.newAnswers(previous as never, next as never).sort()).toEqual(["judgment:j2", "session:s2", "turn:s1:3"]);
   });
 
+  test("a lesson's opening is new when its explanation arrives, not when the lesson is saved with its request", () => {
+    const lesson = (explanation: string) => ({ ...session("s1", []), lesson: { request: "Why?", explanation } });
+    const empty = { sessions: [], cases: [] }, waiting = { sessions: [lesson("")], cases: [] }, explained = { sessions: [lesson("Rows meet columns.")], cases: [] };
+    expect(choice.newAnswers(empty as never, waiting as never)).toEqual([]);
+    expect(choice.newAnswers(waiting as never, explained as never)).toEqual(["session:s1"]);
+    expect(choice.newAnswers(explained as never, explained as never)).toEqual([]);
+    // A lesson that arrives already explained, as after a reload, is new at once.
+    expect(choice.newAnswers(empty as never, explained as never)).toEqual(["session:s1"]);
+  });
+
   test("a manual correction after an AI judgment is not labelled, and an identical read finds nothing new", () => {
     const before = { sessions: [], cases: [{ case: "c1", judgment: judgment("j1", "AI"), history: [judgment("j1", "AI")] }] };
     const corrected = { sessions: [], cases: [{ case: "c1", judgment: judgment("j2", "MANUAL"), history: [judgment("j1", "AI"), judgment("j2", "MANUAL")] }] };

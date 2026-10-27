@@ -42,7 +42,11 @@ const response = ref(""), channel = ref<"TEXT" | "VOICE">("TEXT"), attachments =
 const reviewed = ref(false), unseen = ref(true), outsideHelp = ref(false), reason = ref(""), correction = ref<NonNullable<SkillData["cases"][number]["judgment"]>["result"]>("SLIP"), fullGate = ref(false);
 const current = computed(() => freshLesson.value ? undefined : data.value?.sessions.find((session) => session.session === selected.value));
 const currentCases = computed(() => data.value?.cases.filter((item) => item.task === selected.value) ?? []);
-const canSend = computed(() => !busy.value && !recording.value && (props.aiAvailable || !!current.value?.task) && (!!response.value.trim() || (attachments.value.length > 0 && !!current.value)));
+// A lesson is saved with the learner's request before the tutor answers. Until its opening explanation arrives it is
+// unexplained: the thread shows the request and, in the explanation's place, the tutor's dots or "Retry tutor reply",
+// and nothing can be sent in it.
+const unexplained = computed(() => !!current.value?.lesson && !current.value.lesson.explanation.trim());
+const canSend = computed(() => !busy.value && !recording.value && !unexplained.value && (props.aiAvailable || !!current.value?.task) && (!!response.value.trim() || (attachments.value.length > 0 && !!current.value)));
 const unsent = new Map<string, { text: string; channel: "TEXT" | "VOICE"; attachments: Attachment[] }>();
 const previews = new Set<string>();
 const speechEdits = ref<Record<number, string>>({});
@@ -101,16 +105,26 @@ function takeDraft() {
     response.value = since.trim() ? `${text}\n\n${since}` : text; attachments.value = [...sent, ...attachments.value]; channel.value = ch; pending.value = null;
   } };
 }
+/**
+ * The lesson is saved with the learner's request at once, before the tutor answers, so leaving the page or a failed
+ * answer never loses it: the page shows the saved request and the sidebar lists the lesson while the tutor's dots wait.
+ * The opening explanation is then asked for with Reply. If saving fails, the draft comes back; once the lesson is saved,
+ * the draft is its request, and a failed opening leaves "Retry tutor reply" in the thread.
+ */
 async function startLesson() {
   const draft = takeDraft();
   await act(async () => {
+    let saved = false;
     try {
-      const result = await timedAnswer(async () => unwrap(await api.learning.lesson({ skill: props.skill, request: draft.text.trim() })));
+      const result = unwrap(await api.learning.lesson({ skill: props.skill, request: draft.text.trim() }));
+      saved = true;
       // What the learner wrote while the lesson was being prepared stays in the box of the lesson it now belongs to.
       if (selected.value !== result.lesson) carryDraft = true;
       freshLesson.value = false; selected.value = result.lesson;
+      await load(); emit("changed");
+      await timedAnswer(async () => unwrap(await api.learning.reply({ studySession: result.lesson })));
     }
-    catch (problem) { draft.restore(); throw problem; }
+    catch (problem) { if (!saved) draft.restore(); throw problem; }
     finally { pending.value = null; }
   });
 }
@@ -491,17 +505,18 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
               <div class="prompt-choices"><button :disabled="busy" @click="choosePrompt('Explain this skill with a worked example.')">Show me an example</button><button :disabled="busy" @click="choosePrompt('Explain why this method works, using a concrete example.')">Help me understand why</button><button :disabled="busy" @click="choosePrompt('Walk me through guided practice. Ask one question at a time.')">Guide me through practice</button></div>
             </div>
             <template v-if="current">
-              <!-- The opening: the learner's request, then the lesson or practice task in a card. A divider separates it from the dialogue. -->
+              <!-- The opening: the learner's request, then the lesson or practice task in a card. A divider separates it from the dialogue.
+                   An unexplained lesson has no card yet: the tutor's dots or the retry row below take its place. -->
               <div class="opening">
                 <div v-if="current.lesson" class="message from-you"><span class="sr-only">You</span><MarkdownText class="prose" kind="message" :text="current.lesson.request" /></div>
-                <article class="message from-tutor opening-card" :class="{ latest: !current.dialogue.length }" :title="openingTime?.label">
+                <article v-if="!unexplained" class="message from-tutor opening-card" :class="{ latest: !current.dialogue.length }" :title="openingTime?.label">
                   <div class="speaker-row"><span class="speaker"><span class="avatar"><PixelIcon name="leaf" :size="16" /></span> StillGotIt<span v-if="openingTime" class="sr-only">, <time :datetime="openingTime.iso">{{ openingTime.label }}</time></span><span v-if="current.task" class="tag task">Practice task</span></span></div>
                   <MarkdownText class="prose" :text="current.lesson?.explanation || current.task?.question || ''" />
                   <SourcesUsed v-if="current.citations.length" :key="current.session" compact :citations="current.citations" :titles="materialTitles" :id-prefix="`passage-${current.session}`" @open="openSource" />
                   <div class="reply-foot"><ReplyMeta :seconds="measured[answerKey('session', current.session)]" :sources="current.citations.length" :tutor="answerLabel('session', current.session)" /><ReplyActions :message-key="`${current.session}:opening`" :text="current.lesson?.explanation || current.task?.question || ''" :what="current.lesson ? 'lesson' : 'practice question'" describedby="listen-reason" /></div>
                 </article>
               </div>
-              <div v-if="current.dialogue.length || pending" class="thread-divider" role="separator" aria-label="Conversation"><span aria-hidden="true">Conversation</span></div>
+              <div v-if="(current.dialogue.length || pending) && !unexplained" class="thread-divider" role="separator" aria-label="Conversation"><span aria-hidden="true">Conversation</span></div>
               <article v-for="(item, position) in current.dialogue" :key="item.turnIndex" class="message" :class="[item.turn.speaker === 'LEARNER' ? 'from-you' : 'from-tutor', { latest: position === current.dialogue.length - 1 }]" :title="messageTime(item.turn.at) || undefined">
                 <template v-if="item.turn.speaker === 'TUTOR'">
                   <div class="speaker-row"><span class="speaker"><span class="avatar"><PixelIcon name="leaf" :size="16" /></span> StillGotIt<span v-if="messageTime(item.turn.at)" class="sr-only">, <time :datetime="item.turn.at">{{ messageTime(item.turn.at) }}</time></span><span v-if="item.turn.purpose === 'HINT'" class="tag hint-tag">Hint</span><span v-else-if="item.turn.purpose === 'CORRECTION'" class="tag">Transcript correction</span></span></div>
@@ -512,8 +527,8 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
                   <MarkdownText class="prose" kind="message" :text="item.turn.text" /></template>
                 <p v-for="(file, fileIndex) in item.turn.media" :key="file.file" class="attachment-label"><span class="attach-thumb" aria-hidden="true" />{{ item.turn.media.length > 1 ? `Attachment ${fileIndex + 1} of ${item.turn.media.length}` : 'Attachment' }} · {{ file.name }}</p>
                 <div v-if="item.turn.speaker === 'TUTOR'" class="reply-foot"><ReplyMeta :seconds="replySeconds(current, item.turnIndex)" :sources="item.turn.citations.length" :tutor="answerLabel('turn', current.session, item.turnIndex)" /><ReplyActions :message-key="`${current.session}:${item.turnIndex}`" :text="item.turn.text" :what="item.turn.purpose === 'HINT' ? 'hint' : 'tutor reply'" describedby="listen-reason" /></div></article>
-              <!-- A lesson question without a reply: the retry sits where the tutor's reply would be. -->
-              <div v-if="current.lesson && current.status === 'OPEN' && current.dialogue.at(-1)?.turn.speaker === 'LEARNER' && !pending" class="retry-row"><span class="avatar"><PixelIcon name="leaf" :size="16" /></span><button class="secondary dawn reply-retry" :disabled="busy || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="retryReply"><span aria-hidden="true">↻</span>Retry tutor reply</button></div>
+              <!-- A lesson question without a reply, or a lesson without its opening explanation: the retry sits where the tutor's answer would be. -->
+              <div v-if="current.lesson && current.status === 'OPEN' && (current.dialogue.at(-1)?.turn.speaker === 'LEARNER' || unexplained) && !pending" class="retry-row"><span class="avatar"><PixelIcon name="leaf" :size="16" /></span><button class="secondary dawn reply-retry" :disabled="busy || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="retryReply"><span aria-hidden="true">↻</span>Retry tutor reply</button></div>
               <div v-if="current.task && current.status === 'OPEN' && current.dialogue.some(item => item.turn.speaker === 'LEARNER' && item.turn.purpose === 'RESPONSE')" class="review-step">
                 <button class="secondary dawn" :disabled="busy || recording" :aria-expanded="reviewOpen" @click="reviewOpen = !reviewOpen">{{ reviewOpen ? 'Close review' : 'Review and assess my work' }}</button>
                 <div v-if="reviewOpen" class="attempt-review">
@@ -538,7 +553,8 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
             </template>
             <div role="status"><p v-if="notice && !busy" ref="noticeBox" class="notice" tabindex="-1">{{ notice }}</p></div>
             <div role="alert"><p v-if="error" ref="errorBox" class="error" tabindex="-1">{{ error }}</p></div>
-            <article v-if="pending" class="message from-you pending" aria-live="polite"><span class="sr-only">You</span><MarkdownText class="prose" kind="message" :text="pending.text" /><p v-for="(name, fileIndex) in pending.files" :key="fileIndex" class="attachment-label"><span class="attach-thumb" aria-hidden="true" />Attachment · {{ name }}</p></article>
+            <!-- A new lesson's request shows as its saved request once the lesson exists, so only the tutor's dots wait below it. -->
+            <article v-if="pending && !unexplained" class="message from-you pending" aria-live="polite"><span class="sr-only">You</span><MarkdownText class="prose" kind="message" :text="pending.text" /><p v-for="(name, fileIndex) in pending.files" :key="fileIndex" class="attachment-label"><span class="attach-thumb" aria-hidden="true" />Attachment · {{ name }}</p></article>
             <article v-if="pending?.reply" class="message from-tutor thinking" aria-hidden="true"><div class="speaker-row"><span class="speaker"><span class="avatar"><PixelIcon name="leaf" :size="16" /></span> StillGotIt</span></div><p class="prose dots"><span>·</span><span>·</span><span>·</span></p><span class="waited">{{ waited }}</span></article>
             <!-- While the tutor's dots show, they are the visible sign of work; the sentence stays for screen readers. -->
             <p v-if="busy" class="working" :class="{ 'sr-only': pending?.reply }" role="status"><PixelIcon name="leaf" :size="18" /> Working on it…</p>

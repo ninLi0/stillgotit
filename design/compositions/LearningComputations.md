@@ -39,11 +39,17 @@ gradeRequest(selected: Library.SourceRecords, data: AssessmentReviewing.CaseReco
 hasLessonQuestion(data: GroundedTutoring.StudyRecord) : Flag
   Requires a lesson whose latest turn is a learner response.
 
+lessonUnexplained(data: GroundedTutoring.StudyRecord) : Flag
+  Requires a lesson whose explanation is empty: it was saved with the learner's request and still waits for the tutor's opening explanation. Such a lesson has no dialogue, so this and hasLessonQuestion never hold together.
+
+lessonAwaitsTutor(data: GroundedTutoring.StudyRecord) : Flag
+  Requires a lesson that waits for the tutor: lessonUnexplained or hasLessonQuestion holds. Request admission uses it for Reply, whose two cases these are.
+
 itemSubject(candidate: StudyPlanning.Candidate) : ItemSubject
   Extracts the activity's saved skill and requirement version for validation.
 
 lessonRequest(selected: Library.SourceRecords, context: SkillContext, request: String) : TutorRequest
-  Prepares the selected outcome and learner question for a cited lesson.
+  Prepares the selected outcome and learner question for a cited lesson's opening explanation.
 
 planDetail(schedule: StudyPlanning.ScheduleValue) : PlanDetail
   Selects the active plan and totals scheduled and deferred minutes.

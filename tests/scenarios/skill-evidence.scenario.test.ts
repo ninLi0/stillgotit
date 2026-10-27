@@ -10,6 +10,7 @@ import { failureText } from "../../frontend/src/api.ts";
 import { planDay, sourceLabel } from "../../frontend/src/labels.ts";
 import { PendingAdjustment } from "../../frontend/src/pending-adjustment.ts";
 import { R, daysBetween, gradeOf, leftAlone, review, seed } from "../fixtures/fsrs.ts";
+import { openLesson } from "../fixtures/open-lesson.ts";
 
 // One learner's journey through the brief "Evidence behind each skill's estimate", end to end through HTTP.
 // The tests run in order and share one application, so each step starts where the previous one ended.
@@ -261,7 +262,7 @@ describe("Evidence behind each skill's estimate", () => {
   }, 60_000);
 
   test("Opening a source shows the text at the cited location and names the file and location as the labels do today (\"Lecture 4 · Page 1\").", async () => {
-    const { lesson } = await learner.ok("/learning/lesson", { skill, request: "Explain why the inner dimensions must match." });
+    const { lesson } = await openLesson(learner.ok, { skill, request: "Explain why the inner dimensions must match." });
     const session = (await read()).sessions.find((item: { session: string }) => item.session === lesson);
     const [citation] = session.citations as { material: string; location: string }[];
     expect(citation!.material).toBe(lessonMaterial);
@@ -281,7 +282,7 @@ describe("Evidence behind each skill's estimate", () => {
     const whiteboard = await learner.upload(course, "Whiteboard", photo("whiteboard.png"));
     const { skill: reading } = await learner.ok("/courses/skills/propose", { proposalKey: crypto.randomUUID(), unit, material: whiteboard, title: "Read the whiteboard", outcome: "Read a worked product", gate: "Explain each step" });
     await learner.ok("/courses/skills/confirm", { skill: reading });
-    const { lesson } = await learner.ok("/learning/lesson", { skill: reading, request: "Walk me through the whiteboard." });
+    const { lesson } = await openLesson(learner.ok, { skill: reading, request: "Walk me through the whiteboard." });
     const session = (await learner.ok("/learning/read", { skill: reading })).sessions.find((item: { session: string }) => item.session === lesson);
     const [citation] = session.citations as { material: string; location: string }[];
     expect(citation!.material).toBe(whiteboard);

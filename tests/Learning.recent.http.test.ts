@@ -89,6 +89,11 @@ test("Recent lists every lesson and practice session in the course, newest activ
     title: "Explain why the inner dimensions must match when two…", startedAt: sessions[0]!.startedAt, lastActivity: sessions[0]!.startedAt }]);
   expect(Date.parse(sessions[0]!.startedAt!)).toBeGreaterThanOrEqual(before - 1000);
   expect(Date.parse(sessions[0]!.startedAt!)).toBeLessThanOrEqual(after + 1000);
+  // The lesson is listed as soon as its request is saved, before the tutor's opening explanation. The opening is not a
+  // dialogue turn, so explaining the lesson leaves its row unchanged.
+  const waiting = sessions;
+  await learner.ok("/learning/reply", { studySession: lesson });
+  expect((await learner.ok("/learning/recent", { course })).sessions).toEqual(waiting);
 
   // A submitted practice attempt is closed and still listed, titled by its skill; it started after the lesson.
   await learner.ok("/learning/confidence", { skill, confidence: 50 });
@@ -126,7 +131,10 @@ test("Recent answers at most 40 sessions, the most recently active ones", async 
   expect(sessions).toHaveLength(40);
   // The two oldest lessons are left out.
   expect(ids(sessions)).toEqual(lessons.slice(2).reverse());
-  // A new turn in the oldest lesson brings it back at the top, and the oldest of the rest leaves.
+  // A new turn in the oldest lesson brings it back at the top, and the oldest of the rest leaves. Its opening
+  // explanation, which a turn needs first, is not a turn and moves nothing.
+  await learner.ok("/learning/reply", { studySession: lessons[0] });
+  expect(ids((await learner.ok("/learning/recent", { course })).sessions)).toEqual(lessons.slice(2).reverse());
   await learner.ok("/learning/respond", { studySession: lessons[0], text: "One more question.", dialogueLength: 0 });
   ({ sessions } = await learner.ok("/learning/recent", { course }));
   expect(sessions).toHaveLength(40);

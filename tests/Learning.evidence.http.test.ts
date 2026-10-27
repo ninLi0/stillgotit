@@ -10,6 +10,7 @@ import type { CourseTutor } from "../src/host/tutor.ts";
 import { rm } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { resolve } from "node:path";
+import { openLesson } from "./fixtures/open-lesson.ts";
 const ORIGIN = "http://localhost:5173", DAY = 86_400_000, cleanups: (() => Promise<void>)[] = [];
 afterAll(async () => { for (const cleanup of cleanups.reverse()) await cleanup(); });
 
@@ -261,7 +262,7 @@ test("Respond and Question save every attachment in one learner turn, in the ord
   await learner.ok("/learning/respond", { studySession: task, text: "My two pages.", attachments: [second, first], dialogueLength: 0 });
   // An empty list with text succeeds.
   await learner.ok("/learning/respond", { studySession: task, text: "And a note.", attachments: [], dialogueLength: 1 });
-  const { lesson } = await learner.ok("/learning/lesson", { skill, request: "Explain products." });
+  const { lesson } = await openLesson(learner.ok, { skill, request: "Explain products." });
   await learner.ok("/learning/question", { studySession: lesson, text: "Is my working right?", attachments: [first, second], dialogueLength: 0 });
   const { sessions } = await learner.ok("/learning/read", { skill });
   const dialogue = (session: string) => sessions.find((item: { session: string }) => item.session === session).dialogue;
@@ -286,7 +287,7 @@ test("a duplicate, foreign, or other-course attachment declines the whole respon
   const { material: foreign } = await outsider.ok("/courses/materials/add", upload(foreignCourse, "theirs.md", "Someone else's work."));
   await learner.ok("/learning/confidence", { skill, confidence: 50 });
   const { task } = await learner.ok("/learning/task", { skill });
-  const { lesson } = await learner.ok("/learning/lesson", { skill, request: "Explain products." });
+  const { lesson } = await openLesson(learner.ok, { skill, request: "Explain products." });
   const refused = [{ attachments: [photo, photo] }, { attachments: [photo, foreign] }, { attachments: [elsewhere] }, { attachments: ["missing"] }, { text: "  ", attachments: [] }];
   for (const change of refused) {
     expect(await learner.post("/learning/respond", { studySession: task, text: "My work.", dialogueLength: 0, ...change }), JSON.stringify(change))
@@ -389,7 +390,7 @@ test("another learner's real skill, draft, sessions, case, and material are refu
   const app = await setup(), { learner, user, course, unit, skill, material } = await learningFixture(app, "ids-owner");
   const other = app.browser(), outsider = await other.signIn("ids-outsider");
   await learner.ok("/learning/confidence", { skill, confidence: 50 });
-  const { lesson } = await learner.ok("/learning/lesson", { skill, request: "Explain why the dimensions matter." });
+  const { lesson } = await openLesson(learner.ok, { skill, request: "Explain why the dimensions matter." });
   await learner.ok("/learning/question", { studySession: lesson, text: "Why does order matter?", dialogueLength: 0 });
   const assessed = await practise(learner, skill);
   const { task } = await learner.ok("/learning/task", { skill });
