@@ -32,8 +32,9 @@ import type { AskAboutPage, HomeView, OpenSource, ViewerSkill, ViewSkill, ViewUn
 
 // The shell (sidebar + app card) lives here because the views do; App.vue fills the course switcher slot and owns
 // Settings, the Tutor dialog and the Home view preference.
-const props = defineProps<{ course: Course; username: string; homeView: HomeView }>();
-const emit = defineEmits<{ settings: []; tutor: []; "update:homeView": [view: HomeView]; progress: [] }>();
+// startOnPlan opens the Plan view instead of the view saved for this course; openPlan asks App.vue to switch to another course's Plan view.
+const props = defineProps<{ course: Course; username: string; homeView: HomeView; startOnPlan?: boolean }>();
+const emit = defineEmits<{ settings: []; tutor: []; "update:homeView": [view: HomeView]; progress: []; openPlan: [course: string] }>();
 const view = ref<"home" | "setup" | "chat" | "plan" | "memory">("home");
 const viewKey = `stillgotit-view:${props.course.course}`;
 const sourceSelectionKey = `stillgotit-source:${props.course.course}`;
@@ -221,7 +222,11 @@ async function confirm(skill: string) {
 }
 onMounted(() => task(async () => {
   try { const saved = JSON.parse(sessionStorage.getItem(viewKey) ?? "null"); if (saved && ["home", "setup", "chat", "plan", "memory"].includes(saved.view)) { view.value = saved.view; selectedSkill.value = typeof saved.skill === "string" ? saved.skill : null; } } catch { /* Open Home if there is no saved view. */ }
+  const onPlan = props.startOnPlan;
+  if (onPlan) view.value = "plan";
   await nextTick(); viewRestored = true;
+  // The control that opened this course belonged to the course before it, so focus starts at the Plan heading.
+  if (onPlan) document.querySelector<HTMLElement>("#plan-title")?.focus();
   pendingDraftCount.value = draftSaves.read().length; await refresh(); await refreshAI();
 }));
 
@@ -541,7 +546,7 @@ watch(view, (now) => { if (now === "setup" && material.value && !preview.value) 
 
     <section v-show="view === 'plan'" class="plan-view" aria-labelledby="plan-title">
       <h1 id="plan-title" class="sr-only" tabindex="-1">Plan</h1>
-      <StudyPlanner ref="planner" :course="course.course" :revision="revision + planRevision" @select="openSkill" />
+      <StudyPlanner ref="planner" :course="course.course" :revision="revision + planRevision" @select="openSkill" @open-plan="(other) => emit('openPlan', other)" />
     </section>
 
     <section v-show="view === 'setup'" class="setup-view">

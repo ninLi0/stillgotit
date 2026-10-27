@@ -450,13 +450,13 @@ Concrete types:
 ## Computations
 
 - `attemptIsReady(data: GroundedTutoring.StudyRecord, dialogueLength: Number, reviewed: Flag, unseen: Flag, outsideHelp: Flag) : Flag` — [Learning computations](../design/compositions/LearningComputations.md), line 105.
-- `beginAllowed(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows, skill: SkillMapping.Skill, urgent: Flag) : Flag` — [Daily planning flows](../design/compositions/Planning.md), line 106.
+- `beginAllowed(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows, skill: SkillMapping.Skill, urgent: Flag) : Flag` — [Daily planning flows](../design/compositions/Planning.md), line 114.
 - `carriedEstimate(tracks: MasteryEstimating.ProgressRows, skill: SkillMapping.Skill, current: SkillMapping.Version) : CarriedEstimate` — [Courses, materials, and skills](../design/compositions/Courses.md), line 58.
 - `choiceOffered(choice: TutorChoice) : Flag` — [Settings](../design/compositions/Settings.md), line 44.
 - `correctionNote(reason: String) : AttemptClarification` — [Learning computations](../design/compositions/LearningComputations.md), line 21.
 - `courseScore(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows) : CourseScore` — [Shared learning reads](../design/compositions/LearningReads.md), line 128.
-- `coveredSkillsConfirmed(covered: StudyPlanning.SubjectSet, skills: SkillMapping.SkillMapRows) : Flag` — [Daily planning flows](../design/compositions/Planning.md), line 100.
-- `cutKey(cut: StudyPlanning.CutValue) : String` — [Daily planning flows](../design/compositions/Planning.md), line 112.
+- `coveredSkillsConfirmed(covered: StudyPlanning.SubjectSet, skills: SkillMapping.SkillMapRows) : Flag` — [Daily planning flows](../design/compositions/Planning.md), line 108.
+- `cutKey(cut: StudyPlanning.CutValue) : String` — [Daily planning flows](../design/compositions/Planning.md), line 120.
 - `defaultChoice() : TutorChoice` — [Settings](../design/compositions/Settings.md), line 32.
 - `defaultHomeView() : HomeView` — [Settings](../design/compositions/Settings.md), line 148.
 - `dialogueIsCurrent(data: GroundedTutoring.StudyRecord, dialogueLength: Number) : Flag` — [Learning computations](../design/compositions/LearningComputations.md), line 24.
@@ -477,7 +477,7 @@ Concrete types:
 - `hasGradedRows(answer: TutorAnswer) : Flag` — [Importing graded work](../design/compositions/Importing.md), line 115.
 - `hasLessonQuestion(data: GroundedTutoring.StudyRecord) : Flag` — [Learning computations](../design/compositions/LearningComputations.md), line 39.
 - `homeViewOffered(view: String) : Flag` — [Settings](../design/compositions/Settings.md), line 142.
-- `itemOrder(day: Date, candidate: StudyPlanning.Candidate) : String` — [Daily planning flows](../design/compositions/Planning.md), line 109.
+- `itemOrder(day: Date, candidate: StudyPlanning.Candidate) : String` — [Daily planning flows](../design/compositions/Planning.md), line 117.
 - `itemSubject(candidate: StudyPlanning.Candidate) : ItemSubject` — [Learning computations](../design/compositions/LearningComputations.md), line 42.
 - `leftAloneDays(explanation: MasteryEstimating.EstimateExplanation, at: DateTime) : LeftAloneDays` — [Shared learning reads](../design/compositions/LearningReads.md), line 107.
 - `leftAlonePath(explanation: MasteryEstimating.EstimateExplanation, at: DateTime, u0: Number, v1: Number, v3: Number, v7: Number, v14: Number, v30: Number, v60: Number, v90: Number) : LeftAlonePath` — [Shared learning reads](../design/compositions/LearningReads.md), line 110.
@@ -517,7 +517,7 @@ Concrete types:
 - `treeKindOffered(kind: String) : Flag` — [Courses, materials, and skills](../design/compositions/Courses.md), line 82.
 - `tutorCatalog() : TutorCatalog` — [Settings](../design/compositions/Settings.md), line 29.
 - `tutorStatus(saved: Flag, offered: Flag) : String` — [Settings](../design/compositions/Settings.md), line 47.
-- `urgentExamItem(schedule: StudyPlanning.ScheduleValue, candidate: StudyPlanning.Candidate) : Flag` — [Daily planning flows](../design/compositions/Planning.md), line 103.
+- `urgentExamItem(schedule: StudyPlanning.ScheduleValue, candidate: StudyPlanning.Candidate) : Flag` — [Daily planning flows](../design/compositions/Planning.md), line 111.
 - `withChoice(request: TutorRequest, choice: TutorChoice) : TutorRequest` — [Settings](../design/compositions/Settings.md), line 84.
 
 ## Views
@@ -603,8 +603,8 @@ Authored path: `Reads.OpenSession`.
 Authored path: `Reads.CanReplan`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 71.
 - Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 70.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 31.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 37.
 - Covered by [Progress reactions](../design/compositions/Progress.md), line 35.
 
 ```view
@@ -643,8 +643,10 @@ Authored path: `Reads.SessionSources`.
 
 Authored path: `Planning.ActivityInProgress`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 71.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 29.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 31.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 17.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 27.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 35.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 37.
 - Covered by [Progress reactions](../design/compositions/Progress.md), line 35.
 
 ```view
@@ -698,7 +700,7 @@ Authored path: `Importing.GradedMaterial`.
 ### (owner) may start (item) in (course)
 
 Authored path: `Planning.StartAllowed`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 73.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 79.
 
 ```view
 (owner) may start (item) in (course) — inputs (owner, course, item); outputs (); bindings (candidate, skill, definition, skills, tracks, schedule, urgent)
@@ -813,6 +815,20 @@ review inputs for (owner) in (course) — inputs (owner, course); outputs (candi
     MasteryEstimating._progress (learner: owner) has (tracks)
     StudyPlanning._schedule (owner, scope: course) has (schedule)
     (basis, candidates, explanation, horizonEnd) is planRequest (schedule, skills, tracks)
+```
+
+### the activity in progress of (owner)
+
+Authored path: `Planning.BlockingActivity`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 17.
+
+```view
+the activity in progress of (owner) — inputs (owner); outputs (course, courseTitle, item, skillTitle); bindings (candidate, skill) — answers at most one (course, courseTitle, item, skillTitle)
+  where
+    SkillMapping._courses (owner) has (course, title: courseTitle)
+    StudyPlanning._next (owner, scope: course) has (candidate, item, status: "IN_PROGRESS")
+    (skill) is itemSubject (candidate)
+    SkillMapping._skill (skill) has (title: skillTitle)
 ```
 
 ### the current context of (skill) for (owner)
@@ -1310,6 +1326,22 @@ Former "the activities of the proposal awaiting confirmation for (owner) in (cou
       candidate
       day
       item
+```
+
+### the activity in progress that keeps the plans of (owner) from changing
+
+Authored path: `Planning.Blocking`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 7.
+
+```former
+Former "the activity in progress that keeps the plans of (owner) from changing" — inputs (owner); bindings (course, courseTitle, item, skillTitle); promises exactly one record — forms:
+  each view "the activity in progress of (owner)" with (owner) has (course, courseTitle, item, skillTitle)
+    arranged by item
+    form a record of
+      course
+      courseTitle
+      item
+      skillTitle
 ```
 
 ### the confidence in each active course of (owner)
@@ -6859,8 +6891,8 @@ then
 ### Planning.Begin
 
 Authored path: `Planning.Begin`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 73.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 89.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 79.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 97.
 
 ```reaction
 when RequestBoundary.request (course, item, path: "/planning/begin", requestId, session)
@@ -6871,8 +6903,8 @@ then
 ### Planning.Begin:item#2
 
 Authored path: `Planning.Begin`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 73.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 89.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 79.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 97.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Planning.Begin
@@ -6887,8 +6919,8 @@ then
 ### Planning.Begin:missing#2
 
 Authored path: `Planning.Begin`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 73.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 89.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 79.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 97.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Planning.Begin
@@ -6902,8 +6934,8 @@ then
 ### Planning.Begin:owned#2
 
 Authored path: `Planning.Begin`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 73.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 89.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 79.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 97.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Planning.Begin
@@ -6918,8 +6950,8 @@ then
 ### Planning.Begin:owned#3
 
 Authored path: `Planning.Begin`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 73.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 89.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 79.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 97.
 
 ```reaction
 when StudyPlanning.begin (item, owner), asked by Planning.Begin:owned#2
@@ -6932,8 +6964,8 @@ then
 ### Planning.Configure
 
 Authored path: `Planning.Configure`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 19.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 87.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 23.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 95.
 
 ```reaction
 when RequestBoundary.request (course, dailyMinutes, focusNote, path: "/planning/configure", requestId, session)
@@ -6944,8 +6976,8 @@ then
 ### Planning.Configure:missing#2
 
 Authored path: `Planning.Configure`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 19.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 87.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 23.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 95.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Planning.Configure
@@ -6959,8 +6991,8 @@ then
 ### Planning.Configure:missing#3
 
 Authored path: `Planning.Configure`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 19.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 87.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 23.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 95.
 
 ```reaction
 when RequestBoundary.respond (detail: "Choose one of your own courses.", error: "COURSE_UNAVAILABLE", requestId), asked by Planning.Configure:missing#2
@@ -6977,8 +7009,8 @@ then
 ### Planning.Configure:owned#2
 
 Authored path: `Planning.Configure`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 19.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 87.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 23.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 95.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Planning.Configure
@@ -6992,8 +7024,8 @@ then
 ### Planning.Configure:owned#3
 
 Authored path: `Planning.Configure`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 19.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 87.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 23.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 95.
 
 ```reaction
 when StudyPlanning.configure (dailyMinutes, focusNote, owner, scope: course), asked by Planning.Configure:owned#2
@@ -7009,8 +7041,8 @@ then
 ### Planning.ConfirmTradeoffs
 
 Authored path: `Planning.ConfirmTradeoffs`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 65.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 95.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 71.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 103.
 
 ```reaction
 when RequestBoundary.request (course, path: "/planning/tradeoffs/confirm", plan, requestId, session)
@@ -7021,8 +7053,8 @@ then
 ### Planning.ConfirmTradeoffs:missing#2
 
 Authored path: `Planning.ConfirmTradeoffs`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 65.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 95.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 71.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 103.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Planning.ConfirmTradeoffs
@@ -7036,8 +7068,8 @@ then
 ### Planning.ConfirmTradeoffs:owned#2
 
 Authored path: `Planning.ConfirmTradeoffs`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 65.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 95.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 71.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 103.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Planning.ConfirmTradeoffs
@@ -7053,8 +7085,8 @@ then
 ### Planning.ConfirmTradeoffs:owned#3
 
 Authored path: `Planning.ConfirmTradeoffs`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 65.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 95.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 71.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 103.
 
 ```reaction
 when StudyPlanning.confirmTradeoffs (currentBasis, owner, plan), asked by Planning.ConfirmTradeoffs:owned#2
@@ -7067,8 +7099,8 @@ then
 ### Planning.ConfirmTradeoffs:plan#2
 
 Authored path: `Planning.ConfirmTradeoffs`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 65.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 95.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 71.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 103.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Planning.ConfirmTradeoffs
@@ -7083,8 +7115,8 @@ then
 ### Planning.DeclineTradeoffs
 
 Authored path: `Planning.DeclineTradeoffs`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 67.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 96.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 73.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 104.
 
 ```reaction
 when RequestBoundary.request (course, path: "/planning/tradeoffs/decline", plan, requestId, session)
@@ -7095,8 +7127,8 @@ then
 ### Planning.DeclineTradeoffs:missing#2
 
 Authored path: `Planning.DeclineTradeoffs`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 67.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 96.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 73.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 104.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Planning.DeclineTradeoffs
@@ -7110,8 +7142,8 @@ then
 ### Planning.DeclineTradeoffs:owned#2
 
 Authored path: `Planning.DeclineTradeoffs`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 67.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 96.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 73.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 104.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Planning.DeclineTradeoffs
@@ -7126,8 +7158,8 @@ then
 ### Planning.DeclineTradeoffs:owned#3
 
 Authored path: `Planning.DeclineTradeoffs`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 67.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 96.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 73.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 104.
 
 ```reaction
 when StudyPlanning.declineTradeoffs (owner, plan), asked by Planning.DeclineTradeoffs:owned#2
@@ -7140,8 +7172,8 @@ then
 ### Planning.DeclineTradeoffs:plan#2
 
 Authored path: `Planning.DeclineTradeoffs`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 67.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 96.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 73.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 104.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Planning.DeclineTradeoffs
@@ -7156,8 +7188,8 @@ then
 ### Planning.Finish
 
 Authored path: `Planning.Finish`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 77.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 90.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 83.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 98.
 
 ```reaction
 when RequestBoundary.request (actualMinutes, course, item, path: "/planning/finish", requestId, session)
@@ -7168,8 +7200,8 @@ then
 ### Planning.Finish:item#2
 
 Authored path: `Planning.Finish`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 77.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 90.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 83.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 98.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Planning.Finish
@@ -7184,8 +7216,8 @@ then
 ### Planning.Finish:item#3
 
 Authored path: `Planning.Finish`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 77.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 90.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 83.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 98.
 
 ```reaction
 when RequestBoundary.respond (error: "ACTIVITY_FINISH_UNAVAILABLE", requestId), asked by Planning.Finish:item#2
@@ -7202,8 +7234,8 @@ then
 ### Planning.Finish:missing#2
 
 Authored path: `Planning.Finish`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 77.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 90.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 83.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 98.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Planning.Finish
@@ -7217,8 +7249,8 @@ then
 ### Planning.Finish:missing#3
 
 Authored path: `Planning.Finish`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 77.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 90.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 83.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 98.
 
 ```reaction
 when RequestBoundary.respond (detail: "Choose one of your own courses.", error: "COURSE_UNAVAILABLE", requestId), asked by Planning.Finish:missing#2
@@ -7235,8 +7267,8 @@ then
 ### Planning.Finish:owned#2
 
 Authored path: `Planning.Finish`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 77.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 90.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 83.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 98.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Planning.Finish
@@ -7251,8 +7283,8 @@ then
 ### Planning.Finish:owned#3
 
 Authored path: `Planning.Finish`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 77.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 90.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 83.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 98.
 
 ```reaction
 when StudyPlanning.finish (actualMinutes, item, owner), asked by Planning.Finish:owned#2
@@ -7268,8 +7300,8 @@ then
 ### Planning.Miss
 
 Authored path: `Planning.Miss`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 77.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 92.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 83.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 100.
 
 ```reaction
 when RequestBoundary.request (course, item, path: "/planning/miss", requestId, session)
@@ -7280,8 +7312,8 @@ then
 ### Planning.Miss:item#2
 
 Authored path: `Planning.Miss`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 77.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 92.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 83.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 100.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Planning.Miss
@@ -7296,8 +7328,8 @@ then
 ### Planning.Miss:item#3
 
 Authored path: `Planning.Miss`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 77.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 92.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 83.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 100.
 
 ```reaction
 when RequestBoundary.respond (error: "ACTIVITY_MISS_UNAVAILABLE", requestId), asked by Planning.Miss:item#2
@@ -7314,8 +7346,8 @@ then
 ### Planning.Miss:missing#2
 
 Authored path: `Planning.Miss`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 77.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 92.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 83.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 100.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Planning.Miss
@@ -7329,8 +7361,8 @@ then
 ### Planning.Miss:missing#3
 
 Authored path: `Planning.Miss`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 77.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 92.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 83.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 100.
 
 ```reaction
 when RequestBoundary.respond (detail: "Choose one of your own courses.", error: "COURSE_UNAVAILABLE", requestId), asked by Planning.Miss:missing#2
@@ -7347,8 +7379,8 @@ then
 ### Planning.Miss:owned#2
 
 Authored path: `Planning.Miss`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 77.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 92.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 83.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 100.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Planning.Miss
@@ -7363,8 +7395,8 @@ then
 ### Planning.Miss:owned#3
 
 Authored path: `Planning.Miss`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 77.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 92.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 83.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 100.
 
 ```reaction
 when StudyPlanning.miss (item, owner), asked by Planning.Miss:owned#2
@@ -7380,8 +7412,8 @@ then
 ### Planning.Propose
 
 Authored path: `Planning.Propose`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 88.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 96.
 
 ```reaction
 when RequestBoundary.request (course, path: "/planning/propose", requestId, session)
@@ -7392,8 +7424,8 @@ then
 ### Planning.Propose:budget#2
 
 Authored path: `Planning.Propose`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 88.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 96.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Planning.Propose
@@ -7408,13 +7440,14 @@ then
 ### Planning.Propose:budget#3
 
 Authored path: `Planning.Propose`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 88.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 96.
 
 ```reaction
 when RequestBoundary.respond (error: "PLAN_PREFERENCES_UNAVAILABLE", requestId), asked by Planning.Propose:budget#2
 where
   earlier, Sessioning.use (session, subject: owner), asked by Planning.Propose
+  no view "(owner) has an activity in progress" with (owner)
   earlier, RequestBoundary.request (course, path: "/planning/propose", requestId, session)
   view "(owner) can refresh routine reviews in (course)" with (course, owner)
   view "review inputs for (owner) in (course)" with (course, owner) has (basis, candidates, explanation, horizonEnd)
@@ -7425,8 +7458,8 @@ then
 ### Planning.Propose:budget:active#4
 
 Authored path: `Planning.Propose`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 88.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 96.
 
 ```reaction
 when StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false), asked by Planning.Propose:budget#3
@@ -7443,8 +7476,8 @@ then
 ### Planning.Propose:budget:proposed#4
 
 Authored path: `Planning.Propose`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 88.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 96.
 
 ```reaction
 when StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false), asked by Planning.Propose:budget#3
@@ -7460,8 +7493,8 @@ then
 ### Planning.Propose:busy#2
 
 Authored path: `Planning.Propose`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 88.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 96.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Planning.Propose
@@ -7477,13 +7510,14 @@ then
 ### Planning.Propose:busy#3
 
 Authored path: `Planning.Propose`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 88.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 96.
 
 ```reaction
 when RequestBoundary.respond (error: "PLAN_SESSION_IN_PROGRESS", requestId), asked by Planning.Propose:busy#2
 where
   earlier, Sessioning.use (session, subject: owner), asked by Planning.Propose
+  no view "(owner) has an activity in progress" with (owner)
   earlier, RequestBoundary.request (course, path: "/planning/propose", requestId, session)
   view "(owner) can refresh routine reviews in (course)" with (course, owner)
   view "review inputs for (owner) in (course)" with (course, owner) has (basis, candidates, explanation, horizonEnd)
@@ -7494,8 +7528,8 @@ then
 ### Planning.Propose:busy:active#4
 
 Authored path: `Planning.Propose`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 88.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 96.
 
 ```reaction
 when StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false), asked by Planning.Propose:busy#3
@@ -7512,8 +7546,8 @@ then
 ### Planning.Propose:busy:proposed#4
 
 Authored path: `Planning.Propose`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 88.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 96.
 
 ```reaction
 when StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false), asked by Planning.Propose:busy#3
@@ -7526,11 +7560,80 @@ then
   RequestBoundary.respond (plan, requestId)
 ```
 
+### Planning.Propose:elsewhere#2
+
+Authored path: `Planning.Propose`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 96.
+
+```reaction
+when Sessioning.use (session, subject: owner), asked by Planning.Propose
+where
+  view "(owner) has an activity in progress" with (owner)
+  earlier, RequestBoundary.request (course, path: "/planning/propose", requestId, session)
+  view "(owner) can refresh routine reviews in (course)" with (course, owner)
+then
+  RequestBoundary.respond (error: "PLAN_SESSION_IN_PROGRESS", requestId)
+```
+
+### Planning.Propose:elsewhere#3
+
+Authored path: `Planning.Propose`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 96.
+
+```reaction
+when RequestBoundary.respond (error: "PLAN_SESSION_IN_PROGRESS", requestId), asked by Planning.Propose:elsewhere#2
+where
+  earlier, Sessioning.use (session, subject: owner), asked by Planning.Propose
+  no view "(owner) has an activity in progress" with (owner)
+  earlier, RequestBoundary.request (course, path: "/planning/propose", requestId, session)
+  view "(owner) can refresh routine reviews in (course)" with (course, owner)
+  view "review inputs for (owner) in (course)" with (course, owner) has (basis, candidates, explanation, horizonEnd)
+then
+  StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false)
+```
+
+### Planning.Propose:elsewhere:active#4
+
+Authored path: `Planning.Propose`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 96.
+
+```reaction
+when StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false), asked by Planning.Propose:elsewhere#3
+at the flow's settlement frontier
+where
+  view "(owner) owns (course) with (title)" with (course, owner)
+  no StudyPlanning._plans (owner, scope: course) has (status: "PROPOSED")
+  StudyPlanning._plans (owner, scope: course) has (plan, status: "ACTIVE")
+  earlier, RequestBoundary.respond (error: "PLAN_SESSION_IN_PROGRESS", requestId), asked by Planning.Propose:elsewhere#2
+then
+  RequestBoundary.respond (plan, requestId)
+```
+
+### Planning.Propose:elsewhere:proposed#4
+
+Authored path: `Planning.Propose`.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 96.
+
+```reaction
+when StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false), asked by Planning.Propose:elsewhere#3
+at the flow's settlement frontier
+where
+  view "(owner) owns (course) with (title)" with (course, owner)
+  StudyPlanning._plans (owner, scope: course) has (plan, status: "PROPOSED")
+  earlier, RequestBoundary.respond (error: "PLAN_SESSION_IN_PROGRESS", requestId), asked by Planning.Propose:elsewhere#2
+then
+  RequestBoundary.respond (plan, requestId)
+```
+
 ### Planning.Propose:missing#2
 
 Authored path: `Planning.Propose`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 88.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 96.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Planning.Propose
@@ -7544,13 +7647,14 @@ then
 ### Planning.Propose:missing#3
 
 Authored path: `Planning.Propose`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 88.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 96.
 
 ```reaction
 when RequestBoundary.respond (detail: "Choose one of your own courses.", error: "COURSE_UNAVAILABLE", requestId), asked by Planning.Propose:missing#2
 where
   earlier, Sessioning.use (session, subject: owner), asked by Planning.Propose
+  no view "(owner) has an activity in progress" with (owner)
   earlier, RequestBoundary.request (course, path: "/planning/propose", requestId, session)
   view "(owner) can refresh routine reviews in (course)" with (course, owner)
   view "review inputs for (owner) in (course)" with (course, owner) has (basis, candidates, explanation, horizonEnd)
@@ -7561,8 +7665,8 @@ then
 ### Planning.Propose:missing:active#4
 
 Authored path: `Planning.Propose`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 88.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 96.
 
 ```reaction
 when StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false), asked by Planning.Propose:missing#3
@@ -7579,8 +7683,8 @@ then
 ### Planning.Propose:missing:proposed#4
 
 Authored path: `Planning.Propose`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 88.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 96.
 
 ```reaction
 when StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false), asked by Planning.Propose:missing#3
@@ -7596,12 +7700,13 @@ then
 ### Planning.Propose:ready#2
 
 Authored path: `Planning.Propose`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 88.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 96.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Planning.Propose
 where
+  no view "(owner) has an activity in progress" with (owner)
   earlier, RequestBoundary.request (course, path: "/planning/propose", requestId, session)
   view "(owner) can refresh routine reviews in (course)" with (course, owner)
 then
@@ -7611,12 +7716,13 @@ then
 ### Planning.Propose:ready#3
 
 Authored path: `Planning.Propose`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 88.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 96.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Planning.Propose:ready#2
 where
+  no view "(owner) has an activity in progress" with (owner)
   earlier, RequestBoundary.request (course, path: "/planning/propose", requestId, session)
   view "(owner) can refresh routine reviews in (course)" with (course, owner)
   view "review inputs for (owner) in (course)" with (course, owner) has (basis, candidates, explanation, horizonEnd)
@@ -7627,8 +7733,8 @@ then
 ### Planning.Propose:ready:active#4
 
 Authored path: `Planning.Propose`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 88.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 96.
 
 ```reaction
 when StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false), asked by Planning.Propose:ready#3
@@ -7645,8 +7751,8 @@ then
 ### Planning.Propose:ready:proposed#4
 
 Authored path: `Planning.Propose`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 21.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 88.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 96.
 
 ```reaction
 when StudyPlanning.replan (basis, candidates, explanation, horizonEnd, owner, scope: course, workloadComplete: false), asked by Planning.Propose:ready#3
@@ -7663,7 +7769,7 @@ then
 
 Authored path: `Planning.Read`.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 7.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 86.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 94.
 
 ```reaction
 when RequestBoundary.request (course, path: "/planning/read", requestId, session)
@@ -7675,7 +7781,7 @@ then
 
 Authored path: `Planning.Read`.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 7.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 86.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 94.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Planning.Read
@@ -7690,7 +7796,7 @@ then
 
 Authored path: `Planning.Read`.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 7.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 86.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 94.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Planning.Read
@@ -7698,14 +7804,14 @@ where
   earlier, RequestBoundary.request (course, path: "/planning/read", requestId, session)
   view "(owner) owns (course) with (title)" with (course, owner)
 then
-  RequestBoundary.respond (cuts: former "the cuts of the proposal awaiting confirmation for (owner) in (course)" with (course, owner), data: former "study plan for (owner) in (course)" with (course, owner), exams: former "the active exams for (owner) in (course)" with (course, owner), proposal: former "the proposal awaiting confirmation for (owner) in (course)" with (course, owner), proposalItems: former "the activities of the proposal awaiting confirmation for (owner) in (course)" with (course, owner), requestId)
+  RequestBoundary.respond (blocking: former "the activity in progress that keeps the plans of (owner) from changing" with (owner), cuts: former "the cuts of the proposal awaiting confirmation for (owner) in (course)" with (course, owner), data: former "study plan for (owner) in (course)" with (course, owner), exams: former "the active exams for (owner) in (course)" with (course, owner), proposal: former "the proposal awaiting confirmation for (owner) in (course)" with (course, owner), proposalItems: former "the activities of the proposal awaiting confirmation for (owner) in (course)" with (course, owner), requestId)
 ```
 
 ### Planning.RemoveExam
 
 Authored path: `Planning.RemoveExam`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 27.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 94.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 33.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 102.
 
 ```reaction
 when RequestBoundary.request (course, date, path: "/planning/exams/remove", requestId, session)
@@ -7716,8 +7822,8 @@ then
 ### Planning.RemoveExam:missing#2
 
 Authored path: `Planning.RemoveExam`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 27.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 94.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 33.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 102.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Planning.RemoveExam
@@ -7731,8 +7837,8 @@ then
 ### Planning.RemoveExam:missing:refreshed#3
 
 Authored path: `Planning.RemoveExam`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 27.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 94.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 33.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 102.
 
 ```reaction
 when RequestBoundary.respond (detail: "Choose one of your own courses.", error: "COURSE_UNAVAILABLE", requestId), asked by Planning.RemoveExam:missing#2
@@ -7750,8 +7856,8 @@ then
 ### Planning.RemoveExam:missing:waiting#3
 
 Authored path: `Planning.RemoveExam`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 27.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 94.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 33.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 102.
 
 ```reaction
 when RequestBoundary.respond (detail: "Choose one of your own courses.", error: "COURSE_UNAVAILABLE", requestId), asked by Planning.RemoveExam:missing#2
@@ -7769,8 +7875,8 @@ then
 ### Planning.RemoveExam:owned#2
 
 Authored path: `Planning.RemoveExam`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 27.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 94.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 33.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 102.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Planning.RemoveExam
@@ -7784,8 +7890,8 @@ then
 ### Planning.RemoveExam:owned:refreshed#3
 
 Authored path: `Planning.RemoveExam`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 27.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 94.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 33.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 102.
 
 ```reaction
 when StudyPlanning.removeDeadline (date, owner, scope: course), asked by Planning.RemoveExam:owned#2
@@ -7802,8 +7908,8 @@ then
 ### Planning.RemoveExam:owned:waiting#3
 
 Authored path: `Planning.RemoveExam`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 27.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 94.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 33.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 102.
 
 ```reaction
 when StudyPlanning.removeDeadline (date, owner, scope: course), asked by Planning.RemoveExam:owned#2
@@ -7820,7 +7926,7 @@ then
 ### Planning.ReplanAfterExam
 
 Authored path: `Planning.ReplanAfterExam`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 31.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 37.
 
 ```reaction
 when StudyPlanning.setDeadline (owner, scope: course)
@@ -7835,7 +7941,7 @@ then
 ### Planning.ReplanAfterExamRemoval
 
 Authored path: `Planning.ReplanAfterExamRemoval`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 33.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 39.
 
 ```reaction
 when StudyPlanning.removeDeadline (owner, scope: course)
@@ -7850,8 +7956,8 @@ then
 ### Planning.SetExam
 
 Authored path: `Planning.SetExam`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 93.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 31.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 101.
 
 ```reaction
 when RequestBoundary.request (course, covered, date, path: "/planning/exams/set", requestId, session)
@@ -7862,8 +7968,8 @@ then
 ### Planning.SetExam:missing#2
 
 Authored path: `Planning.SetExam`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 93.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 31.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 101.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Planning.SetExam
@@ -7877,8 +7983,8 @@ then
 ### Planning.SetExam:missing:refreshed#3
 
 Authored path: `Planning.SetExam`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 93.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 31.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 101.
 
 ```reaction
 when RequestBoundary.respond (detail: "Choose one of your own courses.", error: "COURSE_UNAVAILABLE", requestId), asked by Planning.SetExam:missing#2
@@ -7899,8 +8005,8 @@ then
 ### Planning.SetExam:missing:waiting#3
 
 Authored path: `Planning.SetExam`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 93.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 31.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 101.
 
 ```reaction
 when RequestBoundary.respond (detail: "Choose one of your own courses.", error: "COURSE_UNAVAILABLE", requestId), asked by Planning.SetExam:missing#2
@@ -7921,8 +8027,8 @@ then
 ### Planning.SetExam:owned#2
 
 Authored path: `Planning.SetExam`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 93.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 31.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 101.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Planning.SetExam
@@ -7939,8 +8045,8 @@ then
 ### Planning.SetExam:owned:refreshed#3
 
 Authored path: `Planning.SetExam`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 93.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 31.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 101.
 
 ```reaction
 when StudyPlanning.setDeadline (covered, date, owner, scope: course), asked by Planning.SetExam:owned#2
@@ -7960,8 +8066,8 @@ then
 ### Planning.SetExam:owned:waiting#3
 
 Authored path: `Planning.SetExam`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 93.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 31.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 101.
 
 ```reaction
 when StudyPlanning.setDeadline (covered, date, owner, scope: course), asked by Planning.SetExam:owned#2
@@ -7981,8 +8087,8 @@ then
 ### Planning.SetExam:skills#2
 
 Authored path: `Planning.SetExam`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 93.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 31.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 101.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Planning.SetExam
@@ -7999,8 +8105,8 @@ then
 ### Planning.SetExam:skills:refreshed#3
 
 Authored path: `Planning.SetExam`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 93.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 31.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 101.
 
 ```reaction
 when RequestBoundary.respond (detail: "Choose confirmed skills from this course, each once.", error: "EXAM_SKILLS_UNAVAILABLE", requestId), asked by Planning.SetExam:skills#2
@@ -8021,8 +8127,8 @@ then
 ### Planning.SetExam:skills:waiting#3
 
 Authored path: `Planning.SetExam`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 93.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 31.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 101.
 
 ```reaction
 when RequestBoundary.respond (detail: "Choose confirmed skills from this course, each once.", error: "EXAM_SKILLS_UNAVAILABLE", requestId), asked by Planning.SetExam:skills#2
@@ -8043,8 +8149,8 @@ then
 ### Planning.Stop
 
 Authored path: `Planning.Stop`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 77.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 91.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 83.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 99.
 
 ```reaction
 when RequestBoundary.request (actualMinutes, course, item, path: "/planning/stop", requestId, session)
@@ -8055,8 +8161,8 @@ then
 ### Planning.Stop:item#2
 
 Authored path: `Planning.Stop`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 77.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 91.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 83.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 99.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Planning.Stop
@@ -8071,8 +8177,8 @@ then
 ### Planning.Stop:item#3
 
 Authored path: `Planning.Stop`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 77.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 91.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 83.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 99.
 
 ```reaction
 when RequestBoundary.respond (error: "ACTIVITY_STOP_UNAVAILABLE", requestId), asked by Planning.Stop:item#2
@@ -8089,8 +8195,8 @@ then
 ### Planning.Stop:missing#2
 
 Authored path: `Planning.Stop`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 77.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 91.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 83.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 99.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Planning.Stop
@@ -8104,8 +8210,8 @@ then
 ### Planning.Stop:missing#3
 
 Authored path: `Planning.Stop`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 77.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 91.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 83.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 99.
 
 ```reaction
 when RequestBoundary.respond (detail: "Choose one of your own courses.", error: "COURSE_UNAVAILABLE", requestId), asked by Planning.Stop:missing#2
@@ -8122,8 +8228,8 @@ then
 ### Planning.Stop:owned#2
 
 Authored path: `Planning.Stop`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 77.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 91.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 83.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 99.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Planning.Stop
@@ -8138,8 +8244,8 @@ then
 ### Planning.Stop:owned#3
 
 Authored path: `Planning.Stop`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 77.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 91.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 83.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 99.
 
 ```reaction
 when StudyPlanning.stop (actualMinutes, item, owner), asked by Planning.Stop:owned#2
@@ -8155,7 +8261,7 @@ then
 ### Progress.ActivateRoutine
 
 Authored path: `Progress.ActivateRoutine`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 35.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 41.
 - Covered by [Progress reactions](../design/compositions/Progress.md), line 51.
 
 ```reaction
@@ -8317,7 +8423,7 @@ then
 ### Progress.ReplanAfterFinish
 
 Authored path: `Progress.ReplanAfterFinish`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 37.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 43.
 - Covered by [Progress reactions](../design/compositions/Progress.md), line 57.
 
 ```reaction
@@ -8365,7 +8471,7 @@ then
 ### Progress.ReplanAfterStop
 
 Authored path: `Progress.ReplanAfterStop`.
-- Covered by [Daily planning flows](../design/compositions/Planning.md), line 37.
+- Covered by [Daily planning flows](../design/compositions/Planning.md), line 43.
 - Covered by [Progress reactions](../design/compositions/Progress.md), line 59.
 
 ```reaction

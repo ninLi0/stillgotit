@@ -33,6 +33,8 @@ const error = ref(""), notice = ref("");
 const PENDING = "stillgotit-sign-in-pending", SELECTED = "stillgotit-selected-course";
 // The last chosen course survives reloads. Storage can be blocked, so a failed read falls back to the first course.
 const chosenCourse = ref(readChoice()), creating = ref(false), menuOpen = ref(false), switcher = ref<HTMLElement | null>(null);
+// The course whose workspace opens on its Plan view, set only while openCoursePlan below switches to it.
+const planCourse = ref("");
 // Only active courses open. Archived ones are listed apart, under "Archived courses", with a Restore action.
 const activeCourses = computed(() => courses.value.filter((c) => c.status === "ACTIVE"));
 const archivedCourses = computed(() => courses.value.filter((c) => c.status === "ARCHIVED"));
@@ -41,8 +43,15 @@ const inCourse = computed(() => !!username.value && !!selected.value && !creatin
 
 function readChoice() { try { return localStorage.getItem(SELECTED) ?? ""; } catch { return ""; } }
 function selectCourse(course: string) {
-  chosenCourse.value = course; creating.value = false; menuOpen.value = false; error.value = ""; notice.value = ""; courseNote.value = "";
+  chosenCourse.value = course; creating.value = false; menuOpen.value = false; error.value = ""; notice.value = ""; courseNote.value = ""; planCourse.value = "";
   try { localStorage.setItem(SELECTED, course); } catch { /* The choice still applies until reload. */ }
+}
+// The Plan view of another course asks for that course's plan, where its activity in progress can be finished or stopped.
+// The course's workspace mounts on Plan; the request is then cleared, so a later remount opens the saved view again.
+async function openCoursePlan(course: string) {
+  if (!activeCourses.value.some((c) => c.course === course)) return;
+  selectCourse(course); planCourse.value = course;
+  await nextTick(); planCourse.value = "";
 }
 async function startCourse() {
   menuOpen.value = false; creating.value = true; title.value = ""; error.value = ""; notice.value = "";
@@ -230,8 +239,8 @@ onMounted(async () => {
 <template>
   <p v-if="loading" class="loading boot" role="status">Opening your study space…</p>
   <template v-else-if="inCourse">
-    <CourseWorkspace :key="selected!.course" :course="selected!" :username="username!" :home-view="homeView"
-      @update:home-view="saveHomeView" @settings="openSettings()" @tutor="openTutor()" @progress="loadScores">
+    <CourseWorkspace :key="selected!.course" :course="selected!" :username="username!" :home-view="homeView" :start-on-plan="planCourse === selected!.course"
+      @update:home-view="saveHomeView" @settings="openSettings()" @tutor="openTutor()" @progress="loadScores" @open-plan="openCoursePlan">
       <template #switcher>
         <div ref="switcher" class="switcher" @keydown.esc="closeMenu(true)">
           <button class="switch card" type="button" :aria-expanded="menuOpen" aria-controls="course-menu" :disabled="busy" @click="toggleMenu">

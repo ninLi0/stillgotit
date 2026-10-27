@@ -2,7 +2,7 @@ import { computed, ref, shallowRef } from "vue";
 import { api, unwrap } from "./api.ts";
 import type { OpenSession } from "./continue-session.ts";
 import { planDay } from "./labels.ts";
-import { beginRefusal, daysUntil, failureMessage, PlanningFailure, settle, type PlanRead } from "./planning.ts";
+import { beginRefusal, blockingSentence, daysUntil, failureMessage, PlanningFailure, settle, type PlanRead } from "./planning.ts";
 
 /**
  * The plan as Home shows it: the next activity in the hero panel, today's minutes in the sidebar, the nearest exam on
@@ -52,6 +52,9 @@ export function useHomePlan(course: string) {
       catch (problem) {
         let failed: unknown = null;
         try { await read(); } catch (again) { failed = again; }
+        // An activity in progress in any course refuses the start; the fresh read names it, as on the planner.
+        const blocking = plan.value?.blocking[0];
+        if (!failed && problem instanceof PlanningFailure && blocking) throw new PlanningFailure(blockingSentence(blocking, course));
         if (!(problem instanceof PlanningFailure && problem.bare)) throw problem;
         if (failed) throw failed;
         throw new PlanningFailure(beginRefusal(item.item, data.value!));
