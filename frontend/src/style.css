@@ -23,12 +23,12 @@
   --ocean-wash: #EEF8FC; --ocean-line: #C7E5F2; --ocean-rule: #D7ECF5; --ocean-eyebrow: #1F6E92;
   --sand-wash: #FFF6E6; --sand-line: #F3D7A8; --sand-note: #A46626;
   /* Text on a biome's soft tint, where the primary button's dark text would vanish in the dark theme */
-  --sand-mark-text: #4A2A08; --lesson-new-hover: #21185A;
+  --sand-mark-text: #4A2A08;
   /* The edge of a dialog, which only the dark theme draws, and the ground behind a video */
   --raised-edge: transparent; --video-ground: #151515;
   /* The lesson's lavender greys, and the estimate's evidence */
   --lesson-rail: #FAF9FE; --lesson-rail-edge: #EEEAF7; --lesson-head-line: #ECEAF3; --lesson-card-ring: #ECE9F5; --lesson-divider: #EEEBF5;
-  --lesson-chip-line: #E6E3F2; --lesson-chip-hover: #C9C1F0; --lesson-tile-edge: #E2DEF6; --lesson-source: #F7F5FD; --lesson-back: #6B6490; --lesson-new: #4B3FA8;
+  --lesson-chip-line: #E6E3F2; --lesson-chip-hover: #C9C1F0; --lesson-tile-edge: #E2DEF6; --lesson-source: #F7F5FD; --lesson-back: #6B6490;
   --estimate-eyebrow: #777094; --estimate-track: #E3DEF7; --estimate-imported: #A79CEE; --evidence-slate: #5C6B73; --evidence-violet: #5546B0;
   /* Marks: each kind of activity, the sun-yellow of practice and today, mastery cells and the plan's load cells */
   --mark-lesson: #2F7D9B; --mark-practice: #E3A233; --mark-review: #2F8A5F; --mark-prep: #D9663A; --mark-done: #BDBDB8;
@@ -87,9 +87,9 @@
   --meadow-wash: #19271E; --meadow-tile: #1E3327; --meadow-line: #2F4E3B; --meadow-soft-hover: #24402F; --meadow-eyebrow: #8DCDA3;
   --ocean-wash: #132833; --ocean-line: #24485A; --ocean-rule: #21404F; --ocean-eyebrow: #8DC9E5;
   --sand-wash: #2D2314; --sand-line: #5A4524; --sand-note: #E3AE6C; --dawn-nav: #35305C;
-  --sand-mark-text: #F0CF9C; --lesson-new-hover: #DCD7FF; --raised-edge: rgba(255,255,255,.12);
+  --sand-mark-text: #F0CF9C; --raised-edge: rgba(255,255,255,.12);
   --lesson-rail: #17161E; --lesson-rail-edge: #2A2838; --lesson-head-line: #292734; --lesson-card-ring: #2D2B3B; --lesson-divider: #2A2836;
-  --lesson-chip-line: #34314A; --lesson-chip-hover: #5D5592; --lesson-tile-edge: #3A3554; --lesson-source: #221F33; --lesson-back: #ABA4D4; --lesson-new: #BDB4F7;
+  --lesson-chip-line: #34314A; --lesson-chip-hover: #5D5592; --lesson-tile-edge: #3A3554; --lesson-source: #221F33; --lesson-back: #ABA4D4;
   --estimate-eyebrow: #ABA5C9; --estimate-track: #36314F; --estimate-imported: #8E80E0; --evidence-slate: #8E9BA2; --evidence-violet: #8F82E8;
   --mark-lesson: #4FA3C7; --mark-review: #4DB282; --mark-prep: #E0754B; --mark-done: #6C6D67;
   --sun-off: #39321F; --record: #E06A52; --file-tag: #F2A07F; --link: #8FCAE2;
@@ -122,9 +122,9 @@
     --meadow-wash: #19271E; --meadow-tile: #1E3327; --meadow-line: #2F4E3B; --meadow-soft-hover: #24402F; --meadow-eyebrow: #8DCDA3;
     --ocean-wash: #132833; --ocean-line: #24485A; --ocean-rule: #21404F; --ocean-eyebrow: #8DC9E5;
     --sand-wash: #2D2314; --sand-line: #5A4524; --sand-note: #E3AE6C; --dawn-nav: #35305C;
-    --sand-mark-text: #F0CF9C; --lesson-new-hover: #DCD7FF; --raised-edge: rgba(255,255,255,.12);
+    --sand-mark-text: #F0CF9C; --raised-edge: rgba(255,255,255,.12);
     --lesson-rail: #17161E; --lesson-rail-edge: #2A2838; --lesson-head-line: #292734; --lesson-card-ring: #2D2B3B; --lesson-divider: #2A2836;
-    --lesson-chip-line: #34314A; --lesson-chip-hover: #5D5592; --lesson-tile-edge: #3A3554; --lesson-source: #221F33; --lesson-back: #ABA4D4; --lesson-new: #BDB4F7;
+    --lesson-chip-line: #34314A; --lesson-chip-hover: #5D5592; --lesson-tile-edge: #3A3554; --lesson-source: #221F33; --lesson-back: #ABA4D4;
     --estimate-eyebrow: #ABA5C9; --estimate-track: #36314F; --estimate-imported: #8E80E0; --evidence-slate: #8E9BA2; --evidence-violet: #8F82E8;
     --mark-lesson: #4FA3C7; --mark-review: #4DB282; --mark-prep: #E0754B; --mark-done: #6C6D67;
     --sun-off: #39321F; --record: #E06A52; --file-tag: #F2A07F; --link: #8FCAE2;
@@ -251,7 +251,7 @@ form .primary { margin-top: 18px; }
 .file-card, .attachment-chip { animation: sgPop var(--dur-enter) var(--ease-grow) both; }
 .notice, .error { animation: sgFade var(--dur-enter) var(--ease-enter) both; }
 .working span { display: inline-block; animation: sgPulse var(--loop-beat) var(--ease-loop) infinite; }
-.primary, .secondary, .dropzone, .file-remove, .history-item, .practice-button, .small-button, .new-lesson, .prompt-choices button {
+.primary, .secondary, .dropzone, .file-remove, .history-item, .practice-button, .small-button, .prompt-choices button {
   transition: background-color var(--dur-quick) var(--ease-enter), transform var(--dur-quick) var(--ease-enter), box-shadow var(--dur-quick) var(--ease-enter);
 }
 /* Dialogs open with a short scale and fade, and their backdrop fades in with them. */

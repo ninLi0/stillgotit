@@ -15,7 +15,7 @@ import SourcePane from "./SourcePane.vue";
 import { stageOf } from "./pixel-art.ts";
 import type { OpenSource } from "./revamp-types.ts";
 import { api, unwrap } from "./api.ts";
-import { messageTime, resultLabels, secondsLabel, sessionLabels, turnsLabel } from "./labels.ts";
+import { messageTime, resultLabels, secondsLabel, sessionLabels } from "./labels.ts";
 import { UnansweredQuestions, answerSeconds, citedSources, localStore } from "./reply-stats.ts";
 import { focusedControl, restoreFocus } from "./focus.ts";
 import { PendingAdjustment, sessionStore } from "./pending-adjustment.ts";
@@ -23,10 +23,9 @@ import { listenUnavailable, stopSpeaking } from "./speech.ts";
 import type { StillGotItHttp } from "../../generated/wire.ts";
 import { answerKey, newAnswers, takeTutor, tutorLabel, tutorPick, tutorSettings, type TutorUsed } from "./tutor-choice.ts";
 import { sessionRequest, takeSession } from "./continue-session.ts";
-import { useSlidingMark } from "./sliding-mark.ts";
 type SkillData = StillGotItHttp["/learning/read"]["output"]["data"];
 type StudySession = SkillData["sessions"][number];
-/** A photo uploaded for the answer being written. `preview` is a local picture of it, so learners can tell photos apart. */
+/** A file uploaded for the answer being written. `preview` is a local picture of an image file, so learners can tell images apart; other files have none. */
 type Attachment = { material: string; name: string; preview: string };
 // aiReason explains why AI features are off when aiAvailable is false. materials gives titles for cited sources.
 // initialDraft prefills the message box of a new conversation (for example "Ask about this page" in Materials); it is never sent by itself.
@@ -62,7 +61,8 @@ async function load() {
   const skill = props.skill, result = unwrap(await api.learning.read({ skill })).data;
   if (skill !== props.skill) return;
   data.value = result;
-  if (!freshLesson.value && !result.sessions.some((session) => session.session === selected.value)) selected.value = result.sessions.find((session) => session.status === "OPEN")?.session ?? result.sessions.at(-1)?.session ?? "";
+  // With nothing chosen, the page shows the latest open conversation, or else the latest one. Sessions come oldest first.
+  if (!freshLesson.value && !result.sessions.some((session) => session.session === selected.value)) selected.value = result.sessions.findLast((session) => session.status === "OPEN")?.session ?? result.sessions.at(-1)?.session ?? "";
 }
 // `success` is shown after the step finishes; a function gives a sentence that depends on how the step went.
 // Focus returns to the control the learner used, or to the result when that control is gone.
@@ -156,7 +156,7 @@ async function send() {
   const draft = takeDraft();
   let recovered = "";
   await act(async () => {
-    // Photos go in the order the learner attached them.
+    // Files go in the order the learner attached them.
     const input = { studySession: session.session, text: draft.text, channel: draft.ch, attachments: draft.sent.map((item) => item.material), dialogueLength: session.dialogue.length };
     try {
       if (session.lesson) await timedAnswer(async () => unwrap(await api.learning.question(input)));
@@ -165,7 +165,7 @@ async function send() {
       draft.sent.forEach(forgetPreview);
     } catch (problem) {
       // The server may have saved the question and failed only on the tutor's reply. Then the reloaded thread shows it with its
-      // retry button and the draft stays out of the box, so sending again cannot post it twice. Otherwise the draft and every photo come back.
+      // retry button and the draft stays out of the box, so sending again cannot post it twice. Otherwise the draft and every file come back.
       await load().catch(() => undefined);
       const now = current.value;
       const saved = !!now && now.session === session.session &&
@@ -181,7 +181,7 @@ async function send() {
 function forgetPreview(item: Attachment) { if (item.preview) { URL.revokeObjectURL(item.preview); previews.delete(item.preview); } }
 const attach = useAttachUpload(() => props.course);
 /**
- * Each photo is uploaded to this skill's course as its own material, in the order chosen. A failed photo does not stop
+ * Each file is uploaded to this skill's course as its own material, in the order chosen. A failed file does not stop
  * the rest, and it keeps its request ID, so choosing it again never saves it twice.
  */
 async function uploadWork(event: Event) {
@@ -200,9 +200,9 @@ async function uploadWork(event: Event) {
       }
     }
     if (problems.length) throw new Error(problems.join(" "));
-  }, files.length === 1 ? `Attached ${files[0]!.name}. Send your answer to include it.` : `Attached ${files.length} photos. Send your answer to include them.`);
+  }, files.length === 1 ? `Attached ${files[0]!.name}. Send your answer to include it.` : `Attached ${files.length} files. Send your answer to include them.`);
 }
-/** Removing a photo only changes what this answer will send. Focus moves to the next photo, or back to the message box. */
+/** Removing a file only changes what this answer will send. Focus moves to the next file, or back to the message box. */
 async function removeAttachment(index: number) {
   const removed = attachments.value[index]; if (!removed || busy.value) return;
   attachments.value = attachments.value.filter((_, position) => position !== index);
@@ -263,17 +263,11 @@ const composerNote = computed(() => current.value?.task ? "Review your complete 
  * lesson or task was saved. Older ones have no time.
  */
 function sessionStart(id: string) { return id[14] === "7" ? parseInt(id.replace(/-/g, "").slice(0, 12), 16) : NaN; }
-const tabDate = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "America/New_York" });
 // The opening's time is when the lesson or task was saved; the read records no separate time for the learner's request.
 const openingTime = computed(() => {
   const time = current.value ? sessionStart(current.value.session) : NaN;
   return Number.isFinite(time) ? { label: messageTime(time), iso: new Date(time).toISOString() } : null;
 });
-function sessionDate(id: string) {
-  const time = sessionStart(id);
-  return Number.isFinite(time) ? tabDate.format(new Date(time)) : "";
-}
-function assessed(id: string) { return data.value?.cases.some((item) => item.task === id && !!item.judgment) ?? false; }
 // Every source this skill's conversations were taught from, once each, for the rail's Taught from card.
 const railCitations = computed(() => citedSources(data.value?.sessions ?? []));
 const SUCCESS = new Set(["INDEPENDENT", "SUPPORTED"]);
@@ -293,16 +287,6 @@ let narrowQuery: MediaQueryList | null = null;
 const onNarrow = () => { narrow.value = !!narrowQuery?.matches; };
 onMounted(() => { narrowQuery = window.matchMedia("(max-width: 1239px)"); onNarrow(); narrowQuery.addEventListener("change", onNarrow); });
 onBeforeUnmount(() => narrowQuery?.removeEventListener("change", onNarrow));
-// The line under the chosen tab is one mark that slides to the next chosen tab on the move curve. It appears in place
-// when the tabs first load, and slides when the learner switches conversations or starts a new one.
-const tabStrip = ref<HTMLElement | null>(null);
-const tabLine = useSlidingMark(tabStrip, ".chosen");
-const tabLineStyle = computed(() => {
-  const b = tabLine.box.value;
-  return b ? { transform: `translate(${b.x}px, ${b.y + b.h - 3}px)`, width: `${b.w}px` } : { display: "none" };
-});
-watch([() => (freshLesson.value || !data.value?.sessions.length ? "new" : selected.value), () => data.value?.sessions.length ?? 0],
-  ([, count], [, before]) => { void tabLine.place(count > 0 && before > 0); });
 async function toggleRail() { evidenceOpen.value = !evidenceOpen.value; await nextTick(); if (evidenceOpen.value) railClose.value?.focus(); }
 async function closeRail() { evidenceOpen.value = false; await nextTick(); railChip.value?.focus(); }
 // A cited source, from a reply's passage or the rail's Taught from list, opens on this page. On wide screens it opens in
@@ -394,8 +378,14 @@ async function startPractice() {
   if (refusal) { notice.value = ""; error.value = refusal; await nextTick(); errorBox.value?.focus(); return; }
   await startTask();
 }
+/** The sidebar's "+ New conversation": a new conversation here, once the current step finishes, with the box focused. */
+function newConversation() {
+  const start = async () => { newLesson(); await nextTick(); composerInput.value?.focus(); };
+  if (!busy.value && !recording.value) { void start(); return; }
+  const stop = watch([busy, recording], ([working, speaking]) => { if (!working && !speaking) { stop(); void start(); } });
+}
 watch(() => current.value?.session ?? null, (session) => emit("session", props.skill, session), { immediate: true });
-defineExpose({ startPractice });
+defineExpose({ startPractice, newConversation });
 // Each conversation keeps its own unsent message. A lesson that has just started keeps the box as it is (carryDraft).
 let carryDraft = false;
 watch(selected, (next, previous) => {
@@ -472,13 +462,6 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
             <div class="heading-action"><button class="primary dawn practice-button" :disabled="busy || recording || !aiAvailable || !data?.track" :aria-describedby="describedBy(!!practiceReason && 'practice-reason', !aiAvailable && 'ai-reason-chat')" @click="startTask">Check my understanding</button><p v-if="practiceReason" id="practice-reason" class="hint reason">{{ practiceReason }}</p></div>
           </div>
         </div>
-        <nav ref="tabStrip" class="tabs" aria-label="Conversations for this skill">
-          <span class="tab-line" :class="{ sliding: tabLine.sliding.value }" :style="tabLineStyle" data-mark aria-hidden="true" />
-          <button v-for="session in data?.sessions" :key="session.session" type="button" class="tab" :class="{ chosen: !freshLesson && selected === session.session }" :aria-current="!freshLesson && selected === session.session ? 'true' : undefined" :title="session.lesson?.request || (session.status === 'CLOSED' ? 'Submitted work' : 'Independent check')" :disabled="busy || recording" @click="selectSession(session.session)">
-            <span class="tab-square" :class="session.lesson ? 'lesson' : 'practice'" aria-hidden="true" />{{ labels[session.session] }}<span class="tab-meta"><span v-if="sessionDate(session.session)" class="tab-date">{{ sessionDate(session.session) }}<span aria-hidden="true"> · </span></span><span class="sr-only">, </span>{{ turnsLabel(session.dialogue.length) }}</span><span v-if="assessed(session.session)" class="tab-done"><span aria-hidden="true">✓</span><span class="sr-only">, assessed</span></span>
-          </button>
-          <button type="button" class="new-lesson" :class="{ chosen: freshLesson || !data?.sessions.length }" :disabled="busy || recording" @click="newLesson">+ New conversation</button>
-        </nav>
       </header>
       <div class="thread-wrap">
         <div ref="thread" class="chat-thread" tabindex="-1" @scroll.passive="onThreadScroll">
@@ -550,12 +533,12 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
         <div class="composer-inner">
           <template v-if="!current || current.status === 'OPEN'">
             <div class="composer" :class="{ 'is-recording': recording }" :aria-busy="!!pending">
-              <ul v-if="attachments.length" ref="attachmentList" class="attachment-list" aria-label="Photos attached to this answer">
-                <li v-for="(item, index) in attachments" :key="item.material" class="attachment-chip"><img v-if="item.preview" :src="item.preview" alt="" class="attachment-thumb" /><span>{{ attachments.length > 1 ? `${index + 1}. ` : '' }}{{ item.name }}</span><button type="button" :aria-label="`Remove photo ${index + 1}, ${item.name}`" :disabled="busy" @click="removeAttachment(index)">×</button></li>
+              <ul v-if="attachments.length" ref="attachmentList" class="attachment-list" aria-label="Files attached to this answer">
+                <li v-for="(item, index) in attachments" :key="item.material" class="attachment-chip"><img v-if="item.preview" :src="item.preview" alt="" class="attachment-thumb" /><span>{{ attachments.length > 1 ? `${index + 1}. ` : '' }}{{ item.name }}</span><button type="button" :aria-label="`Remove file ${index + 1}, ${item.name}`" :disabled="busy" @click="removeAttachment(index)">×</button></li>
               </ul>
               <label class="sr-only" for="chat-message">{{ current?.task ? 'Your answer and reasoning' : 'Message your tutor' }}</label>
               <textarea id="chat-message" ref="composerInput" v-model="response" rows="2" :placeholder="current?.task ? 'Explain your reasoning. You can type, speak, or attach your work.' : 'Ask a question or tell me what you want to learn…'" @keydown="enterToSend" />
-              <div class="composer-tools"><div class="input-tools"><label class="attach-button tool-pill" :class="{ unavailable: !current || busy || recording }" :title="current ? 'Attach photos of your work' : 'Start a lesson before attaching work'"><span aria-hidden="true">＋ Photo of work</span><span class="sr-only">{{ attachments.length ? 'Add another photo of your work' : 'Add photos of your work' }}</span><input type="file" accept="image/*" capture="environment" multiple :disabled="busy || recording || !current" @change="uploadWork" /></label>
+              <div class="composer-tools"><div class="input-tools"><label class="attach-button tool-pill" :class="{ unavailable: !current || busy || recording }" :title="current ? 'Attach files with your work' : 'Start a lesson before attaching files'"><span aria-hidden="true">＋ Attach files</span><span class="sr-only">{{ attachments.length ? 'Attach more files with your work' : 'Attach files with your work' }}</span><input type="file" multiple :disabled="busy || recording || !current" @change="uploadWork" /></label>
                 <SpeechInput :disabled="busy || !aiAvailable" :active="active !== false" :describedby="aiAvailable ? undefined : 'ai-reason-chat'" compact @recording="recording = $event" @transcript="response = response ? response + '\n' + $event : $event; channel = 'VOICE'" @error="error = $event" />
                 <button type="button" class="tutor-pick" aria-haspopup="dialog" :aria-label="tutorChoice.label" :title="tutorChoice.label" @click="emit('tutor')"><span>{{ tutorChoice.model }}<span v-if="tutorChoice.level" class="tutor-level"> · {{ tutorChoice.level }}</span></span><svg aria-hidden="true" viewBox="0 0 12 12" width="12" height="12"><path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" /></svg></button>
                 <button v-if="current?.task" class="hint-button tool-pill" :disabled="busy || recording || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="requestHint">Ask for a hint</button>
@@ -606,7 +589,7 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
 .learn-source{grid-column:2;grid-row:1}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
 /* Header */
-.learn-head{padding:18px 28px 0;background:var(--card);border-bottom:1px solid var(--lesson-head-line)}
+.learn-head{padding:18px 28px 16px;background:var(--card);border-bottom:1px solid var(--lesson-head-line)}
 .head-row{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
 .head-title{display:flex;align-items:center;gap:14px;min-width:240px;flex:1}
 .sprite-tile{flex:none;width:52px;height:52px;border-radius:14px;background:var(--dawn-soft);display:grid;place-items:center;box-shadow:inset 0 -3px 0 var(--lesson-tile-edge)}
@@ -623,21 +606,6 @@ button.mastery-chip:hover{border-color:var(--lesson-chip-hover)}
 .chip-top strong{font-size:16px;font-variant-numeric:tabular-nums}
 .chip-top span{font-size:11px;font-weight:600;color:var(--faint)}
 .heading-action .primary{min-height:46px;padding:0 18px;font-size:14px;white-space:nowrap}
-/* Tabs */
-.tabs{position:relative;display:flex;align-items:flex-end;gap:22px;margin-top:14px;overflow-x:auto}
-.tab,.new-lesson{display:flex;align-items:center;gap:8px;border:0;background:none;padding:0 2px 12px;font-size:14px;font-weight:500;color:var(--muted);white-space:nowrap;border-radius:0}
-.tab:hover:not(:disabled){color:var(--ink)}
-.tab.chosen{font-weight:700;color:var(--ink)}
-/* The 3px line under the chosen tab, or under "+ New conversation" when that is chosen. */
-.tab-line{position:absolute;left:0;top:0;height:3px;background:var(--dawn-edge);pointer-events:none}
-.tab-line.sliding{transition:transform var(--dur-move) var(--ease-move),width var(--dur-move) var(--ease-move)}
-.tab-square{width:8px;height:8px;flex:none}
-.tab-square.lesson{background:var(--mark-lesson)}
-.tab-square.practice{background:var(--mark-practice)}
-.tab-meta{font-size:12px;font-weight:500;color:var(--faint)}
-.tab-done{font-size:11px;font-weight:800;color:var(--strong)}
-.new-lesson{font-weight:700;color:var(--lesson-new)}
-.new-lesson:hover:not(:disabled){color:var(--lesson-new-hover)}
 /* Thread */
 /* The thread scrolls inside thread-wrap, which also holds the "Jump to latest" pill over its bottom edge. */
 .thread-wrap{position:relative;flex:1;min-height:0;display:flex;flex-direction:column}
@@ -795,6 +763,6 @@ button.mastery-chip:hover{border-color:var(--lesson-chip-hover)}
 .gate-text{margin:0;font-size:13px;line-height:1.55;color:var(--soft)}
 .divider{height:1px;background:var(--lesson-divider);margin:8px 0}
 .rail-empty{margin:8px 0 0;font-size:12px}
-@media(max-width:900px){.learn-head{padding:14px 18px 0}.thread-inner{padding:22px 18px 18px}.composer-area{padding:10px 18px 14px}}
+@media(max-width:900px){.learn-head{padding:14px 18px 12px}.thread-inner{padding:22px 18px 18px}.composer-area{padding:10px 18px 14px}}
 @media(max-width:650px){.learn{height:calc(100dvh - 20px);min-height:520px}.head-title{min-width:0}.learn-head h1{font-size:22px}.sprite-tile{width:44px;height:44px}.heading-action .primary{min-height:42px;padding:0 12px;font-size:13px;white-space:normal}.from-you{max-width:85%}.opening-card{padding:16px 16px 12px}.prose{font-size:14px}.confidence{flex-wrap:wrap}.chat-welcome h2{font-size:29px}}
 </style>

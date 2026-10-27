@@ -238,7 +238,7 @@ function openForest() { design.value = readNumber(groveKey); forestOpen.value = 
 function regrow() { design.value++; groveVersion.value++; try { localStorage.setItem(groveKey, String(design.value)); } catch { /* The new seed applies until reload. */ } }
 function navigate(next: "home" | "plan" | "setup" | "chat" | "memory") { forestOpen.value = false; view.value = next; }
 // The Learn and Plan screens expose these; optional so the page works before they do.
-const study = ref<{ startPractice?: () => unknown } | null>(null), planner = ref<{ openBudget?: () => unknown } | null>(null);
+const study = ref<{ startPractice?: () => unknown; newConversation?: () => unknown } | null>(null), planner = ref<{ openBudget?: () => unknown } | null>(null);
 async function practise(skill: string) { openSkill(skill); await nextTick(); await study.value?.startPractice?.(); }
 async function setStudyTime() { navigate("plan"); await nextTick(); await planner.value?.openBudget?.(); }
 function plant() { navigate("setup"); adding.value = true; }
@@ -257,6 +257,12 @@ function sessionShown(skill: string, session: string | null) { shownSessions.val
 const shownSession = computed(() => view.value === "chat" && !forestOpen.value && current.value?.status === "CONFIRMED" ? shownSessions.value[current.value.skill] ?? null : null);
 /** A row opens its skill on that conversation, as a row of Home's Continue card does. */
 function openConversation(row: RecentSession) { requestSession(row.skill, row.studySession); openSkill(row.skill); }
+/** A new conversation in the open skill. With no skill open, Home's tree is where a skill is chosen. */
+async function newConversation() {
+  const skill = current.value?.status === "CONFIRMED" ? current.value.skill : null;
+  if (!skill) { navigate("home"); await nextTick(); document.getElementById("home-title")?.focus(); return; }
+  openSkill(skill); await nextTick(); await study.value?.newConversation?.();
+}
 const draftWaiting = computed(() => drafts.value.length + pendingDraftCount.value);
 const homePlan = useHomePlan(props.course.course);
 const plan = homePlan.data, next = homePlan.next;
@@ -439,7 +445,7 @@ watch(view, (now) => { if (now === "setup" && material.value && !preview.value) 
       :materials-badge="draftWaiting" :today="homePlan.minutes.value" :username="username"
       @navigate="navigate" @forest="openForest" @settings="emit('settings')">
       <template #switcher><slot name="switcher" /></template>
-      <template #conversations><SidebarConversations :rows="recent" :current="shownSession" :loaded="recentLoaded" :error="recentError" @open="openConversation" @retry="loadRecent" /></template>
+      <template #conversations><SidebarConversations :rows="recent" :current="shownSession" :loaded="recentLoaded" :error="recentError" @open="openConversation" @new="newConversation" @retry="loadRecent" /></template>
     </ShellSidebar>
   <section class="course-space app-card" :aria-busy="busy">
     <p v-if="error && view !== 'setup'" class="error page-error" role="alert">{{ error }}</p>
