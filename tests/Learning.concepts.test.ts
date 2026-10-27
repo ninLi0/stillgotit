@@ -3,6 +3,7 @@ import { AssessmentReviewing } from "../src/concepts/AssessmentReviewing/Assessm
 import { MasteryEstimating } from "../src/concepts/MasteryEstimating/MasteryEstimating.ts";
 import { Budgeting, type Candidate } from "../src/concepts/Budgeting/Budgeting.ts";
 import { connectMongo, localMongoUri } from "../src/storage/mongo.ts";
+import { R, gradeOf, leftAlone, review, seed } from "./fixtures/fsrs.ts";
 
 let connection: Awaited<ReturnType<typeof connectMongo>>;
 beforeAll(async () => { connection = await connectMongo({ uri: process.env.MONGODB_TEST_URI ?? localMongoUri, database: `stillgotit_test_${crypto.randomUUID().replaceAll("-", "")}` }); });
@@ -56,21 +57,37 @@ async function mastery(confidence = 80) {
   return { name, concept, track, estimate, evidence, advance: (n: number) => { now = new Date(start.getTime() + n * day); }, now: () => now };
 }
 describe("Mastery replay", () => {
-  test("confidence is provisional, decays over 60 days, and needs independent evidence", async () => {
+  test("confidence is provisional, fades without practice, and needs independent evidence", async () => {
     const m = await mastery();
     expect(await m.estimate()).toMatchObject({ value: 80, ready: false });
-    m.advance(60); expect((await m.estimate()).value).toBeCloseTo(40);
+    // A confidence of 80 seeds the memory of a first Easy rating. Left alone until day 60, the estimate falls along that memory's curve.
+    m.advance(60); expect((await m.estimate()).value).toBeCloseTo(leftAlone(80, 60));
     await m.evidence("fresh", "INDEPENDENT", { gateMet: true });
     expect(await m.estimate()).toMatchObject({ value: 95, ready: true });
-    m.advance(74); expect((await m.estimate()).ready).toBe(true);
+    // The success counts as a Good review on day 60. Fourteen days later the estimate has fallen from 95 along the new
+    // stability and is still ready; a moment after that, the success is too old to support readiness.
+    const memory = review(seed(80), gradeOf("INDEPENDENT"), 60);
+    m.advance(74);
+    const later = await m.estimate();
+    expect(later.ready).toBe(true);
+    expect(later.value).toBeCloseTo(95 * R(14, memory.stability));
+    // The explanation reports that memory, the retention after 14 days, and the instant the retention reaches 90%.
+    const explanation = (await m.concept._explanation({ ...identity, at: m.now() }))[0]!.explanation;
+    expect(explanation.stability).toBeCloseTo(memory.stability, 9);
+    expect(explanation.difficulty).toBeCloseTo(memory.difficulty, 9);
+    expect(explanation.retention).toBeCloseTo(R(14, memory.stability), 9);
+    expect(Math.abs(explanation.due.getTime() - (start.getTime() + (60 + memory.stability) * day))).toBeLessThan(1);
     m.advance(74.001); expect((await m.estimate()).ready).toBe(false);
   });
   test("supported recovery has a fixed cap until independent work", async () => {
     const m = await mastery(); m.advance(60);
-    await m.evidence("a", "SUPPORTED"); expect((await m.estimate()).value).toBeCloseTo(60);
-    await m.evidence("b", "SUPPORTED"); expect((await m.estimate()).value).toBeCloseTo(60);
-    await m.evidence("c", "INDEPENDENT"); expect((await m.estimate()).value).toBeCloseTo(70);
-    await m.evidence("d", "SLIP"); expect((await m.estimate()).value).toBeCloseTo(65);
+    // Supported work recovers to the midpoint of the faded estimate and the best one, 80. The later events share the same
+    // instant, so no time passes between them and only the gain and loss rules move the estimate.
+    const cap = (leftAlone(80, 60) + 80) / 2;
+    await m.evidence("a", "SUPPORTED"); expect((await m.estimate()).value).toBeCloseTo(cap);
+    await m.evidence("b", "SUPPORTED"); expect((await m.estimate()).value).toBeCloseTo(cap);
+    await m.evidence("c", "INDEPENDENT"); expect((await m.estimate()).value).toBeCloseTo(cap + 10);
+    await m.evidence("d", "SLIP"); expect((await m.estimate()).value).toBeCloseTo(cap + 5);
     expect((await m.estimate()).ready).toBe(false);
   });
   test("regrading replaces the old event and replays a later manual adjustment", async () => {
@@ -78,10 +95,15 @@ describe("Mastery replay", () => {
     const first = await m.evidence("attempt", "GAP");
     m.advance(1); await m.concept.adjust({ ...identity, adjustmentKey: "prior-coursework", value: 85, reason: "Prior coursework." });
     m.advance(2); await m.evidence("later", "SLIP");
+    // The adjustment sets the estimate to 85 on day 1 whatever came before, but it keeps the memory the first attempt left.
+    // That memory sets how far 85 falls by day 2, just before the Slip takes 5 away.
+    const afterGap = review(seed(50), gradeOf("GAP"), 0), afterSuccess = review(seed(50), gradeOf("INDEPENDENT"), 0);
     const before = await m.estimate();
+    expect(before.value).toBeCloseTo(85 * R(1, afterGap.stability) - 5);
     const replacement = await m.evidence("attempt", "INDEPENDENT", { revision: 2, performedAt: start, gateMet: true });
     expect(replacement.input).toBe(first.input);
-    expect((await m.estimate()).value).toBeCloseTo(before.value);
+    // The regrade replaces the Gap with a success, so the replay keeps the adjustment and follows the success's memory instead.
+    expect((await m.estimate()).value).toBeCloseTo(85 * R(1, afterSuccess.stability) - 5);
     await expect(m.evidence("attempt", "INDEPENDENT", { revision: 1, performedAt: start })).rejects.toMatchObject({ code: "EVIDENCE_REVISION_NOT_NEW" });
     expect((await m.concept._inputs(m.track))).toHaveLength(2);
   });

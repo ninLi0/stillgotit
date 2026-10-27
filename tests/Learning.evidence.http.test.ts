@@ -5,6 +5,7 @@ import { MemoryProvider } from "../src/concepts/Federating/provider.ts";
 import { AssessmentReviewing } from "../src/concepts/AssessmentReviewing/AssessmentReviewing.ts";
 import * as mastery from "../src/concepts/MasteryEstimating/refusals.ts";
 import { connectMongo, localMongoUri } from "../src/storage/mongo.ts";
+import { R, daysBetween, gradeOf, leftAlone, review, seed } from "./fixtures/fsrs.ts";
 import type { CourseTutor } from "../src/host/tutor.ts";
 import { rm } from "node:fs/promises";
 import { createHash } from "node:crypto";
@@ -20,7 +21,6 @@ const RESPOND_DECLINED = "Choose an open session, check the latest dialogue, and
 const QUESTION_DECLINED = "Choose an open lesson, check the latest dialogue, and attach only your own work from this course, each file once.";
 // A concept refusal reaches HTTP and the native gateway with the concept's message as `detail`.
 const message = (Refusal: new () => Error) => new Refusal().message;
-const decay = (value: number, days: number) => value * 2 ** (-days / 60);
 const studyDate = (at: Date) => at.toLocaleDateString("en-CA", { timeZone: "America/New_York" });
 // Calendar days, as the planner counts them (src/computations/learning.ts). Adding 24-hour spans to a clock instead lands two
 // different spans on the same New York date when the span crosses the end of daylight saving time.
@@ -179,7 +179,10 @@ test("an adjustment replans: the candidate gets a new key, priority from the adj
   type Candidate = { key: string; subject: string; priority: number; earliestDay: string; latestDay: string; reason: string };
   const candidateFor = (plan: { items: { candidate: Candidate }[] }) => plan.items.map((item) => item.candidate).find((candidate) => candidate.subject === skill)!;
   const before = await learner.ok("/planning/read", { course }), evidenced = candidateFor(before.plan);
-  const occasion = studyDate(new Date(performedAt.getTime() + DAY));
+  // After fresh independent success the next review is due one stability later. Confidence 50 seeds the memory, and the
+  // practice right after it is a same-day Good review.
+  const { stability } = review(seed(50), gradeOf("INDEPENDENT"), daysBetween(performedAt, Date.parse(read.explanation.start.at)));
+  const occasion = studyDate(new Date(performedAt.getTime() + stability * DAY));
   expect(evidenced.key).toBe(`${skill}:${read.skill.current}:${read.cases[0].case}:1:${occasion}`);
   expect(evidenced.priority).toBeCloseTo(5, 3);
 
@@ -311,8 +314,10 @@ test("Read's explanation is null without a track; otherwise it lists the start, 
   expect(provisional.start).toMatchObject({ confidence: 60, startingBasis: "SELF_REPORTED" });
   expect(provisional.changes).toHaveLength(1);
   expect(provisional.changes[0]).toMatchObject({ kind: "TIME", source: "", before: 60, days: 2, reason: "" });
-  expect(provisional.changes[0].after).toBeCloseTo(decay(60, 2.5), 3);
-  expect(provisional.changes[0].decay).toBeCloseTo(60 - decay(60, 2.5), 3);
+  // Confidence 60 seeds the memory, and until the first event the estimate follows that memory's retention.
+  const startedAt = Date.parse(provisional.start.at), alone = leftAlone(60, daysBetween(Date.parse(provisional.changes[0].at), startedAt));
+  expect(provisional.changes[0].after).toBeCloseTo(alone, 3);
+  expect(provisional.changes[0].decay).toBeCloseTo(60 - alone, 3);
   expect(provisional).toMatchObject({ ignored: [], provisional: true });
   expect(provisional.basis).toContain("No scored evidence yet; this estimate is provisional.");
 
@@ -328,14 +333,22 @@ test("Read's explanation is null without a track; otherwise it lists the start, 
   const scored = read.cases.find((item: { task: string }) => item.task !== reused).case, ignored = read.cases.find((item: { task: string }) => item.task === reused).case;
   expect(explanation.changes.map((change: { kind: string }) => change.kind)).toEqual(["ATTEMPT", "ADJUSTMENT", "TIME"]);
   const [attempt, adjusted, time] = explanation.changes;
+  expect(Date.parse(explanation.start.at)).toBe(startedAt);
+  // The attempt is a Good review after about 2.5 days; the estimate reached it on the seeded memory's curve.
+  const attempted = Date.parse(attempt.at), adjustedAt = Date.parse(adjusted.at);
+  const reached = leftAlone(60, daysBetween(attempted, startedAt));
+  const { stability } = review(seed(60), gradeOf("INDEPENDENT"), daysBetween(attempted, startedAt));
   expect(attempt).toMatchObject({ source: scored, after: 95, days: 2, reason: "" });
-  expect(attempt.before).toBeCloseTo(decay(60, 2.5), 3);
-  expect(attempt.decay).toBeCloseTo(60 - decay(60, 2.5), 3);
+  expect(attempt.before).toBeCloseTo(reached, 3);
+  expect(attempt.decay).toBeCloseTo(60 - reached, 3);
+  // From 95 the estimate follows the stability the attempt left until the adjustment, which keeps that stability.
+  const recalled = 95 * R(daysBetween(adjustedAt, attempted), stability);
   expect(adjusted).toMatchObject({ source: adjustment, after: 80, days: 1, reason });
-  expect(adjusted.before).toBeCloseTo(decay(95, 1.2), 3);
-  expect(adjusted.decay).toBeCloseTo(95 - decay(95, 1.2), 3);
+  expect(adjusted.before).toBeCloseTo(recalled, 3);
+  expect(adjusted.decay).toBeCloseTo(95 - recalled, 3);
+  // Reused work is not an event, so the time row runs from the adjustment's 80.
   expect(time).toMatchObject({ source: "", before: 80, days: 4, reason: "" });
-  expect(time.after).toBeCloseTo(decay(80, 4.2), 3);
+  expect(time.after).toBeCloseTo(80 * R(daysBetween(Date.parse(time.at), adjustedAt), stability), 3);
   expect(time.decay).toBeCloseTo(time.before - time.after, 9);
   // Rows are in time order and every value stays unrounded for the page to round.
   expect(explanation.changes.map((change: { at: string }) => change.at)).toEqual(explanation.changes.map((change: { at: string }) => change.at).sort());

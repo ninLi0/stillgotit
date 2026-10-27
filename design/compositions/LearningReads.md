@@ -77,19 +77,19 @@ The Memory view shows how each skill's estimate is expected to fall without prac
 - Where [OwnedCourse](view:Courses.OwnedCourse) holds for that learner and course, the endpoint binds the flow's instant as `at`, as Read does, and answers `asOf`, that instant, `policy` with [MemoryPolicy](former:Reads.MemoryPolicy), and `skills` with [MemorySkills](former:Reads.MemorySkills).
 - Where OwnedCourse does not hold, because the course is unknown or belongs to another learner, the endpoint answers `COURSE_UNAVAILABLE` and reads no estimate.
 
-MemoryPolicy reads `MasteryEstimating._policy` and answers its settings: `policy`, `halfLifeDays`, `reviewThreshold`, which is the policy's readinessMinimum, and `readinessDays`. It adds `reference`, the policy's own curve: an estimate of 100% left alone, on day 0 and on days 1, 3, 7, 14, 30, 60, and 90, each value read from `MasteryEstimating._withoutPractice`. [referenceCurve](computation:referenceCurve) only gathers those values.
+MemoryPolicy reads `MasteryEstimating._policy` and answers its settings: `policy`, `desiredRetention`, `reviewThreshold`, which is the policy's readinessMinimum, and `readinessDays`. It adds `reference`, the policy's own curve: an estimate of 100% left alone, on day 0 and on days 1, 3, 7, 14, 30, 60, and 90, each value read from `MasteryEstimating._withoutPractice`. [referenceCurve](computation:referenceCurve) only gathers those values.
 
 MemorySkills has one row for each confirmed skill in the course, ordered by skill identity, with `skill`, `title`, `unit`, and `unitTitle`. Draft and archived skills are left out. [SkillCurve](view:Reads.SkillCurve) adds the curve of the skill's current definition:
 
 - `startingConfidence` and `startedAt`: the track's starting confidence and when it was set, from `MasteryEstimating._track`.
 - `estimate`: the estimate at `at`, the value of `MasteryEstimating._explanation` at that instant.
-- `projection`: the estimate 1, 3, 7, 14, 30, 60, and 90 days after `at`, each read with `MasteryEstimating._estimate` at that instant. A query at a future time projects the decay from the evidence available now and assumes no practice, so the projection never rises. [memoryInstants](computation:memoryInstants) gives the instants and [memoryCurve](computation:memoryCurve) gathers the values. Each point has `days`, `at`, and `value`.
-- `reviewBy`: the first whole day after `at`, within 180 days, on which the projection is below the review threshold, as a point with `days`, `at`, and `value`. Because the projection never rises, the search halves the 180 days eight times instead of reading every day: [reviewSearch](computation:reviewSearch) starts it, and each step reads `_estimate` on the day [reviewProbe](computation:reviewProbe) names and keeps the half that [reviewNarrow](computation:reviewNarrow) chooses. `reviewBy` is null when the estimate is already below the threshold at `at`, and then `belowNow` is true. It is also null, with `belowNow` false, when the projection stays at or above the threshold for 180 days. Under prototype-1 that cannot happen, because even 100% falls below 70% within 31 days, but the read does not rely on the policy's numbers.
+- `projection`: the estimate 1, 3, 7, 14, 30, 60, and 90 days after `at`, each read with `MasteryEstimating._estimate` at that instant. A query at a future time projects forgetting from the evidence available now and assumes no practice, so the projection never rises. [memoryInstants](computation:memoryInstants) gives the instants and [memoryCurve](computation:memoryCurve) gathers the values. Each point has `days`, `at`, and `value`.
+- `reviewBy`: the day to review by, as a point with `days`, `at`, and `value`. It is the first whole day after `at` at or after the explanation's `due` instant, when the memory's retention falls to the policy's desired retention of 0.9. [reviewInstant](computation:reviewInstant) gives that day's instant from `due`, and its value is read with `_estimate` at that instant. `reviewBy` is null when `due` is at or before `at`, and then `belowNow` is true.
 - `leftAlone`: the curve the skill would have followed from its starting point with no evidence and no adjustment. Its points are the starting point, `at`, and each sample day, with values that `_withoutPractice` gives for the starting confidence and the days since the starting point. [leftAloneDays](computation:leftAloneDays) gives those days and [leftAlonePath](computation:leftAlonePath) gathers the points. The starting point is the explanation's, as on the evidence panel; it is earlier than `startedAt` only when assessed work was done before the learner set a starting point.
 
 A skill whose current definition has no track keeps its row, and every curve field is null, so the page can say that the skill has no curve yet.
 
-The read computes no estimate, decay, or readiness of its own. Every value comes from MasteryEstimating; the computations only choose instants, compare a value with the threshold, and gather values into lists. The page draws the curves from these points, and the past path from the evidence that Read returns, so it computes no decay either. The read changes nothing. Each skill costs about sixteen `_estimate` reads, and a course of twenty skills answers in about a quarter of a second on a local database.
+The read computes no estimate, forgetting, or readiness of its own. Every value comes from MasteryEstimating; the computations only choose instants, compare the due instant with `at`, and gather values into lists. The page draws the curves from these points, and the past path from the evidence that Read returns, so it computes no forgetting either. The read changes nothing. Each skill costs eight `_estimate` reads.
 
 ```computations
 referenceCurve(v0: Number, v1: Number, v3: Number, v7: Number, v14: Number, v30: Number, v60: Number, v90: Number) : ReferenceCurve
@@ -98,17 +98,11 @@ referenceCurve(v0: Number, v1: Number, v3: Number, v7: Number, v14: Number, v30:
 memoryInstants(at: DateTime) : SampleInstants
   Gives at itself as d0, which the endpoint answers as asOf, and the instants 1, 3, 7, 14, 30, 60, and 90 whole days of 24 hours after at.
 
-reviewSearch(at: DateTime) : ReviewSearch
-  Starts the search for the first day below the review threshold: day 0, the instant at, is taken to be at or above it, and day 181 stands for no day within 180.
+reviewInstant(at: DateTime, explanation: MasteryEstimating.EstimateExplanation) : DateTime
+  Gives the instant of the first whole day after at that is at or after the explanation's due instant. When due is at or before at, gives at itself, which memoryCurve does not use.
 
-reviewProbe(search: ReviewSearch) : DateTime
-  Names the instant of the day to read next: the middle of the days still in question, or the last of them once one day is left.
-
-reviewNarrow(search: ReviewSearch, value: Number, threshold: Number) : ReviewSearch
-  Keeps the later half when value is at or above threshold and the earlier half, with value, when it is below. A finished search is returned unchanged.
-
-memoryCurve(at: DateTime, explanation: MasteryEstimating.EstimateExplanation, threshold: Number, search: ReviewSearch, v1: Number, v3: Number, v7: Number, v14: Number, v30: Number, v60: Number, v90: Number) : MemoryCurve
-  Gives the explanation's value as the estimate, the sampled values as the projection, the search's day and value as reviewBy unless the estimate is already below threshold or no day was found, and belowNow.
+memoryCurve(at: DateTime, explanation: MasteryEstimating.EstimateExplanation, review: DateTime, reviewValue: Number, v1: Number, v3: Number, v7: Number, v14: Number, v30: Number, v60: Number, v90: Number) : MemoryCurve
+  Gives the explanation's value as the estimate, the sampled values as the projection, review and reviewValue as reviewBy unless the explanation's due instant is at or before at, and belowNow, which is true exactly then.
 
 leftAloneDays(explanation: MasteryEstimating.EstimateExplanation, at: DateTime) : LeftAloneDays
   Gives the days from the explanation's starting point to at and to each sample day after at.

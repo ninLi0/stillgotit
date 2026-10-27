@@ -251,7 +251,7 @@ Defined in [MasteryEstimating](../design/concepts/MasteryEstimating.md), line 1.
 - `_estimate(learner: Learner, subject: Subject, definition: Definition, at: DateTime) : optional (value: Number, basis: String, ready: Flag)`
 - `_explanation(learner: Learner, subject: Subject, definition: Definition, at: DateTime) : optional (explanation: EstimateExplanation)`
 - `_progress(learner: Learner) : one (tracks: ProgressRows)`
-- `_policy() : one (policy: String, halfLifeDays: Number, readinessMinimum: Number, readinessDays: Number)`
+- `_policy() : one (policy: String, desiredRetention: Number, readinessMinimum: Number, readinessDays: Number, parameters: PolicyParameters)`
 - `_withoutPractice(confidence: Number, days: Number) : one (value: Number)`
 
 #### Instances
@@ -454,7 +454,7 @@ Concrete types:
 - `carriedEstimate(tracks: MasteryEstimating.ProgressRows, skill: SkillMapping.Skill, current: SkillMapping.Version) : CarriedEstimate` — [Courses, materials, and skills](../design/compositions/Courses.md), line 58.
 - `choiceOffered(choice: TutorChoice) : Flag` — [Settings](../design/compositions/Settings.md), line 44.
 - `correctionNote(reason: String) : AttemptClarification` — [Learning computations](../design/compositions/LearningComputations.md), line 21.
-- `courseScore(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows) : CourseScore` — [Shared learning reads](../design/compositions/LearningReads.md), line 134.
+- `courseScore(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows) : CourseScore` — [Shared learning reads](../design/compositions/LearningReads.md), line 128.
 - `coveredSkillsConfirmed(covered: StudyPlanning.SubjectSet, skills: SkillMapping.SkillMapRows) : Flag` — [Daily planning flows](../design/compositions/Planning.md), line 100.
 - `cutKey(cut: StudyPlanning.CutValue) : String` — [Daily planning flows](../design/compositions/Planning.md), line 112.
 - `defaultChoice() : TutorChoice` — [Settings](../design/compositions/Settings.md), line 32.
@@ -479,11 +479,11 @@ Concrete types:
 - `homeViewOffered(view: String) : Flag` — [Settings](../design/compositions/Settings.md), line 142.
 - `itemOrder(day: Date, candidate: StudyPlanning.Candidate) : String` — [Daily planning flows](../design/compositions/Planning.md), line 109.
 - `itemSubject(candidate: StudyPlanning.Candidate) : ItemSubject` — [Learning computations](../design/compositions/LearningComputations.md), line 42.
-- `leftAloneDays(explanation: MasteryEstimating.EstimateExplanation, at: DateTime) : LeftAloneDays` — [Shared learning reads](../design/compositions/LearningReads.md), line 113.
-- `leftAlonePath(explanation: MasteryEstimating.EstimateExplanation, at: DateTime, u0: Number, v1: Number, v3: Number, v7: Number, v14: Number, v30: Number, v60: Number, v90: Number) : LeftAlonePath` — [Shared learning reads](../design/compositions/LearningReads.md), line 116.
+- `leftAloneDays(explanation: MasteryEstimating.EstimateExplanation, at: DateTime) : LeftAloneDays` — [Shared learning reads](../design/compositions/LearningReads.md), line 107.
+- `leftAlonePath(explanation: MasteryEstimating.EstimateExplanation, at: DateTime, u0: Number, v1: Number, v3: Number, v7: Number, v14: Number, v30: Number, v60: Number, v90: Number) : LeftAlonePath` — [Shared learning reads](../design/compositions/LearningReads.md), line 110.
 - `lessonRequest(selected: Library.SourceRecords, context: SkillContext, request: String) : TutorRequest` — [Learning computations](../design/compositions/LearningComputations.md), line 45.
 - `levelSupported(model: String, level: String) : Flag` — [Settings](../design/compositions/Settings.md), line 38.
-- `memoryCurve(at: DateTime, explanation: MasteryEstimating.EstimateExplanation, threshold: Number, search: ReviewSearch, v1: Number, v3: Number, v7: Number, v14: Number, v30: Number, v60: Number, v90: Number) : MemoryCurve` — [Shared learning reads](../design/compositions/LearningReads.md), line 110.
+- `memoryCurve(at: DateTime, explanation: MasteryEstimating.EstimateExplanation, review: DateTime, reviewValue: Number, v1: Number, v3: Number, v7: Number, v14: Number, v30: Number, v60: Number, v90: Number) : MemoryCurve` — [Shared learning reads](../design/compositions/LearningReads.md), line 104.
 - `memoryInstants(at: DateTime) : SampleInstants` — [Shared learning reads](../design/compositions/LearningReads.md), line 98.
 - `modelOffered(model: String) : Flag` — [Settings](../design/compositions/Settings.md), line 35.
 - `offeredChoice(model: String, level: String) : TutorChoice` — [Settings](../design/compositions/Settings.md), line 41.
@@ -500,9 +500,7 @@ Concrete types:
 - `requestChoice(request: TutorRequest) : TutorChoice` — [Settings](../design/compositions/Settings.md), line 87.
 - `responseInput(data: GroundedTutoring.StudyRecord, text: String, channel: GroundedTutoring.Channel, attachments: AttachmentList, sources: Library.SourceRecords) : ResponseInput` — [Learning computations](../design/compositions/LearningComputations.md), line 62.
 - `reviewApproved(reviewed: Flag, unseen: Flag, outsideHelp: Flag) : Flag` — [Learning computations](../design/compositions/LearningComputations.md), line 65.
-- `reviewNarrow(search: ReviewSearch, value: Number, threshold: Number) : ReviewSearch` — [Shared learning reads](../design/compositions/LearningReads.md), line 107.
-- `reviewProbe(search: ReviewSearch) : DateTime` — [Shared learning reads](../design/compositions/LearningReads.md), line 104.
-- `reviewSearch(at: DateTime) : ReviewSearch` — [Shared learning reads](../design/compositions/LearningReads.md), line 101.
+- `reviewInstant(at: DateTime, explanation: MasteryEstimating.EstimateExplanation) : DateTime` — [Shared learning reads](../design/compositions/LearningReads.md), line 101.
 - `selectSkill(skills: SkillMapping.SkillMapRows, skill: SkillMapping.Skill) : SkillContext` — [Learning computations](../design/compositions/LearningComputations.md), line 68.
 - `selectSkillMaterials(context: SkillContext) : GroundedTutoring.MaterialSet` — [Learning computations](../design/compositions/LearningComputations.md), line 71.
 - `selectSources(sources: Library.SourceRecords, materials: GroundedTutoring.MaterialSet) : SourceSelection` — [Learning computations](../design/compositions/LearningComputations.md), line 74.
@@ -859,10 +857,9 @@ Authored path: `Reads.SkillCurve`.
 - Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 82.
 
 ```view
-the memory curve of (skill) at (definition) for (owner) at (at) — inputs (owner, skill, definition, at); outputs (startingConfidence, startedAt, estimate, projection, reviewBy, belowNow, leftAlone); bindings (threshold, explanation, t1, t3, t7, t14, t30, t60, t90, v1, v3, v7, v14, v30, v60, v90, e0, e1, e3, e7, e14, e30, e60, e90, u0, u1, u3, u7, u14, u30, u60, u90, search0, probe1, probed1, search1, probe2, probed2, search2, probe3, probed3, search3, probe4, probed4, search4, probe5, probed5, search5, probe6, probed6, search6, probe7, probed7, search7, probe8, probed8, search8) — answers at most one (startingConfidence, startedAt, estimate, projection, reviewBy, belowNow, leftAlone)
+the memory curve of (skill) at (definition) for (owner) at (at) — inputs (owner, skill, definition, at); outputs (startingConfidence, startedAt, estimate, projection, reviewBy, belowNow, leftAlone); bindings (explanation, review, reviewValue, t1, t3, t7, t14, t30, t60, t90, v1, v3, v7, v14, v30, v60, v90, e0, e1, e3, e7, e14, e30, e60, e90, u0, u1, u3, u7, u14, u30, u60, u90) — answers at most one (startingConfidence, startedAt, estimate, projection, reviewBy, belowNow, leftAlone)
   where
     MasteryEstimating._track (definition, learner: owner, subject: skill) has (initialConfidence: startingConfidence, initializedAt: startedAt)
-    MasteryEstimating._policy () has (readinessMinimum: threshold)
     MasteryEstimating._explanation (at, definition, learner: owner, subject: skill) has (explanation)
     (d1: t1, d14: t14, d3: t3, d30: t30, d60: t60, d7: t7, d90: t90) is memoryInstants (at)
     MasteryEstimating._estimate (at: t1, definition, learner: owner, subject: skill) has (value: v1)
@@ -872,32 +869,9 @@ the memory curve of (skill) at (definition) for (owner) at (at) — inputs (owne
     MasteryEstimating._estimate (at: t30, definition, learner: owner, subject: skill) has (value: v30)
     MasteryEstimating._estimate (at: t60, definition, learner: owner, subject: skill) has (value: v60)
     MasteryEstimating._estimate (at: t90, definition, learner: owner, subject: skill) has (value: v90)
-    search0 is reviewSearch (at)
-    probe1 is reviewProbe (search: search0)
-    MasteryEstimating._estimate (at: probe1, definition, learner: owner, subject: skill) has (value: probed1)
-    search1 is reviewNarrow (search: search0, threshold, value: probed1)
-    probe2 is reviewProbe (search: search1)
-    MasteryEstimating._estimate (at: probe2, definition, learner: owner, subject: skill) has (value: probed2)
-    search2 is reviewNarrow (search: search1, threshold, value: probed2)
-    probe3 is reviewProbe (search: search2)
-    MasteryEstimating._estimate (at: probe3, definition, learner: owner, subject: skill) has (value: probed3)
-    search3 is reviewNarrow (search: search2, threshold, value: probed3)
-    probe4 is reviewProbe (search: search3)
-    MasteryEstimating._estimate (at: probe4, definition, learner: owner, subject: skill) has (value: probed4)
-    search4 is reviewNarrow (search: search3, threshold, value: probed4)
-    probe5 is reviewProbe (search: search4)
-    MasteryEstimating._estimate (at: probe5, definition, learner: owner, subject: skill) has (value: probed5)
-    search5 is reviewNarrow (search: search4, threshold, value: probed5)
-    probe6 is reviewProbe (search: search5)
-    MasteryEstimating._estimate (at: probe6, definition, learner: owner, subject: skill) has (value: probed6)
-    search6 is reviewNarrow (search: search5, threshold, value: probed6)
-    probe7 is reviewProbe (search: search6)
-    MasteryEstimating._estimate (at: probe7, definition, learner: owner, subject: skill) has (value: probed7)
-    search7 is reviewNarrow (search: search6, threshold, value: probed7)
-    probe8 is reviewProbe (search: search7)
-    MasteryEstimating._estimate (at: probe8, definition, learner: owner, subject: skill) has (value: probed8)
-    search8 is reviewNarrow (search: search7, threshold, value: probed8)
-    (belowNow, estimate, projection, reviewBy) is memoryCurve (at, explanation, search: search8, threshold, v1, v14, v3, v30, v60, v7, v90)
+    review is reviewInstant (at, explanation)
+    MasteryEstimating._estimate (at: review, definition, learner: owner, subject: skill) has (value: reviewValue)
+    (belowNow, estimate, projection, reviewBy) is memoryCurve (at, explanation, review, reviewValue, v1, v14, v3, v30, v60, v7, v90)
     (e0, e1, e14, e3, e30, e60, e7, e90) is leftAloneDays (at, explanation)
     MasteryEstimating._withoutPractice (confidence: startingConfidence, days: e0) has (value: u0)
     MasteryEstimating._withoutPractice (confidence: startingConfidence, days: e1) has (value: u1)
@@ -1341,7 +1315,7 @@ Former "the activities of the proposal awaiting confirmation for (owner) in (cou
 ### the confidence in each active course of (owner)
 
 Authored path: `Reads.CourseScores`.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 129.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 123.
 
 ```former
 Former "the confidence in each active course of (owner)" — inputs (owner); bindings (course, skills, tracks, score, count, estimated); promises exactly one record — forms:
@@ -1395,9 +1369,9 @@ Authored path: `Reads.MemoryPolicy`.
 - Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 77.
 
 ```former
-Former "the estimate policy and its reference curve" — inputs (); bindings (policy, halfLifeDays, readinessMinimum, readinessDays, v0, v1, v3, v7, v14, v30, v60, v90, reference); promises exactly one record — forms:
+Former "the estimate policy and its reference curve" — inputs (); bindings (policy, desiredRetention, readinessMinimum, readinessDays, v0, v1, v3, v7, v14, v30, v60, v90, reference); promises exactly one record — forms:
   a record of
-    where MasteryEstimating._policy () has (halfLifeDays, policy, readinessDays, readinessMinimum)
+    where MasteryEstimating._policy () has (desiredRetention, policy, readinessDays, readinessMinimum)
     where MasteryEstimating._withoutPractice (confidence: 100, days: 0) has (value: v0)
     where MasteryEstimating._withoutPractice (confidence: 100, days: 1) has (value: v1)
     where MasteryEstimating._withoutPractice (confidence: 100, days: 3) has (value: v3)
@@ -1407,7 +1381,7 @@ Former "the estimate policy and its reference curve" — inputs (); bindings (po
     where MasteryEstimating._withoutPractice (confidence: 100, days: 60) has (value: v60)
     where MasteryEstimating._withoutPractice (confidence: 100, days: 90) has (value: v90)
     where reference is referenceCurve (v0, v1, v14, v3, v30, v60, v7, v90)
-    halfLifeDays
+    desiredRetention
     policy
     readinessDays
     reference
@@ -8487,7 +8461,7 @@ then
 
 Authored path: `Reads.Memory`.
 - Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 74.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 121.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 115.
 
 ```reaction
 when RequestBoundary.request (course, path: "/learning/memory", requestId, session)
@@ -8499,7 +8473,7 @@ then
 
 Authored path: `Reads.Memory`.
 - Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 74.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 121.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 115.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Reads.Memory
@@ -8514,7 +8488,7 @@ then
 
 Authored path: `Reads.Memory`.
 - Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 74.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 121.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 115.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Reads.Memory
@@ -8572,8 +8546,8 @@ then
 ### Reads.Scores
 
 Authored path: `Reads.Scores`.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 126.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 139.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 120.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 133.
 
 ```reaction
 when RequestBoundary.request (path: "/courses/scores", requestId, session)
@@ -8584,8 +8558,8 @@ then
 ### Reads.Scores#2
 
 Authored path: `Reads.Scores`.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 126.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 139.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 120.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 133.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Reads.Scores

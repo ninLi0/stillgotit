@@ -6,8 +6,8 @@ import { DEFAULT_LINE, HORIZON, STAGE_LINES, THRESHOLD_LINE, layoutSkills, type 
 import { SPRITES, STAGE_LABELS, iconRects, stageOf } from "./pixel-art.ts";
 
 // "Your skills" on the Memory view (design/visual-design.md, "Charts and summaries"): every skill's projected estimate
-// from today to 90 days ahead, each in its growth stage's green, over the default curve from 100% (a 1 px slate line), with a flag where each
-// skill falls below the review threshold. A flag is a button: hovering, focusing or tapping it names the skills and the
+// from today to 90 days ahead, each in its growth stage's green, over the default curve from 100% (a 1 px slate line), with a flag on each
+// skill's review day, when its memory's retention falls to the policy's desired retention. A flag is a button: hovering, focusing or tapping it names the skills and the
 // day and brings their lines forward, and a visually hidden table lists every value. `active` names the skills the view
 // brings forward from outside, such as a hovered row of the "Review by" list. The lines draw themselves once when the
 // view opens, and nothing moves after that.
@@ -61,7 +61,7 @@ function hide(event: KeyboardEvent) {
         <rect class="rule" :x="layout.frame.plot.left" :y="layout.frame.plot.bottom" :width="layout.frame.plot.right - layout.frame.plot.left" height="1" />
         <text v-for="t in layout.ticks" :key="`tick-${t.value}`" class="tick" :x="layout.frame.plot.left - 6" :y="t.y + 4" text-anchor="end">{{ t.value }}%</text>
         <path class="threshold" :d="`M ${layout.frame.plot.left} ${layout.threshold.y + 0.5} H ${layout.frame.plot.right}`" :stroke="THRESHOLD_LINE" />
-        <text class="threshold-label halo" :x="layout.frame.plot.right" :y="layout.threshold.y - 5" text-anchor="end">Review below {{ threshold }}%</text>
+        <text class="threshold-label halo" :x="layout.frame.plot.right" :y="layout.threshold.y - 5" text-anchor="end">Not ready below {{ threshold }}%</text>
         <path class="reference" :d="layout.reference" :stroke="DEFAULT_LINE" />
         <path v-for="line in layout.lines" :key="line.skill" class="line" :class="{ dim: !!active && !active.includes(line.skill), lit: !!active?.includes(line.skill) }" :d="line.d" :stroke="line.color" pathLength="1" />
         <g v-for="(f, i) in layout.flags" :key="f.days" class="arrive" :style="arrives(f.reach)">
@@ -83,15 +83,15 @@ function hide(event: KeyboardEvent) {
     <ul class="legend" aria-hidden="true">
       <li v-for="stage in stages" :key="stage"><svg width="16" height="10" class="key"><rect x="0" y="4" width="16" height="2" :fill="STAGE_LINES[stage]" /></svg><PixelIcon :sprite="stage" :size="14" />{{ STAGE_LABELS[stage] }}</li>
       <li><svg width="16" height="10" class="key"><rect x="0" y="5" width="16" height="1" :fill="DEFAULT_LINE" /></svg>Default curve from 100%</li>
-      <li><svg width="16" height="10" class="key"><rect x="0" y="5" width="5" height="1" :fill="THRESHOLD_LINE" /><rect x="8" y="5" width="5" height="1" :fill="THRESHOLD_LINE" /></svg>Review below {{ threshold }}%</li>
+      <li><svg width="16" height="10" class="key"><rect x="0" y="5" width="5" height="1" :fill="THRESHOLD_LINE" /><rect x="8" y="5" width="5" height="1" :fill="THRESHOLD_LINE" /></svg>Not ready below {{ threshold }}%</li>
       <li><PixelIcon sprite="flag" :size="14" />Review day</li>
     </ul>
     <table class="sr-only">
       <caption>Projected estimate of each skill without practice</caption>
-      <thead><tr><th scope="col">Skill</th><th scope="col">Today</th><th v-for="p in skills[0]?.projection ?? []" :key="p.days" scope="col">In {{ p.days }} {{ p.days === 1 ? "day" : "days" }}</th><th scope="col">Below {{ threshold }}%</th></tr></thead>
+      <thead><tr><th scope="col">Skill</th><th scope="col">Today</th><th v-for="p in skills[0]?.projection ?? []" :key="p.days" scope="col">In {{ p.days }} {{ p.days === 1 ? "day" : "days" }}</th><th scope="col">Review by</th></tr></thead>
       <tbody>
         <tr v-for="s in skills" :key="s.skill"><th scope="row">{{ s.title }}</th><td>{{ percent(s.estimate) }}</td><td v-for="p in s.projection" :key="p.days">{{ percent(p.value) }}</td>
-          <td>{{ s.reviewBy ? long.format(dayAt(s.reviewBy.days)) : s.estimate < threshold ? "Already" : `Not within ${HORIZON} days` }}</td></tr>
+          <td>{{ s.reviewBy ? long.format(dayAt(s.reviewBy.days)) : "Now" }}</td></tr>
       </tbody>
     </table>
   </figure>

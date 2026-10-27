@@ -1,6 +1,7 @@
 // Computations for the memory read (design/compositions/LearningReads.md, "Memory curves") and the course score. They
-// only place, compare and gather values that MasteryEstimating answers. None of them computes a score or a decay: every
-// value on a curve comes from MasteryEstimating._estimate or MasteryEstimating._withoutPractice.
+// only place, compare and gather values that MasteryEstimating answers. None of them computes a score or a forgetting
+// curve: every value on a curve comes from MasteryEstimating._estimate or MasteryEstimating._withoutPractice, and the
+// review day comes from the explanation's due instant.
 import type { EstimateExplanation } from "../concepts/MasteryEstimating/MasteryEstimating.ts";
 import type { SkillRows, Tracks } from "../learning-data.ts";
 import { averageEstimate } from "./course-score.ts";
@@ -8,11 +9,6 @@ import { averageEstimate } from "./course-score.ts";
 const DAY = 86_400_000;
 /** The days after the read's instant at which each projection is sampled. */
 export const SAMPLE_DAYS = [1, 3, 7, 14, 30, 60, 90] as const;
-/** How many whole days ahead the review search looks. */
-export const SEARCH_DAYS = 180;
-/** Binary search steps that narrow 0 to SEARCH_DAYS + 1 to one day. */
-export const SEARCH_STEPS = Math.ceil(Math.log2(SEARCH_DAYS + 1));
-
 const after = (at: Date, days: number) => new Date(at.getTime() + days * DAY);
 type Samples = { v1: number; v3: number; v7: number; v14: number; v30: number; v60: number; v90: number };
 const sampleValues = (values: Samples) => [values.v1, values.v3, values.v7, values.v14, values.v30, values.v60, values.v90];
@@ -23,20 +19,13 @@ export function memoryInstants({ at }: { at: Date }) {
 }
 
 /**
- * The review search. Without new evidence the projection never rises, so the first whole day below the threshold is
- * found by halving: `low` is a day known to be at or above it (0 stands for the read's instant), and `high` a day known
- * to be below it, or SEARCH_DAYS + 1 while none is known. `highValue` is the projection on day `high`.
+ * The instant of the first whole day after `at` at or after the explanation's `due`, when the memory's retention reaches the
+ * desired retention. When `due` is at or before `at` there is no such day, and the read's instant itself is answered so the
+ * estimate read that follows still has an instant; memoryCurve then answers no review day.
  */
-export interface ReviewSearch { at: Date; low: number; high: number; highValue: number | null }
-export function reviewSearch({ at }: { at: Date }): ReviewSearch { return { at, low: 0, high: SEARCH_DAYS + 1, highValue: null }; }
-const middle = (search: ReviewSearch) => (search.high - search.low > 1 ? Math.floor((search.low + search.high) / 2) : search.high);
-/** The instant of the day the next step reads: the middle of the interval, or its end once the search has finished. */
-export function reviewProbe({ search }: { search: ReviewSearch }): Date { return after(search.at, middle(search)); }
-/** Keeps the half of the interval that still holds the first day below the threshold. A finished search stays as it is. */
-export function reviewNarrow({ search, value, threshold }: { search: ReviewSearch; value: number; threshold: number }): ReviewSearch {
-  if (search.high - search.low <= 1) return search;
-  const day = middle(search);
-  return value < threshold ? { ...search, high: day, highValue: value } : { ...search, low: day };
+export function reviewInstant({ at, explanation }: { at: Date; explanation: EstimateExplanation }): Date {
+  const ahead = (explanation.due.getTime() - at.getTime()) / DAY;
+  return ahead > 0 ? after(at, Math.ceil(ahead)) : at;
 }
 
 /** One projected value: whole days after the read's instant, that instant, and the estimate then. */
@@ -45,19 +34,19 @@ export interface CurvePoint { days: number; at: Date; value: number }
 export interface MemoryCurve {
   estimate: number;
   projection: CurvePoint[];
-  /** The first whole day on which the projection is below the threshold, or null when it is already below or holds for SEARCH_DAYS. */
+  /** The first whole day after the read's instant at or after the FSRS due instant, or null when that instant has passed. */
   reviewBy: CurvePoint | null;
+  /** True when the due instant is at or before the read's instant. */
   belowNow: boolean;
 }
-/** Gathers the estimate now, the samples and the search's result. */
-export function memoryCurve({ at, explanation, threshold, search, ...values }: { at: Date; explanation: EstimateExplanation; threshold: number; search: ReviewSearch } & Samples): MemoryCurve {
+/** Gathers the estimate now, the samples, and the review day with the estimate on it. */
+export function memoryCurve({ at, explanation, review, reviewValue, ...values }: { at: Date; explanation: EstimateExplanation; review: Date; reviewValue: number } & Samples): MemoryCurve {
   const projected = sampleValues(values);
-  const belowNow = explanation.value < threshold;
-  const found = !belowNow && search.high <= SEARCH_DAYS && search.highValue !== null;
+  const belowNow = explanation.due.getTime() <= at.getTime();
   return {
     estimate: explanation.value,
     projection: SAMPLE_DAYS.map((days, index) => ({ days, at: after(at, days), value: projected[index]! })),
-    reviewBy: found ? { days: search.high, at: after(at, search.high), value: search.highValue! } : null,
+    reviewBy: belowNow ? null : { days: Math.round((review.getTime() - at.getTime()) / DAY), at: review, value: reviewValue },
     belowNow,
   };
 }

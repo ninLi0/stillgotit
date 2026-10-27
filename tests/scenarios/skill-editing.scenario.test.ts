@@ -7,6 +7,7 @@ import { createRuntime } from "../../src/host/runtime.ts";
 import * as mapping from "../../src/concepts/SkillMapping.ts";
 import type { CourseTutor } from "../../src/host/tutor.ts";
 import { connectMongo, localMongoUri } from "../../src/storage/mongo.ts";
+import { R, daysBetween, gradeOf, review, seed } from "../fixtures/fsrs.ts";
 
 /*
  * The skill-editing brief, walked through HTTP as a learner's browser would. Each test is named with the brief
@@ -164,7 +165,7 @@ describe("After confirming a skill, a learner can keep it accurate", () => {
     return fixture;
   });
   // What earlier steps hand to later ones.
-  const saved = {} as { inverses: string; v1: string; v2: string; assessed: string; open: string; study: Data; tracks: Data[]; inputs: Data[]; oldEstimate: Data };
+  const saved = {} as { inverses: string; v1: string; v2: string; assessed: string; open: string; study: Data; tracks: Data[]; inputs: Data[]; oldEstimate: Data; readAt: Date };
 
   test("rename it or move it to another unit", async () => {
     const { learner, course, products, multiply } = await journey();
@@ -197,11 +198,11 @@ describe("After confirming a skill, a learner can keep it accurate", () => {
     const { task: open } = await learner.ok("/learning/task", { skill: multiply });
     // Six days pass without practice, so the first version's estimate decays before the revision.
     app.advance(6 * DAY);
-    const study = await learner.ok("/learning/read", { skill: multiply });
+    const readAt = app.now, study = await learner.ok("/learning/read", { skill: multiply });
     const tracks = await app.concepts.MasteryEstimating._tracks({ learner: learner.user, subject: multiply });
     const inputs = await app.concepts.MasteryEstimating._inputs({ track: tracks[0]!.track });
     const oldEstimate = await app.concepts.MasteryEstimating._estimate({ learner: learner.user, subject: multiply, definition: v1, at: app.now });
-    Object.assign(saved, { v1, assessed, open, study, tracks, inputs, oldEstimate });
+    Object.assign(saved, { v1, assessed, open, study, tracks, inputs, oldEstimate, readAt });
 
     const revised = await learner.ok("/courses/skills/revise", { skill: multiply, ...REVISED });
     expect(revised).toEqual({ previous: v1, version: expect.any(String) });
@@ -242,7 +243,11 @@ describe("After confirming a skill, a learner can keep it accurate", () => {
     // Before the revision the skill showed the first version's estimate: ready, and lowered by six days without practice.
     expect(before.track).toMatchObject({ definition: saved.v1, startingBasis: "SELF_REPORTED" });
     expect(before.estimate.ready).toBe(true);
-    expect(before.estimate.value).toBeGreaterThan(85);
+    // The confidence of 50 seeded the memory. The assessed attempt a minute later met the gate, so it raised the
+    // estimate to 95 and counted as a same-day Good review. The 95 then fades with that review's stability until the read.
+    const [track] = saved.tracks, [input] = saved.inputs;
+    const memory = review(seed(50), gradeOf("INDEPENDENT"), daysBetween(input.performedAt, track.initializedAt));
+    expect(before.estimate.value).toBeCloseTo(95 * R(daysBetween(saved.readAt, input.performedAt), memory.stability), 9);
     expect(before.estimate.value).toBeLessThan(95);
     // The new version's track starts from that value, has no evidence, and is not ready.
     expect(after.track).toMatchObject({ definition: saved.v2, startingBasis: "PREVIOUS_DEFINITION", inputs: [] });

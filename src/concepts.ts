@@ -32,7 +32,7 @@ const viewPreferring = registerConcept({ class: ViewPreferring, spec: preferring
 export class TreeStyling extends Styling<User, Unit, TreeKind> {}
 const treeStyling = registerConcept({ class: TreeStyling, spec: stylingSpec, refusals: {} });
 import { extractRequest, gradedImport, gradedKey, gradedReview, gradedSource, gradedTitle, gradedToday, hasConfirmedSkill, hasGradedRows } from "./computations/importing.ts";
-import { courseScore, leftAloneDays, leftAlonePath, memoryCurve, memoryInstants, referenceCurve, reviewNarrow, reviewProbe, reviewSearch } from "./computations/memory.ts";
+import { courseScore, leftAloneDays, leftAlonePath, memoryCurve, memoryInstants, referenceCurve, reviewInstant } from "./computations/memory.ts";
 
 export const applicationConceptSet = conceptSet({
   Registering: registering,
@@ -52,5 +52,5 @@ export const applicationConceptSet = conceptSet({
   tutorCatalog, defaultChoice, modelOffered, levelSupported, offeredChoice, choiceOffered, withChoice, requestChoice, tutorStatus,
   homeViewOffered, offeredHomeView, defaultHomeView, treeKindOffered, offeredTreeKind,
   gradedTitle, hasConfirmedSkill, extractRequest, hasGradedRows, gradedToday, gradedReview, gradedKey, gradedImport, gradedSource,
-  memoryInstants, reviewSearch, reviewProbe, reviewNarrow, memoryCurve, leftAloneDays, leftAlonePath, referenceCurve, courseScore });
+  memoryInstants, reviewInstant, memoryCurve, leftAloneDays, leftAlonePath, referenceCurve, courseScore });
 export const { concepts, computations } = applicationConceptSet;

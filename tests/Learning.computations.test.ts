@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { estimateTimeline, planRequest, responseInput } from "../src/computations/learning.ts";
 import type { EstimateExplanation, ProgressRow } from "../src/concepts/MasteryEstimating/MasteryEstimating.ts";
+import { D0, S0, g0 } from "./fixtures/fsrs.ts";
 
 const DAY = 86_400_000, start = new Date("2026-10-13T12:00:00Z");
 const after = (days: number) => new Date(start.getTime() + days * DAY);
@@ -26,9 +27,11 @@ describe("responseInput", () => {
 
 describe("estimateTimeline", () => {
   const explanation = (changes: EstimateExplanation["changes"], extra: Partial<EstimateExplanation> = {}): EstimateExplanation => ({
-    policy: "prototype-1", initialConfidence: 60, startingBasis: "PREVIOUS_DEFINITION", replayStart: start,
+    policy: "fsrs-1", initialConfidence: 60, startingBasis: "PREVIOUS_DEFINITION", replayStart: start,
     evidence: [{ evidence: "case-1", revision: 1 }, { evidence: "case-2", revision: 1 }], ignored: [{ evidence: "case-2", reason: "Too little evidence to change the score." }],
-    changes, value: 0, ready: false, basis: "The concept's own sentence.", ...extra,
+    changes, value: 0, ready: false, basis: "The concept's own sentence.",
+    // The memory state is not part of the timeline; these stand-in values are the seed a confidence of 60 gives.
+    stability: S0(g0(60)), difficulty: D0(g0(60)), retention: 1, due: new Date(start.getTime() + S0(g0(60)) * DAY), ...extra,
   });
   const tracks = [
     { adjustments: [{ adjustment: "other-track-adjustment", value: 10, reason: "Unrelated", at: start }] },
@@ -66,8 +69,11 @@ describe("estimateTimeline", () => {
 describe("planRequest", () => {
   const skills = [{ skill: "s", title: "Products", current: "v1", status: "CONFIRMED", prerequisites: [] }] as never;
   const input = { input: "i", evidence: "case-1", revision: 1, performedAt: new Date("2026-10-22T16:00:00Z"), signal: "INDEPENDENT", fresh: true, gateMet: true, attribution: "AI assessment" };
+  // These tests are about keys and windows, so the track's FSRS stability is a stand-in of one day: the review after the
+  // independent success falls on the next day. Planning.computations.test.ts checks days computed from the FSRS formulas.
   const track = (adjustments: ProgressRow["adjustments"], value: number) => ({ track: "t", subject: "s", definition: "v1", initialConfidence: 50, startingBasis: "SELF_REPORTED",
-    initializedAt: new Date("2026-10-20T16:00:00Z"), inputs: [input], adjustments, estimate: { value, basis: "", ready: value >= 70 } }) as ProgressRow;
+    initializedAt: new Date("2026-10-20T16:00:00Z"), inputs: [input], adjustments,
+    estimate: { value, basis: "", ready: value >= 70, stability: 1, due: new Date(input.performedAt.getTime() + DAY) } }) as ProgressRow;
   const schedule = (plans: unknown[] = []) => ({ today: "2026-10-23", plans, deadlines: [] }) as never;
   const adjustment = { adjustment: "adj-1", value: 40, reason: "Not sure any more.", at: new Date("2026-10-23T15:00:00Z") };
   const plan = (candidate: unknown, status = "TODO") => ({ status: "ACTIVE", items: [{ candidate, status }], deferred: [] });

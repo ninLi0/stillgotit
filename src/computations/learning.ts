@@ -230,10 +230,13 @@ export function planRequest({ skills, tracks, schedule }: { skills: SkillRows; t
   const preparing = focus ? examSkills(skills, focus.covered) : new Set<string>();
   for (const row of rows) {
     const informative = row.track?.inputs.filter((input) => input.signal === "SLIP" || input.signal === "GAP" || (input.fresh && ["INDEPENDENT", "SUPPORTED"].includes(input.signal))) ?? [];
-    const latest = informative.at(-1), successfulDays = new Set<string>();
-    for (const input of informative) { if (input.signal === "SLIP" || input.signal === "GAP") successfulDays.clear(); if (input.signal === "INDEPENDENT") successfulDays.add(studyDate(input.performedAt)); }
-    const interval = latest?.signal === "INDEPENDENT" ? [1, 3, 7][Math.min(2, Math.max(0, successfulDays.size - 1))]! : 1;
-    const earliestDay = latest ? studyDate(new Date(latest.performedAt.getTime() + interval * 86_400_000)) : day;
+    // After independent success the next review is the FSRS due instant: the stability in days after that success. An
+    // adjustment leaves the stability unchanged and is not practice, so the day is counted from the evidence. After any
+    // other result the next review is one day later.
+    const latest = informative.at(-1), stability = row.track?.estimate?.stability;
+    const interval = latest?.signal === "INDEPENDENT" && stability !== undefined ? stability : 1;
+    const next = latest ? new Date(latest.performedAt.getTime() + interval * 86_400_000) : null;
+    const earliestDay = next ? studyDate(next) : day;
     const occasion = earliestDay < day ? day : earliestDay;
     // The key names the evidence and, once the track has one, its latest adjustment; a reused key keeps its saved candidate.
     const evidencePrefix = `${row.skill}:${row.current}:${latest?.evidence ?? "initial"}:${latest?.revision ?? 0}:`;
@@ -273,7 +276,7 @@ export function planRequest({ skills, tracks, schedule }: { skills: SkillRows; t
     // Tracks without adjustments keep the fingerprint they had before adjustments existed.
     ...(row.track.adjustments.length ? { adjustments: row.track.adjustments } : {}),
   }]) })).digest("hex");
-  const explanation = "Ten-minute activities ordered by estimated need. Successful independent practice on later days extends the review interval from one to three to seven days. These are prototype settings." +
+  const explanation = "Ten-minute activities ordered by estimated need. After independent success the next review falls on the day the memory model expects recall to drop to 90%; after any other result it is the next day." +
     (focus ? ` Preparation for the exam on ${focus.date} comes first.` : "");
   return { candidates, horizonEnd, basis, explanation };
 }

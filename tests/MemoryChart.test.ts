@@ -4,6 +4,7 @@ import {
   DEFAULT_LINE, HORIZON, STAGE_LINES, THRESHOLD_LINE, assignLanes, chartFrame, dayX, labelWidth, layoutDefault, layoutShaped,
   layoutSkills, pastShare, reviewOrder, stageLine, standing, steppedPath, type DayValue, type ReviewRow,
 } from "../frontend/src/memory-chart.ts";
+import { leftAlone } from "./fixtures/fsrs.ts";
 
 /** The path's corners, in order. The paths use only M, H and V, so every segment is horizontal or vertical. */
 function corners(path: string): [number, number][] {
@@ -22,9 +23,10 @@ function corners(path: string): [number, number][] {
 const whole = (path: string) => corners(path).every(([x, y]) => Number.isInteger(x) && Number.isInteger(y));
 const has = (path: string, x: number, y: number) => corners(path).some(([cx, cy]) => cx === x && cy === y);
 
-// The test's own copy of the policy's curve, standing in for the values the memory read answers.
+// The test's own copy of the policy's curve left alone (tests/fixtures/fsrs.ts), standing in for the values the memory
+// read answers. The review days below are placements for the geometry, standing in for the FSRS due days the read answers.
 const SAMPLES = [1, 3, 7, 14, 30, 60, 90];
-const fall = (value: number, days: number) => value * 2 ** (-days / 60);
+const fall = (value: number, days: number) => leftAlone(value, days);
 const REFERENCE: DayValue[] = [0, ...SAMPLES].map((days) => ({ days, value: fall(100, days) }));
 const projection = (value: number) => SAMPLES.map((days) => ({ days, value: fall(value, days) }));
 const DAY = 86_400_000, TODAY = Date.parse("2026-10-26T16:00:00Z");
@@ -81,7 +83,7 @@ describe("The Memory view's chart geometry", () => {
     expect(steps[0]).toEqual([layout.frame.inner.left, valueY(100)]);
     expect(steps.at(-1)).toEqual([layout.frame.inner.right, valueY(fall(100, 90))]);
     for (let i = 1; i < steps.length; i++) expect(steps[i]![1]).toBeGreaterThanOrEqual(steps[i - 1]![1]);
-    expect(has(layout.path, dayX(60, layout.frame.inner.left, layout.frame.inner.right), valueY(50))).toBe(true);
+    expect(has(layout.path, dayX(60, layout.frame.inner.left, layout.frame.inner.right), valueY(fall(100, 60)))).toBe(true);
     expect(layout.threshold).toEqual({ value: 70, y: valueY(70) });
     expect(layout.days.map((d) => d.days)).toEqual([0, 30, 60, 90]);
     expect(layout.end).toEqual({ x: layout.frame.inner.right, y: valueY(fall(100, 90)), value: fall(100, 90) });

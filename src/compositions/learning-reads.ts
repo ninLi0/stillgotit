@@ -1,7 +1,6 @@
 import { endpoint, receive, respond } from "@mit-sdg/sync-engine/boundary";
-import { compute, each, former, no, now, view, where, whether, type Condition } from "@mit-sdg/sync-engine/language";
+import { compute, each, former, no, now, view, where, whether } from "@mit-sdg/sync-engine/language";
 import { concepts, computations } from "../concepts.ts";
-import { SEARCH_STEPS } from "../computations/memory.ts";
 import { composition as Courses } from "./courses.ts";
 import { learningInput, structuredOutput, validators } from "./reusable/inputs.ts";
 const { Sessioning, SkillMapping: Mapping, Library, GroundedTutoring: Tutoring, AssessmentReviewing: Assessment, MasteryEstimating: Mastery, StudyPlanning: Planning } = concepts;
@@ -101,36 +100,21 @@ const Recent = endpoint("/learning/recent", ({ session, course, owner }) => rece
 // ---- Memory curves (design/compositions/LearningReads.md, "Memory curves") ----
 // Every value on a curve is MasteryEstimating's: _estimate for the skill's own projection, _withoutPractice for a curve
 // that belongs to no track. The computations only place and compare those values.
-/**
- * The review search's steps. Each reads the projection on the middle day of the interval still in question and keeps the
- * half that holds the first day below the threshold; SEARCH_STEPS steps narrow 180 days to one.
- */
-function reviewSearchLines(owner: symbol, skill: symbol, definition: symbol, threshold: symbol, at: symbol, free: Record<string, symbol>): Condition[] {
-  const lines: Condition[] = [compute(computations.reviewSearch, { at }, free.search0!)];
-  for (let step = 1; step <= SEARCH_STEPS; step++) {
-    const search = free[`search${step - 1}`]!, probe = free[`probe${step}`]!, value = free[`probed${step}`]!;
-    lines.push(compute(computations.reviewProbe, { search }, probe),
-      Mastery._estimate({ learner: owner, subject: skill, definition, at: probe }).is({ value }),
-      compute(computations.reviewNarrow, { search, value, threshold }, free[`search${step}`]!));
-  }
-  return lines;
-}
 // The skill's curve for its current definition: its starting point, the estimate at `at`, the projection sampled at whole
-// days after `at`, the first day the projection falls below the review threshold, and the curve the skill would have
-// followed from its starting point with no evidence. There is no row when the definition has no track.
+// days after `at`, the first whole day at or after the FSRS due instant, and the curve the skill would have followed from
+// its starting point with no evidence. There is no row when the definition has no track.
 export const SkillCurve = view("the memory curve of (skill) at (definition) for (owner) at (at)", ({ owner, skill, definition, at },
   { startingConfidence, startedAt, estimate, projection, reviewBy, belowNow, leftAlone }, free) => {
-  const { threshold, explanation, t1, t3, t7, t14, t30, t60, t90, v1, v3, v7, v14, v30, v60, v90, e0, e1, e3, e7, e14, e30, e60, e90, u0, u1, u3, u7, u14, u30, u60, u90 } = free;
+  const { explanation, review, reviewValue, t1, t3, t7, t14, t30, t60, t90, v1, v3, v7, v14, v30, v60, v90, e0, e1, e3, e7, e14, e30, e60, e90, u0, u1, u3, u7, u14, u30, u60, u90 } = free;
   const estimateAt = (instant: symbol, value: symbol) => Mastery._estimate({ learner: owner, subject: skill, definition, at: instant }).is({ value });
   const leftAloneAt = (days: symbol, value: symbol) => Mastery._withoutPractice({ confidence: startingConfidence, days }).is({ value });
   return where(
     Mastery._track({ learner: owner, subject: skill, definition }).is({ initialConfidence: startingConfidence, initializedAt: startedAt }),
-    Mastery._policy({}).is({ readinessMinimum: threshold }),
     Mastery._explanation({ learner: owner, subject: skill, definition, at }).is({ explanation }),
     compute(computations.memoryInstants, { at }, { d1: t1, d3: t3, d7: t7, d14: t14, d30: t30, d60: t60, d90: t90 }),
     estimateAt(t1, v1), estimateAt(t3, v3), estimateAt(t7, v7), estimateAt(t14, v14), estimateAt(t30, v30), estimateAt(t60, v60), estimateAt(t90, v90),
-    ...reviewSearchLines(owner, skill, definition, threshold, at, free),
-    compute(computations.memoryCurve, { at, explanation, threshold, search: free[`search${SEARCH_STEPS}`]!, v1, v3, v7, v14, v30, v60, v90 }, { estimate, projection, reviewBy, belowNow }),
+    compute(computations.reviewInstant, { at, explanation }, review), estimateAt(review, reviewValue),
+    compute(computations.memoryCurve, { at, explanation, review, reviewValue, v1, v3, v7, v14, v30, v60, v90 }, { estimate, projection, reviewBy, belowNow }),
     compute(computations.leftAloneDays, { explanation, at }, { e0, e1, e3, e7, e14, e30, e60, e90 }),
     leftAloneAt(e0, u0), leftAloneAt(e1, u1), leftAloneAt(e3, u3), leftAloneAt(e7, u7), leftAloneAt(e14, u14), leftAloneAt(e30, u30), leftAloneAt(e60, u60), leftAloneAt(e90, u90),
     compute(computations.leftAlonePath, { explanation, at, u0, v1: u1, v3: u3, v7: u7, v14: u14, v30: u30, v60: u60, v90: u90 }, leftAlone),
@@ -146,13 +130,13 @@ export const MemorySkills = former("the memory curves of the confirmed skills in
     .form({ skill, title, unit, unitTitle, startingConfidence, startedAt, estimate, projection, reviewBy, belowNow, leftAlone }),
 );
 // The policy's settings and its reference curve: an estimate of 100% left alone, on day 0 and each sample day.
-export const MemoryPolicy = former("the estimate policy and its reference curve", (_inputs, { policy, halfLifeDays, readinessMinimum, readinessDays, v0, v1, v3, v7, v14, v30, v60, v90, reference }) => {
+export const MemoryPolicy = former("the estimate policy and its reference curve", (_inputs, { policy, desiredRetention, readinessMinimum, readinessDays, v0, v1, v3, v7, v14, v30, v60, v90, reference }) => {
   const fromFull = (days: number, value: symbol) => Mastery._withoutPractice({ confidence: 100, days }).is({ value });
   return where(
-    Mastery._policy({}).is({ policy, halfLifeDays, readinessMinimum, readinessDays }),
+    Mastery._policy({}).is({ policy, desiredRetention, readinessMinimum, readinessDays }),
     fromFull(0, v0), fromFull(1, v1), fromFull(3, v3), fromFull(7, v7), fromFull(14, v14), fromFull(30, v30), fromFull(60, v60), fromFull(90, v90),
     compute(computations.referenceCurve, { v0, v1, v3, v7, v14, v30, v60, v90 }, reference),
-  ).form({ policy, halfLifeDays, reviewThreshold: readinessMinimum, readinessDays, reference });
+  ).form({ policy, desiredRetention, reviewThreshold: readinessMinimum, readinessDays, reference });
 });
 const Memory = endpoint("/learning/memory", ({ session, course, owner, at, asOf }) => receive({ session, course })
   .then(Sessioning.use({ session }).responds({ subject: owner })).then(

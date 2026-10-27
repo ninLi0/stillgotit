@@ -3,6 +3,9 @@ import { randomUUID } from "node:crypto";
 import type { Document } from "mongodb";
 import { MasteryEstimating, type Signal, type StartingBasis } from "../src/concepts/MasteryEstimating/MasteryEstimating.ts";
 import { connectMongo, localMongoUri } from "../src/storage/mongo.ts";
+import {
+  D0, D0raw, DAY, DECAY, type Grade, R, S0, W, daysBetween, g0, gradeOf, lapseS, leftAlone, nextD, review, sameDayS, seed, successFactor,
+} from "./fixtures/fsrs.ts";
 
 const database = `stillgotit_test_${randomUUID().replaceAll("-", "")}`;
 const uri = process.env.MONGODB_TEST_URI ?? localMongoUri;
@@ -45,10 +48,14 @@ async function savedState(): Promise<Record<string, Document[]>> {
 type EvidenceInput = Parameters<MasteryEstimating["acceptEvidence"]>[0];
 type AdjustInput = Parameters<MasteryEstimating["adjust"]>[0];
 
-const start = new Date("2026-09-01T12:00:00Z"), day = 86_400_000;
+const start = new Date("2026-09-01T12:00:00Z"), day = DAY;
 const at = (days: number) => new Date(start.getTime() + days * day);
-/** Policy prototype-1 halves the estimate every 60 days without practice. */
-const decay = (value: number, days: number) => value * 2 ** (-days / 60);
+/** Fresh independent work without the full gate adds up to 10, but not past 79 or past the highest value reached before. */
+const partialGain = (value: number, highest: number) => Math.max(value, Math.min(Math.max(79, highest), value + 10));
+/** The concept and the test each round a fractional day count to whole milliseconds, so two instants match within one. */
+function sameInstant(actual: Date, expected: number) {
+  expect(Math.abs(actual.getTime() - expected)).toBeLessThanOrEqual(1);
+}
 const sam = { learner: "sam", subject: "matrix-products", definition: "v1" };
 const leo = { ...sam, learner: "leo" };
 
@@ -56,7 +63,8 @@ function setup() {
   let now = start;
   const mastery = new MasteryEstimating(connection!.db, "MasteryEstimating", () => now);
   const estimate = async (days: number, identity = sam) => (await mastery._estimate({ ...identity, at: at(days) }))[0]!;
-  return { mastery, estimate, setDay: (days: number) => { now = at(days); } };
+  const explain = async (when: Date, identity = sam) => (await mastery._explanation({ ...identity, at: when }))[0]!.explanation;
+  return { mastery, estimate, explain, setDay: (days: number) => { now = at(days); } };
 }
 
 function evidence(id: string, signal: Signal, performedAt: Date, overrides: Partial<EvidenceInput> = {}): EvidenceInput {
@@ -69,38 +77,45 @@ function adjustment(adjustmentKey: string, value: number, reason = reviewed, ove
 }
 
 describe("MasteryEstimating", () => {
-  test("principle: confidence decays, assisted and independent work restore it, a regrade replays, and an adjustment resets it", async () => {
-    const { mastery, estimate, setDay } = setup();
+  test("principle: confidence fades without practice, assisted and independent work restore it, a regrade replays, and an adjustment resets it", async () => {
+    const { mastery, estimate, explain, setDay } = setup();
     const { track } = await mastery.initialize({ ...sam, confidence: 80, basis: "SELF_REPORTED" });
     expect(await mastery._track(sam)).toEqual([{ track, initialConfidence: 80, startingBasis: "SELF_REPORTED", initializedAt: start }]);
     expect(await estimate(0)).toMatchObject({ value: 80, ready: false, basis: expect.stringContaining("provisional") });
 
-    // One half-life without practice halves the estimate.
+    // Sixty days without practice lower the estimate along the forgetting curve of the memory that 80 seeds.
+    const seeded = seed(80), faded = 80 * R(60, seeded.stability);
     setDay(60);
-    expect((await estimate(60)).value).toBeCloseTo(40);
-    // Success with help restores half of the loss.
+    expect((await estimate(60)).value).toBeCloseTo(faded, 9);
+    // Success with help restores half of the loss. It counts as a Hard review, so the memory becomes more stable.
     await mastery.acceptEvidence(evidence("attempt-a", "SUPPORTED", at(60)));
-    expect((await estimate(60)).value).toBeCloseTo(60);
-    // Fresh independent work a day later adds the partial gain, which is still below readiness.
+    const helped = (faded + 80) / 2, afterHelp = review(seeded, gradeOf("SUPPORTED"), 60);
+    expect((await estimate(60)).value).toBeCloseTo(helped, 9);
+    expect((await explain(at(60))).stability).toBeCloseTo(afterHelp.stability, 9);
+    expect(afterHelp.stability).toBeGreaterThan(seeded.stability);
+    // Fresh independent work a day later adds the partial gain, which reaches readiness.
     setDay(61);
     await mastery.acceptEvidence(evidence("attempt-b", "INDEPENDENT", at(61)));
-    expect(await estimate(61)).toMatchObject({ value: expect.closeTo(decay(60, 1) + 10, 9), ready: false });
+    expect(await estimate(61)).toMatchObject({ value: expect.closeTo(partialGain(helped * R(1, afterHelp.stability), 80), 9), ready: true });
 
     // A regrade replaces attempt-a at its original date, and the later gain is recalculated from there.
+    // The slip leaves the estimate below the readiness minimum.
     const [original] = await mastery._inputs({ track });
     const regraded = await mastery.acceptEvidence(evidence("attempt-a", "SLIP", at(60), { revision: 2, attribution: "The regrade found one wrong entry." }));
     expect(regraded.input).toBe(original!.input);
-    const afterSlip = decay(80, 60) - 5;
-    expect((await estimate(61)).value).toBeCloseTo(decay(afterSlip, 1) + 10);
+    const afterSlip = faded - 5, slipped = review(seeded, gradeOf("SLIP"), 60);
+    const afterIndependent = review(slipped, gradeOf("INDEPENDENT"), 1);
+    expect(await estimate(61)).toMatchObject({ value: expect.closeTo(partialGain(afterSlip * R(1, slipped.stability), 80), 9), ready: false });
+    expect((await explain(at(61))).stability).toBeCloseTo(afterIndependent.stability, 9);
     expect((await mastery._inputs({ track })).map(({ evidence: id, revision, signal }) => [id, revision, signal]))
       .toEqual([["attempt-a", 2, "SLIP"], ["attempt-b", 1, "INDEPENDENT"]]);
 
-    // A manual adjustment sets a new value. Time and later practice still change it.
+    // A manual adjustment sets a new value. Time and later practice still change it, and the memory keeps its stability.
     setDay(62);
     const { adjustment: adjusted } = await mastery.adjust(adjustment("principle-adjustment", 60));
     expect(await mastery._adjustments({ track })).toEqual([{ adjustment: adjusted, value: 60, reason: reviewed, at: at(62) }]);
     expect(await estimate(62)).toMatchObject({ value: 60, ready: false });
-    expect((await estimate(63)).value).toBeCloseTo(decay(60, 1));
+    expect((await estimate(63)).value).toBeCloseTo(60 * R(1, afterIndependent.stability), 9);
     setDay(63);
     await mastery.acceptEvidence(evidence("attempt-c", "INDEPENDENT", at(63), { gateMet: true }));
     expect(await estimate(63)).toMatchObject({ value: 95, ready: true });
@@ -108,44 +123,55 @@ describe("MasteryEstimating", () => {
     const [{ explanation }] = await mastery._explanation({ ...sam, at: at(63) });
     expect(explanation.evidence).toEqual([{ evidence: "attempt-a", revision: 2 }, { evidence: "attempt-b", revision: 1 }, { evidence: "attempt-c", revision: 1 }]);
     expect(explanation.changes.map(({ source }) => source)).toEqual(["attempt-a", "attempt-b", adjusted, "attempt-c"]);
+    // The last review counts its days from the adjustment, the last event before it.
+    expect(explanation.stability).toBeCloseTo(review(afterIndependent, gradeOf("INDEPENDENT"), daysBetween(at(63), at(62))).stability, 9);
     // An earlier query time uses only the evidence and adjustments dated by then.
-    expect((await estimate(60)).value).toBeCloseTo(afterSlip);
+    expect((await estimate(60)).value).toBeCloseTo(afterSlip, 9);
     expect(await mastery._estimate({ ...sam, at: new Date(start.getTime() - 1) })).toEqual([]);
     const { tracks } = await mastery._progress({ learner: "sam" });
     expect(tracks.map(({ track: id, inputs, adjustments, estimate: current }) => ({ id, inputs: inputs.length, adjustments, value: current?.value, ready: current?.ready })))
       .toEqual([{ id: track, inputs: 3, adjustments: [{ adjustment: adjusted, value: 60, reason: reviewed, at: at(62) }], value: 95, ready: true }]);
   });
 
-  test("_policy reports the policy's settings and _withoutPractice gives the decay a track's estimate follows between events", async () => {
+  test("_policy reports the policy's settings and _withoutPractice gives the curve a track's estimate follows with no evidence", async () => {
     const { mastery, estimate, setDay } = setup();
-    expect(await mastery._policy()).toEqual({ policy: "prototype-1", halfLifeDays: 60, readinessMinimum: 70, readinessDays: 14 });
-    // The same decay as a track left alone, from any starting value, with no track and no stored state.
+    const policy = { policy: "fsrs-1", desiredRetention: 0.9, readinessMinimum: 70, readinessDays: 14, parameters: W };
+    expect(await mastery._policy()).toEqual(policy);
+    // The same curve as a track left alone, from any starting value, with no track and no stored state.
     await mastery.initialize({ ...sam, confidence: 90, basis: "SELF_REPORTED" });
     for (const days of [0, 1, 3, 7, 14, 30, 60, 90, 180]) {
       const { value } = await mastery._withoutPractice({ confidence: 90, days });
       expect(value).toBeCloseTo((await estimate(days)).value, 9);
-      expect(value).toBeCloseTo(decay(90, days), 9);
+      expect(value).toBeCloseTo(leftAlone(90, days), 9);
     }
-    expect(await mastery._withoutPractice({ confidence: 100, days: 60 })).toEqual({ value: 50 });
-    // Out-of-range input is clamped, and input that is not a number answers 0.
+    // A lower starting confidence seeds a less stable memory, so it keeps a smaller share after the same time.
+    const kept = async (confidence: number) => (await mastery._withoutPractice({ confidence, days: 30 })).value / confidence;
+    expect(await kept(40)).toBeCloseTo(R(30, S0(2)), 9);
+    expect(await kept(40)).toBeLessThan(await kept(90));
+    // Out-of-range input is clamped and then follows the clamped value's curve. Input that is not a number answers 0.
     expect(await mastery._withoutPractice({ confidence: 140, days: -5 })).toEqual({ value: 100 });
+    expect((await mastery._withoutPractice({ confidence: 140, days: 10 })).value).toBeCloseTo(leftAlone(100, 10), 9);
     expect(await mastery._withoutPractice({ confidence: -3, days: 10 })).toEqual({ value: 0 });
     expect(await mastery._withoutPractice({ confidence: Number.NaN, days: 10 })).toEqual({ value: 0 });
     expect(await mastery._withoutPractice({ confidence: 80, days: Number.POSITIVE_INFINITY })).toEqual({ value: 0 });
     // Both queries read no state: the track's estimate is unchanged, and a later day changes neither answer.
     setDay(30);
     expect(await mastery._withoutPractice({ confidence: 90, days: 0 })).toEqual({ value: 90 });
-    expect((await mastery._policy()).halfLifeDays).toBe(60);
+    expect(await mastery._policy()).toEqual(policy);
   });
 
   test("work done before setup calibrates the estimate from the attempt's date", async () => {
-    const { mastery, estimate, setDay } = setup();
+    const { mastery, estimate, explain, setDay } = setup();
     setDay(10);
     await mastery.initialize({ ...sam, confidence: 50, basis: "SELF_REPORTED" });
     await mastery.acceptEvidence(evidence("earlier-exam", "INDEPENDENT", at(0), { gateMet: true }));
-    // Replay starts at the earlier attempt, so the full gate applies there and then decays for 10 days.
-    expect((await mastery._explanation({ ...sam, at: at(10) }))[0]!.explanation.replayStart).toEqual(at(0));
-    expect(await estimate(10)).toMatchObject({ value: expect.closeTo(decay(95, 10), 9), ready: true });
+    // Replay starts at the earlier attempt, so the full gate applies there, and the estimate fades for 10 days from it.
+    // The attempt is a Good review on the day the memory that 50 seeds begins.
+    const explanation = await explain(at(10));
+    const memory = review(seed(50), gradeOf("INDEPENDENT"), 0);
+    expect(explanation.replayStart).toEqual(at(0));
+    expect(explanation.stability).toBeCloseTo(memory.stability, 9);
+    expect(await estimate(10)).toMatchObject({ value: expect.closeTo(95 * R(10, memory.stability), 9), ready: true });
     expect(await mastery._estimate({ ...sam, at: at(5) })).toEqual([]);
   });
 
@@ -257,7 +283,7 @@ describe("MasteryEstimating", () => {
 
       // A query before an adjustment neither uses it nor mentions it.
       const earlier = await estimate(5);
-      expect(earlier.value).toBeCloseTo(decay(80, 5));
+      expect(earlier.value).toBeCloseTo(leftAlone(80, 5), 9);
       expect(earlier.basis).not.toContain("manual adjustments");
     });
 
@@ -350,6 +376,9 @@ describe("MasteryEstimating", () => {
       const third = await mastery.adjust(adjustment("key-gamma", 30, "Third reason.", { definition: "v2" }));
       setDay(4);
 
+      // The first track's slip is a Hard review two days after the start. The adjustments keep its memory.
+      // The second track has only its seeded memory, with the reference point moved to its adjustment.
+      const slipped = review(seed(80), gradeOf("SLIP"), 2);
       const { tracks } = await mastery._progress({ learner: "sam" });
       expect(tracks).toEqual([
         {
@@ -359,19 +388,30 @@ describe("MasteryEstimating", () => {
             { adjustment: first.adjustment, value: 40, reason: "First reason.", at: at(2) },
             { adjustment: second.adjustment, value: 70, reason: "Second reason.", at: at(2) },
           ],
-          estimate: { value: expect.closeTo(decay(70, 2), 9), basis: expect.stringContaining("Your manual adjustments are included."), ready: false },
+          estimate: {
+            value: expect.closeTo(70 * R(2, slipped.stability), 9), basis: expect.stringContaining("Your manual adjustments are included."), ready: false,
+            stability: expect.closeTo(slipped.stability, 9), due: expect.any(Date),
+          },
         },
         {
           track: revised, subject: "matrix-products", definition: "v2", initialConfidence: 60, startingBasis: "PREVIOUS_DEFINITION", initializedAt: at(1),
           inputs: [],
           adjustments: [{ adjustment: third.adjustment, value: 30, reason: "Third reason.", at: at(3) }],
-          estimate: { value: expect.closeTo(decay(30, 1), 9), basis: expect.stringContaining("provisional"), ready: false },
+          estimate: {
+            value: expect.closeTo(30 * R(1, S0(g0(60))), 9), basis: expect.stringContaining("provisional"), ready: false,
+            stability: S0(g0(60)), due: expect.any(Date),
+          },
         },
       ]);
+      // Each track is due one stability after its last event.
+      sameInstant(tracks[0]!.estimate!.due, at(2).getTime() + slipped.stability * day);
+      sameInstant(tracks[1]!.estimate!.due, at(3).getTime() + S0(g0(60)) * day);
       // The explanation reports the same order: the attempt, then both adjustments, then time.
       const [{ explanation }] = await mastery._explanation({ ...sam, at: at(4) });
-      expect(explanation.changes.map(({ source, after }) => [source, after]))
-        .toEqual([["attempt-a", expect.closeTo(decay(80, 2) - 5, 9)], [first.adjustment, 40], [second.adjustment, 70], ["time", expect.closeTo(decay(70, 2), 9)]]);
+      expect(explanation.changes.map(({ source, after }) => [source, after])).toEqual([
+        ["attempt-a", expect.closeTo(80 * R(2, S0(g0(80))) - 5, 9)], [first.adjustment, 40], [second.adjustment, 70],
+        ["time", expect.closeTo(70 * R(2, slipped.stability), 9)],
+      ]);
       // _adjustments reports the same rows.
       expect(await mastery._adjustments({ track })).toEqual(tracks[0]!.adjustments);
       expect(await mastery._adjustments({ track: "unknown" })).toEqual([]);
@@ -408,6 +448,174 @@ describe("MasteryEstimating", () => {
         expect(outcome.reason).toMatchObject({ code: "ADJUSTMENT_KEY_CONFLICT", message: messages.ADJUSTMENT_KEY_CONFLICT });
       }
       expect(settled.filter((outcome) => outcome.status === "rejected")).toHaveLength(4);
+    });
+  });
+
+  // Each expectation here comes from the published FSRS-6 formulas and default parameters in tests/fixtures/fsrs.ts.
+  describe("FSRS-6 anchors", () => {
+    test("the forgetting curve keeps 90 percent after one stability, and a track reports that retention there", async () => {
+      expect(DECAY).toBe(-0.1542);
+      for (const stability of [S0(1), S0(2), S0(3), S0(4), 1, 30, 365]) expect(R(stability, stability)).toBeCloseTo(0.9, 12);
+      const { mastery, explain } = setup();
+      await mastery.initialize({ ...sam, confidence: 90, basis: "SELF_REPORTED" });
+      const explanation = await explain(at(S0(4)));
+      expect(explanation.retention).toBeCloseTo(0.9, 9);
+      expect(explanation.value).toBeCloseTo(81, 6);
+    });
+
+    test("a starting confidence seeds the published first stability and difficulty of its rating", async () => {
+      // The first stabilities are w0 through w3. The first difficulty is w4 - exp(w5 * (G - 1)) + 1, clamped to 1 through 10.
+      expect(([1, 2, 3, 4] as const).map(S0)).toEqual([0.212, 1.2931, 2.3065, 8.2956]);
+      for (const grade of [1, 2, 3, 4] as const) {
+        expect(D0(grade)).toBeCloseTo(Math.min(10, Math.max(1, 6.4133 - Math.exp(0.8334 * (grade - 1)) + 1)), 12);
+      }
+      // Again starts at w4 itself, and Easy falls below 1 before the clamp.
+      expect(D0(1)).toBeCloseTo(6.4133, 12);
+      expect(D0raw(4)).toBeLessThan(1);
+      expect(D0(4)).toBe(1);
+
+      const { mastery, explain } = setup();
+      for (const [confidence, grade] of [[10, 1], [30, 2], [60, 3], [90, 4]] as const) {
+        const identity = { ...sam, definition: `seeded-at-${confidence}` };
+        await mastery.initialize({ ...identity, confidence, basis: "SELF_REPORTED" });
+        expect(g0(confidence)).toBe(grade);
+        const explanation = await explain(start, identity);
+        expect(explanation).toMatchObject({ value: confidence, retention: 1, stability: S0(grade), changes: [] });
+        expect(explanation.difficulty).toBeCloseTo(D0(grade), 12);
+        sameInstant(explanation.due, start.getTime() + S0(grade) * day);
+      }
+    });
+
+    test("the starting confidences 20, 50, and 80 each begin a higher first rating than one point less", async () => {
+      const { mastery, explain } = setup();
+      const ratings: [number, Grade][] = [[19, 1], [20, 2], [49, 2], [50, 3], [79, 3], [80, 4]];
+      for (const [confidence, grade] of ratings) {
+        const identity = { ...sam, definition: `boundary-${confidence}` };
+        await mastery.initialize({ ...identity, confidence, basis: "SELF_REPORTED" });
+        expect(g0(confidence)).toBe(grade);
+        expect((await explain(start, identity)).stability).toBe(S0(grade));
+        // _withoutPractice seeds its curve the same way.
+        expect((await mastery._withoutPractice({ confidence, days: 10 })).value).toBeCloseTo(confidence * R(10, S0(grade)), 9);
+      }
+    });
+
+    test("a Good review exactly one stability after the start multiplies stability by the success factor at 90 percent retention", async () => {
+      const { mastery, explain, setDay } = setup();
+      await mastery.initialize({ ...sam, confidence: 60, basis: "SELF_REPORTED" });
+      const { stability, difficulty } = seed(60);
+      setDay(stability);
+      await mastery.acceptEvidence(evidence("good-review", "INDEPENDENT", at(stability)));
+      expect(daysBetween(at(stability), start)).toBe(stability);
+
+      // At retention 0.9 the factor is exp(w8) * (11 - D) * S^-w9 * (exp(0.1 * w10) - 1) + 1.
+      const factor = Math.exp(1.8722) * (11 - difficulty) * stability ** -0.1666 * (Math.exp(0.1 * 0.796) - 1) + 1;
+      expect(successFactor(stability, difficulty, stability, 3)).toBeCloseTo(factor, 12);
+      const explanation = await explain(at(stability));
+      expect(explanation.stability / stability).toBeCloseTo(successFactor(stability, difficulty, stability, 3), 9);
+      // Good moves difficulty only by the small pull toward the first difficulty of Easy.
+      expect(explanation.difficulty).toBeCloseTo(nextD(difficulty, 3), 12);
+      expect(nextD(difficulty, 3)).toBeCloseTo(W[7]! * D0raw(4) + (1 - W[7]!) * difficulty, 12);
+      // The estimate kept 90 percent of 60, then gained 10.
+      expect(explanation.value).toBeCloseTo(partialGain(60 * 0.9, 60), 9);
+    });
+
+    test("a lapse a day or more later takes the smaller of the long-term lapse stability and the short-term bound", async () => {
+      const { mastery, explain, setDay } = setup();
+      const { stability, difficulty } = seed(10);
+      const bound = stability / Math.exp(W[17]! * W[18]!);
+      const longTerm = (days: number) =>
+        W[11]! * difficulty ** -W[12]! * ((stability + 1) ** W[13]! - 1) * Math.exp((1 - R(days, stability)) * W[14]!);
+      // One day after the start the long-term formula is smaller. A year after, retention has fallen so far that the bound is smaller.
+      expect(longTerm(1)).toBeLessThan(bound);
+      expect(longTerm(365)).toBeGreaterThan(bound);
+
+      const afterADay = { ...sam, definition: "lapse-after-a-day" }, afterAYear = { ...sam, definition: "lapse-after-a-year" };
+      await mastery.initialize({ ...afterADay, confidence: 10, basis: "SELF_REPORTED" });
+      await mastery.initialize({ ...afterAYear, confidence: 10, basis: "SELF_REPORTED" });
+      setDay(365);
+      await mastery.acceptEvidence(evidence("gap-after-a-day", "GAP", at(1), afterADay));
+      await mastery.acceptEvidence(evidence("gap-after-a-year", "GAP", at(365), afterAYear));
+      const early = await explain(at(1), afterADay), late = await explain(at(365), afterAYear);
+      expect(early.stability).toBeCloseTo(lapseS(stability, difficulty, 1), 12);
+      expect(early.stability).toBeCloseTo(longTerm(1), 12);
+      expect(late.stability).toBeCloseTo(lapseS(stability, difficulty, 365), 12);
+      expect(late.stability).toBeCloseTo(bound, 12);
+      for (const explanation of [early, late]) {
+        expect(explanation.difficulty).toBeCloseTo(nextD(difficulty, 1), 12);
+        // The gap loss of 20 takes a faded 10 to 0.
+        expect(explanation.value).toBe(0);
+      }
+    });
+
+    test("a review less than a day after the last event uses the same-day formula", async () => {
+      const { mastery, explain, setDay } = setup();
+      const low = { ...sam, definition: "good-the-same-day" }, middle = { ...sam, definition: "hard-the-same-day" };
+      await mastery.initialize({ ...low, confidence: 10, basis: "SELF_REPORTED" });
+      await mastery.initialize({ ...middle, confidence: 60, basis: "SELF_REPORTED" });
+      // Six hours after the start.
+      setDay(0.25);
+      await mastery.acceptEvidence(evidence("good-the-same-day", "INDEPENDENT", at(0.25), low));
+      await mastery.acceptEvidence(evidence("hard-the-same-day", "SUPPORTED", at(0.25), middle));
+      const good = await explain(at(0.25), low), hard = await explain(at(0.25), middle);
+
+      // Good multiplies a small stability by exp(w17 * w18) * S^-w19, which is above 1. Hard lowers stability.
+      expect(good.stability).toBeCloseTo(sameDayS(S0(1), 3), 12);
+      expect(good.stability).toBeCloseTo(S0(1) * Math.exp(0.5425 * 0.0912) * S0(1) ** -0.0658, 12);
+      expect(good.stability).toBeGreaterThan(S0(1));
+      expect(hard.stability).toBeCloseTo(sameDayS(S0(3), 2), 12);
+      expect(hard.stability).toBeLessThan(S0(3));
+      // The formula for a day or more would give a different stability.
+      expect(good.stability).not.toBeCloseTo(S0(1) * successFactor(S0(1), D0(1), 0.25, 3), 3);
+      expect(good.difficulty).toBeCloseTo(nextD(D0(1), 3), 12);
+      expect(hard.difficulty).toBeCloseTo(nextD(D0(3), 2), 12);
+    });
+
+    test("due is the last event plus the stability in days, whatever the query time", async () => {
+      const { mastery, explain, setDay } = setup();
+      await mastery.initialize({ ...sam, confidence: 80, basis: "SELF_REPORTED" });
+      setDay(3);
+      await mastery.acceptEvidence(evidence("attempt-a", "INDEPENDENT", at(3)));
+      const memory = review(seed(80), gradeOf("INDEPENDENT"), 3);
+      const soon = await explain(at(10)), later = await explain(at(40));
+      expect(soon.stability).toBeCloseTo(memory.stability, 9);
+      sameInstant(soon.due, at(3).getTime() + memory.stability * day);
+      expect(later.due).toEqual(soon.due);
+      // At the due instant the retention is the desired retention.
+      expect((await explain(soon.due)).retention).toBeCloseTo(0.9, 9);
+    });
+
+    test("an adjustment moves the reference point and leaves stability and difficulty unchanged", async () => {
+      const { mastery, explain, setDay } = setup();
+      await mastery.initialize({ ...sam, confidence: 80, basis: "SELF_REPORTED" });
+      setDay(2);
+      await mastery.acceptEvidence(evidence("attempt-a", "INDEPENDENT", at(2)));
+      setDay(5);
+      await mastery.adjust(adjustment("reference-point", 50));
+      const memory = review(seed(80), gradeOf("INDEPENDENT"), 2);
+
+      // Just before the adjustment, the reference point is the attempt.
+      const before = await explain(new Date(at(5).getTime() - 1));
+      expect(before.stability).toBeCloseTo(memory.stability, 9);
+      expect(before.difficulty).toBeCloseTo(memory.difficulty, 12);
+      sameInstant(before.due, at(2).getTime() + memory.stability * day);
+      // At the adjustment, the estimate is the adjusted value and the memory is the same.
+      const after = await explain(at(5));
+      expect(after).toMatchObject({ value: 50, retention: 1, stability: before.stability, difficulty: before.difficulty });
+      sameInstant(after.due, at(5).getTime() + memory.stability * day);
+      // A week later, the adjusted value has followed the curve from the adjustment.
+      const later = await explain(at(12));
+      expect(later.value).toBeCloseTo(50 * R(7, memory.stability), 9);
+      expect(later.retention).toBeCloseTo(R(7, memory.stability), 12);
+      expect(later.due).toEqual(after.due);
+    });
+
+    test("_policy reports fsrs-1 with the 21 published parameters, and _withoutPractice keeps 90 percent after one stability", async () => {
+      const { mastery } = setup();
+      const policy = await mastery._policy();
+      expect(policy).toMatchObject({ policy: "fsrs-1", desiredRetention: 0.9, readinessMinimum: 70, readinessDays: 14 });
+      expect(policy.parameters).toHaveLength(21);
+      expect(policy.parameters).toEqual(W);
+      expect((await mastery._withoutPractice({ confidence: 100, days: S0(4) })).value).toBeCloseTo(90, 9);
     });
   });
 });
