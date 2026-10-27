@@ -43,8 +43,8 @@ export interface EstimateExplanation {
 /** FSRS-6's published default parameters w[0] through w[20], as fsrs-rs and py-fsrs ship them. */
 const W = [0.212, 1.2931, 2.3065, 8.2956, 6.4133, 0.8334, 3.0194, 0.001, 1.8722, 0.1666, 0.796,
   1.4835, 0.0614, 0.2629, 1.6483, 0.6014, 1.8729, 0.5425, 0.0912, 0.0658, 0.1542] as const;
-/** Policy fsrs-1's time model and readiness settings, read by the replay and reported by _policy. */
-const POLICY = { policy: "fsrs-1", desiredRetention: 0.9, readinessMinimum: 70, readinessDays: 14 } as const;
+/** Policy fsrs-2's time model and readiness settings, read by the replay and reported by _policy. */
+const POLICY = { policy: "fsrs-2", desiredRetention: 0.9, readinessMinimum: 70, readinessDays: 14 } as const;
 const DECAY = -W[20], FACTOR = 0.9 ** (1 / DECAY) - 1;
 /** FSRS grades: 1 Again, 2 Hard, 3 Good, 4 Easy. */
 type Grade = 1 | 2 | 3 | 4;
@@ -55,8 +55,8 @@ const stable = (stability: number) => clamp(stability, 0.001, 36_500);
 const retention = (elapsed: number, stability: number) => (1 + FACTOR * Math.max(0, elapsed) / stability) ** DECAY;
 /** The difficulty of a first rating, before clamping. The mean reversion uses the unclamped value for Easy, as fsrs-rs and py-fsrs do. */
 const firstDifficulty = (grade: Grade) => W[4] - Math.exp(W[5] * (grade - 1)) + 1;
-/** The rating a starting confidence stands for. */
-const startingGrade = (confidence: number): Grade => (confidence >= 80 ? 4 : confidence >= 50 ? 3 : confidence >= 20 ? 2 : 1);
+/** The rating a starting confidence stands for. A reported confidence is at most a Good recall, never an Easy one. */
+const startingGrade = (confidence: number): Grade => (confidence >= 80 ? 3 : confidence >= 40 ? 2 : 1);
 /** The FSRS grade of an informative input. */
 const inputGrade = (input: InputDocument): Grade => (input.signal === "GAP" ? 1 : input.signal === "INDEPENDENT" ? 3 : 2);
 /** One FSRS review with `grade` after `elapsed` days: stability first, from the difficulty before the review, then difficulty. */

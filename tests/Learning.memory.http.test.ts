@@ -13,7 +13,7 @@ afterAll(async () => { for (const cleanup of cleanups.reverse()) await cleanup()
 const SAMPLE_DAYS = [1, 3, 7, 14, 30, 60, 90];
 // Courses.md, "Course and skill refusals": the general sentence for a course that is not the learner's.
 const COURSE_UNAVAILABLE = "This course is not available. Reload the page to see your courses.";
-// Policy fsrs-1, as MasteryEstimating.md states it, computed with the tests' own copy of FSRS-6. The test checks the read
+// Policy fsrs-2, as MasteryEstimating.md states it, computed with the tests' own copy of FSRS-6. The test checks the read
 // against these numbers; the read itself takes every value from the concept.
 /** An instant as milliseconds, from a JSON string or a native Date. */
 const instant = (value: string | Date) => new Date(value).getTime();
@@ -116,27 +116,28 @@ test("Memory answers the policy and its reference curve, a curve for a skill wit
   const started = await confirmed("Products"), unstarted = await confirmed("Transposes");
   await learner.ok("/courses/skills/propose", { proposalKey: crypto.randomUUID(), unit, material, title: "Inverses", outcome: "Invert matrices", gate: "One inverse and why" });
   const before = Date.now();
-  await learner.ok("/learning/confidence", { skill: started, confidence: 50 });
+  await learner.ok("/learning/confidence", { skill: started, confidence: 80 });
   const answer = await memory(learner, course);
 
   // The policy's settings come from MasteryEstimating, with the reference curve of an estimate of 100% left alone.
   expect(Object.keys(answer.policy).sort()).toEqual(["desiredRetention", "policy", "readinessDays", "reference", "reviewThreshold"]);
-  expect(answer.policy).toMatchObject({ policy: "fsrs-1", desiredRetention: 0.9, reviewThreshold: 70, readinessDays: 14 });
+  expect(answer.policy).toMatchObject({ policy: "fsrs-2", desiredRetention: 0.9, reviewThreshold: 70, readinessDays: 14 });
   expect(answer.policy.reference.map((point) => point.days)).toEqual([0, ...SAMPLE_DAYS]);
   for (const point of answer.policy.reference) expect(point.value).toBeCloseTo(leftAlone(100, point.days), 9);
 
   // Only confirmed skills are listed, in skill identity order; the draft is left out.
   expect(answer.skills.map((item) => item.skill)).toEqual([started, unstarted].sort());
   const curve = row(answer, started);
-  expect(curve).toMatchObject({ title: "Products", unit, unitTitle: "Products", startingConfidence: 50, belowNow: false });
-  const startedAt = Date.parse(curve.startedAt!), fromStart = (at: number) => leftAlone(50, daysBetween(at, startedAt));
+  expect(curve).toMatchObject({ title: "Products", unit, unitTitle: "Products", startingConfidence: 80, belowNow: false });
+  const startedAt = Date.parse(curve.startedAt!), fromStart = (at: number) => leftAlone(80, daysBetween(at, startedAt));
   expect(startedAt).toBeGreaterThanOrEqual(before - 1000);
-  expect(curve.estimate!).toBeCloseTo(50, 3);
+  expect(curve.estimate!).toBeCloseTo(80, 3);
   expect(curve.estimate!).toBeCloseTo(fromStart(Date.parse(answer.asOf)), 9);
   expectDecaying(answer, curve, fromStart);
-  // A starting confidence of 50 stands for a first Good rating. Its memory is due when the retention falls to 90%, a little
-  // over two days after the start, so the review day is day 3, with the projection's value on that day.
-  const due = startedAt + S0(g0(50)) * DAY;
+  // A starting confidence of 80 stands for a first Good rating, the highest a reported confidence seeds. Its memory is due
+  // when the retention falls to 90%, a little over two days after the start, so the review day is day 3, with the
+  // projection's value on that day.
+  const due = startedAt + S0(g0(80)) * DAY;
   expect(curve.reviewBy).toMatchObject({ days: dueDays(answer.asOf, due) });
   expect(curve.reviewBy!.days).toBe(3);
   expect(Date.parse(curve.reviewBy!.at)).toBe(Date.parse(answer.asOf) + 3 * DAY);
@@ -144,7 +145,7 @@ test("Memory answers the policy and its reference curve, a curve for a skill wit
   expect(curve.reviewBy!.value).toBeCloseTo(curve.projection!.find((point) => point.days === 3)!.value, 9);
   // Left alone from its starting point, the skill follows its own projection, because nothing has changed it.
   expect(curve.leftAlone!.map((point) => point.at)).toEqual([curve.startedAt!, answer.asOf, ...curve.projection!.map((point) => point.at)]);
-  expect(curve.leftAlone![0]!.value).toBe(50);
+  expect(curve.leftAlone![0]!.value).toBe(80);
   curve.projection!.forEach((point, index) => expect(curve.leftAlone![index + 2]!.value).toBeCloseTo(point.value, 9));
 
   // A skill without a starting point keeps its row with no curve.
@@ -152,21 +153,21 @@ test("Memory answers the policy and its reference curve, a curve for a skill wit
     estimate: null, projection: null, reviewBy: null, belowNow: null, leftAlone: null });
   // A course with no confirmed skill answers an empty list and the same policy.
   const { course: empty } = await learner.ok("/courses/create", { title: "Statistics" });
-  expect(await memory(learner, empty)).toMatchObject({ skills: [], policy: { policy: "fsrs-1", desiredRetention: 0.9, reviewThreshold: 70 } });
+  expect(await memory(learner, empty)).toMatchObject({ skills: [], policy: { policy: "fsrs-2", desiredRetention: 0.9, reviewThreshold: 70 } });
 }, 60_000);
 
 test("a skill lifted to 95% by an assessment is due for review on the first day its retention reaches 90%, and that day moves with time", async () => {
   const app = await setup(), { learner, user, course, confirmed } = await learningFixture(app, "memory-practiser");
   const skill = await confirmed("Products");
-  await learner.ok("/learning/confidence", { skill, confidence: 50 });
+  await learner.ok("/learning/confidence", { skill, confidence: 80 });
   await practise(learner, skill);
 
   const answer = await memory(learner, course), curve = row(answer, skill);
-  // The success is a Good review of the memory the 50% start seeded, moments after the start. It lifts the estimate to 95,
+  // The success is a Good review of the memory the 80% start seeded, moments after the start. It lifts the estimate to 95,
   // which then falls along the memory the review left.
   const { track } = await learner.ok("/learning/read", { skill }) as { track: { inputs: { performedAt: string }[] } };
   const practisedAt = Date.parse(track.inputs[0]!.performedAt);
-  const after = review(seed(50), gradeOf("INDEPENDENT"), daysBetween(practisedAt, Date.parse(curve.startedAt!)));
+  const after = review(seed(80), gradeOf("INDEPENDENT"), daysBetween(practisedAt, Date.parse(curve.startedAt!)));
   const estimateAt = (at: number) => 95 * R(daysBetween(at, practisedAt), after.stability), due = practisedAt + after.stability * DAY;
   expect(curve.estimate!).toBeCloseTo(95, 3);
   expect(curve.estimate!).toBeCloseTo(estimateAt(Date.parse(answer.asOf)), 9);
@@ -179,8 +180,8 @@ test("a skill lifted to 95% by an assessment is due for review on the first day 
   expect(Date.parse(curve.reviewBy!.at)).toBe(Date.parse(answer.asOf) + 3 * DAY);
   expect(curve.reviewBy!.value).toBeCloseTo(estimateAt(Date.parse(curve.reviewBy!.at)), 9);
   expect(curve.reviewBy!.value).toBeCloseTo(curve.projection!.find((point) => point.days === 3)!.value, 9);
-  // The assessment lifted the curve above the one it would have followed from its 50% start.
-  expect(curve.leftAlone![0]!.value).toBe(50);
+  // The assessment lifted the curve above the one it would have followed from its 80% start.
+  expect(curve.leftAlone![0]!.value).toBe(80);
   curve.projection!.forEach((point, index) => expect(point.value).toBeGreaterThan(curve.leftAlone![index + 2]!.value));
 
   // A day later, without practice, the estimate has fallen and the review day is one day nearer. Each later read uses a new

@@ -1,4 +1,4 @@
-// The tests' own copy of FSRS-6 as policy fsrs-1 uses it (design/concepts/MasteryEstimating.md), written from the
+// The tests' own copy of FSRS-6 as policy fsrs-2 uses it (design/concepts/MasteryEstimating.md), written from the
 // published formulas and independent of the concept's code, so a test can compute the numbers it expects.
 export const W = [0.212, 1.2931, 2.3065, 8.2956, 6.4133, 0.8334, 3.0194, 0.001, 1.8722, 0.1666, 0.796,
   1.4835, 0.0614, 0.2629, 1.6483, 0.6014, 1.8729, 0.5425, 0.0912, 0.0658, 0.1542];
@@ -17,8 +17,8 @@ export const S0 = (g: Grade) => W[g - 1]!;
 export const D0raw = (g: Grade) => W[4]! - Math.exp(W[5]! * (g - 1)) + 1;
 /** Difficulty of a first rating, clamped to 1 through 10. */
 export const D0 = (g: Grade) => between(D0raw(g), 1, 10);
-/** The first rating a starting confidence stands for. */
-export const g0 = (c: number): Grade => (c >= 80 ? 4 : c >= 50 ? 3 : c >= 20 ? 2 : 1);
+/** The first rating a starting confidence stands for: Good from 80, Hard from 40, and Again below. It is never Easy. */
+export const g0 = (c: number): Grade => (c >= 80 ? 3 : c >= 40 ? 2 : 1);
 /** The memory a starting confidence seeds. */
 export const seed = (c: number): Memory => ({ stability: S0(g0(c)), difficulty: D0(g0(c)) });
 /** Difficulty after a review: linear damping, then mean reversion toward the unclamped D0(4), then clamping. */

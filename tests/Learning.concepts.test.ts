@@ -60,7 +60,7 @@ describe("Mastery replay", () => {
   test("confidence is provisional, fades without practice, and needs independent evidence", async () => {
     const m = await mastery();
     expect(await m.estimate()).toMatchObject({ value: 80, ready: false });
-    // A confidence of 80 seeds the memory of a first Easy rating. Left alone until day 60, the estimate falls along that memory's curve.
+    // A confidence of 80 seeds the memory of a first Good rating. Left alone until day 60, the estimate falls along that memory's curve.
     m.advance(60); expect((await m.estimate()).value).toBeCloseTo(leftAlone(80, 60));
     await m.evidence("fresh", "INDEPENDENT", { gateMet: true });
     expect(await m.estimate()).toMatchObject({ value: 95, ready: true });
