@@ -46,7 +46,11 @@ export class AnswerNotGrounded extends Error {
 export class TutorFailures {
   private readonly reasons = new Map<string, string>();
   record(owner: string, error: unknown) {
-    const reason = error instanceof GeminiError || error instanceof OriginalTooLarge || error instanceof AnswerNotGrounded ? error.message : "The tutor could not produce a usable answer. Try again.";
+    const plain = error instanceof GeminiError || error instanceof OriginalTooLarge || error instanceof AnswerNotGrounded;
+    // A refused answer gets the general sentence, so the server log keeps its reason for the operator. It names the
+    // failure only: never the learner, the request, or the API key.
+    if (!plain) console.warn(`Tutor answer refused: ${(error instanceof Error ? `${error.name}: ${error.message}` : String(error)).slice(0, 300)}`);
+    const reason = plain ? error.message : "The tutor could not produce a usable answer. Try again.";
     this.reasons.set(owner, `${reason} Your saved work is still available.`);
   }
   take(owner: string): string | undefined { const reason = this.reasons.get(owner); this.reasons.delete(owner); return reason; }
