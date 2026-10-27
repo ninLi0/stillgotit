@@ -23,7 +23,9 @@ import {
 // retained image; Markdown is rendered; text and code read in a column; other files show their text by location.
 // Recordings and HEIC or HEIF photos ("media" pages) are shown by MaterialMedia.vue, mounted for that one file: a player
 // beside the transcript segments, or the photo with a download when the browser cannot draw it.
-const props = defineProps<{ material: string; title: string; skills: ViewerSkill[]; initialLocation?: string }>();
+// With `mode="page"` (a cited source beside a lesson) it shows only the file at its place and the pager: no zoom, no
+// "Ask about", no thumbnail rail, no skills, and no readable text beside a PDF page or a photo. It fills its parent's height.
+const props = defineProps<{ material: string; title: string; skills: ViewerSkill[]; initialLocation?: string; mode?: "full" | "page" }>();
 const emit = defineEmits<{ ask: [request: AskAboutPage]; "open-skill": [skill: string]; "review-draft": [skill: string] }>();
 
 type MaterialId = StillGotItHttp["/courses/materials/read"]["input"]["material"];
@@ -60,6 +62,7 @@ const pending = ref<string | null>(null);
 const toHighlight = ref<{ key: string; location: string } | null>(null);
 let generation = 0, scrollTimer: ReturnType<typeof setTimeout> | undefined, flashTimer: ReturnType<typeof setTimeout> | undefined, resizeObserver: ResizeObserver | null = null;
 
+const pageOnly = computed(() => props.mode === "page");
 const displayTitle = computed(() => props.title.trim() || read.value?.title || "this file");
 const graded = computed(() => (props.title || read.value?.title || "").startsWith("Graded work: "));
 const pages = computed<ViewerPage[]>(() => read.value ? buildPages(read.value, pdfCounts, keys, graded.value) : []);
@@ -67,7 +70,7 @@ const index = computed(() => Math.max(0, pages.value.findIndex((item) => item.ke
 const page = computed<ViewerPage | undefined>(() => pages.value[index.value]);
 const multiFile = computed(() => (read.value?.originals.length ?? 0) > 1);
 const hasPager = computed(() => pages.value.length > 1 || (!!page.value && isPaged(page.value.kind)));
-const showThumbs = computed(() => pages.value.length > 1 && paneWidth.value >= RAIL_MIN_PANE);
+const showThumbs = computed(() => !pageOnly.value && pages.value.length > 1 && paneWidth.value >= RAIL_MIN_PANE);
 const canvasWidth = computed(() => paneWidth.value - (showThumbs.value ? THUMB_RAIL : 0));
 // The page fits the pane but never drops below 0.6 scale; narrower panes scroll sideways instead.
 const fit = computed(() => Math.min(1, Math.max(0.6, (canvasWidth.value - 48) / BASE[page.value?.kind ?? "pdf"])));
@@ -85,7 +88,7 @@ const askLocation = computed(() => {
   if (!item) return "content";
   return !isPaged(item.kind) && item.sections.some((section) => section.location === visibleLocation.value) ? visibleLocation.value : item.location;
 });
-const chips = computed(() => pageSkills(props.skills, page.value));
+const chips = computed(() => pageOnly.value ? [] : pageSkills(props.skills, page.value));
 const fileState = computed<FileState | undefined>(() => page.value ? files[page.value.file] : undefined);
 const markdownHtml = computed(() => {
   const item = page.value;
@@ -310,7 +313,8 @@ function onKey(event: KeyboardEvent) {
     if (pages.value.length < 2) return;
     event.preventDefault();
     go(index.value + (event.key === "ArrowLeft" ? -1 : 1));
-  } else if (event.key === "+" || event.key === "=") { event.preventDefault(); zoomBy(ZOOM_STEP); }
+  } else if (pageOnly.value) return;
+  else if (event.key === "+" || event.key === "=") { event.preventDefault(); zoomBy(ZOOM_STEP); }
   else if (event.key === "-") { event.preventDefault(); zoomBy(-ZOOM_STEP); }
 }
 
@@ -343,7 +347,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section ref="root" class="viewer" :aria-label="`Preview of ${displayTitle}`" @keydown="onKey">
+  <section ref="root" class="viewer" :class="{ 'page-only': pageOnly }" :aria-label="`Preview of ${displayTitle}`" @keydown="onKey">
     <div class="toolbar">
       <div class="tool-group">
         <template v-if="status === 'ready' && hasPager">
@@ -353,7 +357,7 @@ onBeforeUnmount(() => {
         </template>
         <span v-else class="page-label solo" aria-live="polite">{{ status === 'ready' ? pageLabel : '' }}</span>
       </div>
-      <div class="tool-group">
+      <div v-if="!pageOnly" class="tool-group">
         <button type="button" class="tool" :disabled="zoom <= ZOOM_MIN" aria-label="Zoom out" @click="zoomBy(-ZOOM_STEP)">−</button>
         <span class="zoom-label" aria-live="polite">{{ zoom }}%</span>
         <button type="button" class="tool" :disabled="zoom >= ZOOM_MAX" aria-label="Zoom in" @click="zoomBy(ZOOM_STEP)">+</button>
@@ -398,11 +402,11 @@ onBeforeUnmount(() => {
             role="img" :aria-label="`${page.unit} ${page.number} of ${displayTitle}`">
             <ViewerPdfCanvas :doc="pdfDoc(page.file)!" :page="page.number" :width="Math.round(BASE.pdf * scale)" @failed="pageFailed(page.file)" />
           </div>
-          <article v-else-if="fileState?.state === 'failed'" class="page-frame text-page" :class="{ flash: flashPage === page.key }" :style="{ zoom: scale }">
+          <article v-else-if="fileState?.state === 'failed' && !pageOnly" class="page-frame text-page" :class="{ flash: flashPage === page.key }" :style="{ zoom: scale }">
             <p v-if="page.text" class="text-page-body">{{ page.text }}</p>
             <p v-else class="hint">This page has no readable text.</p>
           </article>
-          <div v-else class="page-frame placeholder" :style="{ width: `${Math.round(BASE.pdf * scale)}px`, height: `${Math.round(BASE.pdf * scale * 11 / 8.5)}px` }" role="status">
+          <div v-else-if="fileState?.state !== 'failed'" class="page-frame placeholder" :style="{ width: `${Math.round(BASE.pdf * scale)}px`, height: `${Math.round(BASE.pdf * scale * 11 / 8.5)}px` }" role="status">
             Loading page {{ page.number }}…
           </div>
           <div v-if="page.text && pdfDoc(page.file) && fileState?.state !== 'failed'" class="sr-only">{{ page.text }}</div>
@@ -413,8 +417,9 @@ onBeforeUnmount(() => {
           <MaterialMedia :key="page.key" class="media-view" :material="materialId" :file="page.file" :location="mediaLocations[page.file]" />
         </div>
 
-        <!-- Everything else scales with CSS zoom from its design width. -->
-        <div v-else class="stage" :style="{ zoom: scale }">
+        <!-- Everything else scales with CSS zoom from its design width. In page-only mode a document's text instead
+             fills the narrow pane at full size, so it stays readable. -->
+        <div v-else class="stage" :class="{ fluid: pageOnly && !isPaged(page.kind) }" :style="pageOnly && !isPaged(page.kind) ? undefined : { zoom: scale }">
           <article v-if="page.kind === 'slides'" class="slide" :class="{ flash: flashPage === page.key, dense: slideDense }">
             <template v-if="slideLines.length">
               <p class="slide-title">{{ slideLines[0] }}</p>
@@ -436,7 +441,7 @@ onBeforeUnmount(() => {
               <span v-if="grading.grade" class="stamp">{{ grading.grade }}</span>
             </div>
             <figcaption v-if="grading.note" class="photo-note">Grader’s note: {{ grading.note }}</figcaption>
-            <p v-if="grading.rest" class="photo-text">{{ grading.rest }}</p>
+            <p v-if="grading.rest && !pageOnly" class="photo-text">{{ grading.rest }}</p>
           </figure>
 
           <article v-else-if="page.kind === 'markdown' && md" class="doc md" v-html="markdownHtml" />
@@ -578,6 +583,13 @@ onBeforeUnmount(() => {
 .chip:hover { background: var(--inset); }
 .chip.draft { border-style: dashed; border-color: var(--sand-edge); }
 .to-review { color: var(--new-text); font-weight: 700; }
+
+/* Page only: the viewer fills its parent, and the pager stands alone in the middle of the toolbar. */
+.viewer.page-only { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+.page-only .toolbar { justify-content: center; }
+.page-only .body, .page-only .state { flex: 1; min-height: 0; height: auto; }
+.stage.fluid { width: auto; max-width: 580px; }
+.stage.fluid .doc { width: auto; padding: 28px 30px; }
 
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 </style>
