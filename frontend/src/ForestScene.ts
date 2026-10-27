@@ -3,11 +3,13 @@
 // loop (ForestView.vue, scene-motion.ts); the land holds the mountains, pines, grass, path, topic trees and bushes,
 // and changes only when the selection, hover or topic changes. The caller owns the canvases and passes the
 // device-pixel size of one cell, so every cell lands on whole device pixels and stays crisp. Each topic's tree is the
-// kind the learner chose for it, or the unit's default kind (tree-kinds.ts).
+// kind the learner chose for it, or the unit's default kind (tree-kinds.ts). Each tree has two views: a portrait, a full
+// canopy of its kind with one due flag at most, and the skills view, a leaf per skill; LandState.open says which trees
+// show their skills.
 import { PAL, SPRITES, hash, rng, stageOf } from "./pixel-art.ts";
 import { MOON, dayOrNight, isNight, leafColor, sceneColor } from "./scene-palette.ts";
 import type { ViewSkill, ViewUnit } from "./revamp-types.ts";
-import { growTree, moveTree, paintTree, type CrownPart, type Segment } from "./tree-draw.ts";
+import { crownTop, growCanopy, growTree, moveTree, paintCanopy, paintTree, type CrownPart, type Segment } from "./tree-draw.ts";
 import { kindFor, type TreeKind } from "./tree-kinds.ts";
 
 export type ForestLeaf = { skill: ViewSkill; unit: string; x: number; y: number };
@@ -19,9 +21,13 @@ export type ForestTree = {
   trunk: number;
   /** The ground line of this tree: back trees stand a little higher, behind the front row. */
   base: number; back: boolean; seed: number; kind: TreeKind;
-  /** The highest tip, for hit-testing the tree as a whole. */
+  /** The highest tip of either view, for hit-testing the tree as a whole. */
   top: number;
   segs: Segment[]; tips: [number, number][]; crown: CrownPart[]; leaves: ForestLeaf[]; buds: { x: number; y: number }[];
+  /** The portrait: a full canopy of the tree's kind on the same trunk foot. */
+  portrait: { segs: Segment[]; tips: [number, number][]; crown: CrownPart[] };
+  /** Whether any of its skills is due today, for the portrait's one flag. */
+  due: boolean;
 };
 export type ForestLayout = {
   /** CSS px per cell. */
@@ -33,7 +39,8 @@ export type ForestLayout = {
   /** Back trees first, so the front row draws over them. */
   trees: ForestTree[];
 };
-export type LandState = { design: number; selected: string | null; hover: string | null; topic: string | null };
+/** `open` names the topics whose trees show their skills; the others show their portrait. "all" opens every tree. */
+export type LandState = { design: number; selected: string | null; hover: string | null; topic: string | null; open: ReadonlySet<string> | "all" };
 
 /** The narrowest slot a topic gets, in CSS px, so neighbouring signposts never touch. Past that the forest scrolls. */
 const MIN_SLOT_PX = 160;
@@ -54,8 +61,12 @@ export function layoutForest(units: readonly ViewUnit[], design: number, viewW: 
   const trees = shown.map((u, i): ForestTree => {
     const back = n > 2 && i % 2 === 1, base = back ? G - 4 : G + 2, cx = Math.round(slot * (i + 0.75));
     const kind = kindFor(u.unit, u.kind);
-    const grown = growTree(kind, u.unit, design, u.skills.length + 2, Math.min(slot * 1.2, 130), G * (back ? 0.8 : 0.74), 3.2, 1.25);
+    const maxW = Math.min(slot * 1.2, 130), maxH = G * (back ? 0.8 : 0.74);
+    const grown = growTree(kind, u.unit, design, u.skills.length + 2, maxW, maxH, 3.2, 1.25);
     const t = moveTree(grown, Math.round(cx - grown.w / 2), base);
+    // The portrait fits the same box and stands on the same trunk foot, so the tree opens up rather than moves.
+    const canopy = growCanopy(kind, u.unit, design, u.skills.length + 2, maxW, maxH, 3.2, 1.25);
+    const portrait = moveTree(canopy, Math.round(cx - grown.w / 2) + Math.round(grown.segs[0]?.[0] ?? 0) - Math.round(canopy.segs[0]?.[0] ?? 0), base);
     const tips = t.tips.slice().sort((a, b) => a[0] - b[0]);
     // Spread the skills evenly across the tips, left to right; the spare tips stay buds. growTree grows until there
     // are enough tips, so every skill gets one in practice; a skill without a tip is still listed in the aside.
@@ -72,9 +83,10 @@ export function layoutForest(units: readonly ViewUnit[], design: number, viewW: 
     });
     const buds = tips.filter((_, k) => !used.has(k)).map(([x, y]) => ({ x: Math.round(x), y: Math.round(y) }));
     const trunk = Math.round(t.segs[0]?.[0] ?? cx);
-    const top = tips.reduce((m, p) => Math.min(m, p[1]), base);
+    const top = [...tips, ...portrait.tips].reduce((m, p) => Math.min(m, p[1]), base);
     return { unit: u.unit, title: u.title, skills: u.skills, cx, trunk, base, back, seed: hash(`${u.unit}:forest:${design}`), kind, top,
-      segs: t.segs, tips, crown: t.crown, leaves, buds };
+      segs: t.segs, tips, crown: t.crown, leaves, buds, portrait: { segs: portrait.segs, tips: portrait.tips, crown: portrait.crown },
+      due: u.skills.some((skill) => skill.dueToday) };
   });
   trees.sort((a, b) => Number(b.back) - Number(a.back));
   return { cell, Wv, Wc, Hc, G, slot, trees };
@@ -118,8 +130,8 @@ function painter(ctx: CanvasRenderingContext2D, px: number, tone = (c: string) =
 }
 
 /** Where the sun, or the moon by night, sits: at its morning place on the arc, or higher when a tree would stand in
- * front of it there, as far as the top of the canvas allows. A leaf counts with room for its selection brackets and
- * its due flag. */
+ * front of it there, as far as the top of the canvas allows. Both views of each tree count: a leaf with room for its
+ * selection brackets and its due flag, and a portrait with its flag. */
 export function sunPlace(layout: ForestLayout): { x: number; y: number } {
   const { Wv, G } = layout, x = Math.round(Wv * (0.1 + 0.8 * SUN_AT)), arc = Math.round(G * 0.5 - Math.sin(SUN_AT * Math.PI) * G * 0.32);
   let under = Infinity;
@@ -129,6 +141,8 @@ export function sunPlace(layout: ForestLayout): { x: number; y: number } {
     paintTree(record, { segs: t.segs, crown: t.crown, buds: t.buds.map((b) => [b.x, b.y] as const), leaves: t.leaves.map((lf) => [lf.x, lf.y] as const) },
       t.kind, rng(t.seed), { widen: true });
     for (const lf of t.leaves) for (let dx = -5; dx <= 5; dx++) mark(lf.x + dx, lf.y - (lf.skill.dueToday ? 8 : 5));
+    paintCanopy(record, t.portrait, t.kind, rng(t.seed), { widen: true });
+    if (t.due) { const [fx, fy] = crownTop(t.portrait.tips); for (let dx = 0; dx <= 2; dx++) mark(fx + dx, fy - 8); }
   }
   return { x, y: Math.max(9, Math.min(arc, under - 10)) };
 }
@@ -192,6 +206,11 @@ export function drawLand(ctx: CanvasRenderingContext2D, layout: ForestLayout, px
   }
 }
 
+/** A due flag beside a leaf at (x, y), or on a portrait's crown top. */
+function paintFlag({ rect, cell }: Paint, x: number, y: number) {
+  rect(x + 3, y - 8, 1, 5, "#48555C"); rect(x + 4, y - 8, 2, 2, "#D9663A"); cell(x + 5, y - 7, "#EE9C78");
+}
+
 function drawTree(paint: Paint, t: ForestTree, state: LandState) {
   const { rect, cell } = paint, RT = rng(t.seed), dim = !!state.topic && state.topic !== t.unit;
   for (let dx = -14; dx <= 14; dx++) {
@@ -199,23 +218,38 @@ function drawTree(paint: Paint, t: ForestTree, state: LandState) {
     rect(t.trunk + dx, t.base, 1, hh, state.topic === t.unit ? "#E3C46A" : "#5A9F7A");
   }
   // The other topics' trees are drawn paler while one topic is picked out.
-  paintTree(dim ? paint.toned(paler) : paint, { segs: t.segs, crown: t.crown, buds: t.buds.map((b) => [b.x, b.y] as const), leaves: t.leaves.map((lf) => [lf.x, lf.y] as const) },
+  const tone = dim ? paint.toned(paler) : paint;
+  if (state.open !== "all" && !state.open.has(t.unit)) {
+    // The portrait keeps one due flag on its crown top, so a review that is due still shows.
+    paintCanopy(tone, t.portrait, t.kind, RT, { widen: true });
+    if (t.due) { const [fx, fy] = crownTop(t.portrait.tips); paintFlag(paint, fx - 3, fy); }
+    paintFlowers(paint, t);
+    return;
+  }
+  paintTree(tone, { segs: t.segs, crown: t.crown, buds: t.buds.map((b) => [b.x, b.y] as const), leaves: t.leaves.map((lf) => [lf.x, lf.y] as const) },
     t.kind, RT, { widen: true });
   for (const lf of t.leaves) {
     SPRITES[stageOf(lf.skill.mastery)].forEach((row, ry) => {
       for (let rx = 0; rx < row.length; rx++) { const ch = row.charAt(rx); if (ch !== ".") cell(lf.x - 3 + rx, lf.y - 3 + ry, leafColor(PAL[ch] ?? "#000000")); }
     });
-    if (lf.skill.dueToday) { rect(lf.x + 3, lf.y - 8, 1, 5, "#48555C"); rect(lf.x + 4, lf.y - 8, 2, 2, "#D9663A"); cell(lf.x + 5, lf.y - 7, "#EE9C78"); }
+    if (lf.skill.dueToday) paintFlag(paint, lf.x, lf.y);
     const mark = lf.skill.skill === state.selected ? "#151515" : lf.skill.skill === state.hover ? "#5F5F5C" : null;
     if (mark) {
       const a = lf.x - 5, b = lf.y - 5, c = lf.x + 5, d = lf.y + 5;
       for (const [x, y, sx, sy] of [[a, b, 1, 1], [c, b, -1, 1], [a, d, 1, -1], [c, d, -1, -1]] as const) { cell(x, y, mark); cell(x + sx, y, mark); cell(x, y + sy, mark); }
     }
-    // A flower at the tree's foot for each mastered skill.
-    if ((lf.skill.mastery ?? 0) >= 80) {
-      const fx = t.trunk + Math.round((RT() - 0.5) * 26), fy = t.base + 3 + Math.floor(RT() * 3), petal = RT() < 0.5 ? "#D9663A" : "#9A8EE6";
-      cell(fx, fy, "#256F4C"); cell(fx, fy - 1, "#256F4C"); cell(fx - 1, fy - 2, petal); cell(fx + 1, fy - 2, petal); cell(fx, fy - 3, petal); cell(fx, fy - 2, "#F3CD7A");
-    }
+  }
+  paintFlowers(paint, t);
+}
+
+/** A flower at the tree's foot for each mastered skill, in both views. The flowers have their own seed, so they stay
+ * put when the tree opens or closes. */
+function paintFlowers({ cell }: Paint, t: ForestTree) {
+  const RF = rng(t.seed ^ 0x2f6b);
+  for (const lf of t.leaves) {
+    if ((lf.skill.mastery ?? 0) < 80) continue;
+    const fx = t.trunk + Math.round((RF() - 0.5) * 26), fy = t.base + 3 + Math.floor(RF() * 3), petal = RF() < 0.5 ? "#D9663A" : "#9A8EE6";
+    cell(fx, fy, "#256F4C"); cell(fx, fy - 1, "#256F4C"); cell(fx - 1, fy - 2, petal); cell(fx + 1, fy - 2, petal); cell(fx, fy - 3, petal); cell(fx, fy - 2, "#F3CD7A");
   }
 }
 

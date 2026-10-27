@@ -18,6 +18,8 @@ import { averageEstimate } from "../../src/computations/course-score.ts";
 // Each leaf is a skill drawn as its mastery sprite. The canvas is for looking and pointing; every skill is also a
 // button in the topics list, so the keyboard reaches everything. The parent owns the selected skill and the design
 // seed; this view owns only which topic is picked out (it dims the other trees and opens that topic in the list).
+// Each tree shows its portrait, a full canopy of its kind, until the pointer is over it or its signpost has focus; then
+// it opens to show its leaves. Where nothing can hover, every tree shows its leaves.
 const props = withDefaults(defineProps<ForestProps>(), { selected: null });
 const emit = defineEmits<{ close: []; open: [skill: string]; practice: [skill: string]; select: [skill: string | null]; plant: []; regrow: [] }>();
 
@@ -29,6 +31,11 @@ const canvas = ref<HTMLCanvasElement | null>(null);
 const topic = ref<string | null>(null);
 const hover = ref<string | null>(null);
 const pointing = ref(false);
+// The topics whose trees show their skills rather than their portrait.
+const hoverTree = ref<string | null>(null), focusTree = ref<string | null>(null);
+const hoverless = typeof window !== "undefined" && window.matchMedia ? window.matchMedia("(hover: none)") : null;
+const touch = ref(hoverless?.matches ?? false);
+function hoverChanged() { touch.value = hoverless?.matches ?? false; }
 const view = ref({ w: 0, h: 0, dpr: 1 });
 
 const INFO = "Each tree is a topic and each leaf on it is one of its skills, drawn as a sprite that shows your estimate, from a bud (no estimate yet) to a bloom (80% and up). Open a topic to change what kind of tree it is.";
@@ -112,6 +119,13 @@ const tag = computed(() => {
     style: { left: `${left}px`, top: `${below ? (lf.y + 5) * c : above}px`, transform: below ? "translateX(-50%)" : "translate(-50%, -100%)" },
   };
 });
+const openTrees = computed<ReadonlySet<string> | "all">(() => {
+  if (touch.value) return "all";
+  const units = new Set<string>();
+  for (const unit of [hoverTree.value, focusTree.value, leafOf(hover.value)?.unit]) if (unit) units.add(unit);
+  return units;
+});
+const openKey = computed(() => openTrees.value === "all" ? "all" : [...openTrees.value].sort().join(" "));
 const canvasLabel = computed(() => (empty.value
   ? "An empty meadow. No topics have skills yet."
   : `Course forest with ${plural(units.value.length, "topic")} and ${plural(skills.value.length, "skill")}. Every skill is also listed under Topics.`));
@@ -146,7 +160,24 @@ function paintLand() {
   const L = layout.value, target = canvas.value;
   if (!L || !target) return;
   const ctx = prepare(target, L);
-  if (ctx) drawLand(ctx, L, cellPx.value, { design: props.design, selected: props.selected ?? null, hover: hover.value, topic: topic.value });
+  if (ctx) drawLand(ctx, L, cellPx.value, { design: props.design, selected: props.selected ?? null, hover: hover.value, topic: topic.value, open: openTrees.value });
+}
+// When a tree opens or closes, the land as it was is copied onto a canvas laid over it, which fades out while the land
+// underneath is drawn in its new state: a crossfade with no render loop. Under reduced motion it switches at once.
+const fade = ref<HTMLCanvasElement | null>(null);
+function crossfade() {
+  const from = canvas.value, over = fade.value;
+  if (!from || !over || !from.width || motion?.matches) return;
+  if (over.width !== from.width) over.width = from.width;
+  if (over.height !== from.height) over.height = from.height;
+  const ctx = over.getContext("2d");
+  if (!ctx) return;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, over.width, over.height);
+  ctx.drawImage(from, 0, 0);
+  over.classList.remove("fading");
+  void over.offsetWidth;
+  over.classList.add("fading");
 }
 function paintAll() { paintSky(); paintLand(); }
 
@@ -159,7 +190,8 @@ watch(layout, () => {
 // A changed estimate or due flag keeps the same layout but changes the sprites.
 watch(() => props.units, paintAll, { deep: true, flush: "post" });
 watch(currentTheme, paintAll, { flush: "post" });
-watch([() => props.selected, hover, topic], paintLand, { flush: "post" });
+watch([() => props.selected, hover, topic, openKey], paintLand, { flush: "post" });
+watch(openKey, crossfade);
 
 function measure() {
   const el = scroller.value;
@@ -187,9 +219,11 @@ function onMove(event: MouseEvent) {
   const hit = pointAt(event);
   const id = hit?.leaf?.skill.skill ?? null;
   if (id !== hover.value) hover.value = id;
+  const unit = hit?.leaf?.unit ?? hit?.tree ?? null;
+  if (unit !== hoverTree.value) hoverTree.value = unit;
   pointing.value = !!(hit?.leaf || hit?.tree);
 }
-function onLeave() { hover.value = null; pointing.value = false; }
+function onLeave() { hover.value = null; hoverTree.value = null; pointing.value = false; }
 function onClick(event: MouseEvent) {
   const hit = pointAt(event);
   if (hit?.leaf) { topic.value = hit.leaf.unit; emit("select", hit.leaf.skill.skill); }
@@ -237,12 +271,14 @@ onMounted(() => {
   measure();
   if (scroller.value) { observer = new ResizeObserver(measure); observer.observe(scroller.value); }
   window.addEventListener("resize", measure);
+  hoverless?.addEventListener("change", hoverChanged);
   document.addEventListener("keydown", onKey, true);
   nextTick(() => title.value?.focus());
 });
 onBeforeUnmount(() => {
   observer?.disconnect();
   window.removeEventListener("resize", measure);
+  hoverless?.removeEventListener("change", hoverChanged);
   document.removeEventListener("keydown", onKey, true);
 });
 onUnmounted(() => {
@@ -278,8 +314,10 @@ onUnmounted(() => {
             </svg>
             <canvas ref="canvas" class="forest-canvas" :class="{ pointing }" :style="canvasStyle" role="img" :aria-label="canvasLabel"
               @click="onClick" @mousemove="onMove" @mouseleave="onLeave" />
+            <canvas ref="fade" class="forest-fade" :style="canvasStyle" aria-hidden="true" />
             <button v-for="s in signs" :key="s.unit" type="button" class="forest-sign" :class="{ on: topic === s.unit }" :style="s.style"
-              :aria-pressed="topic === s.unit" :aria-label="`Topic ${s.title}, ${s.meta}`" :title="s.title" @click="toggleTopic(s.unit)">
+              :aria-pressed="topic === s.unit" :aria-label="`Topic ${s.title}, ${s.meta}`" :title="s.title" @click="toggleTopic(s.unit)"
+              @focus="focusTree = s.unit" @blur="focusTree = null">
               <span class="sign-title">{{ s.title }}</span><span class="sign-meta">{{ s.meta }}</span>
             </button>
             <button v-if="plantSign" type="button" class="forest-sign" :style="plantSign" aria-label="Plant a topic from course materials" @click="emit('plant')">
@@ -381,8 +419,12 @@ onUnmounted(() => {
 .forest-scene { position: relative; min-height: 0; border-radius: 24px; overflow: hidden; background: var(--sky); box-shadow: 0 18px 25px rgb(var(--shadow) / .08); }
 .forest-scroll { position: absolute; inset: 0; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; }
 .forest-stage { position: relative; overflow: hidden; }
-.forest-sky, .forest-canvas { position: absolute; left: 0; top: 0; display: block; image-rendering: pixelated; }
-.forest-sky, .forest-clouds { pointer-events: none; }
+.forest-sky, .forest-canvas, .forest-fade { position: absolute; left: 0; top: 0; display: block; image-rendering: pixelated; }
+.forest-sky, .forest-clouds, .forest-fade { pointer-events: none; }
+/* The land as it was before a tree opened or closed, fading out over the land as it is now. */
+.forest-fade { opacity: 0; }
+.forest-fade.fading { animation: forestFadeOut var(--dur-enter) var(--ease-enter) both; }
+@keyframes forestFadeOut { from { opacity: 1; } to { opacity: 0; } }
 .forest-clouds { position: absolute; left: 0; top: 0; overflow: hidden; }
 .forest-canvas.pointing { cursor: pointer; }
 .forest-sign { position: absolute; z-index: 2; width: max-content; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 5px 12px 6px; border: 0; border-radius: 0; background: var(--plank); box-shadow: inset 0 -2px 0 var(--plank-edge), 0 0 0 2px var(--plank-ring), 0 6px 0 -1px rgb(var(--shadow) / .12); text-align: center; }

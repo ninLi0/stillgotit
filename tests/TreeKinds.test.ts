@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { TREE_KINDS, TREE_KIND_IDS, defaultKind, findKind, kindFor, surpriseKind } from "../frontend/src/tree-kinds.ts";
-import { growTree, paintTree } from "../frontend/src/tree-draw.ts";
+import { CANOPY_TIPS, crownTop, growCanopy, growTree, paintCanopy, paintTree } from "../frontend/src/tree-draw.ts";
 import { GROUND, growGrove, type GroveTopic } from "../frontend/src/GroveScene.ts";
 import { layoutForest, sunPlace } from "../frontend/src/ForestScene.ts";
 import { PAL, rng } from "../frontend/src/pixel-art.ts";
@@ -14,6 +14,11 @@ function uuids(count: number, seed = 7): string[] {
 }
 function topic(id: string, kind: string, skills: number): GroveTopic {
   return { id, title: "Topic", kind, skills: Array.from({ length: skills }, (_, i) => ({ skill: `${id}-${i}`, title: `Skill ${i + 1}`, mastery: (i * 37) % 100, due: i === 1 })) };
+}
+/** A painter that records every cell it paints, on whole cells. */
+function recorder(painted: [number, number][]) {
+  return { cell: (x: number, y: number) => { painted.push([Math.round(x), Math.round(y)]); },
+    rect: (x: number, y: number, w: number, h: number) => { for (let i = 0; i < Math.round(w); i++) for (let j = 0; j < Math.round(h); j++) painted.push([Math.round(x) + i, Math.round(y) + j]); } };
 }
 /** The smallest distance, across or up and down, between two leaves' centres. */
 function closest(leaves: readonly { x: number; y: number }[]): number {
@@ -99,10 +104,43 @@ describe("Drawing each kind", () => {
         expect(leaf.x - 3).toBeGreaterThanOrEqual(tree!.x0);
         expect(leaf.x + 3).toBeLessThanOrEqual(tree!.x0 + tree!.w);
       }
-      for (const part of tree!.crown) {
+      for (const part of [...tree!.crown, ...tree!.portrait.crown]) {
         const top = part.shape === "cone" ? part.top : part.shape === "frond" ? Math.min(part.y1, part.y2) : part.shape === "blob" ? part.y - part.r : part.shape === "oval" ? part.y - part.ry : part.y;
         expect(top).toBeGreaterThanOrEqual(0);
       }
+      // The portrait, a full canopy on the same trunk foot, stays above the ground and inside the scene, and so does
+      // its one due flag on the crown top.
+      expect(Math.round(tree!.portrait.segs[0]![0])).toBe(Math.round(tree!.segs[0]![0]));
+      const painted: [number, number][] = [];
+      paintCanopy(recorder(painted), tree!.portrait, tree!.kind, rng(tree!.seed));
+      const [fx, fy] = crownTop(tree!.portrait.tips);
+      for (let dx = 0; dx <= 2; dx++) painted.push([fx + dx, fy - 8]);
+      for (const [x, y] of painted) {
+        expect(y).toBeGreaterThanOrEqual(0);
+        expect(y).toBeLessThanOrEqual(GROUND);
+        expect(x).toBeGreaterThanOrEqual(0);
+      }
+    }
+  });
+
+  test("a full canopy grows at least as many tips as the picker's preview and paints inside its own box", () => {
+    for (const kind of TREE_KINDS) for (const need of [1, 3, 6, 12, 25]) for (const [maxW, maxH, cap, bulk] of [[38, 33, 1.4, 1], [44, 56, 2.4, 1], [130, 68, 3.2, 1.25], [62, 55, 3.2, 1.25]] as const) {
+      const canopy = growCanopy(kind, `${kind.id}-${need}`, 1, need, maxW, maxH, cap, bulk);
+      expect(canopy.tips.length).toBeGreaterThanOrEqual(Math.max(need, CANOPY_TIPS));
+      const painted: [number, number][] = [];
+      expect(paintCanopy(recorder(painted), canopy, kind, rng(1), { widen: bulk > 1 })).toEqual([]);
+      // Nothing reaches below the trunk's foot, except that a willow's strands may hang to the grass in a small box, as
+      // they do on the tree that carries the leaves.
+      for (const [x, y] of painted) {
+        expect(x).toBeGreaterThanOrEqual(0);
+        expect(x).toBeLessThanOrEqual(canopy.w);
+        expect(y).toBeLessThanOrEqual(kind.id === "willow" ? 3 : 0);
+      }
+      // The sample leaves are spread across the tips from left to right, one tip each.
+      const sample = paintCanopy(recorder([]), canopy, kind, rng(1), { leaves: 3 });
+      expect(sample.length).toBe(3);
+      expect(new Set(sample.map(([x, y]) => `${x},${y}`)).size).toBe(3);
+      expect([...sample].sort((a, b) => a[0] - b[0])).toEqual(sample);
     }
   });
 
@@ -117,15 +155,27 @@ describe("Drawing each kind", () => {
     }
   });
 
-  test("in the Forest view, the taller trees stay inside the canvas and leave the sun clear", () => {
-    // A desktop scene and a phone's, each with one to four topics of 1, 3, 6 or 12 skills, every one due today.
+  test("in the Forest view, the taller trees stay inside the canvas and leave the sun clear, in both views", () => {
+    // A desktop scene and a phone's, each with one to four topics of 1, 3, 6 or 12 skills, every one due today. Each
+    // tree is drawn in its skills view and as its portrait.
     for (const [width, height, cell] of [[1100, 640, 5], [343, 420, 4]] as const) for (const kind of TREE_KINDS) for (let topics = 1; topics <= 4; topics++) {
       const units: ViewUnit[] = uuids(topics, topics).map((unit, i) => ({ unit, title: `Topic ${i + 1}`, kind: kind.id,
         skills: Array.from({ length: [1, 3, 6, 12][i]! }, (_, j) => ({ skill: `${unit}-${j}`, title: "Skill", outcome: "", mastery: null, dueToday: true })) }));
       const layout = layoutForest(units, 1, width, height, cell), sun = sunPlace(layout), painted: [number, number][] = [];
-      const record = { cell: (x: number, y: number) => { painted.push([Math.round(x), Math.round(y)]); },
-        rect: (x: number, y: number, w: number, h: number) => { for (let i = 0; i < Math.round(w); i++) for (let j = 0; j < Math.round(h); j++) painted.push([Math.round(x) + i, Math.round(y) + j]); } };
+      const record = recorder(painted);
       for (const tree of layout.trees) {
+        // The portrait: a full canopy on the same trunk foot, with one due flag on its crown top.
+        expect(Math.round(tree.portrait.segs[0]![0])).toBe(tree.trunk);
+        const portrait: [number, number][] = [];
+        paintCanopy(recorder(portrait), tree.portrait, tree.kind, rng(tree.seed), { widen: true });
+        const [fx, fy] = crownTop(tree.portrait.tips);
+        for (let dx = 0; dx <= 2; dx++) portrait.push([fx + dx, fy - 8]);
+        for (const [x, y] of portrait) {
+          expect(y).toBeGreaterThanOrEqual(0);
+          expect(x).toBeGreaterThanOrEqual(0);
+          expect(x).toBeLessThan(layout.Wc);
+        }
+        painted.push(...portrait);
         paintTree(record, { segs: tree.segs, crown: tree.crown, buds: tree.buds.map((b) => [b.x, b.y] as const), leaves: tree.leaves.map((leaf) => [leaf.x, leaf.y] as const) },
           tree.kind, rng(tree.seed), { widen: true });
         for (const leaf of tree.leaves) {
