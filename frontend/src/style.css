@@ -21,9 +21,9 @@
   /* More of each biome: washes and lines around a screen's cards, and its eyebrows */
   --meadow-wash: #F1F8F2; --meadow-tile: #EAF7EE; --meadow-line: #CFE6D7; --meadow-soft-hover: #D6EFDF; --meadow-eyebrow: #3F7A55;
   --ocean-wash: #EEF8FC; --ocean-line: #C7E5F2; --ocean-rule: #D7ECF5; --ocean-eyebrow: #1F6E92;
-  --sand-wash: #FFF6E6; --sand-line: #F3D7A8; --sand-note: #A46626; --dawn-wash: #F1EEFF;
+  --sand-wash: #FFF6E6; --sand-line: #F3D7A8; --sand-note: #A46626;
   /* Text on a biome's soft tint, where the primary button's dark text would vanish in the dark theme */
-  --sand-mark-text: #4A2A08; --dawn-wash-text: #21185A; --lesson-new-hover: #21185A;
+  --sand-mark-text: #4A2A08; --lesson-new-hover: #21185A;
   /* The edge of a dialog, which only the dark theme draws, and the ground behind a video */
   --raised-edge: transparent; --video-ground: #151515;
   /* The lesson's lavender greys, and the estimate's evidence */
@@ -86,8 +86,8 @@
   --backdrop: rgba(0,0,0,.6); --rail-shade: rgba(0,0,0,.5); --shadow: 0 0 0;
   --meadow-wash: #19271E; --meadow-tile: #1E3327; --meadow-line: #2F4E3B; --meadow-soft-hover: #24402F; --meadow-eyebrow: #8DCDA3;
   --ocean-wash: #132833; --ocean-line: #24485A; --ocean-rule: #21404F; --ocean-eyebrow: #8DC9E5;
-  --sand-wash: #2D2314; --sand-line: #5A4524; --sand-note: #E3AE6C; --dawn-nav: #35305C; --dawn-wash: #221F38;
-  --sand-mark-text: #F0CF9C; --dawn-wash-text: #D2CCFA; --lesson-new-hover: #DCD7FF; --raised-edge: rgba(255,255,255,.12);
+  --sand-wash: #2D2314; --sand-line: #5A4524; --sand-note: #E3AE6C; --dawn-nav: #35305C;
+  --sand-mark-text: #F0CF9C; --lesson-new-hover: #DCD7FF; --raised-edge: rgba(255,255,255,.12);
   --lesson-rail: #17161E; --lesson-rail-edge: #2A2838; --lesson-head-line: #292734; --lesson-card-ring: #2D2B3B; --lesson-divider: #2A2836;
   --lesson-chip-line: #34314A; --lesson-chip-hover: #5D5592; --lesson-tile-edge: #3A3554; --lesson-source: #221F33; --lesson-back: #ABA4D4; --lesson-new: #BDB4F7;
   --estimate-eyebrow: #ABA5C9; --estimate-track: #36314F; --estimate-imported: #8E80E0; --evidence-slate: #8E9BA2; --evidence-violet: #8F82E8;
@@ -121,8 +121,8 @@
     --backdrop: rgba(0,0,0,.6); --rail-shade: rgba(0,0,0,.5); --shadow: 0 0 0;
     --meadow-wash: #19271E; --meadow-tile: #1E3327; --meadow-line: #2F4E3B; --meadow-soft-hover: #24402F; --meadow-eyebrow: #8DCDA3;
     --ocean-wash: #132833; --ocean-line: #24485A; --ocean-rule: #21404F; --ocean-eyebrow: #8DC9E5;
-    --sand-wash: #2D2314; --sand-line: #5A4524; --sand-note: #E3AE6C; --dawn-nav: #35305C; --dawn-wash: #221F38;
-    --sand-mark-text: #F0CF9C; --dawn-wash-text: #D2CCFA; --lesson-new-hover: #DCD7FF; --raised-edge: rgba(255,255,255,.12);
+    --sand-wash: #2D2314; --sand-line: #5A4524; --sand-note: #E3AE6C; --dawn-nav: #35305C;
+    --sand-mark-text: #F0CF9C; --lesson-new-hover: #DCD7FF; --raised-edge: rgba(255,255,255,.12);
     --lesson-rail: #17161E; --lesson-rail-edge: #2A2838; --lesson-head-line: #292734; --lesson-card-ring: #2D2B3B; --lesson-divider: #2A2836;
     --lesson-chip-line: #34314A; --lesson-chip-hover: #5D5592; --lesson-tile-edge: #3A3554; --lesson-source: #221F33; --lesson-back: #ABA4D4; --lesson-new: #BDB4F7;
     --estimate-eyebrow: #ABA5C9; --estimate-track: #36314F; --estimate-imported: #8E80E0; --evidence-slate: #8E9BA2; --evidence-violet: #8F82E8;
