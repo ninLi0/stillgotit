@@ -72,7 +72,9 @@ const suggestedBy = ref<TutorUsed | null>(null);
 watch(suggestions, () => { suggestedBy.value = takeTutor(); }, { flush: "sync" });
 
 function openSkill(skill: string) { forestOpen.value = false; selectedSkill.value = skill; view.value = "chat"; }
-function showOnTree(skill: string) { selectedSkill.value = skill; view.value = "home"; }
+// "Show on tree" opens the skill's tree on the grove, even when the skill was already selected.
+const skillTree = ref<{ show?: (skill: string) => void } | null>(null);
+function showOnTree(skill: string) { selectedSkill.value = skill; view.value = "home"; skillTree.value?.show?.(skill); }
 watch([view, selectedSkill], () => sessionStorage.setItem(viewKey, JSON.stringify({ view: view.value, skill: selectedSkill.value })));
 let viewRestored = false;
 // Messages belong to the view where they happened. When the control that changed the view is hidden, focus the new view's heading.
@@ -534,7 +536,7 @@ watch(view, (now) => { if (now === "setup" && material.value && !preview.value) 
       </div>
 
       <div v-if="homeView === 'tree'" class="tree-grid">
-        <div class="tree-stage"><SkillTree :key="`grove-${groveVersion}`" :skills="treeSkills" :selected="selectedSkill" :units="groveUnits" :due="dueIds" :course-id="course.course" @select="selectedSkill = $event" @plant="plant"><template #empty><button class="primary sand empty-import" @click="navigate('setup')">Import your first lesson</button></template></SkillTree></div>
+        <div class="tree-stage"><SkillTree :key="`grove-${groveVersion}`" ref="skillTree" :skills="treeSkills" :selected="selectedSkill" :units="groveUnits" :due="dueIds" :course-id="course.course" @select="selectedSkill = $event" @plant="plant"><template #empty><button class="primary sand empty-import" @click="navigate('setup')">Import your first lesson</button></template></SkillTree></div>
         <aside class="skill-card card">
           <template v-if="current?.status === 'CONFIRMED'">
             <div class="skill-band">

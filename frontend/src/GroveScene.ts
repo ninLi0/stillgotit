@@ -3,7 +3,8 @@
 // so layout, drawing and hit-testing share one grid. Each topic grows its tree kind (tree-kinds.ts): the one the
 // learner chose, or the unit's default. Trees are deterministic from the topic id, the kind and the design seed.
 // Each tree has two views: a portrait, a full canopy of its kind with one due flag at most, and the skills view, a leaf
-// per skill at its stage. The caller says which trees show their skills (SkillTree.vue opens one under the pointer).
+// per skill at its stage. The caller says which trees show their skills (SkillTree.vue opens the selected tree and the
+// one under the pointer).
 import { PAL, SPRITES, hash, rng, stageOf } from "./pixel-art.ts";
 import { crownTop, growCanopy, growTree, moveTree, paintCanopy, paintTree, type CrownPart, type Segment } from "./tree-draw.ts";
 import { kindFor, type TreeKind } from "./tree-kinds.ts";
@@ -13,6 +14,8 @@ import { leafColor, sceneColor } from "./scene-palette.ts";
 export const CELL = 4;
 /** Grove height and the grass line, in cells from the top. */
 export const HEIGHT = 112, GROUND = 96;
+/** The extra soil, in cells, under the grove on Home, where a tree's "Change tree" control sits below its sign. */
+export const SIGN_ROOM = 8;
 /** The "+ Plant a topic" plot: its width and height in cells. */
 export const PLOT = 30;
 // Space between slots, space at either end, and the most leaves one tree carries (more become a second tree).
@@ -147,13 +150,14 @@ export function paintFlag({ rect, cell }: { rect: (x: number, y: number, w: numb
 }
 
 /**
- * Draws the grove at `cssWidth` × HEIGHT cells. The backing store is `devicePixelRatio` times larger and every cell
- * edge is rounded to a device pixel, so cells stay crisp with no seams at fractional ratios. `open` names the trees
- * (by key) that show their skills; the others show their portrait. Every tree shows its skills when it is "all".
+ * Draws the grove at `cssWidth` × `rows` cells (HEIGHT unless the caller wants more soil). The backing store is
+ * `devicePixelRatio` times larger and every cell edge is rounded to a device pixel, so cells stay crisp with no seams at
+ * fractional ratios. `open` names the trees (by key) that show their skills; the others show their portrait. Every tree
+ * shows its skills when it is "all".
  */
 export function drawGrove(canvas: HTMLCanvasElement, grove: Grove, cssWidth: number, dpr: number, selected: string | null, hot: string | null,
-  open: ReadonlySet<string> | "all" = "all") {
-  const bw = Math.round(cssWidth * dpr), bh = Math.round(HEIGHT * CELL * dpr);
+  open: ReadonlySet<string> | "all" = "all", rows = HEIGHT) {
+  const bw = Math.round(cssWidth * dpr), bh = Math.round(rows * CELL * dpr);
   if (canvas.width !== bw) canvas.width = bw;
   if (canvas.height !== bh) canvas.height = bh;
   const ctx = canvas.getContext("2d");
@@ -161,7 +165,7 @@ export function drawGrove(canvas: HTMLCanvasElement, grove: Grove, cssWidth: num
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.imageSmoothingEnabled = false;
   ctx.clearRect(0, 0, bw, bh);
-  const W = Math.ceil(cssWidth / CELL), G = GROUND, H = HEIGHT, size = CELL * dpr;
+  const W = Math.ceil(cssWidth / CELL), G = GROUND, H = rows, size = CELL * dpr;
   const rect = (x: number, y: number, w: number, h: number, colour: string) => {
     const left = Math.round(x * size), top = Math.round(y * size);
     ctx.fillStyle = sceneColor(colour);

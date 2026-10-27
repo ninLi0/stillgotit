@@ -7,7 +7,8 @@ import { kindFor } from "./tree-kinds.ts";
 
 // The selected topic's tree: a small picture of its kind, the kind's name and description, and "Change tree", which
 // opens the tree picker. Home shows it under the grove and the Forest view inside the open topic. `label` is the
-// small heading above the kind's name: the topic's title by default.
+// small heading above the kind's name: the topic's title by default. The grove's own "Change tree" control, under a
+// tree's sign, opens the same picker through `openPicker`.
 const props = defineProps<{ unit: string; topic: string; chosen: string | null; label?: string }>();
 const picker = ref<InstanceType<typeof TreePicker> | null>(null);
 const kind = computed(() => kindFor(props.unit, props.chosen));
@@ -22,6 +23,8 @@ async function choose(next: string | null) {
   if (failure) { said.value = ""; problem.value = `The tree could not be changed. ${failure}`; }
 }
 function article(name: string) { return `${/^[AEIOU]/.test(name) ? "an" : "a"} ${name.toLowerCase()}`; }
+function openPicker() { picker.value?.open(); }
+defineExpose({ openPicker });
 </script>
 
 <template>
@@ -32,7 +35,7 @@ function article(name: string) { return `${/^[AEIOU]/.test(name) ? "an" : "a"} $
       <strong class="topic-tree-name">{{ kind.name }}</strong>
       <span class="topic-tree-about">{{ kind.description }}</span>
     </div>
-    <button type="button" class="secondary meadow topic-tree-change" aria-haspopup="dialog" :aria-label="`Change tree for ${topic}`" @click="picker?.open()">Change tree</button>
+    <button type="button" class="secondary meadow topic-tree-change" aria-haspopup="dialog" :aria-label="`Change tree for ${topic}`" @click="openPicker">Change tree</button>
     <p class="sr-only" role="status">{{ said }}</p>
     <p v-if="problem" class="error topic-tree-problem" role="alert">{{ problem }}</p>
     <TreePicker ref="picker" :unit="unit" :topic="topic" :chosen="chosen" @choose="choose" />

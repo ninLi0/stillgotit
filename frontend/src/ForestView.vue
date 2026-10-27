@@ -18,8 +18,10 @@ import { averageEstimate } from "../../src/computations/course-score.ts";
 // Each leaf is a skill drawn as its mastery sprite. The canvas is for looking and pointing; every skill is also a
 // button in the topics list, so the keyboard reaches everything. The parent owns the selected skill and the design
 // seed; this view owns only which topic is picked out (it dims the other trees and opens that topic in the list).
-// Each tree shows its portrait, a full canopy of its kind, until the pointer is over it or its signpost has focus; then
-// it opens to show its leaves. Where nothing can hover, every tree shows its leaves.
+// Each tree shows its portrait, a full canopy of its kind, and opens to show its leaves while the pointer is over it. A
+// tree the learner selects stays open until they select another tree or open ground: selecting the tree, its signpost
+// or one of its leaves, picking its topic or one of its skills in the list, keyboard focus on its signpost, or opening
+// the forest with one of its skills selected. Where nothing can hover, a tap selects and opens.
 const props = withDefaults(defineProps<ForestProps>(), { selected: null });
 const emit = defineEmits<{ close: []; open: [skill: string]; practice: [skill: string]; select: [skill: string | null]; plant: []; regrow: [] }>();
 
@@ -31,11 +33,12 @@ const canvas = ref<HTMLCanvasElement | null>(null);
 const topic = ref<string | null>(null);
 const hover = ref<string | null>(null);
 const pointing = ref(false);
-// The topics whose trees show their skills rather than their portrait.
-const hoverTree = ref<string | null>(null), focusTree = ref<string | null>(null);
+// The topics whose trees show their skills rather than their portrait: the selected tree (`held`), the picked-out
+// topic, and, as a preview, the tree under the pointer and the tree whose signpost has focus.
+const hoverTree = ref<string | null>(null), focusTree = ref<string | null>(null), held = ref<string | null>(null);
 const hoverless = typeof window !== "undefined" && window.matchMedia ? window.matchMedia("(hover: none)") : null;
 const touch = ref(hoverless?.matches ?? false);
-function hoverChanged() { touch.value = hoverless?.matches ?? false; }
+function hoverChanged() { touch.value = hoverless?.matches ?? false; if (touch.value) onLeave(); }
 const view = ref({ w: 0, h: 0, dpr: 1 });
 
 const INFO = "Each tree is a topic and each leaf on it is one of its skills, drawn as a sprite that shows your estimate, from a bud (no estimate yet) to a bloom (80% and up). Open a topic to change what kind of tree it is.";
@@ -119,13 +122,12 @@ const tag = computed(() => {
     style: { left: `${left}px`, top: `${below ? (lf.y + 5) * c : above}px`, transform: below ? "translateX(-50%)" : "translate(-50%, -100%)" },
   };
 });
-const openTrees = computed<ReadonlySet<string> | "all">(() => {
-  if (touch.value) return "all";
+const openTrees = computed<ReadonlySet<string>>(() => {
   const units = new Set<string>();
-  for (const unit of [hoverTree.value, focusTree.value, leafOf(hover.value)?.unit]) if (unit) units.add(unit);
+  for (const unit of [held.value, topic.value, hoverTree.value, focusTree.value, leafOf(hover.value)?.unit]) if (unit) units.add(unit);
   return units;
 });
-const openKey = computed(() => openTrees.value === "all" ? "all" : [...openTrees.value].sort().join(" "));
+const openKey = computed(() => [...openTrees.value].sort().join(" "));
 const canvasLabel = computed(() => (empty.value
   ? "An empty meadow. No topics have skills yet."
   : `Course forest with ${plural(units.value.length, "topic")} and ${plural(skills.value.length, "skill")}. Every skill is also listed under Topics.`));
@@ -216,6 +218,8 @@ function pointAt(event: MouseEvent) {
   return hitForest(L, (event.clientX - r.left) / cell.value, (event.clientY - r.top) / cell.value);
 }
 function onMove(event: MouseEvent) {
+  // Where nothing can hover, a tap's stray mouse events would leave a tree open, so only taps open trees there.
+  if (touch.value) return;
   const hit = pointAt(event);
   const id = hit?.leaf?.skill.skill ?? null;
   if (id !== hover.value) hover.value = id;
@@ -226,11 +230,19 @@ function onMove(event: MouseEvent) {
 function onLeave() { hover.value = null; hoverTree.value = null; pointing.value = false; }
 function onClick(event: MouseEvent) {
   const hit = pointAt(event);
-  if (hit?.leaf) { topic.value = hit.leaf.unit; emit("select", hit.leaf.skill.skill); }
-  else if (hit?.tree) toggleTopic(hit.tree);
+  // A tap on a closed tree opens it first, so a tap never selects a leaf the learner cannot see yet.
+  if (hit?.leaf && (!touch.value || openTrees.value.has(hit.leaf.unit))) { topic.value = held.value = hit.leaf.unit; emit("select", hit.leaf.skill.skill); }
+  else if (hit?.leaf || hit?.tree) toggleTopic(hit.leaf?.unit ?? hit.tree!);
+  // Open ground lets go of the selected tree and the picked-out topic.
+  else { topic.value = null; held.value = null; }
 }
 
-function toggleTopic(unit: string) { topic.value = topic.value === unit ? null : unit; }
+// Picking a topic selects its tree, and letting go of it closes the tree.
+function toggleTopic(unit: string) {
+  topic.value = topic.value === unit ? null : unit;
+  if (topic.value) held.value = unit;
+  else if (held.value === unit) held.value = null;
+}
 function toggleFromList(unit: string) {
   toggleTopic(unit);
   if (topic.value === unit) reveal(layout.value?.trees.find((t) => t.unit === unit)?.cx ?? null);
@@ -239,6 +251,12 @@ function chooseSkill(id: string) {
   emit("select", id);
   reveal(leafOf(id)?.x ?? null);
 }
+// The selected skill's tree stays open: when the forest opens with a skill selected, and when a leaf or a skill in the
+// list is chosen.
+watch(() => props.selected, (id) => {
+  const unit = id ? props.units.find((u) => u.skills.some((s) => s.skill === id))?.unit : undefined;
+  if (unit) held.value = unit;
+}, { immediate: true });
 
 // ---- Dialog behaviour: focus on open and back on close, Escape, and a focus trap ----
 const opener = focusedControl();
@@ -317,7 +335,7 @@ onUnmounted(() => {
             <canvas ref="fade" class="forest-fade" :style="canvasStyle" aria-hidden="true" />
             <button v-for="s in signs" :key="s.unit" type="button" class="forest-sign" :class="{ on: topic === s.unit }" :style="s.style"
               :aria-pressed="topic === s.unit" :aria-label="`Topic ${s.title}, ${s.meta}`" :title="s.title" @click="toggleTopic(s.unit)"
-              @focus="focusTree = s.unit" @blur="focusTree = null">
+              @focus="focusTree = s.unit; held = s.unit" @blur="focusTree = null">
               <span class="sign-title">{{ s.title }}</span><span class="sign-meta">{{ s.meta }}</span>
             </button>
             <button v-if="plantSign" type="button" class="forest-sign" :style="plantSign" aria-label="Plant a topic from course materials" @click="emit('plant')">

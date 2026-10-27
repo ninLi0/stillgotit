@@ -44,7 +44,7 @@
   --sky: #CFE3EE; --home-sky: #DDEFF3; --home-line: #DCEBE1; --sea: #9BD7EC; --sea-line: #CFE7F2; --lamp: #E3A233;
   --plank: #E9D6A8; --plank-edge: #CDB884; --plank-ring: #C08324; --plank-hover: #F3E3BC; --plank-today: #FFF1C9; --plank-today-edge: #E7C676; --plank-ink: #151515; --plank-soft: #4A4A48;
   --scene-label: rgba(255,255,255,.85); --meadow-label: #1F4A30; --sea-label: #08344D; --scene-card: rgba(255,255,255,.94); --scene-chip: rgba(255,255,255,.9);
-  --today-column: rgba(255,255,255,.26); --today-ring: rgba(255,255,255,.85); --plot: rgba(255,255,255,.35); --plot-hover: rgba(255,255,255,.6);
+  --today-ring: rgba(255,255,255,.85); --plot: rgba(255,255,255,.35); --plot-hover: rgba(255,255,255,.6);
   --forest-tag: #263B2E; --tag-accent: #86D6AC;
   /* The Appearance tiles in Settings show the day and the night sky in either theme */
   --preview-day: #CFE3EE; --preview-night: #1B2440;
@@ -100,7 +100,7 @@
   --scene-card: rgba(27,28,26,.94); --plot: rgba(27,28,26,.78); --plot-hover: rgba(27,28,26,.9);
   /* The scenes by night (scene-palette.ts): the grounds behind their canvases, their edges, and the labels laid over them. */
   --sky: #1D2643; --home-sky: #19223D; --home-line: #2A3346; --sea: #2A4D69; --sea-line: #24485A; --scene-chip: rgba(27,28,26,.85);
-  --scene-label: rgba(18,19,17,.72); --meadow-label: #A3DBB5; --sea-label: #9CD0E7; --today-column: rgba(255,255,255,.07); --today-ring: rgba(255,255,255,.45);
+  --scene-label: rgba(18,19,17,.72); --meadow-label: #A3DBB5; --sea-label: #9CD0E7; --today-ring: rgba(255,255,255,.45);
   --viewer: #161715; --viewer-rail: #191A18; --thumb-ring: #34352F; --thumb-bar: #45463F; --page: #1F201D; --page-ink: #E6E6E0;
   --slide-accent: #4F9BBE; --slide-title: #D3E8F1; --slide-text: #C3CCD0; --slide-foot: #929FA5;
 }
@@ -135,7 +135,7 @@
     --scene-card: rgba(27,28,26,.94); --plot: rgba(27,28,26,.78); --plot-hover: rgba(27,28,26,.9);
     /* The scenes by night (scene-palette.ts): the grounds behind their canvases, their edges, and the labels laid over them. */
     --sky: #1D2643; --home-sky: #19223D; --home-line: #2A3346; --sea: #2A4D69; --sea-line: #24485A; --scene-chip: rgba(27,28,26,.85);
-    --scene-label: rgba(18,19,17,.72); --meadow-label: #A3DBB5; --sea-label: #9CD0E7; --today-column: rgba(255,255,255,.07); --today-ring: rgba(255,255,255,.45);
+    --scene-label: rgba(18,19,17,.72); --meadow-label: #A3DBB5; --sea-label: #9CD0E7; --today-ring: rgba(255,255,255,.45);
     --viewer: #161715; --viewer-rail: #191A18; --thumb-ring: #34352F; --thumb-bar: #45463F; --page: #1F201D; --page-ink: #E6E6E0;
     --slide-accent: #4F9BBE; --slide-title: #D3E8F1; --slide-text: #C3CCD0; --slide-foot: #929FA5;
   }
@@ -271,9 +271,13 @@ dialog[open]::backdrop { animation: sgFade var(--dur-enter) var(--ease-enter); }
   transform: translate(round(var(--drift-x), var(--snap, 1px)), round(var(--drift-y), var(--snap, 1px)));
   animation: sgDriftX var(--period-x) var(--ease-loop) var(--delay-x) infinite alternate, sgDriftY var(--period-y) var(--ease-loop) var(--delay-y) infinite alternate;
 }
-/* The Plan sea's whale swims from today toward the lighthouse, fading in at the start and out at the end of each
-   crossing; on the way it dives a little and surfaces again, and it spouts each time it surfaces. */
-@keyframes sgSwim { 0% { --drift-x: 0px; opacity: 0; } 8%, 92% { opacity: 1; } 100% { --drift-x: var(--reach-x); opacity: 0; } }
+/* The Plan sea's whale swims from today toward the lighthouse, rising toward the horizon, fading in at the start and out
+   at the end of each crossing; on the way it dives a little and surfaces again, and it spouts each time it surfaces. It
+   is drawn at 2 px per unit for the deeper half of the crossing and at 1 px for the half nearer the horizon: run with a
+   step timing, sgWhaleNear and sgWhaleFar swap the two drawings at the halfway point. */
+@keyframes sgSwim { 0% { --drift-x: 0px; --drift-y: 0px; opacity: 0; } 8%, 92% { opacity: 1; } 100% { --drift-x: var(--reach-x); --drift-y: var(--reach-y); opacity: 0; } }
+@keyframes sgWhaleNear { 0% { opacity: 1; } 50%, 100% { opacity: 0; } }
+@keyframes sgWhaleFar { 0% { opacity: 0; } 50%, 100% { opacity: 1; } }
 @keyframes sgDive { to { --drift-y: var(--reach-y); opacity: .7; } }
 @keyframes sgSpout { 0%, 100% { opacity: 1; } 14%, 86% { opacity: 0; } }
 /* The lighthouse lamp breathes between a deep and a pale yellow, and its beam fades in as it brightens. */
