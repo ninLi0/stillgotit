@@ -1,6 +1,6 @@
 # P2 diagnostic review
 
-> This review was written in P2 against sync-engine 1.1.0, when the checker reported 40 advisories. P3 moved the project to sync-engine 1.2.0 (`d312f88`), and in P4 the checker reports 83: 66 answer-coverage warnings and 17 list-order notices. They are the same two kinds described below, the checker has not been patched or suppressed in either version, and the counts and the pinned version named in the rest of this page are P2's.
+> This review was written in P2 against sync-engine 1.1.0, when the checker reported 40 advisories. P3 moved the project to sync-engine 1.2.0 (`d312f88`), and after P4 the checker reports 84: 66 answer-coverage warnings and 18 list-order notices. They are the same two kinds described below, the checker has not been patched or suppressed in either version, and the counts and the pinned version named in the rest of this page are P2's.
 
 The pinned sync-engine 1.1.0 checker reports 40 advisories: 36 warnings about answer coverage and four notices about list order. These are two categories, not 40 separate confirmed failures.
 
