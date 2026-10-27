@@ -10,6 +10,7 @@ import SkillTree from "./SkillTree.vue";
 import SkillStudy from "./SkillStudy.vue";
 import StudyPlanner from "./StudyPlanner.vue";
 import ManageSkills from "./ManageSkills.vue";
+import SuggestionReview from "./SuggestionReview.vue";
 import GradedImport from "./GradedImport.vue";
 import type { StillGotItHttp } from "../../generated/wire.ts";
 import { takeTutor, tutorLabel, type TutorUsed } from "./tutor-choice.ts";
@@ -188,7 +189,7 @@ async function suggest() {
     if (!source) throw new Error("Choose a study material first.");
     const result = unwrap(await api.courses.skills.suggest({ material: source })).suggestions;
     suggestions.value = result.skills; newUnit.value = result.unitTitle; suggestionSource.value = source;
-    reviewIndex.value = 0; reviewOpen.value = true;
+    reviewIndex.value = 0; reviewOpen.value = true; reviewDone.value = 0;
     message.value = "Review the outcomes and demonstration requirements. You can edit each suggestion.";
   });
 }
@@ -340,8 +341,8 @@ const materialSkills = computed(() => material.value ? skillsOf(material.value) 
 const viewerSkills = computed<ViewerSkill[]>(() => materialSkills.value.map((skill) => ({ skill: skill.skill, title: skill.title, status: skill.status as "DRAFT" | "CONFIRMED" })));
 // The file whose drafts the banner points at.
 const draftFile = computed(() => { const ids = new Set(drafts.value.map((skill) => skill.skill)); const row = data.value.skillSources.find((item) => ids.has(item.skill)); return row ? data.value.materials.find((source) => source.material === row.material) : undefined; });
-function reviewDrafts() { reviewIndex.value = suggestions.value.length; reviewOpen.value = true; void focusReview(); }
-function reviewDraft(skill: string) { const at = reviewItems.value.findIndex((item) => item.kind === "draft" && item.skill === skill); reviewIndex.value = at < 0 ? 0 : at; reviewOpen.value = true; void focusReview(); }
+function reviewDrafts() { if (!showReview.value) reviewDone.value = 0; reviewIndex.value = suggestions.value.length; reviewOpen.value = true; void focusReview(); }
+function reviewDraft(skill: string) { if (!showReview.value) reviewDone.value = 0; const at = reviewItems.value.findIndex((item) => item.kind === "draft" && item.skill === skill); reviewIndex.value = at < 0 ? 0 : at; reviewOpen.value = true; void focusReview(); }
 async function focusReview() { await nextTick(); document.getElementById("review-title")?.focus(); }
 
 // ---- One-at-a-time review of suggested skills ----
@@ -356,11 +357,30 @@ const reviewItems = computed<ReviewItem[]>(() => [
 const reviewAt = computed(() => Math.max(0, Math.min(reviewIndex.value, reviewItems.value.length - 1)));
 const reviewing = computed(() => reviewItems.value[reviewAt.value]);
 const showReview = computed(() => !!reviewing.value && (reviewOpen.value || suggestions.value.length > 0));
-const draftEdit = ref<{ skill: string; title: string; outcome: string; gate: string; unit: string } | null>(null);
+// Items confirmed or discarded since the deck opened, which the review draws as filled squares before the rest.
+const reviewDone = ref(0);
+type DraftEdit = { skill: string; title: string; outcome: string; gate: string; unit: string };
+const draftEdit = ref<DraftEdit | null>(null);
+// Edits to a saved draft are kept while the learner moves through the deck, and dropped when the deck closes.
+// Closing means Later, or the last item leaving: a save empties the deck for a moment before its draft arrives.
+const draftEdits = new Map<string, DraftEdit>();
+watch(reviewOpen, (open) => { if (!open) { reviewDone.value = 0; draftEdits.clear(); draftEdit.value = null; loadDraftEdit(); } });
 function draftOf(skill: string) { return drafts.value.find((draft) => draft.skill === skill); }
-function loadDraftEdit() { const item = reviewing.value, draft = item?.kind === "draft" ? draftOf(item.skill) : undefined; draftEdit.value = draft ? { skill: draft.skill, title: draft.title, outcome: draft.outcome, gate: draft.gate, unit: draft.unit } : null; }
+function loadDraftEdit() {
+  if (draftEdit.value) draftEdits.set(draftEdit.value.skill, draftEdit.value);
+  const item = reviewing.value, draft = item?.kind === "draft" ? draftOf(item.skill) : undefined;
+  draftEdit.value = draft ? draftEdits.get(draft.skill) ?? { skill: draft.skill, title: draft.title, outcome: draft.outcome, gate: draft.gate, unit: draft.unit } : null;
+}
 watch(() => reviewing.value?.key, loadDraftEdit, { immediate: true });
 const reviewSuggestion = computed(() => reviewing.value?.kind === "suggestion" ? suggestions.value[reviewing.value.index] : undefined);
+// The fields of the item on screen, edited in place: a new suggestion's own record, or the copy of a saved draft.
+const reviewFields = computed(() => reviewing.value?.kind === "suggestion" ? reviewSuggestion.value : draftEdit.value);
+// New suggestions share one topic (`unit`, or a new one named by `newUnit`); each saved draft keeps its own.
+const reviewTopic = computed({
+  get: () => reviewing.value?.kind === "draft" ? draftEdit.value?.unit ?? "" : unit.value,
+  set: (value: string) => { if (reviewing.value?.kind !== "draft") unit.value = value; else if (draftEdit.value) draftEdit.value.unit = value; },
+});
+const reviewTutor = computed(() => reviewing.value?.kind === "suggestion" && suggestedBy.value ? tutorLabel(suggestedBy.value) : "");
 const reviewMaterial = computed(() => { const item = reviewing.value; if (item?.kind === "suggestion") return suggestionSource.value || material.value; return item ? data.value.skillSources.find((row) => row.skill === item.skill)?.material ?? "" : ""; });
 const reviewSourceTitle = computed(() => data.value.materials.find((source) => source.material === reviewMaterial.value)?.title ?? "");
 // A saved draft is discarded on the server. While a draft save waits for its reply, that save may be the one that
@@ -369,7 +389,7 @@ const discardReason = computed(() => reviewing.value?.kind === "draft" && pendin
 async function discardCurrent() {
   const item = reviewing.value; if (!item) return;
   if (item.kind === "suggestion") {
-    suggestions.value.splice(item.index, 1);
+    suggestions.value.splice(item.index, 1); reviewDone.value++;
     if (!reviewItems.value.length) reviewOpen.value = false;
     return;
   }
@@ -384,31 +404,46 @@ async function discardCurrent() {
     if (selectedSkill.value === item.skill) selectedSkill.value = null;
     message.value = `Draft discarded. ${title ? `“${title}” is` : "It is"} no longer in this course.`;
   });
+  if (!error.value) reviewDone.value++;
   if (!reviewItems.value.length) reviewOpen.value = false;
 }
 async function confirmCurrent() {
   const item = reviewing.value; if (!item) return;
   if (item.kind === "suggestion") await confirmSuggestion(item.index);
   else await confirmDraft(item.skill);
+  if (!error.value) reviewDone.value++;
   if (!reviewItems.value.length) reviewOpen.value = false;
+}
+/** Saves one new suggestion as a draft through the draft save queue, and answers the saved draft and what was sent. */
+async function proposeSuggestion(index: number) {
+  if (draftSaves.read().length) throw new Error("Finish saving your skill drafts first.");
+  const source = suggestionSource.value || material.value, chosen = suggestions.value[index];
+  if (!source) throw new Error("Choose learning material first.");
+  if (!chosen) return null;
+  if (!unit.value) unit.value = unwrap(await api.courses.units.add({ course: props.course.course, title: newUnit.value.trim() })).unit;
+  draftSaves.start([{ ...structuredClone({ ...chosen }), unit: unit.value, material: source }]);
+  suggestions.value.splice(index, 1);
+  pendingDraftCount.value = draftSaves.read().length;
+  let saved = "";
+  try { await draftSaves.drain(async (input) => { saved = unwrap(await api.courses.skills.propose(input)).skill; }); }
+  finally { pendingDraftCount.value = draftSaves.read().length; await refresh(); }
+  return { saved, chosen };
 }
 async function confirmSuggestion(index: number) {
   await task(async () => {
-    if (draftSaves.read().length) throw new Error("Finish saving your skill drafts first.");
-    const source = suggestionSource.value || material.value, chosen = suggestions.value[index];
-    if (!source) throw new Error("Choose learning material first.");
-    if (!chosen) return;
-    if (!unit.value) unit.value = unwrap(await api.courses.units.add({ course: props.course.course, title: newUnit.value.trim() })).unit;
-    draftSaves.start([{ ...structuredClone({ ...chosen }), unit: unit.value, material: source }]);
-    suggestions.value.splice(index, 1);
-    pendingDraftCount.value = draftSaves.read().length;
-    let saved = "";
-    try { await draftSaves.drain(async (input) => { saved = unwrap(await api.courses.skills.propose(input)).skill; }); }
-    finally { pendingDraftCount.value = draftSaves.read().length; await refresh(); }
-    unwrap(await api.courses.skills.confirm({ skill: saved }));
-    selectedSkill.value = saved; justConfirmed.value = saved;
-    message.value = `Skill confirmed. “${chosen.title}” is now a leaf on your tree.`;
+    const proposed = await proposeSuggestion(index); if (!proposed) return;
+    unwrap(await api.courses.skills.confirm({ skill: proposed.saved }));
+    selectedSkill.value = proposed.saved; justConfirmed.value = proposed.saved;
+    message.value = `Skill confirmed. “${proposed.chosen.title}” is now a leaf on your tree.`;
     await refresh();
+  });
+}
+/** "Save as draft" for the suggestion on screen: the same save as "Save all", for one. It joins the deck's saved drafts. */
+async function saveCurrentDraft() {
+  const item = reviewing.value; if (item?.kind !== "suggestion") return;
+  await task(async () => {
+    const proposed = await proposeSuggestion(item.index); if (!proposed) return;
+    message.value = `Draft saved. “${proposed.chosen.title}” waits with your drafts until you confirm it.`;
   });
 }
 async function confirmDraft(skill: string) {
@@ -583,36 +618,9 @@ watch(view, (now) => { if (now === "setup" && material.value && !preview.value) 
           </form>
         </section>
         <GradedImport ref="gradedImport" external :course="course.course" :ai-available="ai.available" :ai-reason="ai.reason" @changed="task(refresh)" @closed="gradedButton?.focus()" />
-        <section v-if="showReview && reviewing" class="review-card card" aria-labelledby="review-title">
-          <header class="review-head">
-            <h2 id="review-title" class="display" tabindex="-1">Review suggested skills</h2>
-            <InfoBubble text="Edit each suggestion to match what your course expects. Confirming saves it and adds it as a leaf on your tree. Discard drops a new suggestion, or deletes a saved draft from this course with its requirements. A discarded draft can't be brought back." />
-            <span class="review-dots" role="group" aria-label="Suggestions">
-              <button v-for="(item, i) in reviewItems" :key="item.key" type="button" class="dot" :class="{ on: i === reviewAt, saved: item.kind === 'draft' }" :aria-label="`Suggestion ${i + 1} of ${reviewItems.length}${item.kind === 'draft' ? ', saved draft' : ''}`" :aria-current="i === reviewAt ? 'step' : undefined" @click="reviewIndex = i" />
-            </span>
-            <button v-if="!suggestions.length" type="button" class="quiet review-later" @click="reviewOpen = false">Later</button>
-          </header>
-          <p class="hint review-source">{{ reviewing.kind === 'draft' ? 'Saved draft' : 'New suggestion' }}{{ reviewSourceTitle ? ` · from ${reviewSourceTitle}` : '' }}</p>
-          <p v-if="reviewing.kind === 'suggestion' && suggestedBy" class="tutor-label">{{ tutorLabel(suggestedBy) }}</p>
-          <template v-if="reviewing.kind === 'suggestion' && reviewSuggestion">
-            <label>Skill name<input v-model="reviewSuggestion.title" maxlength="160" :disabled="busy" /></label>
-            <label>Topic<select v-model="unit" :disabled="busy"><option value="">Create a topic</option><option v-for="item in data.units" :key="item.unit" :value="item.unit">{{ item.title }}</option></select></label>
-            <label v-if="!unit">New topic name<input v-model="newUnit" maxlength="160" :disabled="busy" /></label>
-            <label>What you should be able to do<textarea v-model="reviewSuggestion.outcome" rows="2" :disabled="busy" /></label>
-            <label>How you will demonstrate it<textarea v-model="reviewSuggestion.gate" rows="3" :disabled="busy" /></label>
-          </template>
-          <template v-else-if="reviewing.kind === 'draft' && draftEdit">
-            <label>Skill name<input v-model="draftEdit.title" maxlength="160" :disabled="busy" /></label>
-            <label>Topic<select v-model="draftEdit.unit" :disabled="busy"><option v-for="item in data.units" :key="item.unit" :value="item.unit">{{ item.title }}</option></select></label>
-            <label>What you should be able to do<textarea v-model="draftEdit.outcome" rows="2" :disabled="busy" /></label>
-            <label>How you will demonstrate it<textarea v-model="draftEdit.gate" rows="3" :disabled="busy" /></label>
-          </template>
-          <div class="review-actions">
-            <span class="discard-wrap"><button type="button" class="secondary sand" :disabled="busy || !!discardReason" :aria-describedby="discardReason ? 'discard-reason' : undefined" @click="discardCurrent">Discard</button><p v-if="discardReason" id="discard-reason" class="hint reason">{{ discardReason }}</p></span>
-            <button v-if="suggestions.length > 1" type="button" class="quiet" :disabled="busy" @click="saveDrafts">Save all {{ suggestions.length }} as drafts</button>
-            <button type="button" class="primary sand" :disabled="busy" @click="confirmCurrent">{{ busy ? 'Saving…' : 'Confirm · add a leaf' }}</button>
-          </div>
-        </section>
+        <SuggestionReview v-if="showReview && reviewing" v-model:topic="reviewTopic" v-model:new-topic="newUnit" :items="reviewItems" :at="reviewAt" :done="reviewDone" :kind="reviewing.kind"
+          :fields="reviewFields" :units="data.units" :source-title="reviewSourceTitle" :tutor="reviewTutor" :unsaved="suggestions.length" :busy="busy" :discard-reason="discardReason" :can-later="!suggestions.length"
+          @go="reviewIndex = $event" @discard="discardCurrent" @save-draft="saveCurrentDraft" @save-all="saveDrafts" @confirm="confirmCurrent" @later="reviewOpen = false" />
         <section v-if="pendingDraftCount" class="section-block" aria-live="polite">
           <h2 class="display">Finish saving skills</h2>
           <p>{{ pendingDraftCount }} {{ pendingDraftCount === 1 ? 'save is' : 'saves are' }} waiting for confirmation. Retrying uses the original details and keeps any saved drafts.</p>
@@ -787,18 +795,6 @@ select, textarea { width: 100%; font: inherit; padding: 10px 12px; border: 1px s
 textarea { resize: vertical; }
 .add-panel, .suggest-panel, .section-block { margin: 0 0 18px; }
 .add-panel h2, .suggest-panel h2, .section-block h2 { margin: 0 0 10px; font-size: 22px; }
-.review-card { margin: 0 0 18px; padding: 18px; max-width: 760px; animation: sgRise var(--dur-enter) var(--ease-enter) both; }
-.review-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; }
-.review-head h2 { margin: 0; font-size: 22px; }
-.review-dots { display: inline-flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
-.dot { width: 12px; height: 12px; padding: 0; border: 0; border-radius: 2px; background: var(--ring); }
-.dot.saved { background: var(--sand-nav); }
-.dot.on { background: var(--sand-edge); }
-.review-later { margin-left: 4px; }
-.review-source { margin: 6px 0 0; }
-.review-card label { display: flex; flex-direction: column; gap: 6px; }
-.review-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 16px; }
-.discard-wrap { margin-right: auto; }
 .section-block { padding: 16px 18px; border-radius: 18px; background: var(--sand-soft); }
 .section-block p { font-size: 14px; }
 .course-tools form.import-card { max-width: none; }
