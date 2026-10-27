@@ -149,7 +149,7 @@ const address = (model: string) => `${GOOGLE}/${model}:generateContent`;
  * process. The first server stays idle meanwhile, so it changes nothing during the restart.
  * At startup it does what src/main.ts does: it reads Gemini's model list (faked to list only `listed`), withdraws the
  * offered models the list lacks, and fixes the catalog. Then it sends Maya's and Sam's requests below and prints the replies.
- * GEMINI_MODEL is unset in that process, so its default is gemini-3.8-flash at Medium.
+ * GEMINI_MODEL is unset in that process, so its default is gemini-4-argon at Medium.
  */
 async function restartServer(input: { database: string; listed: string[]; maya: { session: string; skill: string }; sam: { session: string }; again: TutorChoice }) {
   const script = `
@@ -338,7 +338,7 @@ describe("model-picker: one learner's journey through HTTP, a second learner bes
       maya: { session: maya.session, skill: maya.skill }, sam: { session: sam.session }, again: FLASH_HIGH });
     expect(restarted.list).toEqual([{ url: `${GOOGLE}?pageSize=200`, method: "GET", headers: { "x-goog-api-key": KEY } }]);
     expect(restarted.logs).toEqual(["Tutor models withdrawn because Gemini's model list lacks them: gemini-3.1-pro-preview."]);
-    const offered = catalog("gemini-3.8-flash", TABLE.filter((entry) => entry.model !== "gemini-3.1-pro-preview")), fallback = defaultFor("gemini-3.8-flash");
+    const offered = catalog("gemini-4-argon", TABLE.filter((entry) => entry.model !== "gemini-3.1-pro-preview")), fallback = defaultFor("gemini-4-argon");
     // Maya's saved choice is still hers, but it is RETIRED: Pro is no longer among the offered models.
     expect(restarted.retired).toEqual({ status: 200, body: { settings: { models: offered, choice: PRO_LOW, status: "RETIRED", defaultChoice: fallback } } });
     // Her lesson is declined at admission with the design's sentence. Nothing was saved, and there is no silent fallback:

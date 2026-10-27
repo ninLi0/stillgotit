@@ -5,7 +5,7 @@ import type { TutorCatalog, TutorChoice, TutorLevel, TutorModelOffer } from "../
 export const TUTOR_LEVELS: readonly TutorLevel[] = Object.freeze(["MINIMAL", "LOW", "MEDIUM", "HIGH"]);
 export const LEVEL_NAMES: Readonly<Record<TutorLevel, string>> = Object.freeze({ MINIMAL: "Minimal", LOW: "Low", MEDIUM: "Medium", HIGH: "High" });
 /** The default entry when GEMINI_MODEL is unset. */
-export const DEFAULT_TUTOR_MODEL = "gemini-3.8-flash";
+export const DEFAULT_TUTOR_MODEL = "gemini-4-argon";
 
 type TutorModel = Readonly<Omit<TutorModelOffer, "appDefault" | "levels" | "slowLevels">> & { readonly levels: readonly TutorLevel[]; readonly slowLevels: readonly TutorLevel[] };
 const row = (entry: TutorModel): TutorModel => Object.freeze({ ...entry, levels: Object.freeze([...entry.levels]), slowLevels: Object.freeze([...entry.slowLevels]) });

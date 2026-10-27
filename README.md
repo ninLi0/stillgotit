@@ -59,7 +59,7 @@ Uploaded files are kept in `.data/files`, which Git ignores, unless the S3 varia
 | `PUBLIC_ORIGIN` | The address people open. The server accepts changes only from this origin. `bun run preview` and `bun run dev:server` set it themselves. |
 | `COMMONS_ORIGIN` | Optional. The Commons sign-in server. The default is `https://class.mit-sdg.dev`. |
 | `GEMINI_API_KEY` | The key for the AI tutor, as described above. |
-| `GEMINI_MODEL` | Optional. The tutor model for learners who have not chosen one. The default is `gemini-3.8-flash`. The server stops at startup if this names a model that the tutor catalog does not offer. |
+| `GEMINI_MODEL` | Optional. The tutor model for learners who have not chosen one. The default is `gemini-4-argon`. The server stops at startup if this names a model that the tutor catalog does not offer. |
 | `GEMINI_TRANSCRIBE_MODEL` | Optional. The model that transcribes imported recordings and videos. Without it, the app uses `GEMINI_MODEL`. |
 | `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | Optional. S3-compatible storage for uploaded files. If any S3 variable is set, these three are required. |
 | `S3_ENDPOINT`, `S3_REGION`, `S3_SESSION_TOKEN` | Optional. Further S3 settings. |

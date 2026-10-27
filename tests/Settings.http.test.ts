@@ -153,7 +153,8 @@ test("Gemini 4 Argon is offered at Low, Medium, and High, refuses Minimal, and i
   expect(await learner.ok("/settings/tutor")).toEqual(settings({ model: ARGON, level: "HIGH" }, "SAVED"));
 
   // A key without access to Argon: the startup check, in a fresh process because the catalog is fixed once per process,
-  // reads a model list that has the other three models and withdraws Argon alone.
+  // reads a model list that has the other three models and withdraws Argon alone. The default is never withdrawn, so this
+  // process names Flash as the default; with Argon as the default, the check would keep Argon.
   const root = resolve(import.meta.dir, "..");
   const script = `const at = (path) => ${JSON.stringify(root)} + "/" + path;
     const { Gemini } = await import(at("src/host/gemini.ts"));
@@ -166,7 +167,7 @@ test("Gemini 4 Argon is offered at Low, Medium, and High, refuses Minimal, and i
     T.withdrawTutorModels(withdrawn);
     console.log(JSON.stringify({ withdrawn, lines, models: T.tutorCatalog({}).map((entry) => entry.model), offered: T.modelOffered({ model: ${JSON.stringify(ARGON)} }),
       saved: T.choiceOffered({ choice: { model: ${JSON.stringify(ARGON)}, level: "HIGH" } }) }));`;
-  const result = Bun.spawnSync(["bun", "-e", script], { cwd: root, env: { ...process.env, GEMINI_MODEL: "", GEMINI_API_KEY: "" } });
+  const result = Bun.spawnSync(["bun", "-e", script], { cwd: root, env: { ...process.env, GEMINI_MODEL: "gemini-3.8-flash", GEMINI_API_KEY: "" } });
   expect(result.exitCode, result.stderr.toString()).toBe(0);
   expect(JSON.parse(result.stdout.toString())).toEqual({ withdrawn: [ARGON], lines: [`Tutor models withdrawn because Gemini's model list lacks them: ${ARGON}.`],
     models: ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-3.1-pro-preview"], offered: false, saved: false });

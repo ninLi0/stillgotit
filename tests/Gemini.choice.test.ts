@@ -150,7 +150,7 @@ describe("dictation keeps the configured model and its current sentences", () =>
 
 describe("startup checks", () => {
   test("GEMINI_MODEL must be unset or an offered model, matched exactly after trimming and removing models/", () => {
-    for (const [value, model] of [[undefined, "gemini-3.8-flash"], ["", "gemini-3.8-flash"], ["  ", "gemini-3.8-flash"], ["gemini-3.8-flash", "gemini-3.8-flash"],
+    for (const [value, model] of [[undefined, "gemini-4-argon"], ["", "gemini-4-argon"], ["  ", "gemini-4-argon"], ["gemini-3.8-flash", "gemini-3.8-flash"],
       ["models/gemini-3.1-pro-preview", "gemini-3.1-pro-preview"], [" gemini-3.5-flash-lite ", "gemini-3.5-flash-lite"]] as const) {
       expect(checkConfiguredModel(value), String(value)).toEqual({ ok: true, model });
     }
@@ -226,13 +226,13 @@ describe("startup checks", () => {
   test("a withdrawn model leaves the offer for this server process, a saved choice of it becomes RETIRED, and the default stays", () => {
     // A separate process, because the catalog can be fixed only once per process.
     const script = `const T = await import(${JSON.stringify(resolve(import.meta.dir, "../src/computations/tutor.ts"))});
-      T.withdrawTutorModels(["gemini-3.1-pro-preview", "gemini-3.8-flash"]);
+      T.withdrawTutorModels(["gemini-3.1-pro-preview", "gemini-4-argon"]);
       let fixed = false; try { T.withdrawTutorModels([]); } catch { fixed = true; }
       console.log(JSON.stringify({ models: T.tutorCatalog({}).map((entry) => entry.model), pro: T.modelOffered({ model: "gemini-3.1-pro-preview" }),
         saved: T.choiceOffered({ choice: { model: "gemini-3.1-pro-preview", level: "HIGH" } }), fallback: T.defaultChoice({}), fixed }));`;
     const result = Bun.spawnSync(["bun", "-e", script], { cwd: resolve(import.meta.dir, ".."), env: { ...process.env, GEMINI_MODEL: "" } });
     expect(result.exitCode).toBe(0);
     expect(JSON.parse(result.stdout.toString())).toEqual({ models: ["gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-4-argon"], pro: false, saved: false,
-      fallback: { model: "gemini-3.8-flash", level: "MEDIUM" }, fixed: true });
+      fallback: { model: "gemini-4-argon", level: "MEDIUM" }, fixed: true });
   });
 });
