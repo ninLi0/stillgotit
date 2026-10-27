@@ -13,7 +13,8 @@ import { currentTheme } from "./theme.ts";
 // keyboard and with a screen reader. `units` names the topics and the tree kind chosen for each, `due` lists the
 // skills due today, and `courseId` keys the saved design seed; all three are optional. Selecting a tree or its sign
 // picks out its topic, and the topic's tree appears under the grove with "Change tree" (design/visual-design.md,
-// "Tree kinds").
+// "Tree kinds"). Each tree shows its portrait, a full canopy of its kind, until the pointer is over it or one of its
+// leaves or its sign has focus; then it opens to show its leaves. Where nothing can hover, every tree shows its leaves.
 const props = defineProps<{
   skills: { skill: string; title: string; status: string; mastery?: number; unit?: string }[];
   selected: string | null;
@@ -94,9 +95,29 @@ const leaves = computed(() => placed.value.grove.trees.flatMap((tree) => tree.le
 
 const hover = ref<string | null>(null), focused = ref<string | null>(null);
 const hot = computed(() => hover.value ?? focused.value);
+
+// Which trees show their skills rather than their portrait, by tree key.
+const hoverTree = ref<string | null>(null), focusTree = ref<string | null>(null);
+const leafTree = computed(() => new Map(placed.value.grove.trees.flatMap((tree) => tree.leaves.map((leaf) => [leaf.skill.skill, tree.key] as const))));
+const hoverless = typeof window !== "undefined" && window.matchMedia ? window.matchMedia("(hover: none)") : null;
+const reduced = typeof window !== "undefined" && window.matchMedia ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
+const touch = ref(hoverless?.matches ?? false);
+function hoverChanged() { touch.value = hoverless?.matches ?? false; }
+const openTrees = computed<ReadonlySet<string> | "all">(() => {
+  if (touch.value) return "all";
+  const keys = new Set<string>();
+  const leafKey = hot.value ? leafTree.value.get(hot.value) : undefined;
+  if (leafKey) keys.add(leafKey);
+  if (hoverTree.value) keys.add(hoverTree.value);
+  if (focusTree.value) keys.add(focusTree.value);
+  return keys;
+});
+const openKey = computed(() => openTrees.value === "all" ? "all" : [...openTrees.value].sort().join(" "));
+// The tag names the leaf under the pointer or focus, or else the selected one, while its tree shows its skills.
 const tagLeaf = computed<GroveLeaf | undefined>(() => {
-  const id = hot.value ?? props.selected;
-  return id ? leaves.value.find((leaf) => leaf.skill.skill === id) : undefined;
+  const id = hot.value ?? props.selected, open = openTrees.value, key = id ? leafTree.value.get(id) : undefined;
+  if (!id || !key || (open !== "all" && !open.has(key))) return undefined;
+  return leaves.value.find((leaf) => leaf.skill.skill === id);
 });
 const percent = (skill: GroveLeaf["skill"]) => skill.mastery === undefined ? "new" : `${Math.round(skill.mastery)}%`;
 const leafLabel = (skill: GroveLeaf["skill"]) =>
@@ -116,11 +137,29 @@ watch(tagLeaf, async () => { await nextTick(); tagWidth.value = tagEl.value?.off
 
 function draw() {
   if (!canvas.value) return;
-  drawGrove(canvas.value, placed.value.grove, placed.value.cssWidth, dpr.value, props.selected, hot.value);
+  drawGrove(canvas.value, placed.value.grove, placed.value.cssWidth, dpr.value, props.selected, hot.value, openTrees.value);
   const ctx = canvas.value.getContext("2d");
   if (ctx) scatterStars(ctx, CELL * dpr.value, Math.ceil(placed.value.cssWidth / CELL), GROUND, 7);
 }
-watch([placed, () => props.selected, hot, dpr, currentTheme], draw, { flush: "post" });
+watch([placed, () => props.selected, hot, openKey, dpr, currentTheme], draw, { flush: "post" });
+
+// When a tree opens or closes, the grove as it was is copied onto a canvas laid over it, which fades out while the
+// grove underneath is drawn in its new state: a crossfade with no render loop. Under reduced motion it switches at once.
+const fade = ref<HTMLCanvasElement | null>(null);
+watch(openKey, () => {
+  const from = canvas.value, over = fade.value;
+  if (!from || !over || !from.width || reduced?.matches) return;
+  if (over.width !== from.width) over.width = from.width;
+  if (over.height !== from.height) over.height = from.height;
+  const ctx = over.getContext("2d");
+  if (!ctx) return;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, over.width, over.height);
+  ctx.drawImage(from, 0, 0);
+  over.classList.remove("fading");
+  void over.offsetWidth;
+  over.classList.add("fading");
+});
 
 // Hit-testing happens in cell space: the nearest leaf within about five cells.
 function leafAtPointer(event: MouseEvent) {
@@ -135,8 +174,12 @@ const pointing = ref(false);
 function onMove(event: MouseEvent) {
   const id = leafAtPointer(event)?.skill.skill ?? null;
   if (id !== hover.value) hover.value = id;
+  const box = (event.currentTarget as HTMLElement).getBoundingClientRect();
+  const tree = (id ? leafTree.value.get(id) : undefined) ?? treeAt(placed.value.grove, (event.clientX - box.left) / CELL, (event.clientY - box.top) / CELL)?.key ?? null;
+  if (tree !== hoverTree.value) hoverTree.value = tree;
   pointing.value = !!id || !!treeAtPointer(event);
 }
+function onLeave() { hover.value = null; hoverTree.value = null; pointing.value = false; }
 function onClick(event: MouseEvent) {
   const leaf = leafAtPointer(event);
   if (leaf) { emit("select", leaf.skill.skill); return; }
@@ -165,6 +208,7 @@ function measureBox() { containerWidth.value = scroller.value?.clientWidth ?? 0;
 function fontsLoaded() { fontsVersion.value++; }
 onMounted(() => {
   measureBox();
+  hoverless?.addEventListener("change", hoverChanged);
   if (typeof ResizeObserver !== "undefined" && scroller.value) { observer = new ResizeObserver(measureBox); observer.observe(scroller.value); }
   window.addEventListener("resize", measureBox);
   const fonts = document.fonts;
@@ -176,6 +220,7 @@ onMounted(() => {
 });
 onBeforeUnmount(() => {
   observer?.disconnect();
+  hoverless?.removeEventListener("change", hoverChanged);
   window.removeEventListener("resize", measureBox);
   document.fonts?.removeEventListener?.("loadingdone", fontsLoaded);
 });
@@ -195,10 +240,12 @@ onBeforeUnmount(() => {
     <div ref="scroller" class="grove-scroll">
       <div class="grove-stage" role="group" aria-label="Each leaf is a confirmed skill. Select one to see it." :style="{ width: `${placed.cssWidth}px`, height: `${HEIGHT * CELL}px` }">
         <canvas ref="canvas" aria-hidden="true" :style="{ width: `${placed.cssWidth}px`, height: `${HEIGHT * CELL}px`, cursor: pointing ? 'pointer' : 'default' }"
-          @mousemove="onMove" @mouseleave="hover = null; pointing = false" @click="onClick" />
+          @mousemove="onMove" @mouseleave="onLeave" @click="onClick" />
+        <canvas ref="fade" class="grove-fade" aria-hidden="true" :style="{ width: `${placed.cssWidth}px`, height: `${HEIGHT * CELL}px` }" />
         <div v-for="tree in placed.grove.trees" :key="`leaves-${tree.key}`" role="group" :aria-label="`${tree.title}, ${tree.meta}`">
           <button v-if="named.has(tree.unit)" type="button" class="plank" :class="{ on: picked === tree.unit }" :aria-pressed="picked === tree.unit"
-            :aria-label="`Topic ${tree.title}, ${tree.meta}`" :style="{ left: `${tree.cx * CELL}px`, top: `${(GROUND + 4) * CELL}px`, maxWidth: '280px' }" @click="togglePicked(tree.unit)">
+            :aria-label="`Topic ${tree.title}, ${tree.meta}`" :style="{ left: `${tree.cx * CELL}px`, top: `${(GROUND + 4) * CELL}px`, maxWidth: '280px' }" @click="togglePicked(tree.unit)"
+            @focus="focusTree = tree.key" @blur="focusTree = null">
             <span class="plank-title">{{ tree.title }}</span><span class="plank-meta">{{ tree.meta }}</span>
           </button>
           <span v-else class="plank" aria-hidden="true" :style="{ left: `${tree.cx * CELL}px`, top: `${(GROUND + 4) * CELL}px`, maxWidth: '280px' }">
@@ -231,6 +278,10 @@ onBeforeUnmount(() => {
 .grove-scroll { overflow-x: auto; overflow-y: hidden; border-radius: 18px; }
 .grove-stage { position: relative; }
 .grove-stage canvas { display: block; image-rendering: pixelated; }
+/* The grove as it was before a tree opened or closed, fading out over the grove as it is now. */
+.grove-stage .grove-fade { position: absolute; left: 0; top: 0; opacity: 0; pointer-events: none; }
+.grove-fade.fading { animation: groveFadeOut var(--dur-enter) var(--ease-enter) both; }
+@keyframes groveFadeOut { from { opacity: 1; } to { opacity: 0; } }
 .plank { position: absolute; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; padding: 4px 10px 5px; border: 0; border-radius: 0; background: var(--plank);
   box-shadow: inset 0 -2px 0 var(--plank-edge), 0 0 0 2px var(--plank-ring); white-space: nowrap; pointer-events: none; }
 /* A named topic's sign is a button that picks out its tree, outlined in amber while it is picked out (as in the Forest view). */

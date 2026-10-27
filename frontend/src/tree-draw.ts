@@ -20,17 +20,19 @@ export type CrownPart = ({ shape: "blob"; x: number; y: number; r: number }
   | { shape: "cone"; x: number; top: number; bottom: number; half: number; banded?: boolean }
   | { shape: "strand"; x: number; y: number; length: number }
   | { shape: "frond"; x1: number; y1: number; x2: number; y2: number; sag: number }) & { front?: boolean };
-export type Tree = { segs: Segment[]; tips: [number, number][]; crown: CrownPart[]; w: number };
+/** `scale` is the number of cells to one of the free units the tree was grown in. */
+export type Tree = { segs: Segment[]; tips: [number, number][]; crown: CrownPart[]; w: number; scale: number };
 
 /**
  * Grows a tree of `kind` that fits `maxW` × `maxH` cells. `cap` limits how far a small tree is scaled up, and `bulk`
  * scales the crown's blobs and pads, which keep their size in cells while the branches scale: the Forest view's
- * larger trees use more bulk than the grove.
+ * larger trees use more bulk than the grove. When `fill` is above zero, a branching kind's blobs and pads also grow with
+ * the tree once it is drawn at more than `fill` cells to the unit (growCanopy).
  */
-export function growTree(kind: TreeKind, id: string, design: number, need: number, maxW: number, maxH: number, cap = 2.4, bulk = 1): Tree {
+export function growTree(kind: TreeKind, id: string, design: number, need: number, maxW: number, maxH: number, cap = 2.4, bulk = 1, fill = 0): Tree {
   const seed = hash(`${id}:${design}`), shape = kind.shape;
   switch (shape.form) {
-    case "branch": return branchTree(shape, seed, need, maxW, maxH, cap, bulk);
+    case "branch": return branchTree(shape, seed, need, maxW, maxH, cap, bulk, fill);
     case "conifer": return spreadOut(coniferTree(shape, seed, need, maxW, maxH, cap), need);
     case "palm": return spreadOut(palmTree(shape, seed, need, maxW, maxH, cap), need);
     case "column": return spreadOut(columnTree(shape, seed, need, maxW, maxH, cap), need);
@@ -109,7 +111,7 @@ function fit({ segs, tips, build }: Raw, maxW: number, maxH: number, cap: number
   const tree: Tree = {
     segs: segs.map(([x1, y1, x2, y2, th]) => [X(x1), y1 * scale, X(x2), y2 * scale, th] as Segment),
     tips: tips.map(([x, y]) => [X(x), y * scale] as [number, number]),
-    crown: build(X, scale), w: Math.ceil(bw * scale),
+    crown: build(X, scale), w: Math.ceil(bw * scale), scale,
   };
   let low = 0, high = tree.w;
   for (const part of tree.crown) { const [a, b] = span(part); low = Math.min(low, Math.floor(a) - 1); high = Math.max(high, Math.ceil(b) + 1); }
@@ -118,7 +120,7 @@ function fit({ segs, tips, build }: Raw, maxW: number, maxH: number, cap: number
 }
 
 /** A branching tree (oak, birch, willow, maple, cherry, baobab, jacaranda, bonsai). */
-function branchTree(shape: BranchShape, seed: number, need: number, maxW: number, maxH: number, cap: number, bulk: number): Tree {
+function branchTree(shape: BranchShape, seed: number, need: number, maxW: number, maxH: number, cap: number, bulk: number, fill: number): Tree {
   let last: Tree | undefined, best: { tree: Tree; apart: number } | undefined;
   for (let depth = 2; depth <= 7; depth++) {
     const R = rng(seed), pick = pickFrom(R);
@@ -147,7 +149,8 @@ function branchTree(shape: BranchShape, seed: number, need: number, maxW: number
     grow(0, 0, lean, 22 * sp.trunk, shape.thickness, depth, true);
     const build = (X: (v: number) => number, scale: number) => {
       const RC = rng(seed ^ 0x5bd1e995), pickCrown = pickFrom(RC), parts: CrownPart[] = [];
-      const size = (v: number) => Math.max(1, Math.round(v * bulk));
+      const grow = fill > 0 ? Math.min(CANOPY_GROW, Math.max(1, scale / fill)) : 1;
+      const size = (v: number) => Math.max(1, Math.round(v * bulk * grow));
       const at = ([x, y]: [number, number]) => ({ x: Math.round(X(x)), y: Math.round(y * scale) });
       if (shape.crown !== "pad") {
         if (shape.forkRadius) for (const fork of forks) parts.push({ shape: "blob", ...at(fork), r: size(shape.forkRadius) });
@@ -165,7 +168,9 @@ function branchTree(shape: BranchShape, seed: number, need: number, maxW: number
       if (shape.crown === "pad") {
         for (const tip of tips) {
           const { x, y } = at(tip);
-          parts.push({ shape: "oval", x, y: y + 1, rx: size(Math.round(pickCrown(shape.tipRadius))), ry: size(Math.round(pickCrown(shape.padHeight ?? [2, 3]))), front: true });
+          // A full canopy's pads grow more in height than in width, since they already spread wide.
+          const rx = Math.max(1, Math.round(Math.round(pickCrown(shape.tipRadius)) * bulk * Math.sqrt(grow)));
+          parts.push({ shape: "oval", x, y: y + 1, rx, ry: size(Math.round(pickCrown(shape.padHeight ?? [2, 3]))), front: true });
         }
       }
       return parts;
@@ -392,6 +397,42 @@ export function evenTips(tips: readonly [number, number][], count: number): [num
   return Array.from({ length: count }, (_, i) => sorted[Math.round(((i + 0.5) * sorted.length) / count - 0.5)]!);
 }
 
+/** The fewest tips a full canopy grows: as many as the picker's preview grows for its three sample leaves. */
+export const CANOPY_TIPS = 7;
+/** The largest scale the picker's previews are drawn at, in cells to the unit. A canopy drawn larger grows its blobs
+ * and pads with it, up to CANOPY_GROW times, so its crown closes up the way the preview's does. */
+const CANOPY_SCALE = 0.8, CANOPY_GROW = 1.6;
+
+/**
+ * Grows a tree of `kind` that looks like a specimen of its kind, as the picker's preview draws it: at least
+ * CANOPY_TIPS tips whatever `need` is, and a crown that closes up at any size. It fits the same box as growTree, so a
+ * scene can draw it in a topic's slot in place of the tree that carries the topic's leaves.
+ */
+export function growCanopy(kind: TreeKind, id: string, design: number, need: number, maxW: number, maxH: number, cap = 2.4, bulk = 1): Tree {
+  return growTree(kind, id, design, Math.max(need, CANOPY_TIPS), maxW, maxH, cap, bulk, CANOPY_SCALE);
+}
+
+/** The highest tip, on whole cells, where a full canopy flies its due flag. */
+export function crownTop(tips: readonly (readonly [number, number])[]): [number, number] {
+  let top: readonly [number, number] = tips[0] ?? [0, 0];
+  for (const tip of tips) if (tip[1] < top[1]) top = tip;
+  return [Math.round(top[0]), Math.round(top[1])];
+}
+
+/**
+ * Paints a placed tree as a full canopy: `leaves` sample leaf places spread from left to right (the preview's; a
+ * scene's portrait has none), and an open bud on every other tip. Returns the sample leaves' centres on whole cells,
+ * for the caller to paint the sprites on. `widen` is paintTree's.
+ */
+export function paintCanopy(paint: Paint, tree: { segs: readonly Segment[]; crown: readonly CrownPart[]; tips: readonly [number, number][] }, kind: TreeKind,
+  random: () => number, { leaves = 0, widen = false }: { leaves?: number; widen?: boolean } = {}): (readonly [number, number])[] {
+  const at = evenTips(tree.tips, leaves).map(([x, y]) => [Math.round(x), Math.round(y)] as const).slice(0, leaves);
+  const used = new Set(at.map(([x, y]) => `${x},${y}`));
+  const buds = tree.tips.map(([x, y]) => [Math.round(x), Math.round(y)] as const).filter(([x, y]) => !used.has(`${x},${y}`));
+  paintTree(paint, { segs: tree.segs, crown: tree.crown, buds, leaves: at }, kind, random, { widen });
+  return at;
+}
+
 /**
  * Draws a small square preview of `kind` for the tree picker: two sky bands, a strip of grass and soil, and the tree
  * with one sample leaf for each of `stages`, in 2 px cells (as in the sign-in page's sample grove). Every color is
@@ -411,11 +452,8 @@ export function drawTreePreview(canvas: HTMLCanvasElement, kind: TreeKind, size:
   const cell = (x: number, y: number, color: string) => rect(Math.round(x), Math.round(y), 1, 1, color);
   rect(0, 0, cells, Math.ceil(ground / 2), "#DEECF3"); rect(0, Math.ceil(ground / 2), cells, ground - Math.ceil(ground / 2), "#E5F0F5");
   rect(0, ground, cells, 1, "#2F8A5F"); rect(0, ground + 1, cells, 1, "#256F4C"); rect(0, ground + 2, cells, cells - ground - 2, "#CDB884");
-  const grown = growTree(kind, `preview:${kind.id}`, 1, stages.length + 4, cells - 6, ground - 4, 1.4, 1);
+  const grown = growCanopy(kind, `preview:${kind.id}`, 1, stages.length + 4, cells - 6, ground - 4, 1.4, 1);
   const tree = moveTree(grown, Math.round((cells - grown.w) / 2), ground);
-  const leaves = evenTips(tree.tips, stages.length).map(([x, y]) => [Math.round(x), Math.round(y)] as const);
-  const used = new Set(leaves.map(([x, y]) => `${x},${y}`));
-  const buds = tree.tips.map(([x, y]) => [Math.round(x), Math.round(y)] as const).filter(([x, y]) => !used.has(`${x},${y}`));
-  paintTree({ cell, rect }, { segs: tree.segs, crown: tree.crown, buds, leaves }, kind, rng(hash(`preview:${kind.id}`)));
+  const leaves = paintCanopy({ cell, rect }, tree, kind, rng(hash(`preview:${kind.id}`)), { leaves: stages.length });
   leaves.forEach(([x, y], i) => paintLeaf({ cell, rect }, x, y, stages[i]!));
 }
