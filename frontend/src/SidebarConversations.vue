@@ -3,12 +3,13 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from "vue";
 import { messageTime } from "./labels.ts";
 import { recentGroups, shortAgo, type RecentSession } from "./recent-groups.ts";
 
-// The sidebar's Conversations group, after ChatGPT's list of recent chats: "+ New conversation" first, then the
-// learner's latest lessons and practice sessions in the course (/learning/recent), grouped by the day of their last
-// activity. Selecting a row opens that conversation. On phones the sidebar is a top bar, so the group folds behind a
-// "Conversations" button and opens below it like a drawer.
+// The sidebar's Conversations group, after ChatGPT's list of recent chats: the learner's latest lessons and practice
+// sessions in the course (/learning/recent), grouped by the day of their last activity. It is a history list: selecting
+// a row opens that conversation, the highlighted row is the one on screen, and a new conversation starts from the
+// lesson's tab strip. On phones the sidebar is a top bar, so the group folds behind a "Conversations" button and opens
+// below it like a drawer.
 const props = defineProps<{ rows: readonly RecentSession[]; current: string | null; loaded: boolean; error: string }>();
-const emit = defineEmits<{ open: [row: RecentSession]; new: []; retry: [] }>();
+const emit = defineEmits<{ open: [row: RecentSession]; retry: [] }>();
 
 // Relative times ("5 min") are worked out against a clock that moves on each minute.
 const now = ref(new Date());
@@ -26,7 +27,6 @@ async function collapse() {
 }
 // On phones the drawer closes once a choice is made, and focus returns to its button.
 function choose(row: RecentSession) { emit("open", row); void collapse(); }
-function startNew() { emit("new"); void collapse(); }
 </script>
 
 <template>
@@ -37,7 +37,6 @@ function startNew() { emit("new"); void collapse(); }
       <svg aria-hidden="true" viewBox="0 0 12 12" width="12" height="12"><path :d="expanded ? 'M3 7.5 6 4.5 9 7.5' : 'M3 4.5 6 7.5 9 4.5'" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" /></svg>
     </button>
     <div id="conversations-body" class="conv-body">
-      <button type="button" class="conv-new" @click="startNew"><span aria-hidden="true">+</span> New conversation</button>
       <div v-if="error" class="conv-note" role="alert"><p>{{ error }}</p><button type="button" class="quiet" @click="emit('retry')">Try again</button></div>
       <p v-else-if="loaded && !rows.length" class="conv-note">Your lessons and practice will appear here.</p>
       <template v-for="group in groups" :key="group.label">
@@ -62,8 +61,6 @@ function startNew() { emit("new"); void collapse(); }
 .conv-title { padding: 4px 12px 6px; }
 .conv-toggle { display: none; }
 .conv-body { display: flex; flex-direction: column; gap: 2px; min-height: 0; overflow-y: auto; margin: 0 -4px; padding: 0 4px 4px; }
-.conv-new { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 36px; padding: 0 12px; border: 0; border-radius: 999px; background: transparent; color: var(--dawn-soft-text); font-size: 14px; font-weight: 700; text-align: left; }
-.conv-new:hover { background: var(--inset-2); }
 .conv-note { margin: 4px 12px; font-size: 13px; color: var(--muted); }
 .conv-note p { margin: 0; }
 .conv-note .quiet { padding: 4px 0; font-size: 13px; }

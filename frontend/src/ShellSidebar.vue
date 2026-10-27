@@ -6,12 +6,12 @@ import { useSlidingMark } from "./sliding-mark.ts";
 
 // The app's sidebar (design/revamp/README.md): brand, course switcher (the slot, owned by App.vue), the nav rows with
 // their biome capsules and badges, the Conversations group (the second slot, owned by CourseWorkspace.vue), and at the
-// bottom the Today card and Settings. Under 760px it becomes a top bar with the nav rows as a
-// horizontal strip.
+// bottom the Today card and Settings. A lesson has no row of its own here: the Conversations group marks the
+// conversation on screen. Under 760px it becomes a top bar with the nav rows as a horizontal strip.
 export type ShellView = "home" | "plan" | "setup" | "chat" | "memory";
-const props = defineProps<{ view: ShellView; forestOpen: boolean; lessonTitle?: string; materialsBadge: number; homeBadge?: number;
+const props = defineProps<{ view: ShellView; forestOpen: boolean; materialsBadge: number; homeBadge?: number;
   today: { spent: number; total: number } | null; username: string }>();
-const emit = defineEmits<{ navigate: [view: ShellView]; forest: []; lesson: []; settings: [] }>();
+const emit = defineEmits<{ navigate: [view: ShellView]; forest: []; settings: [] }>();
 
 type Row = { view: ShellView | "forest"; label: string; icon: IconName; biome: string; badge?: number };
 const rows = computed<Row[]>(() => [
@@ -37,8 +37,6 @@ const capsuleStyle = computed(() => {
   return b ? { transform: `translate(${b.x}px, ${b.y}px)`, width: `${b.w}px`, height: `${b.h}px` } : { display: "none" };
 });
 watch(() => current.value?.view, (now, before) => { void capsule.place(!!now && !!before); });
-// A lesson row appearing or leaving moves the rows under it, and the capsule with them.
-watch(() => props.lessonTitle, () => { void capsule.place(true); });
 const cells = computed(() => {
   const t = props.today; const on = t && t.total > 0 ? Math.round(Math.min(1, t.spent / t.total) * 15) : 0;
   return Array.from({ length: 15 }, (_, i) => i < on);
@@ -51,15 +49,10 @@ const cells = computed(() => {
     <slot name="switcher" />
     <nav ref="nav" class="nav" aria-label="Study views">
       <span class="nav-capsule" :class="[current?.biome, { sliding: capsule.sliding.value }]" :style="capsuleStyle" data-mark aria-hidden="true" />
-      <template v-for="row in rows" :key="row.view">
-        <button type="button" class="nav-row" :class="[row.biome, { current: isCurrent(row) }]" :aria-current="isCurrent(row) ? 'page' : undefined" @click="go(row)">
-          <PixelIcon :name="row.icon" :size="24" /><span class="nav-label">{{ row.label }}</span>
-          <span v-if="row.badge" class="badge" :aria-label="`${row.badge} waiting`">{{ row.badge }}</span>
-        </button>
-        <button v-if="row.view === 'home' && lessonTitle" type="button" class="sub-row" :class="{ current: view === 'chat' && !forestOpen }" :aria-current="view === 'chat' && !forestOpen ? 'page' : undefined" @click="emit('lesson')">
-          <span class="sub-square" aria-hidden="true" /><span class="sub-label">{{ lessonTitle }}</span>
-        </button>
-      </template>
+      <button v-for="row in rows" :key="row.view" type="button" class="nav-row" :class="[row.biome, { current: isCurrent(row) }]" :aria-current="isCurrent(row) ? 'page' : undefined" @click="go(row)">
+        <PixelIcon :name="row.icon" :size="24" /><span class="nav-label">{{ row.label }}</span>
+        <span v-if="row.badge" class="badge" :aria-label="`${row.badge} waiting`">{{ row.badge }}</span>
+      </button>
     </nav>
     <slot name="conversations" />
     <div class="bottom">
@@ -92,10 +85,6 @@ const cells = computed(() => {
 .nav-label { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .badge { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--coral); color: var(--on-fill); font-size: 12px; font-weight: 700; }
 .nav-row.current .badge { background: var(--on-fill); color: var(--coral); }
-.sub-row { display: flex; align-items: center; gap: 8px; margin: 0 4px 2px 34px; padding: 6px 10px; border: 0; border-radius: 10px; background: var(--dawn-wash); color: var(--dawn-wash-text); font-size: 13px; font-weight: 600; text-align: left; min-width: 0; }
-.sub-row.current { box-shadow: 0 0 0 1px var(--dawn-edge); }
-.sub-square { width: 8px; height: 8px; flex: none; background: var(--dawn-edge); }
-.sub-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bottom { margin-top: auto; display: flex; flex-direction: column; gap: 6px; }
 .today { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
 .today-top { display: flex; align-items: center; gap: 6px; }
@@ -113,7 +102,6 @@ const cells = computed(() => {
   .nav { flex-direction: row; overflow-x: auto; gap: 4px; padding-bottom: 4px; scrollbar-width: none; }
   .nav-row { width: auto; flex: none; min-height: 38px; font-size: 14px; }
   .nav-label { overflow: visible; }
-  .sub-row { flex: none; margin: 0; max-width: 180px; }
   .bottom { flex-direction: row; flex-wrap: wrap; margin-top: 0; }
   .today { flex: 1 1 100%; padding: 8px 10px; }
   .foot-row { width: auto; flex: 1 1 0; min-width: 0; }
