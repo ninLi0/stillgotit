@@ -24,13 +24,16 @@ import type { StillGotItHttp } from "../../generated/wire.ts";
 import { answerKey, newAnswers, takeTutor, tutorLabel, tutorPick, tutorSettings, type TutorUsed } from "./tutor-choice.ts";
 import { sessionRequest, takeSession } from "./continue-session.ts";
 import { pendingOpening, trackOpening, type PendingOpening } from "./pending-openings.ts";
+import { ComposerDrafts, conversationSlot, joinDrafts, newConversationSlot, sentAsLesson, sentInConversation, settleSending, slotSession,
+  type ComposerDraft, type SendingDraft } from "./composer-drafts.ts";
 type SkillData = StillGotItHttp["/learning/read"]["output"]["data"];
 type StudySession = SkillData["sessions"][number];
 /** A file uploaded for the answer being written. `preview` is a local picture of an image file, so learners can tell images apart; other files have none. */
 type Attachment = { material: string; name: string; preview: string };
 // aiReason explains why AI features are off when aiAvailable is false. materials gives titles for cited sources.
 // initialDraft prefills the message box of a new conversation (for example "Ask about this page" in Materials); it is never sent by itself.
-const props = defineProps<{ skill: string; course: string; materials: { material: string; title: string }[]; aiAvailable: boolean; aiReason: string; active?: boolean; initialDraft?: string }>();
+// learner is the signed-in learner's username, which keeps each learner's unsent drafts apart in the browser.
+const props = defineProps<{ skill: string; course: string; learner: string; materials: { material: string; title: string }[]; aiAvailable: boolean; aiReason: string; active?: boolean; initialDraft?: string }>();
 // `back` returns to the skill tree. `open-source` asks the shell to show a cited source in Materials, from the source
 // preview's "Open in Materials". `session` names
 // the conversation on screen (null for a new one), so the sidebar can mark it.
@@ -47,7 +50,38 @@ const currentCases = computed(() => data.value?.cases.filter((item) => item.task
 // and nothing can be sent in it.
 const unexplained = computed(() => !!current.value?.lesson && !current.value.lesson.explanation.trim());
 const canSend = computed(() => !busy.value && !recording.value && !unexplained.value && (props.aiAvailable || !!current.value?.task) && (!!response.value.trim() || (attachments.value.length > 0 && !!current.value)));
-const unsent = new Map<string, { text: string; channel: "TEXT" | "VOICE"; attachments: Attachment[] }>();
+// ---- Unsent drafts (frontend/src/composer-drafts.ts) ----
+// The message box holds the draft of the conversation on screen, and each conversation keeps its own: in memory while
+// this page lives, with its attached files, and in the browser's storage under the learner's name, so that a reload or a
+// new sign-in finds the text again. A draft leaves only when the server accepts its message.
+type BoxState = { text: string; channel: "TEXT" | "VOICE"; attachments: Attachment[]; missing: string[] };
+const unsent = new Map<string, BoxState>();
+const draftStore = () => new ComposerDrafts(localStore(), props.learner);
+/** The names of files that were attached to a draft read back from storage. The files were not kept, and the box says so. */
+const missingFiles = ref<string[]>([]);
+const fileList = new Intl.ListFormat("en", { type: "conjunction" });
+const missingNote = computed(() => {
+  const names = missingFiles.value.map((name) => `“${name}”`);
+  return names.length === 1 ? `This draft had a file attached, ${names[0]}. Saved drafts keep only their text, so attach it again if you want to send it.`
+    : `This draft had ${names.length} files attached: ${fileList.format(names)}. Saved drafts keep only their text, so attach them again if you want to send them.`;
+});
+/** The draft the box shows: a saved conversation, or this skill's new conversation. Null until the page knows which. */
+const draftSlot = computed(() => freshLesson.value ? newConversationSlot(props.skill) : selected.value ? conversationSlot(selected.value)
+  : data.value ? newConversationSlot(props.skill) : null);
+/** The draft whose contents are in the box now; null while the page waits to know or to read it. */
+let boxSlot: string | null = null;
+/** A message on its way that the server has not accepted yet, with the draft it came from. Its draft keeps it until then. */
+let unaccepted: { slot: string; sending: SendingDraft } | null = null;
+// A lesson whose request has just been saved takes the box as it is: what the learner wrote while it was being saved.
+let carryDraft = false;
+// "Ask about this page" places a question in a new conversation's box. Until the learner changes it, a later question replaces it.
+let prefilled = "";
+function boxDraft(slot: string): ComposerDraft {
+  return { text: response.value, channel: channel.value, files: [...attachments.value.map((item) => item.name), ...missingFiles.value],
+    sending: unaccepted?.slot === slot ? unaccepted.sending : null };
+}
+function saveDraft() { if (boxSlot) draftStore().save(boxSlot, boxDraft(boxSlot)); }
+async function dismissMissing() { missingFiles.value = []; await nextTick(); composerInput.value?.focus(); }
 const previews = new Set<string>();
 const speechEdits = ref<Record<number, string>>({});
 const unsavedTranscripts = computed(() => current.value?.voice.some((voice) => speechEdits.value[voice.turnIndex] !== voice.text) ?? false);
@@ -98,14 +132,39 @@ watch(pending, (now) => {
 const waited = computed(() => secondsLabel(Math.floor((waitNow.value - waitStarted.value) / 1000)));
 onBeforeUnmount(() => clearInterval(waitTicker));
 function takeDraft() {
-  const text = response.value, sent = attachments.value, ch = channel.value;
+  const text = response.value, sent = attachments.value, ch = channel.value, missing = missingFiles.value, slot = boxSlot;
   pending.value = { text, files: sent.map((item) => item.name), reply: !current.value?.task };
-  response.value = ""; attachments.value = []; channel.value = "TEXT";
+  // The draft keeps the message until the server accepts it, so a reload meanwhile cannot lose it. `after` lets the next
+  // read tell whether it arrived: a turn after the dialogue known now, or a lesson after the conversations known now.
+  if (slot) unaccepted = { slot, sending: { text, channel: ch, files: [...sent.map((item) => item.name), ...missing],
+    after: current.value ? current.value.dialogue.length : data.value?.sessions.length ?? 0 } };
+  response.value = ""; attachments.value = []; channel.value = "TEXT"; missingFiles.value = [];
   void scrollToLatest(true);
-  return { text, sent, ch, restore() {
-    const since = response.value;
-    response.value = since.trim() ? `${text}\n\n${since}` : text; attachments.value = [...sent, ...attachments.value]; channel.value = ch; pending.value = null;
-  } };
+  return { text, sent, ch,
+    /** The server accepted the message, so its draft lets it go. */
+    accepted() {
+      if (!slot || unaccepted?.slot !== slot) return;
+      unaccepted = null;
+      if (slot === boxSlot) { saveDraft(); return; }
+      const stored = draftStore().read(slot);
+      if (stored) draftStore().save(slot, { ...stored, sending: null });
+    },
+    /** The server did not accept it: it returns to its draft ahead of anything written since. */
+    restore() {
+      if (unaccepted?.slot === slot) unaccepted = null;
+      pending.value = null;
+      if (slot && slot !== boxSlot) {
+        // The learner opened another conversation meanwhile, so the message goes back to the draft it came from.
+        const kept = unsent.get(slot) ?? { text: "", channel: "TEXT", attachments: [], missing: [] };
+        const back: BoxState = { text: joinDrafts(text, kept.text), channel: ch, attachments: [...sent, ...kept.attachments], missing: [...missing, ...kept.missing] };
+        unsent.set(slot, back);
+        draftStore().save(slot, { text: back.text, channel: back.channel, files: [...back.attachments.map((item) => item.name), ...back.missing], sending: null });
+        return;
+      }
+      response.value = joinDrafts(text, response.value); attachments.value = [...sent, ...attachments.value]; channel.value = ch;
+      missingFiles.value = [...missing, ...missingFiles.value];
+      saveDraft();
+    } };
 }
 /**
  * The lesson is saved with the learner's request at once, before the tutor answers, so leaving the page or a failed
@@ -120,7 +179,7 @@ async function startLesson() {
     let saved = false;
     try {
       const result = unwrap(await api.learning.lesson({ skill, request }));
-      saved = true;
+      saved = true; draft.accepted();
       // What the learner wrote while the lesson was being prepared stays in the box of the lesson it now belongs to.
       if (selected.value !== result.lesson) carryDraft = true;
       freshLesson.value = false; selected.value = result.lesson;
@@ -178,6 +237,7 @@ async function send() {
     try {
       if (session.lesson) await timedAnswer(async () => unwrap(await api.learning.question(input)));
       else unwrap(await api.learning.respond(input));
+      draft.accepted();
       reviewed.value = false;
       draft.sent.forEach(forgetPreview);
     } catch (problem) {
@@ -185,9 +245,8 @@ async function send() {
       // retry button and the draft stays out of the box, so sending again cannot post it twice. Otherwise the draft and every file come back.
       await load().catch(() => undefined);
       const now = current.value;
-      const saved = !!now && now.session === session.session &&
-        now.dialogue.slice(session.dialogue.length).some((item) => item.turn.speaker === "LEARNER" && item.turn.text === draft.text);
-      if (saved) draft.sent.forEach(forgetPreview); else draft.restore();
+      const saved = !!now && now.session === session.session && sentInConversation(now.dialogue, { text: draft.text, after: session.dialogue.length });
+      if (saved) { draft.accepted(); draft.sent.forEach(forgetPreview); } else draft.restore();
       // A practice answer waits for no tutor reply, so once it is saved the send has done its work and ends as a success.
       if (saved && !session.lesson) { reviewed.value = false; recovered = "Your answer was saved."; return; }
       throw problem;
@@ -260,7 +319,8 @@ async function retryReply() {
 async function finishLesson() {
   const active = current.value; if (!active?.lesson || active.status !== "OPEN" || busy.value || recording.value) return;
   if (response.value.trim() || attachments.value.length) { notice.value = ""; error.value = "Send or clear your message before finishing this lesson."; await nextTick(); errorBox.value?.focus(); return; }
-  await act(async () => { unwrap(await api.learning.finish({ studySession: active.session })); }, "Lesson finished. Its conversation stays here to read.");
+  // A finished lesson has no message box, so a note about files from its draft has nothing left to say.
+  await act(async () => { unwrap(await api.learning.finish({ studySession: active.session })); missingFiles.value = []; }, "Lesson finished. Its conversation stays here to read.");
 }
 async function correctTranscript(turnIndex: number) { const active = current.value; if (!active) return; await act(async () => { unwrap(await api.learning.transcript({ studySession: active.session, turnIndex, text: speechEdits.value[turnIndex] ?? "" })); reviewed.value = false; }, "Transcript correction saved. Review your answer again before assessment."); }
 async function requestRegrade(assessment: string, basedOn: string) {
@@ -370,17 +430,22 @@ watch(narrow, (now) => {
   if (back?.isConnected) back.focus();
   void sourcePreview.value?.open(shown);
 });
-/** A draft from elsewhere starts a new conversation with the message box filled in and focused. It is not sent. */
+/**
+ * A draft from elsewhere starts a new conversation with the message box filled in and focused. It is not sent. What the
+ * learner already wrote for a new conversation stays ahead of it; a question placed here earlier and left unchanged is replaced.
+ */
 async function applyDraft(draft: string | undefined) {
   if (!draft) return;
   if (!freshLesson.value || selected.value !== "") { freshLesson.value = true; reviewOpen.value = false; selected.value = ""; await nextTick(); }
-  response.value = draft; channel.value = "TEXT";
+  const kept = response.value === prefilled ? "" : response.value;
+  response.value = joinDrafts(kept, draft); prefilled = kept.trim() ? "" : draft;
+  if (!kept.trim()) channel.value = "TEXT";
   await nextTick();
   if (!busy.value && composerInput.value && !composerInput.value.disabled) { composerInput.value.focus(); return; }
   const stop = watch(busy, async (now) => { if (!now) { stop(); await nextTick(); composerInput.value?.focus(); } });
 }
 watch(() => props.skill, (skill) => {
-  selected.value = ""; data.value = null; response.value = ""; attachments.value = []; reviewed.value = false;
+  selected.value = ""; data.value = null; response.value = ""; attachments.value = []; missingFiles.value = []; reviewed.value = false;
   paneSource.value = null; paneOpener = null;
   // An unanswered adjustment from before a reload is shown at once, so the learner can see it and send it again.
   evidenceOpen.value = !!new PendingAdjustment(sessionStore(), skill).read();
@@ -432,14 +497,49 @@ function newConversation() {
 }
 watch(() => current.value?.session ?? null, (session) => emit("session", props.skill, session), { immediate: true });
 defineExpose({ startPractice, newConversation });
-// Each conversation keeps its own unsent message. A lesson that has just started keeps the box as it is (carryDraft).
-let carryDraft = false;
-watch(selected, (next, previous) => {
-  if (carryDraft) { carryDraft = false; unsent.delete(previous); reviewed.value = false; void scrollToLatest(true); return; }
-  unsent.set(previous, { text: response.value, channel: channel.value, attachments: attachments.value });
-  const saved = unsent.get(next); response.value = saved?.text ?? ""; channel.value = saved?.channel ?? "TEXT"; attachments.value = saved?.attachments ?? []; reviewed.value = false;
-  void scrollToLatest(true);
-});
+/**
+ * Each conversation keeps its own unsent message. When another conversation opens, the box's draft is put aside and the
+ * new conversation's draft comes back: from this page's memory, with its files, or else from the browser's storage. A
+ * draft read back from storage while a message of it was on its way waits for the page's read, which tells whether the
+ * server accepted that message: if it did, the message is not put back; if not, it returns ahead of the rest. A lesson
+ * that has just started keeps the box as it is (carryDraft), and the new conversation's draft it came from is gone.
+ */
+watch([draftSlot, data], ([slot]) => {
+  if (slot === boxSlot) return;
+  const carry = carryDraft;
+  carryDraft = false;
+  if (carry && boxSlot && slot) {
+    unsent.delete(boxSlot); draftStore().remove(boxSlot);
+    boxSlot = slot; saveDraft(); reviewed.value = false; void scrollToLatest(true);
+    return;
+  }
+  if (boxSlot) {
+    saveDraft();
+    unsent.set(boxSlot, { text: response.value, channel: channel.value, attachments: attachments.value, missing: missingFiles.value });
+    boxSlot = null;
+    response.value = ""; channel.value = "TEXT"; attachments.value = []; missingFiles.value = [];
+  }
+  if (!slot) return;
+  let next = unsent.get(slot);
+  if (!next) {
+    let stored = draftStore().read(slot);
+    if (stored?.sending) {
+      if (!data.value) return;
+      const session = slotSession(slot);
+      stored = settleSending(stored, session === null ? sentAsLesson(data.value.sessions, stored.sending)
+        : sentInConversation(data.value.sessions.find((item) => item.session === session)?.dialogue ?? [], stored.sending));
+    }
+    next = { text: stored?.text ?? "", channel: stored?.channel ?? "TEXT", attachments: [], missing: stored?.files ?? [] };
+  }
+  // Anything typed before the page knew which conversation it showed stays, after the draft.
+  const typed = response.value, typedChannel = channel.value;
+  response.value = joinDrafts(next.text, typed);
+  channel.value = typed.trim() && typedChannel === "VOICE" ? "VOICE" : next.channel;
+  attachments.value = next.attachments; missingFiles.value = next.missing;
+  boxSlot = slot; saveDraft();
+  reviewed.value = false; void scrollToLatest(true);
+}, { immediate: true });
+watch([response, channel, attachments, missingFiles], saveDraft);
 watch(() => [current.value?.dialogue.length, busy.value], () => { void scrollToLatest(); });
 watch(current, (session) => { speechEdits.value = Object.fromEntries(session?.voice.map((voice) => [voice.turnIndex, voice.text]) ?? []); });
 // Each tutor answer names the model and thinking level that wrote it. The read after it shows which answers are new, and they get that label.
@@ -581,11 +681,12 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
         <div class="composer-inner">
           <template v-if="!current || current.status === 'OPEN'">
             <div class="composer" :class="{ 'is-recording': recording }" :aria-busy="!!pending">
+              <p v-if="missingFiles.length" id="draft-files-note" class="draft-files"><span>{{ missingNote }}</span><button type="button" class="message-action" @click="dismissMissing">Dismiss</button></p>
               <ul v-if="attachments.length" ref="attachmentList" class="attachment-list" aria-label="Files attached to this answer">
                 <li v-for="(item, index) in attachments" :key="item.material" class="attachment-chip"><img v-if="item.preview" :src="item.preview" alt="" class="attachment-thumb" /><span>{{ attachments.length > 1 ? `${index + 1}. ` : '' }}{{ item.name }}</span><button type="button" :aria-label="`Remove file ${index + 1}, ${item.name}`" :disabled="busy" @click="removeAttachment(index)">×</button></li>
               </ul>
               <label class="sr-only" for="chat-message">{{ current?.task ? 'Your answer and reasoning' : 'Message your tutor' }}</label>
-              <textarea id="chat-message" ref="composerInput" v-model="response" rows="2" :placeholder="current?.task ? 'Explain your reasoning. You can type, speak, or attach your work.' : 'Ask a question or tell me what you want to learn…'" @keydown="enterToSend" />
+              <textarea id="chat-message" ref="composerInput" v-model="response" rows="2" :aria-describedby="missingFiles.length ? 'draft-files-note' : undefined" :placeholder="current?.task ? 'Explain your reasoning. You can type, speak, or attach your work.' : 'Ask a question or tell me what you want to learn…'" @keydown="enterToSend" />
               <div class="composer-tools"><div class="input-tools"><label class="attach-button tool-pill" :class="{ unavailable: !current || busy || recording }" :title="current ? 'Attach files with your work' : 'Start a lesson before attaching files'"><span aria-hidden="true">＋ Attach files</span><span class="sr-only">{{ attachments.length ? 'Attach more files with your work' : 'Attach files with your work' }}</span><input type="file" multiple :disabled="busy || recording || !current" @change="uploadWork" /></label>
                 <SpeechInput :disabled="busy || !aiAvailable" :active="active !== false" :describedby="aiAvailable ? undefined : 'ai-reason-chat'" compact @recording="recording = $event" @transcript="response = response ? response + '\n' + $event : $event; channel = 'VOICE'" @error="error = $event" />
                 <button type="button" class="tutor-pick" aria-haspopup="dialog" :aria-label="tutorChoice.label" :title="tutorChoice.label" @click="emit('tutor')"><span>{{ tutorChoice.model }}<span v-if="tutorChoice.level" class="tutor-level"> · {{ tutorChoice.level }}</span></span><svg aria-hidden="true" viewBox="0 0 12 12" width="12" height="12"><path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" /></svg></button>
@@ -769,6 +870,10 @@ button.mastery-chip:hover{border-color:var(--lesson-chip-hover)}
 .composer-note{margin:8px 0 0;text-align:center;font-size:12px;color:var(--coral-text)}
 .is-recording{border-color:var(--coral)}
 .attachment-list{display:flex;flex-wrap:wrap;gap:6px;list-style:none;margin:2px 0 8px;padding:0}
+/* A draft read back from storage had files attached, which were not kept: a quiet note above the box says so. */
+.draft-files{display:flex;align-items:baseline;gap:12px;margin:2px 0 8px;padding:8px 12px;border-radius:10px;background:var(--inset);font-size:13px;line-height:1.5;color:var(--soft)}
+.draft-files span{flex:1;min-width:0;overflow-wrap:anywhere}
+.draft-files .message-action{flex:none;padding:0;font-size:13px}
 .attachment-chip{display:inline-flex;align-items:center;gap:8px;padding:4px 4px 4px 6px;border:1px solid var(--line);border-radius:10px;font-size:12px;max-width:100%}
 .attachment-chip span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .attachment-thumb{width:28px;height:28px;flex:none;object-fit:cover;border-radius:5px;background:var(--inset)}
