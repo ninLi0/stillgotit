@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onDeactivated, onMounted, reactive, ref, shallowRef, watch } from "vue";
+import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, reactive, ref, shallowRef, watch } from "vue";
 import { useAttachUpload } from "./attach-upload.ts";
 import SpeechInput from "./SpeechInput.vue";
 import SourcesUsed from "./SourcesUsed.vue";
@@ -581,6 +581,27 @@ function replySeconds(session: StudySession, turnIndex: number) {
   return measured.value[answerKey("turn", session.session, turnIndex)]
     ?? answerSeconds(session.dialogue, turnIndex, (question) => unanswered.has(`${session.session}:${question}`));
 }
+/**
+ * Motion shows what just changed (design/visual-design.md, "Motion"). Messages, cards and notices rise or fade in when
+ * they arrive while the learner is looking. A conversation that opens, or that shows again after another view or another
+ * skill, shows what it already holds at once: the browser restarts an element's entrance whenever the element is drawn
+ * again, so these entrances are finished before the browser draws the page. They are finished once Vue's whole update is
+ * done, because the shell shows the lesson view again (v-show) at the end of that update, and an element that is not
+ * shown has no entrance yet. With reduced motion there are none to finish.
+ */
+const page = ref<HTMLElement | null>(null);
+const ENTRANCES = new Set(["sgRise", "sgPop", "sgFade"]);
+async function settleEntrances() {
+  await nextTick();
+  if (props.active === false || typeof page.value?.getAnimations !== "function") return;
+  for (const animation of page.value.getAnimations({ subtree: true })) {
+    if (!(animation instanceof CSSAnimation) || !ENTRANCES.has(animation.animationName)) continue;
+    try { animation.finish(); } catch { /* An entrance that cannot finish keeps playing. */ }
+  }
+}
+watch(() => props.active, () => { void settleEntrances(); }, { flush: "post" });
+watch(() => current.value?.session ?? null, () => { void settleEntrances(); }, { flush: "post" });
+onActivated(() => { void settleEntrances(); });
 // Reading aloud stops when the learner leaves this page: another view, another skill, or closing it.
 watch(() => props.active, (active) => { if (active === false) stopSpeaking(); });
 onDeactivated(stopSpeaking);
@@ -588,7 +609,7 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
 </script>
 
 <template>
-  <section class="learn" :class="{ narrow, 'rail-over': railOver, 'source-open': !!paneSource && !narrow, 'rail-open': evidenceOpen }" :aria-busy="busy">
+  <section ref="page" class="learn" :class="{ narrow, 'rail-over': railOver, 'source-open': !!paneSource && !narrow, 'rail-open': evidenceOpen }" :aria-busy="busy">
     <div class="learn-main">
       <header class="learn-head">
         <div class="head-row">
