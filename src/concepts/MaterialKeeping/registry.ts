@@ -12,5 +12,7 @@ export const materialKeeping = registerConcept({
     INVALID_TUTORING_MATERIAL: refusal.InvalidTutoringMaterial,
     INVALID_MATERIAL_IMPORT_KEY: refusal.InvalidMaterialImportKey,
     MATERIAL_IMPORT_CONFLICT: refusal.MaterialImportConflict,
+    MATERIAL_DELETED: refusal.MaterialDeleted,
+    MATERIAL_DELETE_UNAVAILABLE: refusal.MaterialDeleteUnavailable,
   },
 });

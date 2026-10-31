@@ -167,7 +167,7 @@ export type StillGotItWire = {
   };
   "/courses/materials/read": {
     input: {
-      "material": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>[0], ["material"]>>;
+      "material": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>[0], ["material"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["_deleted"]>[0], ["material"]>]>>;
       "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
     };
     output: {
@@ -177,14 +177,17 @@ export type StillGotItWire = {
       "originals": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>>>, ["originals"]>>;
       "title": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>>>, ["title"]>>;
     };
-    error: { error: AppWideError | "COURSE_UNAVAILABLE" | "INVALID_INPUT" | "MATERIAL_UNAVAILABLE" | "NOT_SIGNED_IN" };
+    error: { error: AppWideError | "COURSE_UNAVAILABLE" | "INVALID_INPUT" | "MATERIAL_DELETED" | "MATERIAL_UNAVAILABLE" | "NOT_SIGNED_IN" };
   };
   "/courses/read": {
     input: {
-      "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["_materials"]>[0], ["scope"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_units"]>[0], ["course"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_unit"]>>>, ["course"]>]>>;
+      "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["_deletions"]>[0], ["scope"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["_materials"]>[0], ["scope"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_units"]>[0], ["course"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_unit"]>>>, ["course"]>]>>;
       "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
     };
     output: {
+      "deletedMaterials": {
+        "material": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Library"]["_deletions"]>>>, ["material"]>>;
+      }[];
       "looks": {
         "kind": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["treeKindOffered"]["fn"]>[0], ["kind"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TreeStyling"]["_styles"]>>>, ["style"]>]>>;
         "unit": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_unit"]>[0], ["unit"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TreeStyling"]["_styles"]>>>, ["item"]>]>>;
@@ -416,7 +419,15 @@ export type StillGotItWire = {
     output: {
       "material": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Library"]["add"]>>, ["material"]>>;
     };
-    error: { error: AppWideError | "COURSE_UNAVAILABLE" | "INVALID_INPUT" | "INVALID_MATERIAL_IMPORT_KEY" | "INVALID_TUTORING_MATERIAL" | "MATERIAL_IMPORT_CONFLICT" | "NOT_SIGNED_IN" };
+    error: { error: AppWideError | "COURSE_UNAVAILABLE" | "INVALID_INPUT" | "INVALID_MATERIAL_IMPORT_KEY" | "INVALID_TUTORING_MATERIAL" | "MATERIAL_DELETED" | "MATERIAL_IMPORT_CONFLICT" | "NOT_SIGNED_IN" };
+  };
+  "/internal/materials/delete": {
+    input: {
+      "material": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>[0], ["material"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["delete"]>[0], ["material"]>]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+    };
+    output: Record<string, never>;
+    error: { error: AppWideError | "COURSE_UNAVAILABLE" | "DRAFT_DISCARD_UNAVAILABLE" | "INVALID_INPUT" | "MATERIAL_DELETE_UNAVAILABLE" | "MATERIAL_UNAVAILABLE" | "NOT_SIGNED_IN" };
   };
   "/learning/adjust": {
     input: {
@@ -1121,7 +1132,7 @@ export type StillGotItHttp = {
   };
   "/courses/materials/read": {
     input: {
-      "material": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>[0], ["material"]>>;
+      "material": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>[0], ["material"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["_deleted"]>[0], ["material"]>]>>;
     };
     output: {
       "content": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>>>, ["content"]>>;
@@ -1130,13 +1141,16 @@ export type StillGotItHttp = {
       "originals": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>>>, ["originals"]>>;
       "title": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>>>, ["title"]>>;
     };
-    error: { error: HttpAppWideError | "FORBIDDEN" | "INVALID_REQUEST" | "UNAUTHORIZED" };
+    error: { error: HttpAppWideError | "FORBIDDEN" | "INVALID_REQUEST" | "NOT_FOUND" | "UNAUTHORIZED" };
   };
   "/courses/read": {
     input: {
-      "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["_materials"]>[0], ["scope"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_units"]>[0], ["course"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_unit"]>>>, ["course"]>]>>;
+      "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["_deletions"]>[0], ["scope"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["_materials"]>[0], ["scope"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_units"]>[0], ["course"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_unit"]>>>, ["course"]>]>>;
     };
     output: {
+      "deletedMaterials": {
+        "material": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Library"]["_deletions"]>>>, ["material"]>>;
+      }[];
       "looks": {
         "kind": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["treeKindOffered"]["fn"]>[0], ["kind"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TreeStyling"]["_styles"]>>>, ["style"]>]>>;
         "unit": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_unit"]>[0], ["unit"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["TreeStyling"]["_styles"]>>>, ["item"]>]>>;
@@ -1349,6 +1363,13 @@ export type StillGotItHttp = {
     output: {
       "material": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Library"]["add"]>>, ["material"]>>;
     };
+    error: { error: HttpAppWideError | "CONFLICT" | "FORBIDDEN" | "INVALID_REQUEST" | "NOT_FOUND" | "UNAUTHORIZED" };
+  };
+  "/internal/materials/delete": {
+    input: {
+      "material": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>[0], ["material"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["delete"]>[0], ["material"]>]>>;
+    };
+    output: Record<string, never>;
     error: { error: HttpAppWideError | "CONFLICT" | "FORBIDDEN" | "INVALID_REQUEST" | "UNAUTHORIZED" };
   };
   "/learning/adjust": {

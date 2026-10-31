@@ -179,6 +179,8 @@ Uploads are limited to 12 files and 95 MB in total. The server accepts an upload
 
 A download or view first checks the learner's access to the material and the exact file reference. It then streams the bytes from the store, without loading the whole file. Removing an unfinished import deletes every file that its declared sources can have under its import key, whether or not the upload had finished saving them. When that deletion fails, the transcription worker finishes it on a later turn.
 
+Deleting a material deletes its retained files the same way, through its import. A material saved before imports were recorded has no import, so its files are deleted from its own file references instead; nothing retries that deletion when it fails, and the failure is logged. Image renditions refer to their original file, so deleting the originals deletes every stored file of the material. Gemini's copies of the files, which the tutor uses for large files, are not deleted; Gemini deletes them within 48 hours, as it does for a removed import.
+
 ## Readability and ownership
 
 A material needs nonblank `content` or at least one valid readable rendition. Text, image, and page renditions are readable; a page rendition is readable because the tutor reads that page from the retained PDF. A filename, file reference, MIME type, or `readable: true` flag by itself is insufficient. Valid metadata with no renditions can accompany readable content or another readable original; its reported limitations remain available.
@@ -195,6 +197,8 @@ The pair `(owner, importKey)` identifies one material. A matching retry returns 
 
 An intentional new import uses a new key, even when its content matches an earlier import. Another learner can use the same key without recovering the first learner's record. Keys do not expire and are not returned by `_materials` or `_material`.
 
+A deleted material keeps its key. A later `add` under that key, for example a retry of the import that saved the material, causes `MATERIAL_DELETED`, "This material was deleted. Import the files again to use them.", and saves nothing. Importing the same files again starts a new import with a new key, so it saves a new material.
+
 The host must save the key and prepared input before calling the action. Retrying with regenerated file references or changed extraction output is a conflict. The [import operation store](material-import-store.md) saves the original request, retained sources, exact prepared input, and completed material identity at separate checkpoints.
 
 ## Storage behavior
@@ -203,6 +207,8 @@ The host must save the key and prepared input before calling the action. Retryin
 
 Reads use the primary with majority read concern. Writes use majority, journaled acknowledgement. The key index covers only records with string keys. Older materials without keys remain readable and are not claimed by matching content. There is no material-update action.
 
-`_materials` filters by both owner and scope, orders by material ID, and returns only ID, title, locator, and origin. `_material` returns the full material for one ID, or no row. `_sourceSet` returns the owner's materials in one scope with their content and originals, which the application uses to build tutor requests. All three queries are read-only. `_material` is an internal lookup; an application ownership check is required before its result reaches a browser.
+`delete` takes the owner and the material. One update, which requires the owner's material that is not yet deleted, removes the title, locator, content, originals, and origin and marks the record deleted. What remains is the material's ID, owner, scope, and import key. An unknown material, another owner's material, a malformed identity, and a material already deleted cause `MATERIAL_DELETE_UNAVAILABLE`, "Choose one of your materials to delete.", and change nothing; of two competing deletes, one succeeds.
+
+`_materials` filters by both owner and scope, orders by material ID, and returns only ID, title, locator, and origin. `_material` returns the full material for one ID, or no row. `_sourceSet` returns the owner's materials in one scope with their content and originals, which the application uses to build tutor requests. These three return only materials that are not deleted. `_deleted` returns the owner and scope of one deleted material, or no row, and `_deletions` returns the IDs of the owner's deleted materials in one scope, in ID order. All five queries are read-only. `_material` is an internal lookup; an application ownership check is required before its result reaches a browser.
 
 MaterialKeeping and GroundedTutoring are each registered with their full specifications. The [checked P2 stage](stages/materials.md) connects material import, ownership checks, AI proposals, and skill confirmation. File and provider operations remain host responsibilities.

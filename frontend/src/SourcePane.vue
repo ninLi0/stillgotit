@@ -1,16 +1,20 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, watch } from "vue";
 import MaterialViewer from "./MaterialViewer.vue";
 import { placeLabel } from "./locations.ts";
+import { DELETED_MATERIAL } from "./labels.ts";
 import type { OpenSource } from "./revamp-types.ts";
 
 // A cited source beside the lesson on wide screens: the material's file at the cited place and nothing else (the
 // viewer's page-only mode), under a small header with "Open in Materials" and a close button. The lesson owns the
 // pane's state and focus: it opens the pane, moves focus here, and returns focus to the opener when the pane closes.
 // Escape inside the pane closes it.
-const props = defineProps<{ source: OpenSource; titles: Record<string, string> }>();
+// `deleted` lists the materials the learner deleted. A deleted material shows a sentence saying so and no link into
+// Materials, as it does when the viewer's read finds it deleted since the course was read.
+const props = withDefaults(defineProps<{ source: OpenSource; titles: Record<string, string>; deleted?: readonly string[] }>(), { deleted: () => [] });
 const emit = defineEmits<{ close: []; "open-materials": [source: OpenSource] }>();
-const root = ref<HTMLElement | null>(null);
+const root = ref<HTMLElement | null>(null), gone = ref(false);
+watch(() => [props.source.material, props.deleted] as const, ([material, deleted]) => { gone.value = deleted.includes(material); }, { immediate: true });
 defineExpose({ focus: () => root.value?.focus(), element: root });
 </script>
 
@@ -19,13 +23,14 @@ defineExpose({ focus: () => root.value?.focus(), element: root });
     <header class="pane-head">
       <div class="pane-heading">
         <p class="eyebrow">Source · {{ placeLabel(props.source.location) }}</p>
-        <h2 id="source-pane-title" class="display">{{ props.titles[props.source.material] || 'Course material' }}</h2>
+        <h2 id="source-pane-title" class="display">{{ gone ? DELETED_MATERIAL : props.titles[props.source.material] || 'Course material' }}</h2>
       </div>
-      <button type="button" class="quiet open-materials" @click="emit('open-materials', props.source)">Open in Materials</button>
+      <button v-if="!gone" type="button" class="quiet open-materials" @click="emit('open-materials', props.source)">Open in Materials</button>
       <button type="button" class="pane-close" aria-label="Close the source" @click="emit('close')"><span aria-hidden="true">✕</span></button>
     </header>
-    <MaterialViewer :key="`${props.source.material}\n${props.source.location}`" class="pane-page" mode="page" :material="props.source.material"
-      :title="props.titles[props.source.material] ?? ''" :skills="[]" :initial-location="props.source.location" />
+    <p v-if="props.deleted.includes(props.source.material)" class="pane-gone">This material was deleted, so it can no longer be shown.</p>
+    <MaterialViewer v-else :key="`${props.source.material}\n${props.source.location}`" class="pane-page" mode="page" :material="props.source.material"
+      :title="props.titles[props.source.material] ?? ''" :skills="[]" :initial-location="props.source.location" @deleted="gone = true" />
   </aside>
 </template>
 
@@ -42,4 +47,5 @@ defineExpose({ focus: () => root.value?.focus(), element: root });
 .pane-close { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 10px; background: var(--inset); color: var(--ink); font-size: 15px; line-height: 1; }
 .pane-close:hover { background: var(--inset-2); }
 .pane-page { flex: 1; min-height: 0; }
+.pane-gone { margin: 0; color: var(--muted); font-size: 14px; }
 </style>

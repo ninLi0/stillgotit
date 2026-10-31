@@ -3,7 +3,7 @@
 These functions are pure calculations over values supplied by queries and action records. They do not read databases, change state, call providers, or start other actions.
 
 - **SkillContext**: One current skill, its course, requirements, source identities, and prerequisites.
-- **SourceSelection**: The selected source records and a flag saying whether every requested source was found.
+- **SourceSelection**: The selected source records, the requested material identities that remain among the sources, and a flag saying whether at least one remains.
 - **StudyDetail**: The selected skill, matching track and estimate, sessions, and assessment cases.
 - **EstimateTimeline**: The estimate's starting point, its ordered changes with time, source, values before and after, time decay, and each adjustment's reason, the attempts that did not count, a provisional flag, and the concept's basis sentence. It is null when the skill's current definition has no explanation.
 - **SkillProgress**: Skill identities paired with optional current estimates.
@@ -34,7 +34,7 @@ generationFields(answer: TutorAnswer) : TutorAnswer
   Exposes fields from a validated provider answer for later actions.
 
 gradeRequest(selected: Library.SourceRecords, data: AssessmentReviewing.CaseRecord) : TutorRequest
-  Prepares the immutable assessment work and clarifications for grading. It does not call a provider.
+  Prepares the immutable assessment work and clarifications for grading. It does not call a provider. The selected sources may be empty when the learner deleted every material of the task; the work is then judged against the saved criteria alone.
 
 hasLessonQuestion(data: GroundedTutoring.StudyRecord) : Flag
   Requires a lesson whose latest turn is a learner response.
@@ -78,7 +78,7 @@ selectSkillMaterials(context: SkillContext) : GroundedTutoring.MaterialSet
   Returns the current skill's material identities.
 
 selectSources(sources: Library.SourceRecords, materials: GroundedTutoring.MaterialSet) : SourceSelection
-  Selects the requested material identities and checks that none are missing. The flows pass the learner's own materials in one course as the sources, so a valid selection also means that every requested material belongs to the learner and to that course, which GroundedTutoring no longer checks itself.
+  Selects the requested material identities that are among the sources, and lists them once each, in the requested order, as `remaining`. The flows pass the learner's own kept materials in one course as the sources, so every selected material belongs to the learner and to that course, which GroundedTutoring no longer checks itself, and a material the learner deleted is left out. The selection is valid when at least one requested material remains; it is invalid when none does, or when none was requested.
 
 sessionMaterials(data: GroundedTutoring.StudyRecord) : GroundedTutoring.MaterialSet
   Returns the source identities fixed when the session was created.

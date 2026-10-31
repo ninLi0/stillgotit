@@ -580,7 +580,7 @@ test("SetUnitEmphasis sets the flag, repeats without change, and refuses a value
 test("ReadCourse lists prerequisites, sources, and versions in the designed order, unchanged by database row order", async () => {
   const app = await setup(), { learner, course, unit, other, source, skills } = await app.course("read-order", ["One", "Two", "Three", "Four"]);
   const empty = await learner.ok("/courses/create", { title: "Empty course" });
-  expect(await learner.ok("/courses/read", { course: empty.course })).toEqual({ materials: [], units: [], skills: [], prerequisites: [], skillSources: [], versions: [], looks: [] });
+  expect(await learner.ok("/courses/read", { course: empty.course })).toEqual({ materials: [], deletedMaterials: [], units: [], skills: [], prerequisites: [], skillSources: [], versions: [], looks: [] });
   const second = await app.material(learner, course, "Second notes");
   const [one, two, three, four] = skills as [string, string, string, string];
   // Spread the skills over both units so unit order and skill order disagree.
@@ -645,7 +645,7 @@ test("practice admission names the prerequisite to work on first, and keeps its 
   expect(await form(Access.TaskReady({ owner, skill: target }))).toBeNull();
   expect(await form(Access.PracticePrerequisite({ owner, skill: target }))).toEqual({ title: titles[expected] });
   expect(prerequisiteDetail({ title: titles[expected] })).toBe(`Work on “${titles[expected]}” first. This skill builds on it.`);
-  expect(admissions["/learning/task"][1].prerequisite.check).toBe(Access.PracticePrerequisite);
+  expect(admissions["/learning/task"][2].prerequisite.check).toBe(Access.PracticePrerequisite);
   // Over HTTP and the native gateway, the declined practice start carries that sentence in place of the general one.
   expect(await learner.post("/learning/task", { skill: target })).toEqual({ status: 400, body: { error: "INVALID_REQUEST", detail: prerequisiteDetail({ title: titles[expected] }) } });
   expect(await learner.invoke("/learning/task", { skill: target })).toMatchObject({ ok: false, error: { kind: "framework", code: "INVALID_INPUT", detail: prerequisiteDetail({ title: titles[expected] }) } });

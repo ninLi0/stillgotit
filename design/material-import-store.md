@@ -25,9 +25,11 @@ The saved operation contains:
 | `partial` | From TRANSCRIBING on: the originals as read at upload. Each recording's renditions and limitations are still empty. |
 | `recordings` | From TRANSCRIBING on: one entry for each distinct audio or video file, in original order. Two originals with the same bytes and the same file extension share one retained file and so one entry, and the finished transcript serves both. |
 | `failure` | Optional, only in TRANSCRIBING: a failure of the final preparation. |
-| `prepared` | From READY on: the exact `Library.add` input. |
-| `material` | In COMPLETE: the saved material identity. |
+| `prepared` | From READY on: the exact `Library.add` input. An import removed because the learner deleted its material no longer has it. |
+| `material` | In COMPLETE: the saved material identity. An import removed after its material was deleted keeps it. |
 | `filesDeleted` | Only in DISCARDED: `false` when the import is removed, and `true` once every file its declared sources can have under its import key has been deleted. |
+
+When the learner deletes a material, its import is removed too, as described under `discardSaved` below. The text read from its files goes with it: `prepared`, `partial`, and `recordings`, which holds the transcripts, are removed in the same write. The record keeps its `request` and `importKey`, which hold the title, the file names, sizes, and digests but none of the files' content. With them, a repeated upload under the same request ID is answered as removed instead of starting the import again, and the worker can still delete every file the request declares.
 
 A recording entry contains:
 
@@ -194,7 +196,14 @@ when discard is called with owner, requestId, and the host's report that AddMate
 where the operation is READY
 then set DISCARDED with filesDeleted false, increase the revision, and return it
 
-when discard is called with owner and requestId and no such report
+when discard is called with owner, requestId, and the host's report that AddMaterial
+     refused the operation's prepared input because the learner deleted the material
+     saved under its key
+where the operation is READY
+then set DISCARDED with filesDeleted false, remove prepared, partial, and recordings,
+     increase the revision, and return it
+
+when discard is called with owner and requestId and neither report
 where the operation is READY
 then refuse IMPORT_ALREADY_SAVED and change nothing
 
@@ -205,6 +214,19 @@ then refuse IMPORT_ALREADY_SAVED and change nothing
 when discard is called with owner and requestId
 where the operation is DISCARDED
 then return it unchanged; return null when no operation matches
+
+when discardSaved is called with owner and material
+where the owner's operation that saved the material is COMPLETE
+then set DISCARDED with filesDeleted false, remove prepared, partial, and recordings,
+     increase the revision, and return it
+
+when discardSaved is called with owner and material
+where the owner's operation that saved the material is DISCARDED
+then return it unchanged; return null when no operation of the owner saved the material
+
+when savedFor is called with owner and a list of materials
+then return the owner's COMPLETE operations that saved one of those materials,
+     ordered by createdAt and then requestId, without changing them
 
 when deletable is called
 then return the DISCARDED operations whose filesDeleted is false, ordered by
@@ -225,9 +247,9 @@ These describe ordinary host methods, not registered concept actions or executab
 
 Snapshot validated input before the first database wait. Unique indexes protect `(owner, requestId)` and `(owner, importKey)`. More indexes serve the worker's searches for waiting recordings, imports ready to finish, and removed imports with files left, and the library's search by learner and course. One document write saves the entire operation. After a duplicate insert, read the winning owner/request pair and apply the same match or conflict rule. An unrelated uniqueness failure remains a database error.
 
-Use primary reads with majority read concern and majority, journaled writes. Return no candidate key after a failed or uncertain write. A retry reads any completed write. The records have no automatic expiry. `get`, `pending`, `preparable`, and `deletable` create no indexes and change no state. No method returns MongoDB's internal `_id`.
+Use primary reads with majority read concern and majority, journaled writes. Return no candidate key after a failed or uncertain write. A retry reads any completed write. The records have no automatic expiry. `get`, `pending`, `preparable`, `savedFor`, and `deletable` create no indexes and change no state. No method returns MongoDB's internal `_id`.
 
-The stages advance in this order. `saveSources` advances CREATED to SOURCES_SAVED with retained-file references. An import without recordings then goes from SOURCES_SAVED to READY through `savePrepared`. An import with recordings goes from SOURCES_SAVED to TRANSCRIBING through `startTranscription`, and from TRANSCRIBING to READY through `savePrepared` once every recording is DONE. `complete` advances READY to COMPLETE with the saved material identity. `discard` ends an import before READY, or ends a READY import whose prepared input AddMaterial refused as invalid. `markFilesDeleted` records that a removed import's files are gone. `savePrepared` requires the owner, key, course, title, and origin to match the saved request.
+The stages advance in this order. `saveSources` advances CREATED to SOURCES_SAVED with retained-file references. An import without recordings then goes from SOURCES_SAVED to READY through `savePrepared`. An import with recordings goes from SOURCES_SAVED to TRANSCRIBING through `startTranscription`, and from TRANSCRIBING to READY through `savePrepared` once every recording is DONE. `complete` advances READY to COMPLETE with the saved material identity. `discard` ends an import before READY, or ends a READY import whose prepared input AddMaterial refused as invalid or because its material was deleted. `discardSaved` ends a COMPLETE import whose material the learner deleted. `markFilesDeleted` records that a removed import's files are gone. `savePrepared` requires the owner, key, course, title, and origin to match the saved request.
 
 Each transition requires the expected stage and revision, and an atomic update advances both. Transcript saves and failures instead require the recording's claim token, and one atomic update checks the stage and the claim together. A claim and its renewal are atomic updates of one recording that leave the revision unchanged. `markFilesDeleted` is an atomic update that requires DISCARDED. An exact replay of a saved checkpoint returns current progress. Changed preparation, a different material result, a lost claim, or a competing stale transition causes `IMPORT_PROGRESS_CONFLICT`. A caller can reread and retry after another matching request finishes. A lost reply never requires a new import key.
 
@@ -239,7 +261,8 @@ The store never verifies a file by itself. It receives host-prepared references 
 - transcript replays, and automatic and learner retries;
 - a retry refused while another recording waits;
 - an operation ready to finish after a stop, and a removed operation with files left after a stop;
-- discarding during a claim, and discarding a READY operation only with the host's invalid-input report;
+- discarding during a claim, and discarding a READY operation only with the host's invalid-input or deleted-material report;
+- removing the import of a deleted material once, with the text read from it, and finding the saved imports of deleted materials;
 - the pending list's owner, course, and order.
 
 File-processing and HTTP tests check the surrounding flow.

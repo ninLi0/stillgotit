@@ -32,6 +32,13 @@ export function sourceLabel(location: string, materialTitle?: string): string {
   return `${materialTitle?.trim() || "Course material"} · ${placeLabel(location)}`;
 }
 
+/** The name a citation or a skill's source shows for a material the learner deleted. Nothing else of it is kept. */
+export const DELETED_MATERIAL = "Deleted material";
+/** What opening a citation of a deleted material shows in place of its passage. */
+export const DELETED_PASSAGE = "This material was deleted, so this passage can no longer be shown.";
+/** A material read answers NOT_FOUND only for a material the learner deleted (design/compositions/Courses.md). */
+export function deletedRead(result: { error: unknown }): boolean { return result.error === "NOT_FOUND"; }
+
 /** A wait in whole seconds, such as "7 s", or "2 min 5 s" from a minute up. */
 export function secondsLabel(seconds: number): string {
   const whole = Math.max(0, Math.round(seconds)), minutes = Math.floor(whole / 60), rest = whole % 60;

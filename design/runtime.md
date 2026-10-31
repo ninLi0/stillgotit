@@ -66,6 +66,8 @@ Uploads allow 12 files and 95 MB in total, where 1 MB is 1,048,576 bytes. Each P
 
 A download goes through the declared material-read endpoint, which checks the owner and course access, and then requires an exact saved file reference. Knowing a file ID is not enough to download it.
 
+A learner can delete one of their materials for good. The delete route checks the session and a declared admission former under the learner's lock, calls a private endpoint whose `Library.delete` removes everything the material contained, and then removes the material's import record and retained files, as the [material flows](compositions/Materials.md#deleting-a-material) describe. The concept keeps only the material's identity, owner, course, and import key, so pages that cited the material can say it was deleted and a late retry of its import cannot save it again. Lessons, practice, and grading then use the sources that remain.
+
 ## Lessons, practice, and evidence
 
 Declared views join the learner's skills, their current requirements, and the source material before a Generating action asks the tutor. The host checks the returned text and its citations. A citation of the learner's own attached work is dropped, since that work is sent to be read and is not a course material; an answer that cites nothing else is refused with a sentence the learner can act on. The endpoint then rechecks the skill's definition, and if the definition changed during generation, it reports a conflict instead of saving content under the new requirements. Existing sessions keep their original requirements and sources. A submitted photo is read as the learner's own work, separately from any reference solution.

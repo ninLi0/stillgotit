@@ -13,6 +13,8 @@ import { skillMapping } from "../concepts/SkillMapping.registry.ts";
 import { budgeting } from "../concepts/Budgeting/registry.ts";
 
 export const SESSION_COOKIE = "__Host-stillgotit-session";
+/** The sentence for reading a material the learner deleted, as a citation of it does. */
+export const MATERIAL_DELETED_READ = "This material was deleted, so it can no longer be shown.";
 export const ATTEMPT_COOKIE = "__Host-stillgotit-sign-in";
 export const BODY_LIMIT = 16_384;
 
@@ -136,6 +138,9 @@ export function stillGotItPolicy(publicOrigin: string, requestBodyBytes = BODY_L
       INVALID_TUTORING_MATERIAL: "INVALID_REQUEST",
       INVALID_MATERIAL_IMPORT_KEY: "INVALID_REQUEST",
       MATERIAL_IMPORT_CONFLICT: "CONFLICT",
+      // A deleted material is gone for good, so the browser can tell a deletion apart from a material it may not see.
+      MATERIAL_DELETED: "NOT_FOUND",
+      MATERIAL_DELETE_UNAVAILABLE: "FORBIDDEN",
       UNIT_COURSE_UNAVAILABLE: "FORBIDDEN",
       INVALID_UNIT_TITLE: "INVALID_REQUEST",
       PROPOSAL_UNIT_UNAVAILABLE: "FORBIDDEN",
@@ -234,6 +239,8 @@ export const scopedRefusalDetails: Readonly<Record<string, { readonly applies: (
   COURSE_UNAVAILABLE: { applies: (path) => path.startsWith("/planning/"), detail: "Choose one of your own courses." },
   // Learning.md: Adjust answers a skill that is not one of the learner's confirmed skills with this sentence.
   SKILL_UNAVAILABLE: { applies: (path) => path === "/learning/adjust", detail: "Choose one of your confirmed skills before adjusting its estimate." },
+  // Courses.md: reading a material the learner deleted. Elsewhere the code keeps MaterialKeeping's sentence.
+  MATERIAL_DELETED: { applies: (path) => path === "/courses/materials/read", detail: MATERIAL_DELETED_READ },
 };
 
 /**

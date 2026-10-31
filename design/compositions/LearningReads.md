@@ -6,6 +6,8 @@
 
 [SkillContext](view:Reads.SkillContext) supplies the current definition, course map, owned materials, and learner progress. Each concept query reads only its own records. Application computations combine the returned values without database calls.
 
+A learner can delete a material that a skill or a session names, as the [course composition](Courses.md#deleting-a-material) describes. The deleted material leaves the learner's sources, so [selectSources](computation:selectSources) leaves it out, and lessons and practice use the sources that remain. Two views say when none remains. [SkillSourcesDeleted](view:Reads.SkillSourcesDeleted) holds for a confirmed skill of the learner, through ActiveSkill and SkillContext, when none of the skill's materials is still among the learner's sources in its course. [SessionSourcesDeleted](view:Reads.SessionSourcesDeleted) holds for an open session, through SessionSources, when none of the materials saved with the session is still among them. A confirmed skill always has at least one material, and a session always has one, so either view holds only after deletions. [Request admission](LearningAccess.md) reads them to explain why a lesson, a practice task, or a tutor answer cannot start.
+
 [SkillData](former:Reads.SkillData) presents current requirements, the matching mastery track, saved sessions, original work, and judgment history. [SessionData](former:Reads.SessionData) presents a saved tutoring session. [Progress](former:Reads.Progress) builds the tree's estimate list. [PlanData](former:Reads.PlanData) presents preferences, today's budget, the next activity, and the active plan.
 
 ## Evidence behind the estimate

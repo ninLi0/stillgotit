@@ -69,7 +69,9 @@ function validated(tutor: Pick<CourseTutor, "generate" | "suggest">) {
   return async (owner: string, request: TutorRequest): Promise<TutorAnswer> => {
     const answer: TutorAnswer = { text: "", citations: [], materials: request.sources.map((source) => source.material),
       result: "UNCERTAIN", gateMet: false, rationale: "", suggestions: { unitTitle: "", skills: [] }, rows: [] };
-    if (!request.sources.length || request.sources.some((source) => source.data.owner !== owner)) throw new Error("Invalid sources");
+    // Grading reads the saved work against the saved criteria. Its sources are context only, and the learner may have
+    // deleted every one of them since the task was set, so a grading request may carry none. Every other kind needs one.
+    if ((!request.sources.length && request.kind !== "GRADE") || request.sources.some((source) => source.data.owner !== owner)) throw new Error("Invalid sources");
     // The transport refuses a request that carries no validated model and level (src/host/tutor.ts).
     if (request.kind === "SUGGEST") { answer.suggestions = await tutor.suggest(owner, request.sources[0]!, request.tutor); return answer; }
     if (request.kind === "EXTRACT") {

@@ -28,9 +28,13 @@ type SkillData = StillGotItHttp["/learning/read"]["output"]["data"];
 type StudySession = SkillData["sessions"][number];
 /** A file uploaded for the answer being written. `preview` is a local picture of an image file, so learners can tell images apart; other files have none. */
 type Attachment = { material: string; name: string; preview: string };
-// aiReason explains why AI features are off when aiAvailable is false. materials gives titles for cited sources.
+// aiReason explains why AI features are off when aiAvailable is false. materials gives titles for cited sources, and
+// deletedMaterials lists the course materials the learner deleted, which citations and the rail name as deleted.
+// skillMaterials lists this skill's sources from the same course read. The course read is refreshed after every change
+// under Manage skills, while this page reads its skill only when it opens or acts, so a source added there counts at once.
 // initialDraft prefills the message box of a new conversation (for example "Ask about this page" in Materials); it is never sent by itself.
-const props = defineProps<{ skill: string; course: string; materials: { material: string; title: string }[]; aiAvailable: boolean; aiReason: string; active?: boolean; initialDraft?: string }>();
+const props = withDefaults(defineProps<{ skill: string; course: string; materials: { material: string; title: string }[]; deletedMaterials?: readonly string[]; skillMaterials?: readonly string[]; aiAvailable: boolean; aiReason: string; active?: boolean; initialDraft?: string }>(),
+  { deletedMaterials: () => [] });
 // `back` returns to the skill tree. `open-source` asks the shell to show a cited source in Materials, from the source
 // preview's "Open in Materials". `session` names
 // the conversation on screen (null for a new one), so the sidebar can mark it.
@@ -46,7 +50,15 @@ const currentCases = computed(() => data.value?.cases.filter((item) => item.task
 // unexplained: the thread shows the request and, in the explanation's place, the tutor's dots or "Retry tutor reply",
 // and nothing can be sent in it.
 const unexplained = computed(() => !!current.value?.lesson && !current.value.lesson.explanation.trim());
-const canSend = computed(() => !busy.value && !recording.value && !unexplained.value && (props.aiAvailable || !!current.value?.task) && (!!response.value.trim() || (attachments.value.length > 0 && !!current.value)));
+// Lessons and practice use the sources that remain after the learner deletes a material. When none remains, the tutor has
+// nothing to ground them in: a skill cannot start a new lesson or task, and an open session cannot ask the tutor again.
+// The server declines these requests with the same explanation (design/compositions/LearningAccess.md).
+const deletedSet = computed(() => new Set<string>(props.deletedMaterials));
+const allDeleted = (materials: readonly string[]) => materials.length > 0 && materials.every((material) => deletedSet.value.has(material));
+const skillSourcesGone = computed(() => allDeleted(props.skillMaterials ?? data.value?.skill.materials ?? []));
+const sessionSourcesGone = computed(() => !!current.value && current.value.status === "OPEN" && allDeleted(current.value.materials));
+const canSend = computed(() => !busy.value && !recording.value && !unexplained.value && !(current.value ? current.value.lesson && sessionSourcesGone.value : skillSourcesGone.value)
+  && (props.aiAvailable || !!current.value?.task) && (!!response.value.trim() || (attachments.value.length > 0 && !!current.value)));
 const unsent = new Map<string, { text: string; channel: "TEXT" | "VOICE"; attachments: Attachment[] }>();
 const previews = new Set<string>();
 const speechEdits = ref<Record<number, string>>({});
@@ -58,7 +70,9 @@ const estimateText = computed(() => data.value?.estimate ? `${Math.round(data.va
 const materialTitles = computed(() => Object.fromEntries(props.materials.map((item) => [item.material, item.title])));
 // Why a disabled action is unavailable. Empty when it is available or the app is only busy.
 const aiOff = computed(() => props.aiAvailable ? "" : props.aiReason || "Checking whether the AI tutor is available…");
-const practiceReason = computed(() => recording.value ? "Finish recording first." : !props.aiAvailable ? "The AI tutor is unavailable right now." : data.value && !data.value.track ? "Set your starting confidence first." : "");
+const practiceReason = computed(() => recording.value ? "Finish recording first." : !props.aiAvailable ? "The AI tutor is unavailable right now."
+  : skillSourcesGone.value ? "Add another source for this skill first." : data.value && !data.value.track ? "Set your starting confidence first." : "");
+const hintReason = computed(() => sessionSourcesGone.value ? "The materials this task came from have been deleted, so no hint is available. You can still answer and submit it." : "");
 const assessReason = computed(() => unsavedTranscripts.value ? "Save your transcript corrections first." : !reviewed.value ? "Confirm that you reviewed your answer first." : aiOff.value);
 function describedBy(...ids: (string | false)[]) { return ids.filter(Boolean).join(" ") || undefined; }
 function purposeNote(purpose: string) { return purpose === "HINT" ? " · hint" : purpose === "CORRECTION" ? " · transcript correction" : ""; }
@@ -505,7 +519,7 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
               <span class="chip-top"><strong>{{ pctText }}</strong><span>mastery</span></span><MasteryCells :value="pct" :cells="7" :height="4" label="" aria-hidden="true" />
             </button>
             <div v-else class="mastery-chip static" role="img" :aria-label="estimateText || 'No estimate yet'"><span class="chip-top"><strong>{{ pctText }}</strong><span>mastery</span></span><MasteryCells :value="pct" :cells="7" :height="4" label="" aria-hidden="true" /></div>
-            <div class="heading-action"><button class="primary dawn practice-button" :disabled="busy || recording || !aiAvailable || !data?.track" :aria-describedby="describedBy(!!practiceReason && 'practice-reason', !aiAvailable && 'ai-reason-chat')" @click="startTask">Check my understanding</button><p v-if="practiceReason" id="practice-reason" class="hint reason">{{ practiceReason }}</p></div>
+            <div class="heading-action"><button class="primary dawn practice-button" :disabled="busy || recording || !aiAvailable || !data?.track || skillSourcesGone" :aria-describedby="describedBy(!!practiceReason && 'practice-reason', !aiAvailable && 'ai-reason-chat')" @click="startTask">Check my understanding</button><p v-if="practiceReason" id="practice-reason" class="hint reason">{{ practiceReason }}</p></div>
           </div>
         </div>
       </header>
@@ -527,7 +541,7 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
                 <article v-if="!unexplained" class="message from-tutor opening-card" :class="{ latest: !current.dialogue.length }" :title="openingTime?.label">
                   <div class="speaker-row"><span class="speaker"><span class="avatar"><PixelIcon name="leaf" :size="16" /></span> StillGotIt<span v-if="openingTime" class="sr-only">, <time :datetime="openingTime.iso">{{ openingTime.label }}</time></span><span v-if="current.task" class="tag task">Practice task</span></span></div>
                   <MarkdownText class="prose" :text="current.lesson?.explanation || current.task?.question || ''" />
-                  <SourcesUsed v-if="current.citations.length" :key="current.session" compact :citations="current.citations" :titles="materialTitles" :id-prefix="`passage-${current.session}`" @open="openSource" />
+                  <SourcesUsed v-if="current.citations.length" :key="current.session" compact :citations="current.citations" :titles="materialTitles" :deleted="deletedMaterials" :id-prefix="`passage-${current.session}`" @open="openSource" />
                   <div class="reply-foot"><ReplyMeta :seconds="measured[answerKey('session', current.session)]" :sources="current.citations.length" :tutor="answerLabel('session', current.session)" /><ReplyActions :message-key="`${current.session}:opening`" :text="current.lesson?.explanation || current.task?.question || ''" :what="current.lesson ? 'lesson' : 'practice question'" describedby="listen-reason" /></div>
                 </article>
               </div>
@@ -536,14 +550,14 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
                 <template v-if="item.turn.speaker === 'TUTOR'">
                   <div class="speaker-row"><span class="speaker"><span class="avatar"><PixelIcon name="leaf" :size="16" /></span> StillGotIt<span v-if="messageTime(item.turn.at)" class="sr-only">, <time :datetime="item.turn.at">{{ messageTime(item.turn.at) }}</time></span><span v-if="item.turn.purpose === 'HINT'" class="tag hint-tag">Hint</span><span v-else-if="item.turn.purpose === 'CORRECTION'" class="tag">Transcript correction</span></span></div>
                   <MarkdownText class="prose" :text="item.turn.text" />
-                  <SourcesUsed v-if="item.turn.citations.length" :key="`${current.session}:${item.turnIndex}`" :citations="item.turn.citations" :titles="materialTitles" :id-prefix="`passage-${current.session}-${item.turnIndex}`" compact @open="openSource" />
+                  <SourcesUsed v-if="item.turn.citations.length" :key="`${current.session}:${item.turnIndex}`" :citations="item.turn.citations" :titles="materialTitles" :deleted="deletedMaterials" :id-prefix="`passage-${current.session}-${item.turnIndex}`" compact @open="openSource" />
                 </template>
                 <template v-else><span class="sr-only">You{{ purposeNote(item.turn.purpose) }}</span><span v-if="messageTime(item.turn.at)" class="sr-only">, <time :datetime="item.turn.at">{{ messageTime(item.turn.at) }}</time></span><span v-if="purposeNote(item.turn.purpose)" class="tag you-tag" aria-hidden="true">{{ purposeNote(item.turn.purpose).replace(' · ', '') }}</span>
                   <MarkdownText class="prose" kind="message" :text="item.turn.text" /></template>
                 <p v-for="(file, fileIndex) in item.turn.media" :key="file.file" class="attachment-label"><span class="attach-thumb" aria-hidden="true" />{{ item.turn.media.length > 1 ? `Attachment ${fileIndex + 1} of ${item.turn.media.length}` : 'Attachment' }} · {{ file.name }}</p>
                 <div v-if="item.turn.speaker === 'TUTOR'" class="reply-foot"><ReplyMeta :seconds="replySeconds(current, item.turnIndex)" :sources="item.turn.citations.length" :tutor="answerLabel('turn', current.session, item.turnIndex)" /><ReplyActions :message-key="`${current.session}:${item.turnIndex}`" :text="item.turn.text" :what="item.turn.purpose === 'HINT' ? 'hint' : 'tutor reply'" describedby="listen-reason" /></div></article>
               <!-- A lesson question without a reply, or a lesson without its opening explanation: the retry sits where the tutor's answer would be. -->
-              <div v-if="current.lesson && current.status === 'OPEN' && (current.dialogue.at(-1)?.turn.speaker === 'LEARNER' || unexplained) && !pending" class="retry-row"><span class="avatar"><PixelIcon name="leaf" :size="16" /></span><button class="secondary dawn reply-retry" :disabled="busy || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="retryReply"><span aria-hidden="true">↻</span>Retry tutor reply</button></div>
+              <div v-if="current.lesson && current.status === 'OPEN' && (current.dialogue.at(-1)?.turn.speaker === 'LEARNER' || unexplained) && !pending && !sessionSourcesGone" class="retry-row"><span class="avatar"><PixelIcon name="leaf" :size="16" /></span><button class="secondary dawn reply-retry" :disabled="busy || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="retryReply"><span aria-hidden="true">↻</span>Retry tutor reply</button></div>
               <div v-if="current.task && current.status === 'OPEN' && current.dialogue.some(item => item.turn.speaker === 'LEARNER' && item.turn.purpose === 'RESPONSE')" class="review-step">
                 <button class="secondary dawn" :disabled="busy || recording" :aria-expanded="reviewOpen" @click="reviewOpen = !reviewOpen">{{ reviewOpen ? 'Close review' : 'Review and assess my work' }}</button>
                 <div v-if="reviewOpen" class="attempt-review">
@@ -579,7 +593,10 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
       </div>
       <div class="composer-area">
         <div class="composer-inner">
-          <template v-if="!current || current.status === 'OPEN'">
+          <div v-if="current?.lesson && sessionSourcesGone" class="finished-message sources-gone"><p>The materials this lesson was grounded in have been deleted, so the tutor can no longer answer here. The conversation stays here to read.</p><button type="button" class="message-action" :disabled="busy" @click="finishLesson">Finish lesson</button><button class="message-action" :disabled="busy" @click="newLesson">Keep learning</button></div>
+          <template v-else-if="!current || current.status === 'OPEN'">
+            <p v-if="!current && skillSourcesGone" id="sources-gone" class="sources-gone-note">Every material this skill was taught from has been deleted. Add another source for it under Manage skills in Materials, then start a lesson.</p>
+            <p v-if="hintReason" id="hint-reason" class="sources-gone-note">{{ hintReason }}</p>
             <div class="composer" :class="{ 'is-recording': recording }" :aria-busy="!!pending">
               <ul v-if="attachments.length" ref="attachmentList" class="attachment-list" aria-label="Files attached to this answer">
                 <li v-for="(item, index) in attachments" :key="item.material" class="attachment-chip"><img v-if="item.preview" :src="item.preview" alt="" class="attachment-thumb" /><span>{{ attachments.length > 1 ? `${index + 1}. ` : '' }}{{ item.name }}</span><button type="button" :aria-label="`Remove file ${index + 1}, ${item.name}`" :disabled="busy" @click="removeAttachment(index)">×</button></li>
@@ -589,9 +606,9 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
               <div class="composer-tools"><div class="input-tools"><label class="attach-button tool-pill" :class="{ unavailable: !current || busy || recording }" :title="current ? 'Attach files with your work' : 'Start a lesson before attaching files'"><span aria-hidden="true">＋ Attach files</span><span class="sr-only">{{ attachments.length ? 'Attach more files with your work' : 'Attach files with your work' }}</span><input type="file" multiple :disabled="busy || recording || !current" @change="uploadWork" /></label>
                 <SpeechInput :disabled="busy || !aiAvailable" :active="active !== false" :describedby="aiAvailable ? undefined : 'ai-reason-chat'" compact @recording="recording = $event" @transcript="response = response ? response + '\n' + $event : $event; channel = 'VOICE'" @error="error = $event" />
                 <button type="button" class="tutor-pick" aria-haspopup="dialog" :aria-label="tutorChoice.label" :title="tutorChoice.label" @click="emit('tutor')"><span>{{ tutorChoice.model }}<span v-if="tutorChoice.level" class="tutor-level"> · {{ tutorChoice.level }}</span></span><svg aria-hidden="true" viewBox="0 0 12 12" width="12" height="12"><path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" /></svg></button>
-                <button v-if="current?.task" class="hint-button tool-pill" :disabled="busy || recording || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="requestHint">Ask for a hint</button>
+                <button v-if="current?.task" class="hint-button tool-pill" :disabled="busy || recording || !aiAvailable || !!hintReason" :aria-describedby="describedBy(!aiAvailable && 'ai-reason-chat', !!hintReason && 'hint-reason')" @click="requestHint">Ask for a hint</button>
                 <button v-else-if="current?.lesson" type="button" class="tool-pill" :disabled="busy || recording" @click="finishLesson">Finish lesson</button>
-              </div><div class="composer-right"><span class="note-info"><InfoBubble :text="composerNote" label="About this message box" /></span><button class="send-button" :class="{ waiting: !!pending }" :disabled="!canSend" :aria-label="sendLabel" :aria-describedby="aiAvailable || current?.task || pending ? undefined : 'ai-reason-chat'" @click="submitMessage"><span v-if="pending" class="send-ring" aria-hidden="true" /><span v-else aria-hidden="true">↑</span></button></div></div>
+              </div><div class="composer-right"><span class="note-info"><InfoBubble :text="composerNote" label="About this message box" /></span><button class="send-button" :class="{ waiting: !!pending }" :disabled="!canSend" :aria-label="sendLabel" :aria-describedby="describedBy(!(aiAvailable || current?.task || pending) && 'ai-reason-chat', !current && skillSourcesGone && 'sources-gone')" @click="submitMessage"><span v-if="pending" class="send-ring" aria-hidden="true" /><span v-else aria-hidden="true">↑</span></button></div></div>
             </div>
             <p v-if="recording" class="composer-note" role="status">Recording. Stop to review your words before sending.</p>
           </template>
@@ -620,11 +637,11 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
       </section>
       <section v-if="railCitations.length" class="rail-card">
         <p class="eyebrow rail-eyebrow">Taught from</p>
-        <SourcesUsed :citations="railCitations" :titles="materialTitles" id-prefix="rail-source" variant="rail" @open="openSource" />
+        <SourcesUsed :citations="railCitations" :titles="materialTitles" :deleted="deletedMaterials" id-prefix="rail-source" variant="rail" @open="openSource" />
       </section>
     </aside>
-    <SourcePane v-if="paneSource && !narrow" ref="sourcePane" class="learn-source" :source="paneSource" :titles="materialTitles" @close="closePane()" @open-materials="paneToMaterials" />
-    <SourcePreview ref="sourcePreview" :titles="materialTitles" @open-materials="emit('open-source', $event)" @ask="applyDraft($event.question)" />
+    <SourcePane v-if="paneSource && !narrow" ref="sourcePane" class="learn-source" :source="paneSource" :titles="materialTitles" :deleted="deletedMaterials" @close="closePane()" @open-materials="paneToMaterials" />
+    <SourcePreview ref="sourcePreview" :titles="materialTitles" :deleted="deletedMaterials" @open-materials="emit('open-source', $event)" @ask="applyDraft($event.question)" />
   </section>
 </template>
 
@@ -767,6 +784,7 @@ button.mastery-chip:hover{border-color:var(--lesson-chip-hover)}
 .send-button.waiting:disabled{background:var(--dawn);color:var(--dawn-text);box-shadow:0 3px 0 var(--dawn-edge);cursor:progress}
 .send-ring{width:18px;height:18px;border-radius:50%;border:2.5px solid color-mix(in srgb, var(--dawn-text) 22%, transparent);border-top-color:var(--dawn-text);animation:sgSpin var(--loop-beat) var(--ease-loop) infinite}
 .composer-note{margin:8px 0 0;text-align:center;font-size:12px;color:var(--coral-text)}
+.sources-gone-note{margin:0 0 10px;font-size:13px;line-height:1.5;color:var(--soft)}
 .is-recording{border-color:var(--coral)}
 .attachment-list{display:flex;flex-wrap:wrap;gap:6px;list-style:none;margin:2px 0 8px;padding:0}
 .attachment-chip{display:inline-flex;align-items:center;gap:8px;padding:4px 4px 4px 6px;border:1px solid var(--line);border-radius:10px;font-size:12px;max-width:100%}
@@ -776,6 +794,7 @@ button.mastery-chip:hover{border-color:var(--lesson-chip-hover)}
 .attachment-chip button:hover:not(:disabled){color:var(--ink)}
 .finished-message{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:15px;font-size:13px;color:var(--muted)}
 .finished-message .secondary{min-height:38px;font-size:13px}
+.finished-message.sources-gone p{flex-basis:100%;margin:0;text-align:center;line-height:1.5}
 /* Rail */
 .rail{border-left:1px solid var(--lesson-rail-edge);background:var(--lesson-rail);overflow-y:auto;overflow-x:hidden;padding:16px 14px;display:flex;flex-direction:column;gap:10px;min-height:0}
 /* On narrow screens, and while a source pane holds the rail's column, the rail slides in over the lesson on the move

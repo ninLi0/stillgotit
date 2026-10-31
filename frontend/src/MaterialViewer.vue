@@ -10,6 +10,7 @@ import ViewerPdfCanvas from "./ViewerPdfCanvas.vue";
 import { docIcon } from "./pixel-art.ts";
 import type { AskAboutPage, ViewerSkill } from "./revamp-types.ts";
 import { markdown, mathState, renderMarkdown } from "./markdown.ts";
+import { deletedRead } from "./labels.ts";
 import { openPdf, type PDFDocumentProxy } from "./ViewerPdf.ts";
 import {
   askLabel, askQuestion, buildPages, digestKey, fileKey, fileKind, findLocation, gradeNote, isPaged, lineRange, markdownSource,
@@ -26,7 +27,8 @@ import {
 // With `mode="page"` (a cited source beside a lesson) it shows only the file at its place and the pager: no zoom, no
 // "Ask about", no thumbnail rail, no skills, and no readable text beside a PDF page or a photo. It fills its parent's height.
 const props = defineProps<{ material: string; title: string; skills: ViewerSkill[]; initialLocation?: string; mode?: "full" | "page" }>();
-const emit = defineEmits<{ ask: [request: AskAboutPage]; "open-skill": [skill: string]; "review-draft": [skill: string] }>();
+// `deleted` says that the read found the material deleted, so a pane around the viewer can drop its link into Materials.
+const emit = defineEmits<{ ask: [request: AskAboutPage]; "open-skill": [skill: string]; "review-draft": [skill: string]; deleted: [] }>();
 
 type MaterialId = StillGotItHttp["/courses/materials/read"]["input"]["material"];
 type FileState = { state: "loading" } | { state: "ready" } | { state: "failed"; message: string };
@@ -38,7 +40,8 @@ const ICON_KIND: Record<FileKind, string> = { pdf: "PDF", slides: "PPTX", image:
 
 const root = ref<HTMLElement | null>(null), scroller = ref<HTMLElement | null>(null), rail = ref<HTMLElement | null>(null);
 const read = shallowRef<MaterialRead | null>(null);
-const status = ref<"loading" | "ready" | "failed">("loading");
+// "deleted": the learner deleted the material, so there is nothing to show and trying again cannot help.
+const status = ref<"loading" | "ready" | "failed" | "deleted">("loading");
 const failure = ref("");
 const files = reactive<Record<string, FileState>>({});
 const pdfCounts = reactive<Record<string, number>>({});
@@ -138,6 +141,7 @@ async function load() {
   try {
     const result = await api.courses.materials.read({ material: props.material as MaterialId });
     if (mine !== generation) return;
+    if ("error" in result && deletedRead(result)) { status.value = "deleted"; emit("deleted"); return; }
     if ("error" in result) { status.value = "failed"; failure.value = readFailure(result); return; }
     read.value = result;
     status.value = "ready";
@@ -366,6 +370,7 @@ onBeforeUnmount(() => {
     </div>
 
     <div v-if="status === 'loading'" class="state" role="status">Loading page 1…</div>
+    <div v-else-if="status === 'deleted'" class="state" role="status"><p class="state-title">This material was deleted, so it can no longer be shown.</p></div>
     <div v-else-if="status === 'failed'" class="state" role="alert">
       <p class="state-title">Couldn't load this file. Try again.</p>
       <p v-if="failure" class="hint">{{ failure }}</p>

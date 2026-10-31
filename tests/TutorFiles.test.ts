@@ -51,7 +51,9 @@ async function setup(options: FakeGeminiOptions = {}, timeoutMs?: number) {
     ({ material: material as Material, data: { owner: "sam", scope: "course", title: "Lecture notes", locator: "upload:1", content: "Text", origin: "COURSE", originals } });
   const ask = (...sources: ReturnType<typeof source>[]) => tutor.generate("sam", sources, "Explain.", { request: "Teach me" }, schema, [], { model: DEFAULT_MODEL, level: "MEDIUM" });
   const parts = (index = -1) => google.generations().at(index)!.body!.contents[0].parts as { text?: string; inlineData?: { mimeType: string }; fileData?: { mimeType: string; fileUri: string } }[];
-  return { google, tutor, providers, records, retain, source, ask, parts, advance: (ms: number) => { now = new Date(now.getTime() + ms); } };
+  /** Deletes a retained file, as deleting its material does. */
+  const remove = (file: string) => store.delete(files.storeKey("sam", file));
+  return { google, tutor, providers, records, retain, remove, source, ask, parts, advance: (ms: number) => { now = new Date(now.getTime() + ms); } };
 }
 
 describe("Sending files to the tutor", () => {
@@ -160,6 +162,42 @@ describe("Sending files to the tutor", () => {
     expect(app.google.state.mostUploadsAtOnce).toBe(1);
     expect(app.google.uploads).toHaveLength(2);
     expect(app.google.generations()).toHaveLength(3);
+  });
+
+  test("learner work whose material was deleted is described instead of sent, while a course source's missing file still fails", async () => {
+    const app = await setup();
+    const page = await app.retain("page.png", 1000, "image/png", 1);
+    const photo = await app.retain("work.png", 1000, "image/png", 2), scan = await app.retain("work.pdf", 1000, "application/pdf", 3);
+    const kept = await app.retain("kept.png", 1000, "image/png", 4);
+    await app.remove(photo.file); await app.remove(scan.file);
+    const choice = { model: DEFAULT_MODEL, level: "MEDIUM" } as const;
+    await app.tutor.generate("sam", [app.source([page])], "Answer.", { request: "Check my work" }, schema, [photo, scan, kept], choice);
+    // The course page and the work file that remains are attached; the two deleted work files are not, and the tutor is told why.
+    expect(app.parts().filter((part) => part.inlineData).map((part) => part.inlineData!.mimeType)).toEqual(["image/png", "image/png"]);
+    const work = app.parts().map((part) => part.text ?? "").filter((text) => text.startsWith("{")).map((text) => JSON.parse(text))
+      .find((item: { material: string }) => item.material === "submitted-work");
+    expect(work.sources.map((item: { name: string; sent: string }) => [item.name, item.sent])).toEqual([
+      ["work.png", "The learner deleted this file from their materials, so it could not be sent. Any text saved from it is in the content."],
+      ["work.pdf", "The learner deleted this file from their materials, so it could not be sent. Any text saved from it is in the content."],
+      ["kept.png", "The image is attached inline."],
+    ]);
+    // A course source must still have its file.
+    await app.remove(page.file);
+    await expect(app.tutor.generate("sam", [app.source([page])], "Answer.", {}, schema, [], choice)).rejects.toMatchObject({ message: "This saved file is no longer available." });
+  });
+
+  test("a grading request may carry no source once the learner deleted them all; every other request needs one", async () => {
+    let received: unknown[] | undefined;
+    const generate = tutorGenerator({ suggest: async () => ({ unitTitle: "", skills: [] }), generate: async (_owner, sources) => {
+      received = sources;
+      return { result: "INDEPENDENT", gateMet: true, rationale: "Both products are right.", text: "Check the dimensions." };
+    } });
+    const grade = { kind: "GRADE", sources: [], context: { help: "NONE", fresh: true }, work: [] };
+    expect(await generate("sam", grade as never)).toMatchObject({ result: "INDEPENDENT", gateMet: true, materials: [] });
+    expect(received).toEqual([]);
+    for (const kind of ["LESSON", "TASK", "REPLY", "HINT", "SUGGEST"]) {
+      await expect(generate("sam", { kind, sources: [], context: {}, work: [] } as never), kind).rejects.toThrow("Invalid sources");
+    }
   });
 
   test("a recording's transcript and a scanned PDF's page locations are accepted as citations", async () => {

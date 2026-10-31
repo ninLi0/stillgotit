@@ -1,6 +1,7 @@
 import type { Material } from "../concepts/MaterialKeeping/MaterialKeeping.ts";
 import { FilesApiError, GEMINI_TIMEOUT_MS, GeminiError, type Gemini, type GeminiPart } from "./gemini.ts";
-import type { MaterialFiles } from "./material-files.ts";
+import { FILE_GONE, type MaterialFiles } from "./material-files.ts";
+import { Refusal } from "./refusal.ts";
 import type { MediaList, MediaValue } from "../media.ts";
 import type { ProviderFiles } from "./provider-files.ts";
 import { assertTutorChoice, objectSchema } from "./gemini.ts";
@@ -20,6 +21,9 @@ export const SUBMITTED_WORK = "submitted-work" as Material;
 const imageTypes = new Set(["image/png", "image/jpeg", "image/webp", "image/heic", "image/heif"]);
 const isPdf = (file: MediaValue) => file.mediaType === "application/pdf" || /\.pdf$/i.test(file.name);
 const isRecording = (file: MediaValue) => /^(audio|video)\//.test(file.mediaType);
+/** A retained file that is no longer in the store, because the learner deleted its material. */
+const gone = (error: unknown) => error instanceof Refusal && error.message === FILE_GONE;
+const DELETED_WORK = "The learner deleted this file from their materials, so it could not be sent. Any text saved from it is in the content.";
 
 /**
  * An original that a request must send in full cannot be sent, so the tutor is never contacted.
@@ -128,14 +132,26 @@ export class CourseTutor {
       if (source.data.owner !== owner) throw new Error("Choose one of your materials.");
       const attached: GeminiPart[] = [], sent = new Map<string, Set<string>>();
       const say = (file: MediaValue, how: string) => sent.set(file.file, (sent.get(file.file) ?? new Set()).add(how));
+      // Work attached to an earlier answer keeps its saved text after the learner deletes its material, but its file is
+      // gone. That file is described instead of sent, so the conversation can continue. A course source's file must exist.
+      const send = async (file: MediaValue, ...args: Parameters<typeof attach>) => {
+        try { return await attach(...args); }
+        catch (error) {
+          if (source.material !== SUBMITTED_WORK || !gone(error)) throw error;
+          say(file, DELETED_WORK);
+          return null;
+        }
+      };
       for (const file of source.data.originals) {
         if (isPdf(file)) {
           if (seen.has(file.file)) say(file, "The original PDF is attached earlier in this request.");
           else {
             seen.add(file.file);
-            const { part, how } = await attach(file.file, "application/pdf", file.name, complete ? PDF_TOO_LARGE : undefined);
-            attached.push({ text: `Source ${source.material}: the original PDF ${file.name}. Its pages match the page locations listed for this file.` }, part);
-            say(file, `The original PDF is attached ${how}, so pages without selectable text can be read from it.`);
+            const sending = await send(file, file.file, "application/pdf", file.name, complete ? PDF_TOO_LARGE : undefined);
+            if (sending) {
+              attached.push({ text: `Source ${source.material}: the original PDF ${file.name}. Its pages match the page locations listed for this file.` }, sending.part);
+              say(file, `The original PDF is attached ${sending.how}, so pages without selectable text can be read from it.`);
+            }
           }
         }
         const pictures: { file: string; mediaType: string; label: string }[] = file.renditions.flatMap((part) =>
@@ -148,10 +164,11 @@ export class CourseTutor {
           // An uploaded photo's image rendition refers to the original file itself.
           const whole = complete && picture.file === file.file;
           if (!whole && images >= IMAGE_COUNT) { say(file, "An image was left out because one request carries at most 40 images."); continue; }
+          const sending = await send(file, picture.file, picture.mediaType, file.name, whole ? PHOTO_TOO_LARGE : undefined);
+          if (!sending) continue;
           images++;
-          const { part, how } = await attach(picture.file, picture.mediaType, file.name, whole ? PHOTO_TOO_LARGE : undefined);
-          attached.push({ text: `Source ${source.material}, ${picture.label}` }, part);
-          say(file, `The image is attached ${how}.`);
+          attached.push({ text: `Source ${source.material}, ${picture.label}` }, sending.part);
+          say(file, `The image is attached ${sending.how}.`);
         }
         if (isRecording(file)) say(file, "Sent as its transcript, which is in the content and locations. The recording itself is not attached.");
         else if (!sent.has(file.file)) say(file, "Sent as text only.");

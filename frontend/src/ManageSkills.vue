@@ -3,6 +3,7 @@ import InfoBubble from "./InfoBubble.vue";
 import { computed, nextTick, reactive, ref, watch } from "vue";
 import { api, errorMessage } from "./api.ts";
 import { focusedControl, restoreFocus } from "./focus.ts";
+import { DELETED_MATERIAL } from "./labels.ts";
 import ManageNote from "./ManageNote.vue";
 import type { StillGotItHttp } from "../../generated/wire.ts";
 
@@ -79,6 +80,7 @@ const lookup = computed(() => ({
   skills: new Map<string, SkillRow & { index: number }>(props.data.skills.map((skill, index) => [skill.skill, { ...skill, index }])),
   units: new Map<string, UnitRow & { index: number }>(props.data.units.map((unit, index) => [unit.unit, { ...unit, index }])),
   materials: new Map<string, string>(props.data.materials.map((material) => [material.material, material.title])),
+  deleted: new Set<string>(props.data.deletedMaterials.map((row) => row.material)),
   prerequisites: bySkill(props.data.prerequisites),
   sources: bySkill(props.data.skillSources),
   versions: bySkill(props.data.versions),
@@ -109,7 +111,10 @@ function describe(skill: SkillRow, draft: Draft) {
     keys: { details: `${id}:details`, requirements: `${id}:requirements`, sources: `${id}:sources`, prerequisites: `${id}:prerequisites`, status: `${id}:status` },
     // The read lists a skill's versions newest first; every row but the current one is a previous definition.
     previous: (lookup.value.versions.get(id) ?? []).filter((row) => row.version !== skill.current),
-    sources: [...attached].map((material) => lookup.value.materials.get(material) ?? "Course material"),
+    // A source the learner deleted stays among the skill's sources, named only as deleted.
+    sources: [...attached].map((material) => lookup.value.deleted.has(material) ? { title: DELETED_MATERIAL, deleted: true }
+      : { title: lookup.value.materials.get(material) ?? "Course material", deleted: false }),
+    sourcesGone: attached.size > 0 && [...attached].every((material) => lookup.value.deleted.has(material)),
     addable: props.data.materials.filter((material) => !attached.has(material.material)),
     builtOn: saved.map(titleOf),
     // The course's other confirmed skills, and any saved prerequisite that is no longer confirmed, so saving never drops it unseen.
@@ -327,13 +332,15 @@ function setEmphasis(unit: UnitRow, emphasized: boolean) {
               <div class="part-side">
               <div class="part">
                 <h4 class="eyebrow">Sources</h4>
-                <ul v-if="item.sources.length" class="chips"><li v-for="(title, index) in item.sources" :key="index">{{ title }}</li></ul>
+                <ul v-if="item.sources.length" class="chips"><li v-for="(source, index) in item.sources" :key="index" :class="{ gone: source.deleted }">{{ source.title }}</li></ul>
+                <p v-if="item.sourcesGone" class="hint">Every material this skill was taught from has been deleted. Add another source before its next lesson or practice.</p>
                 <form v-if="item.addable.length" @submit.prevent="addSource(item)">
                   <label>Add a source<select v-model="item.draft.source" :disabled="busy"><option value="">Choose a material</option><option v-for="material in item.addable" :key="material.material" :value="material.material">{{ material.title }}</option></select></label>
                   <p class="info-line"><InfoBubble label="About sources" text="A source stays with the skill once it is added." /></p>
                   <div class="actions"><button class="primary sand" :disabled="busy || !!item.reasons.sources" :aria-describedby="item.reasons.sources ? reasonId(item.keys.sources) : undefined">{{ working === item.keys.sources ? 'Adding…' : 'Add source' }}</button><p v-if="item.reasons.sources" :id="reasonId(item.keys.sources)" class="hint reason">{{ item.reasons.sources }}</p></div>
                 </form>
-                <p v-else class="hint">Every material in this course is already a source for this skill.</p>
+                <p v-else-if="data.materials.length" class="hint">Every material in this course is already a source for this skill.</p>
+                <p v-else class="hint">This course has no materials to add. Import one in Materials first.</p>
                 <ManageNote :id="noteId(item.keys.sources)" :note="notes[item.keys.sources]" />
               </div>
 
@@ -412,6 +419,7 @@ label{margin:12px 0 0;font-size:13px}input[type=text]{min-height:40px;margin-top
 .actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px 12px;margin-top:14px}.actions .reason{flex:1 1 220px;margin:0}.actions .primary{min-height:38px;margin-top:0;padding:0 15px;font-size:14px}.secondary{min-height:34px;padding:0 13px;font-size:13px}
 .caption{margin:12px 0 0;font-size:11px;font-weight:600;color:var(--faint)}
 .versions{display:grid;gap:8px;list-style:none;margin:16px 0 0;padding:0}.versions li{padding:10px 12px;border-radius:10px;background:var(--inset)}.versions .caption{margin:0 0 4px}.versions p{margin:0;font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere}.versions .gate{margin-top:6px;color:var(--muted)}.versions .gate span{font-weight:600;color:var(--ink)}
+.chips li.gone{border-style:dashed;color:var(--muted)}
 .chips{display:flex;flex-wrap:wrap;gap:8px;list-style:none;margin:10px 0 0;padding:0}.chips li{max-width:100%;padding:4px 11px;border:1px solid var(--line);border-radius:999px;background:var(--card);font-size:13px;overflow-wrap:anywhere}
 .choices{margin-top:6px}.check{display:flex;align-items:flex-start;gap:10px;margin:8px 0;font-size:13px;font-weight:400}.check input{flex:none;width:16px;height:16px;min-height:16px;margin:3px 0 0;padding:0;accent-color:var(--sand-soft-text)}.check span{min-width:0;overflow-wrap:anywhere}.check small{display:block;font-size:12px;color:var(--muted)}
 .item-note:has(p){padding:0 16px 12px}.empty-unit{margin:0}

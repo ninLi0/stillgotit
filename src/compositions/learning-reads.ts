@@ -38,6 +38,17 @@ export const SkillContext = view("the current context of (skill) for (owner)", (
   OwnedSkill({ owner, skill }).is({ course, definition }), Mapping._map({ course }).is({ skills }), Mastery._progress({ learner: owner }).is({ tracks }),
   Library._sourceSet({ owner, scope: course }).is({ sources }), compute(computations.selectSkill, { skills, skill }, context),
 )).optional();
+// A confirmed skill whose every source the learner deleted. Lessons and practice need at least one source, so request
+// admission explains this case before the general lesson and practice checks.
+export const SkillSourcesDeleted = view("every source of (owner)'s (skill) was deleted", ({ owner, skill }, {}, { context, sources, materials }) => where(
+  ActiveSkill({ owner, skill }), SkillContext({ owner, skill }).is({ context, sources }), compute(computations.selectSkillMaterials, { context }, materials),
+  compute(computations.selectSources, { sources, materials }, { valid: false }),
+)).holds();
+// An open session whose every saved material the learner deleted. The tutor cannot answer in it any more.
+export const SessionSourcesDeleted = view("every source of (owner)'s open session (studySession) was deleted", ({ owner, studySession }, {}, { data, sources, materials }) => where(
+  SessionSources({ owner, studySession }).is({ data, sources }), compute(computations.sessionMaterials, { data }, materials),
+  compute(computations.selectSources, { sources, materials }, { valid: false }),
+)).holds();
 // `at` is the Read flow's instant. The explanation is an optional row: without one, `explanation` is null and the record is unchanged.
 export const SkillData = former("study data for (owner) and (skill) at (at)", ({ owner, skill, at }, { context, definition, tracks, sessions, cases, track, estimate, explanation, timeline }) => where(
   SkillContext({ owner, skill }).is({ context, definition, tracks }), Tutoring._study({ owner, topic: skill }).is({ sessions }),
@@ -157,4 +168,5 @@ export const CourseScores = former("the confidence in each active course of (own
 const Scores = endpoint("/courses/scores", ({ session, owner }) => receive({ session })
   .then(Sessioning.use({ session }).responds({ subject: owner }))
   .then(respond({ courses: CourseScores({ owner }) })), { validators: { ...validators, output: structuredOutput } });
-export const composition = { OwnedSkill, ActiveSkill, OwnedSession, OpenSession, SessionSources, PendingGrade, OwnedCase, OwnedAnyCase, SkillContext, SkillData, SessionData, Progress, PlanData, PlanContext, CanReplan, NeedsEvidence, OpenStudy, Continue, RecentStudy, Recent, SkillCurve, MemorySkills, MemoryPolicy, Memory, CourseScores, Scores };
+export const composition = { OwnedSkill, ActiveSkill, OwnedSession, OpenSession, SessionSources, PendingGrade, OwnedCase, OwnedAnyCase, SkillContext,
+  SkillSourcesDeleted, SessionSourcesDeleted, SkillData, SessionData, Progress, PlanData, PlanContext, CanReplan, NeedsEvidence, OpenStudy, Continue, RecentStudy, Recent, SkillCurve, MemorySkills, MemoryPolicy, Memory, CourseScores, Scores };

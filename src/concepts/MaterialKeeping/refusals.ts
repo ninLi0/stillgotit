@@ -12,3 +12,11 @@ export class MaterialImportConflict extends Error {
   readonly code = "MATERIAL_IMPORT_CONFLICT";
   constructor() { super("Use the original material input for this import key."); this.name = "MaterialImportConflict"; }
 }
+export class MaterialDeleted extends Error {
+  readonly code = "MATERIAL_DELETED";
+  constructor() { super("This material was deleted. Import the files again to use them."); this.name = "MaterialDeleted"; }
+}
+export class MaterialDeleteUnavailable extends Error {
+  readonly code = "MATERIAL_DELETE_UNAVAILABLE";
+  constructor() { super("Choose one of your materials to delete."); this.name = "MaterialDeleteUnavailable"; }
+}

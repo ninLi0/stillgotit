@@ -40,6 +40,16 @@ export class DraftSaveQueue {
     }
   }
 
+  /**
+   * Drops the waiting saves whose source the learner deleted. The server refuses them now, so they could never finish;
+   * a draft that one of them already created was discarded with the material. Returns how many were dropped.
+   */
+  forget(deleted: ReadonlySet<string>): number {
+    const pending = this.read(), kept = pending.filter((draft) => !deleted.has(draft.material));
+    if (kept.length !== pending.length) this.write(kept);
+    return pending.length - kept.length;
+  }
+
   private write(pending: DraftSave[]) {
     try {
       if (pending.length) this.storage.setItem(this.key, JSON.stringify(pending));
