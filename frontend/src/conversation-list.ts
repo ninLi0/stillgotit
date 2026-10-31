@@ -63,7 +63,8 @@ const message = (problem: unknown, fallback: string) => problem instanceof Error
  * The first read asks for one page, as the sidebar always did. "Show older conversations" asks for one more, and every
  * later read asks for as many pages as are shown, so the list stays whole while conversations move to the top. The
  * archived list is read only while it is open. `changed` runs after each archive or restore made here, so other views
- * that list open conversations, such as Home's Continue card, can read again.
+ * that list open conversations, such as Home's Continue card, can read again. A study page reports its own changes, and
+ * its refused steps, through `pageChanged`, which reads both lists again and clears the note.
  */
 export function useConversationList(course: string, { requests = serverList, changed = () => undefined }: { requests?: ListRequests; changed?: () => void } = {}) {
   const rows = shallowRef<readonly RecentSession[]>([]), loaded = ref(false), error = ref("");
@@ -146,9 +147,15 @@ export function useConversationList(course: string, { requests = serverList, cha
   /** Undo restores the conversation the note named. */
   async function undo() { const row = note.value?.undo; return row ? restore(row) : false; }
   function clearNote() { note.value = null; olderNote.value = null; }
+  /**
+   * A study page changed a conversation, for example by restoring, continuing, or finishing it, or had a step on one
+   * refused because it changed in another tab. The note may then name a conversation that is already back, and its Undo
+   * would act on it again, so the note goes. Both lists read again, so the sidebar agrees with the page.
+   */
+  async function pageChanged() { note.value = null; await refresh(); }
 
   return reactive({ rows, loaded, error, pages, more, olderBusy, olderNote, load, showOlder,
     archivedOpen, archivedRows, archivedLoaded, archivedError, loadArchived, toggleArchived, refresh,
-    note, busy, archive, restore, undo, clearNote });
+    note, busy, archive, restore, undo, clearNote, pageChanged });
 }
 export type ConversationList = ReturnType<typeof useConversationList>;

@@ -27,6 +27,7 @@ import { pendingOpening, trackOpening, type PendingOpening } from "./pending-ope
 import { ComposerDrafts, conversationSlot, joinDrafts, newConversationSlot, sentAsLesson, sentInConversation, settleSending, slotSession,
   type ComposerDraft, type SendingDraft } from "./composer-drafts.ts";
 import { isArchived, readDone, readStarted, setArchived } from "./conversation-list.ts";
+import { finishedLessonOffer } from "./finished-lesson.ts";
 type SkillData = StillGotItHttp["/learning/read"]["output"]["data"];
 type StudySession = SkillData["sessions"][number];
 /** A file uploaded for the answer being written. `preview` is a local picture of an image file, so learners can tell images apart; other files have none. */
@@ -42,7 +43,9 @@ const props = withDefaults(defineProps<{ skill: string; course: string; learner:
 // `back` returns to the skill tree. `open-source` asks the shell to show a cited source in Materials, from the source
 // preview's "Open in Materials". `session` names
 // the conversation on screen (null for a new one), so the sidebar can mark it.
-const emit = defineEmits<{ changed: []; back: []; "open-source": [source: OpenSource]; session: [skill: string, session: string | null]; tutor: [] }>();
+// "conversation-refused" follows a refused Continue or Restore. The page has read the conversation again, since a refusal
+// usually means it changed in another tab, and the sidebar should read its lists again too.
+const emit = defineEmits<{ changed: []; "conversation-refused": []; back: []; "open-source": [source: OpenSource]; session: [skill: string, session: string | null]; tutor: [] }>();
 const data = shallowRef<SkillData | null>(null), selected = ref<StudySession["session"] | "">(""), busy = ref(false), error = ref(""), notice = ref("");
 const noticeBox = ref<HTMLElement | null>(null), errorBox = ref<HTMLElement | null>(null), composerInput = ref<HTMLTextAreaElement | null>(null), heading = ref<HTMLElement | null>(null);
 const confidence = ref(50), freshLesson = ref(false), recording = ref(false), reviewOpen = ref(false), thread = ref<HTMLElement | null>(null), evidenceOpen = ref(false);
@@ -68,6 +71,9 @@ const deletedSet = computed(() => new Set<string>(props.deletedMaterials));
 const allDeleted = (materials: readonly string[]) => materials.length > 0 && materials.every((material) => deletedSet.value.has(material));
 const skillSourcesGone = computed(() => allDeleted(props.skillMaterials ?? data.value?.skill.materials ?? []));
 const sessionSourcesGone = computed(() => !!current.value && current.value.status === "OPEN" && allDeleted(current.value.materials));
+// A finished lesson that is not archived can be continued in the same conversation, unless every material it was
+// grounded in has been deleted (frontend/src/finished-lesson.ts).
+const finishedOffer = computed(() => current.value ? finishedLessonOffer(current.value, archived.value, deletedSet.value) : null);
 const canSend = computed(() => !busy.value && !recording.value && !unexplained.value && !(current.value ? current.value.lesson && sessionSourcesGone.value : skillSourcesGone.value)
   && (props.aiAvailable || !!current.value?.task) && (!!response.value.trim() || (attachments.value.length > 0 && !!current.value)));
 // ---- Unsent drafts (frontend/src/composer-drafts.ts) ----
@@ -340,8 +346,9 @@ async function retryReply() {
   await act(async () => { await timedAnswer(() => opening !== null ? trackOpening(skill, active.session, opening, ask) : ask()); });
 }
 /**
- * Finishing closes the lesson for good, so it leaves Home's Continue card. Its conversation stays here to read. A message
- * still in the box would be lost with the box, so the learner sends or clears it first; the refusal shows in the alert area.
+ * Finishing closes the lesson, so it leaves Home's Continue card until the learner continues it. Its conversation stays
+ * here to read. A message still in the box would be lost with the box, so the learner sends or clears it first; the
+ * refusal shows in the alert area.
  */
 async function finishLesson() {
   const active = current.value; if (!active?.lesson || active.status !== "OPEN" || busy.value || recording.value) return;
@@ -349,11 +356,28 @@ async function finishLesson() {
   // A finished lesson has no message box, so a note about files from its draft has nothing left to say.
   await act(async () => { unwrap(await api.learning.finish({ studySession: active.session })); missingFiles.value = []; }, "Lesson finished. Its conversation stays here to read.");
 }
-/** Restoring puts the conversation back in the sidebar exactly as it was, so an open one can be continued. */
+/**
+ * Continuing a finished lesson reopens it on the server, with its thread unchanged, so the next question is answered in
+ * the same conversation (design/compositions/Learning.md, "Continuing a finished lesson"). The message box then returns
+ * with the focus in it. A refusal shows the server's sentence at the end of the thread, just above this button, and the
+ * lesson stays finished. The page has read the lesson again by then, and the sidebar is told to read its lists again.
+ */
+async function continueLesson() {
+  const active = current.value; if (!active || finishedOffer.value !== "continue" || busy.value || recording.value) return;
+  await act(async () => { unwrap(await api.learning.reopen({ studySession: active.session })); }, "This lesson is open again. Ask your next question below.");
+  await nextTick();
+  if (error.value) { emit("conversation-refused"); void scrollToLatest(true); return; }
+  if (current.value?.session === active.session && composerInput.value && !composerInput.value.disabled) composerInput.value.focus();
+}
+/**
+ * Restoring puts the conversation back in the sidebar exactly as it was, so an open one can be continued. After a refusal
+ * the page has read the conversation again, and the sidebar is told to read its lists again.
+ */
 async function restoreConversation() {
   const active = current.value; if (!active || busy.value || recording.value) return;
   await act(async () => { await setArchived(active.session, false); },
     active.status === "OPEN" ? "Conversation restored. It is back in Conversations, and you can continue it." : "Conversation restored. It is back in Conversations.");
+  if (error.value) emit("conversation-refused");
 }
 async function correctTranscript(turnIndex: number) { const active = current.value; if (!active) return; await act(async () => { unwrap(await api.learning.transcript({ studySession: active.session, turnIndex, text: speechEdits.value[turnIndex] ?? "" })); reviewed.value = false; }, "Transcript correction saved. Review your answer again before assessment."); }
 async function requestRegrade(assessment: string, basedOn: string) {
@@ -754,7 +778,8 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
             <p v-if="recording" class="composer-note" role="status">Recording. Stop to review your words before sending.</p>
           </template>
           <div v-else-if="archived" class="finished-message archived-message"><p>{{ current.status === 'OPEN' ? 'This conversation is archived, so it is read-only. Restore it to continue where you left off.' : 'This conversation is archived. Restore it to list it in Conversations again.' }}</p><button class="secondary dawn" :disabled="busy || recording" @click="restoreConversation">Restore conversation</button><button class="message-action" :disabled="busy" @click="newLesson">Keep learning</button></div>
-          <div v-else-if="current.lesson" class="finished-message"><p>This lesson is finished. Start a new conversation to keep going.</p><button class="message-action" :disabled="busy" @click="newLesson">Keep learning</button></div>
+          <div v-else-if="finishedOffer === 'continue'" class="finished-message continue-message"><p>This lesson is finished. You can continue it with another question here, or start a new conversation.</p><button type="button" class="primary dawn" :disabled="busy || recording" @click="continueLesson">Continue this lesson</button><button class="message-action" :disabled="busy" @click="newLesson">Keep learning</button></div>
+          <div v-else-if="current.lesson" class="finished-message sources-gone"><p>This lesson is finished, and the materials it was grounded in have been deleted, so the tutor can no longer answer in it. Start a new conversation to keep going.</p><button class="message-action" :disabled="busy" @click="newLesson">Keep learning</button></div>
           <div v-else class="finished-message"><p>This attempt is saved.</p><button v-if="!currentCases.some(item => item.judgment)" class="secondary dawn" :disabled="busy || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="startTask">Try a fresh check</button><button class="message-action" :disabled="busy" @click="newLesson">Keep learning</button></div>
           <p v-if="aiOff" id="ai-reason-chat" class="hint">{{ aiOff }}</p>
           <p v-if="current && listenUnavailable" id="listen-reason" class="hint">{{ listenUnavailable }}</p>
@@ -940,7 +965,9 @@ button.mastery-chip:hover{border-color:var(--lesson-chip-hover)}
 .attachment-chip button:hover:not(:disabled){color:var(--ink)}
 .finished-message{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:15px;font-size:13px;color:var(--muted)}
 .finished-message .secondary{min-height:38px;font-size:13px}
-.finished-message.sources-gone p{flex-basis:100%;margin:0;text-align:center;line-height:1.5}
+.finished-message .primary{min-height:38px;font-size:13px}
+/* A longer sentence takes its own centered line, with the actions below it. */
+.finished-message.sources-gone p,.finished-message.continue-message p{flex-basis:100%;margin:0;text-align:center;line-height:1.5}
 /* Rail */
 .rail{border-left:1px solid var(--lesson-rail-edge);background:var(--lesson-rail);overflow-y:auto;overflow-x:hidden;padding:16px 14px;display:flex;flex-direction:column;gap:10px;min-height:0}
 /* On narrow screens, and while a source pane holds the rail's column, the rail slides in over the lesson on the move

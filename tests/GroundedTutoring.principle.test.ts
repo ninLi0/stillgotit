@@ -41,6 +41,7 @@ const messages = {
   ATTEMPT_REVIEW_UNAVAILABLE: "Choose one of your open practice tasks.",
   ATTEMPT_REVIEW_CHANGED: "The conversation changed. Review the latest transcript.",
   SESSION_CLOSE_UNAVAILABLE: "Choose one of your open sessions.",
+  LESSON_REOPEN_UNAVAILABLE: "Choose one of your finished lessons.",
 } as const;
 
 async function refuses(action: Promise<unknown>, code: keyof typeof messages) {
@@ -405,7 +406,82 @@ describe("GroundedTutoring principle", () => {
       await refuses(tutoring.confirmAttempt({ owner: "sam", task: session, dialogueLength: length }), "ATTEMPT_REVIEW_UNAVAILABLE");
       await refuses(tutoring.close({ owner: "sam", session }), "SESSION_CLOSE_UNAVAILABLE");
     }
+    // Only a closed lesson reopens: an open lesson, an open or closed task, and an unknown session are refused.
+    for (const session of [lesson, task, closedTask, unknown]) await refuses(tutoring.reopenLesson({ owner: "sam", lesson: session }), "LESSON_REOPEN_UNAVAILABLE");
     expect(await savedState()).toEqual(before);
+  });
+
+  test("a finished lesson reopens for its owner with only its status changed, takes dialogue again, and can be finished and reopened again", async () => {
+    const { tutoring, library, tick } = setup();
+    const context = await sources(library);
+    const { lesson } = await explainedLesson(tutoring, { ...context, ...lessonText });
+    const askedAt = tick();
+    await tutoring.respond({ owner: "sam", session: lesson, text: "Does AB equal BA?", media: [], channel: "VOICE" });
+    const answeredAt = tick();
+    await tutoring.answerLesson({ owner: "sam", lesson, text: "Usually not.", citations: context.citations, channel: "TEXT" });
+    const whileOpen = await tutoring._sessionData({ session: lesson });
+    await tutoring.close({ owner: "sam", session: lesson });
+    // Leo has his own closed lesson, which Sam cannot reopen either.
+    const leo = await sources(library, "leo");
+    const { lesson: leosLesson } = await explainedLesson(tutoring, { ...leo, ...lessonText });
+    await tutoring.close({ owner: "leo", session: leosLesson });
+    const closed = await savedState();
+
+    // Another learner cannot reopen the lesson, in either direction, and nothing changes.
+    await refuses(tutoring.reopenLesson({ owner: "leo", lesson }), "LESSON_REOPEN_UNAVAILABLE");
+    await refuses(tutoring.reopenLesson({ owner: "sam", lesson: leosLesson }), "LESSON_REOPEN_UNAVAILABLE");
+    expect(await savedState()).toEqual(closed);
+
+    await tutoring.reopenLesson({ owner: "sam", lesson });
+    // Only the status changes; the stored record also moves its revision, as every change does. The request, opening
+    // explanation, citations, sources, definition, and dialogue read exactly as they did before the lesson was finished.
+    expect(await savedState()).toEqual({
+      ...closed,
+      "groundedtutoring.sessions": closed["groundedtutoring.sessions"]!.map((row) => row._id === lesson ? { ...row, status: "OPEN", revision: row.revision + 1 } : row),
+    });
+    expect(await tutoring._sessionData({ session: lesson })).toEqual(whileOpen);
+    expect(await tutoring._session({ session: lesson })).toEqual([{ owner: "sam", topic: "matrix-products", definition: "v1", status: "OPEN" }]);
+    // A lesson that is open again cannot be reopened a second time.
+    await refuses(tutoring.reopenLesson({ owner: "sam", lesson }), "LESSON_REOPEN_UNAVAILABLE");
+
+    // The reopened lesson takes dialogue again after its earlier turns, which keep their indices.
+    const correctedAt = tick();
+    await tutoring.confirmTranscript({ owner: "sam", session: lesson, turnIndex: 0, text: "Does AB equal BA for matrices?" });
+    const laterAt = tick();
+    await tutoring.respond({ owner: "sam", session: lesson, text: "When do AB and BA agree?", media: [], channel: "TEXT" });
+    const laterAnswerAt = tick();
+    await tutoring.answerLesson({ owner: "sam", lesson, text: "When the two matrices commute.", citations: context.citations, channel: "TEXT" });
+    expect((await tutoring._dialogue({ session: lesson })).map(({ turnIndex, turn }) => [turnIndex, turn.purpose, turn.text, turn.at])).toEqual([
+      [0, "RESPONSE", "Does AB equal BA?", askedAt],
+      [1, "EXPLANATION", "Usually not.", answeredAt],
+      [2, "CORRECTION", "Does AB equal BA for matrices?", correctedAt],
+      [3, "RESPONSE", "When do AB and BA agree?", laterAt],
+      [4, "EXPLANATION", "When the two matrices commute.", laterAnswerAt],
+    ]);
+
+    // It can be finished and continued again, any number of times.
+    await tutoring.close({ owner: "sam", session: lesson });
+    await refuses(tutoring.respond({ owner: "sam", session: lesson, text: "One more?", media: [], channel: "TEXT" }), "RESPONSE_SESSION_UNAVAILABLE");
+    await tutoring.reopenLesson({ owner: "sam", lesson });
+    await tutoring.respond({ owner: "sam", session: lesson, text: "One more?", media: [], channel: "TEXT" });
+    expect(await tutoring._dialogue({ session: lesson })).toHaveLength(6);
+    expect((await tutoring._session({ session: leosLesson }))[0]!.status).toBe("CLOSED");
+  });
+
+  test("a lesson finished before its opening explanation reopens still waiting for it, and then takes it", async () => {
+    const { tutoring, library } = setup();
+    const { citations, ...requested } = await sources(library);
+    const { lesson } = await tutoring.requestLesson({ ...requested, request: lessonText.request });
+    await tutoring.close({ owner: "sam", session: lesson });
+    await tutoring.reopenLesson({ owner: "sam", lesson });
+    expect(await tutoring._lesson({ lesson })).toEqual([{ request: lessonText.request, explanation: "" }]);
+    expect(await tutoring._citations({ session: lesson })).toEqual([]);
+    // It is unexplained again, so no question comes before the opening explanation.
+    await refuses(tutoring.respond({ owner: "sam", session: lesson, text: "Why?", media: [], channel: "TEXT" }), "RESPONSE_SESSION_UNAVAILABLE");
+    await tutoring.explainLesson({ owner: "sam", lesson, explanation: lessonText.explanation, citations });
+    expect(await tutoring._lesson({ lesson })).toEqual([lessonText]);
+    await tutoring.respond({ owner: "sam", session: lesson, text: "Why?", media: [], channel: "TEXT" });
+    expect(await tutoring._dialogue({ session: lesson })).toHaveLength(1);
   });
 
   test("repeated transcript confirmations add a correction only for changed text, and later speech needs another review", async () => {

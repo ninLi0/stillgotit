@@ -201,6 +201,15 @@ const FinishLesson = endpoint("/learning/finish", ({ session, studySession, owne
     where(R.OpenSession({ owner, studySession }), no(Tutoring._lesson({ lesson: studySession }))).then(respond({ error: "SESSION_UNAVAILABLE" })).named("practice"),
     where(no(R.OpenSession({ owner, studySession }))).then(respond({ error: "SESSION_UNAVAILABLE" })).named("missing"),
   ), options);
+// A finished lesson can be continued: the learner reopens it, and it takes questions again in the same conversation, with
+// its request, explanation, citations, and dialogue unchanged. ReopenableLesson leaves out an open lesson, a practice task,
+// which never reopens, and an archived lesson, which is read-only until it is restored; each gets the same refusal, and
+// admission's sentence names the cases. Nothing reacts to reopenLesson, so no case, estimate, or plan changes.
+const ReopenLesson = endpoint("/learning/reopen", ({ session, studySession, owner }) => receive({ session, studySession })
+  .then(Sessioning.use({ session }).responds({ subject: owner })).then(
+    where(R.ReopenableLesson({ owner, studySession })).then(Tutoring.reopenLesson({ owner, lesson: studySession }).responds({})).then(respond({})).named("finished"),
+    where(no(R.ReopenableLesson({ owner, studySession }))).then(respond({ error: "SESSION_UNAVAILABLE" })).named("missing"),
+  ), options);
 
 // A learner archives or restores one of their own conversations, open or finished, lesson or practice. Archiving changes
 // nothing in the conversation: OpenSession leaves an archived one out, so it is read-only until it is restored, and no
@@ -328,4 +337,4 @@ const Suggest = endpoint("/courses/skills/suggest", ({ session, material, owner,
     .then(AI.generate({ owner, request: prepared }).responds({ answer })))
   .then(Sessioning.use({ session }).responds({ subject: owner }))
   .then(where(compute(C.generationFields, { answer }, { suggestions })).then(respond({ suggestions, tutor: Settings.SentTutor({ request: prepared }) }))), options);
-export const composition = { Read, Progress, Confidence, Lesson, Task, Respond, Question, Reply, Hint, Transcript, FinishLesson, ArchiveConversation, RestoreConversation, Assess, RetryAssessment, Correct, Regrade, Adjust, ReplanAfterAdjustment, Suggest };
+export const composition = { Read, Progress, Confidence, Lesson, Task, Respond, Question, Reply, Hint, Transcript, FinishLesson, ReopenLesson, ArchiveConversation, RestoreConversation, Assess, RetryAssessment, Correct, Regrade, Adjust, ReplanAfterAdjustment, Suggest };

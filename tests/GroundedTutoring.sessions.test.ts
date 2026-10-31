@@ -155,4 +155,24 @@ describe("Grounded tutoring sessions", () => {
     expect(await recent(lessons, 10)).toEqual([]);
     expect((await tutoring._session({ session: fifth as never }))[0]).toMatchObject({ owner: "sam", status: "OPEN" });
   });
+
+  test("a reopened lesson keeps its place in recent until its next question, and another instance sees it open", async () => {
+    let now = Date.parse("2026-10-22T15:00:00Z");
+    const name = `Tutoring_${crypto.randomUUID()}`, tutoring = new GroundedTutoring(connection.db, name, () => new Date(now));
+    const { material } = await notes();
+    const context = { owner: "sam", topic: "products", definition: "v1", materials: [material], citations: [{ material, location: "content" }] };
+    const { lesson: older } = await explainedLesson(tutoring, { ...context, request: "Show an example.", explanation: "Match each row to each column." });
+    now += 60_000; await tutoring.respond({ owner: "sam", session: older, text: "Why rows?", media: [], channel: "TEXT" });
+    now += 60_000; const { lesson: newer } = await explainedLesson(tutoring, { ...context, request: "Explain transposes.", explanation: "Swap rows and columns." });
+    const recent = async () => (await tutoring._recent({ owner: "sam", topics: ["products"], hidden: [], limit: 10 })).map(({ session, status }) => [session, status]);
+    await tutoring.close({ owner: "sam", session: older });
+    expect(await recent()).toEqual([[newer, "OPEN"], [older, "CLOSED"]]);
+    // Reopening adds no turn, so the lesson keeps its place; its next question moves it to the top.
+    now += 60_000; await tutoring.reopenLesson({ owner: "sam", lesson: older });
+    expect(await recent()).toEqual([[newer, "OPEN"], [older, "OPEN"]]);
+    const restarted = new GroundedTutoring(connection.db, name, () => new Date(now));
+    now += 60_000; await restarted.respond({ owner: "sam", session: older, text: "And columns?", media: [], channel: "TEXT" });
+    expect(await recent()).toEqual([[older, "OPEN"], [newer, "OPEN"]]);
+    expect((await tutoring._dialogue({ session: older })).map(({ turn }) => turn.text)).toEqual(["Why rows?", "And columns?"]);
+  });
 });

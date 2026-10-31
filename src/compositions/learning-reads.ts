@@ -16,6 +16,12 @@ export const OpenSession = view("(owner) can change session (studySession)", ({ 
   OwnedSession({ owner, studySession }).is({ skill, course, definition }), Tutoring._session({ session: studySession }).is({ status: "OPEN" }),
   no(Assessment._byTask({ author: owner, task: studySession })), no(Archive._archived({ owner, item: studySession })),
 )).optional();
+// A finished lesson the learner can reopen to continue it: their own lesson, closed, and not archived. A practice task
+// never reopens, and an archived conversation stays read-only until it is restored.
+export const ReopenableLesson = view("(owner) can reopen finished lesson (studySession)", ({ owner, studySession }) => where(
+  OwnedSession({ owner, studySession }), Tutoring._session({ session: studySession }).is({ status: "CLOSED" }), Tutoring._lesson({ lesson: studySession }),
+  no(Archive._archived({ owner, item: studySession })),
+)).holds();
 // The learner's open session with its saved dialogue and the learner's sources in its course. The two queries always
 // answer for an existing session, so this view holds exactly when OpenSession holds; OpenSession stays the refusal guard.
 export const SessionSources = view("(owner) can use open session (studySession) with its sources", ({ owner, studySession }, { course, data, sources }) => where(
@@ -189,6 +195,6 @@ export const CourseScores = former("the confidence in each active course of (own
 const Scores = endpoint("/courses/scores", ({ session, owner }) => receive({ session })
   .then(Sessioning.use({ session }).responds({ subject: owner }))
   .then(respond({ courses: CourseScores({ owner }) })), { validators: { ...validators, output: structuredOutput } });
-export const composition = { OwnedSkill, ActiveSkill, OwnedSession, OpenSession, SessionSources, PendingGrade, OwnedCase, OwnedAnyCase, SkillContext,
+export const composition = { OwnedSkill, ActiveSkill, OwnedSession, OpenSession, ReopenableLesson, SessionSources, PendingGrade, OwnedCase, OwnedAnyCase, SkillContext,
   SkillSourcesDeleted, SessionSourcesDeleted, SkillData, SessionData, Progress, PlanData, PlanContext, CanReplan, NeedsEvidence, OpenStudy, Continue, RecentStudy, Recent,
   ArchivedStudy, Archived, SkillCurve, MemorySkills, MemoryPolicy, Memory, CourseScores, Scores };

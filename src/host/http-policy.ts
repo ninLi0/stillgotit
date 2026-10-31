@@ -95,6 +95,7 @@ export function stillGotItPolicy(publicOrigin: string, requestBodyBytes = BODY_L
       JUDGMENT_REVISION_OUTDATED: "INVALID_REQUEST",
       LESSON_ANSWER_UNAVAILABLE: "INVALID_REQUEST",
       LESSON_EXPLANATION_UNAVAILABLE: "INVALID_REQUEST",
+      LESSON_REOPEN_UNAVAILABLE: "INVALID_REQUEST",
       MASTERY_TRACK_EXISTS: "INVALID_REQUEST",
       PLAN_DECLINE_UNAVAILABLE: "INVALID_REQUEST",
       PLAN_PREFERENCES_UNAVAILABLE: "INVALID_REQUEST",
@@ -233,17 +234,24 @@ export const refusalDetails: Readonly<Record<string, string>> = {
   SKILL_UNAVAILABLE: "This skill is not available. Reload the page to see your skills.",
 };
 
-/** Codes whose design gives a more specific sentence on some endpoints. Elsewhere they take their general sentence above. */
-export const scopedRefusalDetails: Readonly<Record<string, { readonly applies: (path: string) => boolean; readonly detail: string }>> = {
+/**
+ * Codes whose design gives a more specific sentence on some endpoints. Elsewhere they take their general sentence above.
+ * A code may have more than one: the first whose `applies` holds for the path gives the sentence.
+ */
+export const scopedRefusalDetails: Readonly<Record<string, readonly { readonly applies: (path: string) => boolean; readonly detail: string }[]>> = {
   // Planning.md: every planning endpoint answers a course that is not the learner's with this sentence.
-  COURSE_UNAVAILABLE: { applies: (path) => path.startsWith("/planning/"), detail: "Choose one of your own courses." },
+  COURSE_UNAVAILABLE: [{ applies: (path) => path.startsWith("/planning/"), detail: "Choose one of your own courses." }],
   // Learning.md: Adjust answers a skill that is not one of the learner's confirmed skills with this sentence.
-  SKILL_UNAVAILABLE: { applies: (path) => path === "/learning/adjust", detail: "Choose one of your confirmed skills before adjusting its estimate." },
-  // Learning.md, "Archiving a conversation": archiving and restoring accept any of the learner's own conversations, so
-  // they answer one that is not the learner's with this sentence.
-  SESSION_UNAVAILABLE: { applies: (path) => path === "/learning/archive" || path === "/learning/restore", detail: "This conversation is not one of yours. Choose one of your own conversations." },
+  SKILL_UNAVAILABLE: [{ applies: (path) => path === "/learning/adjust", detail: "Choose one of your confirmed skills before adjusting its estimate." }],
+  SESSION_UNAVAILABLE: [
+    // Learning.md, "Archiving a conversation": archiving and restoring accept any of the learner's own conversations, so
+    // they answer one that is not the learner's with this sentence.
+    { applies: (path) => path === "/learning/archive" || path === "/learning/restore", detail: "This conversation is not one of yours. Choose one of your own conversations." },
+    // Learning.md, "Continuing a finished lesson": reopening accepts only the learner's own finished lesson that is not archived.
+    { applies: (path) => path === "/learning/reopen", detail: "This session is still open, archived, a practice task, or not one of yours. Choose one of your finished lessons to continue." },
+  ],
   // Courses.md: reading a material the learner deleted. Elsewhere the code keeps MaterialKeeping's sentence.
-  MATERIAL_DELETED: { applies: (path) => path === "/courses/materials/read", detail: MATERIAL_DELETED_READ },
+  MATERIAL_DELETED: [{ applies: (path) => path === "/courses/materials/read", detail: MATERIAL_DELETED_READ }],
 };
 
 /**
@@ -251,7 +259,7 @@ export const scopedRefusalDetails: Readonly<Record<string, { readonly applies: (
  * its design gives one, otherwise the code's general sentence, or undefined for a code with no sentence.
  */
 export function refusalDetail(path: string, code: string): string | undefined {
-  const scoped = Object.hasOwn(scopedRefusalDetails, code) ? scopedRefusalDetails[code] : undefined;
-  if (scoped?.applies(path)) return scoped.detail;
+  const scoped = Object.hasOwn(scopedRefusalDetails, code) ? scopedRefusalDetails[code]!.find((entry) => entry.applies(path)) : undefined;
+  if (scoped) return scoped.detail;
   return Object.hasOwn(refusalDetails, code) ? refusalDetails[code] : undefined;
 }
