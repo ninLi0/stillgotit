@@ -10,6 +10,7 @@ This page is the facilitator's working copy for the two user tests described on 
 - [ ] https://stillgotit.mit-sdg.dev loads, and three things that only the P5 build has are visible: every sidebar conversation row has a "⋯" button with "Archive conversation", the Materials page offers "Delete material…", and reopening a conversation shows its messages at once.
 - [ ] The laptop used for the sessions is signed in to the owner's account. Sign in again on the morning of each session, so a session that expired overnight does not interrupt task 1.
 - [ ] The message box's model pill reads Gemini 4 Argon at Medium. In the P4 test the other models often failed the server's checks.
+- [ ] In Settings, "Interactive examples" is off on the owner's account, so the participants see plain answers unless they turn it on themselves. Before Sunday, turn it on once, ask one lesson question on the deployed app, and note whether the real model produced a valid example; then turn it off again.
 - [ ] A tutor call works end to end on the deployed app: ask one question in an existing conversation and see the answer arrive with its citations.
 - [ ] The task course does not exist yet. It is created empty right before each session (see "The task course" below), so both participants start from the same state.
 
