@@ -215,6 +215,14 @@ export function layoutShaped(input: ShapedInput, width: number) {
   };
 }
 
+/**
+ * How far away a review day is, as the Memory view says it: "later today", "in 1 day", "in 5 days". The days are calendar
+ * days from today, so 0 means the memory is due later today; a review whose time has passed is "Due now" instead.
+ */
+export function reviewDistance(days: number): string {
+  return days <= 0 ? "later today" : `in ${days} ${days === 1 ? "day" : "days"}`;
+}
+
 /** Where a skill's review falls, as the "Review by" list sorts it. */
 export type ReviewStanding = "DUE" | "COMING" | "HOLDS" | "UNSTARTED";
 export type ReviewRow = { skill: string; title: string; estimate: number | null; reviewBy: { days: number } | null; belowNow: boolean | null };

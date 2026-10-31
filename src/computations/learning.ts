@@ -6,9 +6,7 @@ import type { Candidate, CutValue } from "../concepts/Budgeting/Budgeting.ts";
 import type { ResponseValue, Help } from "../concepts/AssessmentReviewing/AssessmentReviewing.ts";
 import type { Channel } from "../concepts/GroundedTutoring/dialogue.ts";
 import type { EstimateExplanation, ProgressRows, StartingBasis } from "../concepts/MasteryEstimating/MasteryEstimating.ts";
-const studyDate = (at: Date) => at.toLocaleDateString("en-CA", { timeZone: "America/New_York" });
-// Study dates are YYYY-MM-DD strings, so whole days can be added in UTC.
-const addDays = (day: string, days: number) => new Date(Date.parse(day) + days * 86_400_000).toISOString().slice(0, 10);
+import { addDays, dueDay, notBefore, studyDate } from "./review-day.ts";
 export function selectSkill({ skills, skill }: { skills: SkillRows; skill: string }): SkillInfo {
   const result = skills.find((row) => row.skill === skill);
   if (!result) throw new Error("Unavailable skill");
@@ -234,14 +232,13 @@ export function planRequest({ skills, tracks, schedule }: { skills: SkillRows; t
   const preparing = focus ? examSkills(skills, focus.covered) : new Set<string>();
   for (const row of rows) {
     const informative = row.track?.inputs.filter((input) => input.signal === "SLIP" || input.signal === "GAP" || (input.fresh && ["INDEPENDENT", "SUPPORTED"].includes(input.signal))) ?? [];
-    // After independent success the next review is the FSRS due instant: the stability in days after that success. An
-    // adjustment leaves the stability unchanged and is not practice, so the day is counted from the evidence. After any
-    // other result the next review is one day later.
-    const latest = informative.at(-1), stability = row.track?.estimate?.stability;
-    const interval = latest?.signal === "INDEPENDENT" && stability !== undefined ? stability : 1;
-    const next = latest ? new Date(latest.performedAt.getTime() + interval * 86_400_000) : null;
-    const earliestDay = next ? studyDate(next) : day;
-    const occasion = earliestDay < day ? day : earliestDay;
+    // The review day (design/compositions/LearningReads.md, "The review day"). After independent success it is the day
+    // MasteryEstimating's due instant falls on: the reference point, which is the latest event and so a later manual
+    // adjustment when there is one, plus the stability in days. The memory read names the same day with the same dueDay.
+    // After any other informative result it is the next calendar day after that result; without one, the first check can
+    // be today. A day that has passed becomes today.
+    const latest = informative.at(-1), due = row.track?.estimate?.due;
+    const occasion = !latest ? day : latest.signal === "INDEPENDENT" && due ? dueDay(due, day) : notBefore(addDays(studyDate(latest.performedAt), 1), day);
     // The key names the evidence and, once the track has one, its latest adjustment; a reused key keeps its saved candidate.
     const evidencePrefix = `${row.skill}:${row.current}:${latest?.evidence ?? "initial"}:${latest?.revision ?? 0}:`;
     const adjustment = row.track?.adjustments.at(-1)?.adjustment;
@@ -262,16 +259,12 @@ export function planRequest({ skills, tracks, schedule }: { skills: SkillRows; t
         earliestDay: occasion, latestDay: lastStudyDay, reason: `Preparation for the exam on ${focus.date}. ${reason}`, deadlineRefs: [focus.deadline] });
       continue;
     }
-    // Routine review, including maintenance of an exam skill whose review falls on or after the exam date. An adjustment is not
-    // practice, so routine work already finished for this evidence within its window is not offered again.
-    if (earliestDay > horizonEnd || done.has(routineKey) ||
+    // Routine review, including maintenance of an exam skill whose review falls on or after the exam date. Finishing an
+    // activity records time, not evidence, so routine work already finished for this evidence within its window is not
+    // offered again because of a later adjustment.
+    if (occasion > horizonEnd || done.has(routineKey) ||
       prior.some((candidate) => candidate.deadlineRefs.length === 0 && done.has(candidate.key) && candidate.key.startsWith(evidencePrefix) && candidate.latestDay >= day)) continue;
-    const kept = saved(routineKey);
-    if (kept) { candidates.push(kept); continue; }
-    // A new adjusted candidate keeps the evidence's current window and changes only its key, priority, and reason.
-    const evidenced = adjustment ? prior.find((candidate) => candidate.deadlineRefs.length === 0 && occasionKey(candidate.key, evidencePrefix) && candidate.latestDay >= day) ??
-      prior.find((candidate) => candidate.deadlineRefs.length === 0 && candidate.key.startsWith(evidencePrefix) && candidate.latestDay >= day) : undefined;
-    candidates.push(evidenced ? { ...evidenced, key: routineKey, priority: need, reason } : { key: routineKey, subject: row.skill, definition: row.current, activity,
+    candidates.push(saved(routineKey) ?? { key: routineKey, subject: row.skill, definition: row.current, activity,
       minutes: 10, priority: need, earliestDay: occasion, latestDay: horizonEnd, reason, deadlineRefs: [] });
   }
   // Exam records stay out of the fingerprint; the concept's local check covers them. Prerequisites decide the exam skills.

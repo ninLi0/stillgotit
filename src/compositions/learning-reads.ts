@@ -101,11 +101,12 @@ const Recent = endpoint("/learning/recent", ({ session, course, owner }) => rece
 // Every value on a curve is MasteryEstimating's: _estimate for the skill's own projection, _withoutPractice for a curve
 // that belongs to no track. The computations only place and compare those values.
 // The skill's curve for its current definition: its starting point, the estimate at `at`, the projection sampled at whole
-// days after `at`, the first whole day at or after the FSRS due instant, and the curve the skill would have followed from
-// its starting point with no evidence. There is no row when the definition has no track.
+// days after `at`, the review day, which is the calendar day the FSRS due instant falls on, named by the same dueDay as the
+// plan request, and the curve the skill would have followed from its starting point with no evidence. There is no row when
+// the definition has no track.
 export const SkillCurve = view("the memory curve of (skill) at (definition) for (owner) at (at)", ({ owner, skill, definition, at },
   { startingConfidence, startedAt, estimate, projection, reviewBy, belowNow, leftAlone }, free) => {
-  const { explanation, review, reviewValue, t1, t3, t7, t14, t30, t60, t90, v1, v3, v7, v14, v30, v60, v90, e0, e1, e3, e7, e14, e30, e60, e90, u0, u1, u3, u7, u14, u30, u60, u90 } = free;
+  const { explanation, day, days, review, reviewValue, t1, t3, t7, t14, t30, t60, t90, v1, v3, v7, v14, v30, v60, v90, e0, e1, e3, e7, e14, e30, e60, e90, u0, u1, u3, u7, u14, u30, u60, u90 } = free;
   const estimateAt = (instant: symbol, value: symbol) => Mastery._estimate({ learner: owner, subject: skill, definition, at: instant }).is({ value });
   const leftAloneAt = (days: symbol, value: symbol) => Mastery._withoutPractice({ confidence: startingConfidence, days }).is({ value });
   return where(
@@ -113,8 +114,8 @@ export const SkillCurve = view("the memory curve of (skill) at (definition) for 
     Mastery._explanation({ learner: owner, subject: skill, definition, at }).is({ explanation }),
     compute(computations.memoryInstants, { at }, { d1: t1, d3: t3, d7: t7, d14: t14, d30: t30, d60: t60, d90: t90 }),
     estimateAt(t1, v1), estimateAt(t3, v3), estimateAt(t7, v7), estimateAt(t14, v14), estimateAt(t30, v30), estimateAt(t60, v60), estimateAt(t90, v90),
-    compute(computations.reviewInstant, { at, explanation }, review), estimateAt(review, reviewValue),
-    compute(computations.memoryCurve, { at, explanation, review, reviewValue, v1, v3, v7, v14, v30, v60, v90 }, { estimate, projection, reviewBy, belowNow }),
+    compute(computations.reviewDay, { at, explanation }, { day, days, instant: review }), estimateAt(review, reviewValue),
+    compute(computations.memoryCurve, { at, explanation, day, days, reviewValue, v1, v3, v7, v14, v30, v60, v90 }, { estimate, projection, reviewBy, belowNow }),
     compute(computations.leftAloneDays, { explanation, at }, { e0, e1, e3, e7, e14, e30, e60, e90 }),
     leftAloneAt(e0, u0), leftAloneAt(e1, u1), leftAloneAt(e3, u3), leftAloneAt(e7, u7), leftAloneAt(e14, u14), leftAloneAt(e30, u30), leftAloneAt(e60, u60), leftAloneAt(e90, u90),
     compute(computations.leftAlonePath, { explanation, at, u0, v1: u1, v3: u3, v7: u7, v14: u14, v30: u30, v60: u60, v90: u90 }, leftAlone),

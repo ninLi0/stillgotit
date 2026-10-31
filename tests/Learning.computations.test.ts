@@ -69,12 +69,17 @@ describe("estimateTimeline", () => {
 describe("planRequest", () => {
   const skills = [{ skill: "s", title: "Products", current: "v1", status: "CONFIRMED", prerequisites: [] }] as never;
   const input = { input: "i", evidence: "case-1", revision: 1, performedAt: new Date("2026-10-22T16:00:00Z"), signal: "INDEPENDENT", fresh: true, gateMet: true, attribution: "AI assessment" };
-  // These tests are about keys and windows, so the track's FSRS stability is a stand-in of one day: the review after the
-  // independent success falls on the next day. Planning.computations.test.ts checks days computed from the FSRS formulas.
-  const track = (adjustments: ProgressRow["adjustments"], value: number) => ({ track: "t", subject: "s", definition: "v1", initialConfidence: 50, startingBasis: "SELF_REPORTED",
-    initializedAt: new Date("2026-10-20T16:00:00Z"), inputs: [input], adjustments,
-    estimate: { value, basis: "", ready: value >= 70, stability: 1, due: new Date(input.performedAt.getTime() + DAY) } }) as ProgressRow;
-  const schedule = (plans: unknown[] = []) => ({ today: "2026-10-23", plans, deadlines: [] }) as never;
+  // These tests are about keys and windows, so the track's FSRS stability is a stand-in of one day. As in MasteryEstimating,
+  // the due instant is one stability after the latest event, the success or a later adjustment, so a review after the
+  // success alone falls on the next day. Planning.computations.test.ts checks days computed from the FSRS formulas.
+  const track = (adjustments: ProgressRow["adjustments"], value: number, inputs: ProgressRow["inputs"] = [input as ProgressRow["inputs"][number]]) => {
+    const latest = Math.max(...inputs.map((row) => row.performedAt.getTime()), ...adjustments.map((row) => row.at.getTime()));
+    return { track: "t", subject: "s", definition: "v1", initialConfidence: 50, startingBasis: "SELF_REPORTED",
+      initializedAt: new Date("2026-10-20T16:00:00Z"), inputs, adjustments,
+      estimate: { value, basis: "", ready: value >= 70, stability: 1, due: new Date(latest + DAY) } } as ProgressRow;
+  };
+  const schedule = (plans: unknown[] = [], today = "2026-10-23") => ({ today, plans, deadlines: [] }) as never;
+  // 11:00 in New York on October 23, the day after the success, so its due instant is 11:00 on October 24.
   const adjustment = { adjustment: "adj-1", value: 40, reason: "Not sure any more.", at: new Date("2026-10-23T15:00:00Z") };
   const plan = (candidate: unknown, status = "TODO") => ({ status: "ACTIVE", items: [{ candidate, status }], deferred: [] });
 
@@ -84,30 +89,40 @@ describe("planRequest", () => {
     const { track: id, inputs, initialConfidence, startingBasis, initializedAt } = unadjusted;
     expect(result.basis).toBe(createHash("sha256").update(JSON.stringify({ day: "2026-10-23", skills: [["s", "v1", [], { track: id, inputs, initialConfidence, startingBasis, initializedAt }]] })).digest("hex"));
   });
-  test("an adjustment gives a new key, priority from the adjusted estimate, days from the evidence, and a new fingerprint", () => {
+  test("an adjustment after a success gives a new key, priority from the adjusted estimate, the adjusted due day, and a new fingerprint", () => {
     const before = planRequest({ skills, tracks: [track([], 95)], schedule: schedule() }), saved = before.candidates[0]!;
     const result = planRequest({ skills, tracks: [track([adjustment], 40)], schedule: schedule([plan(saved)]) });
-    expect(result.candidates).toEqual([{ ...saved, key: "s:v1:case-1:1:adj-1:2026-10-23", priority: 60, reason: "This skill needs fresh independent evidence." }]);
+    // The adjustment restarted the curve, so the review is due one stability after it, on October 24, not on the
+    // success's October 23, and the new candidate runs from there to the end of the horizon.
+    expect(result.candidates).toEqual([{ ...saved, key: "s:v1:case-1:1:adj-1:2026-10-24", priority: 60, earliestDay: "2026-10-24", latestDay: "2026-10-29",
+      reason: "This skill needs fresh independent evidence." }]);
     expect(result.basis).not.toBe(before.basis);
     // The adjusted candidate is reused unchanged until the next adjustment.
     const again = planRequest({ skills, tracks: [track([adjustment], 39)], schedule: schedule([plan(saved), plan(result.candidates[0])]) });
     expect(again.candidates).toEqual(result.candidates);
     const later = { ...adjustment, adjustment: "adj-2", value: 30 };
-    expect(planRequest({ skills, tracks: [track([adjustment, later], 30)], schedule: schedule([plan(result.candidates[0])]) }).candidates[0]!.key).toBe("s:v1:case-1:1:adj-2:2026-10-23");
+    expect(planRequest({ skills, tracks: [track([adjustment, later], 30)], schedule: schedule([plan(result.candidates[0])]) }).candidates[0]!.key).toBe("s:v1:case-1:1:adj-2:2026-10-24");
   });
-  test("an adjustment on a later day keeps the evidence's review window", () => {
+  test("an adjustment on a later day moves the review to one stability after that adjustment", () => {
     const saved = planRequest({ skills, tracks: [track([], 95)], schedule: schedule() }).candidates[0]!;
     expect(saved).toMatchObject({ earliestDay: "2026-10-23", latestDay: "2026-10-29" });
     const later = { ...adjustment, at: new Date("2026-10-25T15:00:00Z") };
-    const result = planRequest({ skills, tracks: [track([later], 40)], schedule: { today: "2026-10-25", plans: [plan(saved)], deadlines: [] } as never });
-    expect(result.candidates).toEqual([{ ...saved, key: "s:v1:case-1:1:adj-1:2026-10-25", priority: 60, reason: "This skill needs fresh independent evidence." }]);
-    // A second adjustment still copies the evidence's window, not the previous adjustment's day.
+    const result = planRequest({ skills, tracks: [track([later], 40)], schedule: schedule([plan(saved)], "2026-10-25") });
+    expect(result.candidates).toEqual([{ ...saved, key: "s:v1:case-1:1:adj-1:2026-10-26", priority: 60, earliestDay: "2026-10-26", latestDay: "2026-10-31",
+      reason: "This skill needs fresh independent evidence." }]);
+    // A second adjustment restarts the curve again, from its own time.
     const second = { ...later, adjustment: "adj-2", value: 90, at: new Date("2026-10-27T15:00:00Z") };
-    const again = planRequest({ skills, tracks: [track([later, second], 90)], schedule: { today: "2026-10-27", plans: [plan(saved), plan(result.candidates[0])], deadlines: [] } as never });
-    expect(again.candidates).toEqual([{ ...saved, key: "s:v1:case-1:1:adj-2:2026-10-27", priority: 10, reason: "A later fresh check will test retention." }]);
-    // Once the evidence's window has passed, the adjusted review gets the window an unadjusted one would get.
-    const expired = planRequest({ skills, tracks: [track([later], 40)], schedule: { today: "2026-10-30", plans: [plan(saved)], deadlines: [] } as never });
+    const again = planRequest({ skills, tracks: [track([later, second], 90)], schedule: schedule([plan(saved), plan(result.candidates[0])], "2026-10-27") });
+    expect(again.candidates).toEqual([{ ...saved, key: "s:v1:case-1:1:adj-2:2026-10-28", priority: 10, earliestDay: "2026-10-28", latestDay: "2026-11-02",
+      reason: "A later fresh check will test retention." }]);
+    // Once the adjusted due day has passed, the review is due today, as a passed review without an adjustment is.
+    const expired = planRequest({ skills, tracks: [track([later], 40)], schedule: schedule([plan(saved)], "2026-10-30") });
     expect(expired.candidates).toMatchObject([{ key: "s:v1:case-1:1:adj-1:2026-10-30", earliestDay: "2026-10-30", latestDay: "2026-11-05" }]);
+  });
+  test("after a slip, the review stays on the next calendar day after the slip, with or without an adjustment", () => {
+    const slip = { ...input, signal: "SLIP", gateMet: false } as ProgressRow["inputs"][number];
+    expect(planRequest({ skills, tracks: [track([], 60, [slip])], schedule: schedule() }).candidates).toMatchObject([{ key: "s:v1:case-1:1:2026-10-23", earliestDay: "2026-10-23" }]);
+    expect(planRequest({ skills, tracks: [track([adjustment], 40, [slip])], schedule: schedule() }).candidates).toMatchObject([{ key: "s:v1:case-1:1:adj-1:2026-10-23", earliestDay: "2026-10-23" }]);
   });
   test("work finished for the same evidence within its window is not offered again because of an adjustment", () => {
     const saved = planRequest({ skills, tracks: [track([], 95)], schedule: schedule() }).candidates[0]!;

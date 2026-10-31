@@ -170,7 +170,7 @@ test("Adjust declines an unknown, another learner's, or a draft skill alike, and
   expect(await app.concepts.MasteryEstimating._tracks({ learner: user, subject: unstarted } as never)).toEqual([]);
 }, 60_000);
 
-test("an adjustment replans: the candidate gets a new key, priority from the adjusted estimate, and days from the evidence", async () => {
+test("an adjustment replans: the candidate gets a new key, priority from the adjusted estimate, and the day the adjustment's due instant falls on", async () => {
   const app = await setup(), { learner, user, course, skill } = await learningFixture(app, "adjust-planner");
   await learner.ok("/learning/confidence", { skill, confidence: 50 });
   await learner.ok("/planning/configure", { course, dailyMinutes: 30 });
@@ -191,9 +191,13 @@ test("an adjustment replans: the candidate gets a new key, priority from the adj
   const { adjustment } = await learner.ok("/learning/adjust", input);
   const after = await learner.ok("/planning/read", { course }), adjusted = candidateFor(after.plan);
   expect(after.plan.plan).not.toBe(before.plan.plan);
-  expect(adjusted.key).toBe(`${skill}:${read.skill.current}:${read.cases[0].case}:1:${adjustment}:${occasion}`);
+  // The adjustment keeps the stability and restarts the curve, so the review is due one stability after the adjustment.
+  // Made moments after the practice, it lands on the same day here; Learning.memory.http.test.ts moves it to a later day.
+  const adjustedAt = Date.parse((await learner.ok("/learning/read", { skill })).explanation.changes.find((change: { kind: string }) => change.kind === "ADJUSTMENT").at);
+  const adjustedDay = studyDate(new Date(adjustedAt + stability * DAY));
+  expect(adjusted.key).toBe(`${skill}:${read.skill.current}:${read.cases[0].case}:1:${adjustment}:${adjustedDay}`);
   expect(adjusted.priority).toBeCloseTo(60, 3);
-  expect(adjusted).toMatchObject({ earliestDay: evidenced.earliestDay, latestDay: evidenced.latestDay, reason: "This skill needs fresh independent evidence." });
+  expect(adjusted).toMatchObject({ earliestDay: adjustedDay, latestDay: after.plan.horizonEnd, reason: "This skill needs fresh independent evidence." });
   // The proposal made before the adjustment was replaced, not left active.
   const plans = await app.concepts.StudyPlanning._plans({ owner: user, scope: course } as never);
   expect(plans.find((plan) => plan.plan === before.plan.plan)?.status).toBe("SUPERSEDED");

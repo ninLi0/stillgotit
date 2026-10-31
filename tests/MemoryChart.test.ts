@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { CHART, valueY, type ChartPoint } from "../frontend/src/estimate-chart.ts";
 import {
   DEFAULT_LINE, HORIZON, STAGE_LINES, THRESHOLD_LINE, assignLanes, chartFrame, dayX, labelWidth, layoutDefault, layoutShaped,
-  layoutSkills, pastShare, reviewOrder, stageLine, standing, steppedPath, type DayValue, type ReviewRow,
+  layoutSkills, pastShare, reviewDistance, reviewOrder, stageLine, standing, steppedPath, type DayValue, type ReviewRow,
 } from "../frontend/src/memory-chart.ts";
 import { leftAlone } from "./fixtures/fsrs.ts";
 
@@ -183,6 +183,22 @@ describe("The Memory view's chart geometry", () => {
     expect(layout.flag).toBeNull();
     expect(layout.markers).toHaveLength(1);
     expect(corners(layout.path)[0]).toEqual([layout.frame.inner.left, valueY(100)]);
+  });
+
+  test("a review later today flags today's point on the line, and says so", () => {
+    // The memory read answers a review day 0 days away with the estimate now, so the flag sits where the line starts.
+    const skills = [{ skill: "a", estimate: 30, projection: projection(30), reviewBy: { days: 0, value: 30 } }];
+    const layout = layoutSkills(skills, REFERENCE, 70, 520, (days) => `Day ${days}`);
+    const x0 = dayX(0, layout.frame.inner.left, layout.frame.inner.right);
+    expect(layout.flags.map((f) => [f.days, f.x, f.y, f.skills])).toEqual([[0, x0, valueY(30), ["a"]]]);
+    expect(corners(layout.lines[0]!.d)[0]).toEqual([x0, valueY(30)]);
+    const past: ChartPoint[] = [{ at: at(0), kind: "START", before: null, after: 30, label: "Starting point" }];
+    const shaped = layoutShaped({ past, asOf: at(0), estimate: 30, projection: projection(30), reviewBy: { days: 0, value: 30 },
+      leftAlone: [{ at: at(0), value: 30 }, { at: at(0), value: 30 }, ...projection(30).map((p) => ({ at: at(p.days), value: p.value }))], threshold: 70 }, 600);
+    expect(shaped.flag).toMatchObject({ x: shaped.split, y: valueY(30), days: 0 });
+    expect(has(shaped.path, shaped.split, valueY(30))).toBe(true);
+    expect(standing({ skill: "a", title: "A", estimate: 30, reviewBy: { days: 0 }, belowNow: false })).toBe("COMING");
+    expect([0, 1, 5].map(reviewDistance)).toEqual(["later today", "in 1 day", "in 5 days"]);
   });
 
   test("the review list puts due skills first, lowest first, then coming reviews soonest first, then the rest", () => {

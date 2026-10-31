@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { planDay, planDayLabel, sessionLabels, sourceLabel } from "../frontend/src/labels.ts";
+import { dayAfter, dayTime, planDay, planDayLabel, sessionLabels, sourceLabel } from "../frontend/src/labels.ts";
 import { failureText } from "../frontend/src/api.ts";
 
 describe("Readable plan dates", () => {
@@ -16,6 +16,19 @@ describe("Readable plan dates", () => {
   test("the current plan day reads as Today", () => {
     expect(planDayLabel("2026-10-22", "2026-10-22")).toBe("Today");
     expect(planDayLabel("2026-10-23", "2026-10-22")).toBe("Fri, Oct 23");
+  });
+
+  test("a day some days ahead is counted on the New York calendar, across changes of daylight saving time", () => {
+    // 10:00 on Wednesday in New York: two days ahead is Friday.
+    expect(dayAfter("2026-10-28T14:00:00Z", 2)).toBe("2026-10-30");
+    expect(dayAfter("2026-10-28T14:00:00Z", 0)).toBe("2026-10-28");
+    // 00:30 EDT on Saturday, October 31: two spans of 24 hours end at 23:30 EST on Sunday, but two days ahead is Monday.
+    expect(dayAfter("2026-10-31T04:30:00Z", 2)).toBe("2026-11-02");
+    // 23:30 EST on Saturday, March 13, 2027: one span of 24 hours ends on Monday, but one day ahead is Sunday.
+    expect(dayAfter("2027-03-14T04:30:00Z", 1)).toBe("2027-03-14");
+    // 21:00 in New York is already the next day in UTC; the day still counts from New York's date.
+    expect(dayAfter("2026-10-29T01:00:00Z", 1)).toBe("2026-10-29");
+    expect(planDay(dayTime("2026-11-01").toISOString())).toBe("Sun, Nov 1");
   });
 });
 

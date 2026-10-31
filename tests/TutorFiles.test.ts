@@ -26,9 +26,13 @@ afterAll(async () => {
   if (directory) await rm(directory, { recursive: true, force: true });
 });
 
-/** A tutor wired to a fake Gemini, a disk store, and a provider file store with its own clock. */
+/**
+ * A tutor wired to a fake Gemini, a disk store, and a provider file store with its own clock. The clock starts years ahead
+ * because MongoDB removes a saved reference once its expiry passes by the real clock: with a past start, a reference could
+ * vanish between the two requests that should share it.
+ */
 async function setup(options: FakeGeminiOptions = {}, timeoutMs?: number) {
-  let now = new Date(Date.UTC(2026, 9, 23, 12));
+  let now = new Date(Date.UTC(2030, 9, 23, 12));
   const clock = () => now;
   const google = fakeGemini({ now: clock, ...options });
   const gemini = new Gemini({ key: KEY, fetch: google.fetch, pollMs: 1 });
@@ -78,7 +82,7 @@ describe("Sending files to the tutor", () => {
     await app.ask(app.source([big]));
     const [record] = await app.records.find().toArray();
     expect(record).toMatchObject({ name: "files/file2", uri: "https://generativelanguage.googleapis.com/v1beta/files/file2", mediaType: "application/pdf",
-      expiresAt: new Date(Date.UTC(2026, 9, 25, 12)), savedAt: new Date(Date.UTC(2026, 9, 23, 12)) });
+      expiresAt: new Date(Date.UTC(2030, 9, 25, 12)), savedAt: new Date(Date.UTC(2030, 9, 23, 12)) });
     expect(record!._id).toEndWith(big.file.split("/")[1]);
     app.advance(47 * HOUR - 1);
     await app.ask(app.source([big]));

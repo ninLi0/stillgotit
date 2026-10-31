@@ -11,8 +11,9 @@
   /* Semantic */
   --coral: #C35124; --coral-wash: #FBE6DC; --coral-text: #A8412F; --new-wash: #FBF0D6; --new-text: #8A5A12;
   --strong: #2A7B55; --strong-wash: #EEF7F1; --review-wash: #E3EEF3; --review-text: #2A6B85; --error: #A8412F;
-  /* Grounds: the page, the cards on it, text fields, text and marks on a strong fill, and the dark tooltips. */
-  --ground: #FFFFFF; --card: #FFFFFF; --field: #FFFFFF; --on-fill: #FFFFFF; --tip: #1C1C1D; --tip-text: #FFFFFF;
+  /* Grounds: the page, the cards on it, text fields, text and marks on a strong fill, and the dark tooltips, whose
+     quieter second line (a chart tooltip's date or note) takes --tip-soft. */
+  --ground: #FFFFFF; --card: #FFFFFF; --field: #FFFFFF; --on-fill: #FFFFFF; --tip: #1C1C1D; --tip-text: #FFFFFF; --tip-soft: #E6E6E2;
   --inset-3: #ECECE9; --dim: #767672; --disabled: #BDBDB8; --check-line: #8C8C88; --branch: #DDDDD8; --focus: #151515;
   --line-strong: rgba(20,20,20,.35); --line-faint: rgba(20,20,20,.05); --dash: rgba(20,20,20,.25);
   --backdrop: rgba(21,21,21,.35); --rail-shade: rgba(21,21,21,.28);
@@ -80,7 +81,7 @@
   --dawn: #A69CE8; --dawn-text: #18104A; --dawn-edge: #7467CB; --dawn-hover: #B5ACEE; --dawn-soft: #25213E; --dawn-soft-text: #C7BFF8;
   --coral-wash: #3B2119; --coral-text: #F3A588; --new-wash: #382E17; --new-text: #EAC57B;
   --strong: #6CC495; --strong-wash: #1B3326; --review-wash: #18303B; --review-text: #8FCAE2; --error: #F3A588;
-  --ground: #121311; --card: #1B1C1A; --field: #151614; --tip: #33352F; --tip-text: #F4F4F0;
+  --ground: #121311; --card: #1B1C1A; --field: #151614; --tip: #33352F; --tip-text: #F4F4F0; --tip-soft: #C4C4BE;
   --inset-3: #32332F; --dim: #8E8E88; --disabled: #62635D; --check-line: #8C8D87; --branch: #3A3B36; --focus: #ECECE7;
   --line-strong: rgba(255,255,255,.34); --line-faint: rgba(255,255,255,.08); --dash: rgba(255,255,255,.26);
   --backdrop: rgba(0,0,0,.6); --rail-shade: rgba(0,0,0,.5); --shadow: 0 0 0;
@@ -115,7 +116,7 @@
     --dawn: #A69CE8; --dawn-text: #18104A; --dawn-edge: #7467CB; --dawn-hover: #B5ACEE; --dawn-soft: #25213E; --dawn-soft-text: #C7BFF8;
     --coral-wash: #3B2119; --coral-text: #F3A588; --new-wash: #382E17; --new-text: #EAC57B;
     --strong: #6CC495; --strong-wash: #1B3326; --review-wash: #18303B; --review-text: #8FCAE2; --error: #F3A588;
-    --ground: #121311; --card: #1B1C1A; --field: #151614; --tip: #33352F; --tip-text: #F4F4F0;
+    --ground: #121311; --card: #1B1C1A; --field: #151614; --tip: #33352F; --tip-text: #F4F4F0; --tip-soft: #C4C4BE;
     --inset-3: #32332F; --dim: #8E8E88; --disabled: #62635D; --check-line: #8C8D87; --branch: #3A3B36; --focus: #ECECE7;
     --line-strong: rgba(255,255,255,.34); --line-faint: rgba(255,255,255,.08); --dash: rgba(255,255,255,.26);
     --backdrop: rgba(0,0,0,.6); --rail-shade: rgba(0,0,0,.5); --shadow: 0 0 0;

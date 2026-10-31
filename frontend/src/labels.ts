@@ -24,6 +24,21 @@ export function planDayLabel(day: string, today: string): string {
   return day === today ? "Today" : planDay(day);
 }
 
+const dayKey = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: STUDY_TIME_ZONE });
+/**
+ * The plan day, written YYYY-MM-DD, that comes `days` calendar days after the New York day of the instant `at`. Days are
+ * counted on the calendar, as the plan and the memory read count them, not as spans of 24 hours, which can land two
+ * different counts on one date when they cross a change of daylight saving time.
+ */
+export function dayAfter(at: string, days: number): string {
+  const parts = Object.fromEntries(dayKey.formatToParts(new Date(at)).map((part) => [part.type, Number(part.value)]));
+  return new Date(Date.UTC(parts.year!, parts.month! - 1, parts.day! + days, 12)).toISOString().slice(0, 10);
+}
+/** A plan day as a time that falls on it in New York, for date formats that take a time: noon UTC. */
+export function dayTime(day: string): Date {
+  return new Date(`${day}T12:00:00Z`);
+}
+
 /**
  * A citation as readable text: the material title and the place label of its location, such as
  * "Lecture 4 · Page 3" or "Lecture recording · 12:30–12:45". locations.ts reads the place from the location.

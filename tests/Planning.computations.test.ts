@@ -98,6 +98,38 @@ describe("planRequest", () => {
       reason: "A later fresh check will test retention." })]);
   });
 
+  test("after independent success the review starts on the concept's due day, which a later adjustment moves", () => {
+    // A starting confidence of 40 three days ago, then an independent success two days ago, both at 11:00 in New York.
+    const a = skill("a"), start = at(addDays(TODAY, -3)), success = independent("first", addDays(TODAY, -2));
+    const { stability } = review(seed(40), 3, daysBetween(success.performedAt, start));
+    const unadjusted = track(a, [success], { value: 95, basis: "Ready", ready: true }, start);
+    const fromSuccess = studyDate(new Date(success.performedAt.getTime() + stability * DAY));
+    expect(unadjusted.estimate!.due).toEqual(new Date(success.performedAt.getTime() + stability * DAY));
+    expect(planRequest({ skills: [a], tracks: [unadjusted], schedule: schedule() }).candidates).toMatchObject([{ key: `${prefix(a, "first", 1)}${fromSuccess}`, earliestDay: fromSuccess }]);
+    // An adjustment at 9:00 this morning keeps the stability but restarts the curve, so MasteryEstimating's due instant,
+    // and with it the review day, is one stability after the adjustment.
+    const adjustedAt = new Date(`${TODAY}T14:00:00Z`), due = new Date(adjustedAt.getTime() + stability * DAY), fromAdjustment = studyDate(due);
+    const adjusted: Track = { ...unadjusted, adjustments: [{ adjustment: "adj", value: 70, reason: "I am less sure now.", at: adjustedAt }],
+      estimate: { ...unadjusted.estimate!, value: 70, ready: false, due } };
+    expect(fromAdjustment > fromSuccess).toBe(true);
+    expect(planRequest({ skills: [a], tracks: [adjusted], schedule: schedule() }).candidates).toMatchObject([{ key: `${prefix(a, "first", 1)}adj:${fromAdjustment}`,
+      earliestDay: fromAdjustment, latestDay: addDays(TODAY, 6), priority: 30 }]);
+  });
+
+  test("the review after a slip starts the next calendar day, also across a change of daylight saving time", () => {
+    const a = skill("a");
+    const slip = (performedAt: string): Track["inputs"][number] => ({ input: "input-slip", evidence: "slip", revision: 1, performedAt: new Date(performedAt), signal: "SLIP",
+      fresh: true, gateMet: false, attribution: "AI assessment" });
+    const reviewAfter = (performedAt: string, today: string) =>
+      planRequest({ skills: [a], tracks: [track(a, [slip(performedAt)], undefined, at("2026-10-01"))], schedule: schedule({ today }) }).candidates[0]!.earliestDay;
+    // 00:30 EDT on November 1, 2026, the morning daylight saving time ends: 24 hours later is 23:30 EST, still November 1.
+    expect(reviewAfter("2026-11-01T04:30:00Z", "2026-11-01")).toBe("2026-11-02");
+    // 23:30 EST on March 13, 2027, the eve of the day it starts: 24 hours later is 00:30 EDT on March 15.
+    expect(reviewAfter("2027-03-14T04:30:00Z", "2027-03-13")).toBe("2027-03-14");
+    // On an ordinary day the next calendar day is what 24 hours gave.
+    expect(reviewAfter(at(TODAY).toISOString(), TODAY)).toBe(addDays(TODAY, 1));
+  });
+
   test("unfinished work for the focus exam is carried once per key with its exact content, whatever the plan's status", () => {
     const a = skill("a"), b = skill("b"), examDay = addDays(TODAY, 5);
     const examWork = (row: SkillRow, definition = row.current, day = addDays(TODAY, -2), examId = "midterm"): Candidate => ({

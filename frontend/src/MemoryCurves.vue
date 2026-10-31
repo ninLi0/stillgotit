@@ -2,7 +2,8 @@
 import { computed, ref } from "vue";
 import PixelIcon from "./PixelIcon.vue";
 import { arrivalStyle, useBoxWidth } from "./box-width.ts";
-import { DEFAULT_LINE, HORIZON, STAGE_LINES, THRESHOLD_LINE, layoutSkills, type DayValue } from "./memory-chart.ts";
+import { dayAfter, dayTime } from "./labels.ts";
+import { DEFAULT_LINE, HORIZON, STAGE_LINES, THRESHOLD_LINE, layoutSkills, reviewDistance, type DayValue } from "./memory-chart.ts";
 import { SPRITES, STAGE_LABELS, iconRects, stageOf } from "./pixel-art.ts";
 
 // "Your skills" on the Memory view (design/visual-design.md, "Charts and summaries"): every skill's projected estimate
@@ -20,13 +21,14 @@ const width = useBoxWidth(box, 520);
 const arrives = arrivalStyle();
 const short = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "America/New_York" });
 const long = new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "America/New_York" });
-const dayAt = (days: number) => new Date(Date.parse(props.asOf) + days * 86_400_000);
+// A day on the chart is the plan day that many calendar days after today, the way the read counts a review day.
+const dayAt = (days: number) => dayTime(dayAfter(props.asOf, days));
 const layout = computed(() => layoutSkills(props.skills, props.reference, props.threshold, width.value, (days) => short.format(dayAt(days))));
 const flag = iconRects(SPRITES.flag);
 const titles = computed(() => new Map(props.skills.map((s) => [s.skill, s.title])));
 function percent(value: number) { return `${Math.round(value)}%`; }
 function spoken(skills: string[], days: number) {
-  return `${skills.map((id) => titles.value.get(id)).join(", ")}: below ${props.threshold}% on ${long.format(dayAt(days))}, in ${days} ${days === 1 ? "day" : "days"}`;
+  return `${skills.map((id) => titles.value.get(id)).join(", ")}: review by ${long.format(dayAt(days))}, ${reviewDistance(days)}`;
 }
 // The legend names the stages drawn, then the default curve, the threshold and the flag.
 const stages = computed(() => (["sprout", "leaf", "full", "bloom"] as const).filter((stage) => props.skills.some((s) => stageOf(s.estimate) === stage)));
@@ -77,7 +79,7 @@ function hide(event: KeyboardEvent) {
       <div v-if="tip" class="tip" :class="{ below: tip.below }" :style="tip.style" aria-hidden="true">
         <strong>{{ long.format(dayAt(tip.flag.days)) }}</strong>
         <span v-for="id in tip.flag.skills" :key="id">{{ titles.get(id) }}</span>
-        <span class="tip-note">Below {{ threshold }}% in {{ tip.flag.days }} {{ tip.flag.days === 1 ? "day" : "days" }}</span>
+        <span class="tip-note">Review {{ reviewDistance(tip.flag.days) }}</span>
       </div>
     </div>
     <ul class="legend" aria-hidden="true">
@@ -118,7 +120,7 @@ function hide(event: KeyboardEvent) {
 .tip{position:absolute;z-index:3;display:flex;flex-direction:column;gap:1px;width:max-content;max-width:200px;padding:7px 10px;border-radius:10px;background:var(--tip);color:var(--tip-text);font-size:12px;line-height:1.35;transform:translate(-50%,-100%);pointer-events:none;box-shadow:0 10px 24px rgb(var(--shadow) / .22)}
 .tip.below{transform:translateX(-50%)}
 .tip strong{font-size:13px;font-weight:700}
-.tip-note{color:var(--ring)}
+.tip-note{color:var(--tip-soft)}
 .legend{display:flex;flex-wrap:wrap;gap:4px 14px;margin:8px 0 0;padding:0;list-style:none;color:var(--muted);font-size:12px;line-height:1.4}
 .legend li{display:inline-flex;align-items:center;gap:5px}
 .key{flex:none}
