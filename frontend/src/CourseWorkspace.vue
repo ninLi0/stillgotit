@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { api, unwrap, type Course } from "./api.ts";
-import { aiStatus, type AIStatus } from "./host-api.ts";
+import { aiStatus, deleteMaterial, type AIStatus } from "./host-api.ts";
+import { KeptReviews } from "./graded-import.ts";
 import { DraftSaveQueue } from "./draft-save-queue.ts";
 import { focusedControl, restoreFocus } from "./focus.ts";
 import { fileSize, readyNotice, submitImport } from "./material-imports.ts";
@@ -46,7 +47,9 @@ type CourseData = StillGotItHttp["/courses/read"]["output"];
 type MaterialId = CourseData["materials"][number]["material"];
 type Suggestion = { title: string; outcome: string; gate: string };
 type Original = { file: string; name: string; mediaType?: string; limitations: string[] };
-const data = ref<CourseData>({ materials: [], units: [], skills: [], prerequisites: [], skillSources: [], versions: [], looks: [] });
+const data = ref<CourseData>({ materials: [], deletedMaterials: [], units: [], skills: [], prerequisites: [], skillSources: [], versions: [], looks: [] });
+// The materials the learner deleted from this course. Citations and skill sources that name them say so.
+const deletedIds = computed(() => data.value.deletedMaterials.map((row) => row.material as string));
 const busy = ref(false), message = ref(""), error = ref(""), justConfirmed = ref<string | null>(null);
 const notice = ref<HTMLElement | null>(null), setupError = ref<HTMLElement | null>(null);
 // announcement names materials an import listing saved; it stays until the learner leaves Materials or starts
@@ -63,6 +66,9 @@ const ai = ref<AIStatus>({ available: false, reason: "" });
 const progress = ref<Record<string, number>>({}), revision = ref(0);
 const treeSkills = computed(() => data.value.skills.map((skill) => ({ ...skill, mastery: progress.value[skill.skill] })));
 const current = computed(() => data.value.skills.find((skill) => skill.skill === selectedSkill.value));
+// The open skill's sources from the course read. The study page judges from them whether every source was deleted, so a
+// source added under Manage skills reaches it without the page reading its skill again.
+const currentSources = computed(() => data.value.skillSources.filter((row) => row.skill === current.value?.skill).map((row) => row.material as string));
 const confirmed = computed(() => data.value.skills.filter((skill) => skill.status === "CONFIRMED"));
 const drafts = computed(() => data.value.skills.filter((skill) => skill.status === "DRAFT"));
 // Why a disabled action is unavailable. Empty when the action is available.
@@ -104,6 +110,12 @@ async function refresh() {
   const result = unwrap(await api.courses.read({ course: props.course.course }));
   data.value = result;
   void receiveLooks(result.units.map((item) => item.unit), result.looks);
+  // A waiting draft save whose source was deleted, in this tab or another, can never finish, so it is dropped. An
+  // unreadable queue is left for its own panel to report.
+  const deleted = new Set<string>(result.deletedMaterials.map((row) => row.material));
+  try { if (deleted.size && draftSaves.forget(deleted)) pendingDraftCount.value = draftSaves.read().length; } catch { /* Reported by Retry saving drafts. */ }
+  // A material deleted in another tab leaves the detail pane.
+  if (material.value && !result.materials.some((source) => source.material === material.value)) { material.value = ""; preview.value = null; jumpLocation.value = undefined; }
   if (!material.value && result.materials.length) {
     const previous = sessionStorage.getItem(sourceSelectionKey);
     material.value = result.materials.find((source) => source.material === previous)?.material ?? result.materials[0]!.material;
@@ -460,6 +472,68 @@ async function confirmDraft(skill: string) {
   });
 }
 function openGraded() { void gradedImport.value?.startUpload(); }
+
+// ---- Deleting a material ----
+// Deleting asks first, in a dialog that says what happens. The material is deleted for good; nothing is archived.
+const deleteDialog = ref<HTMLDialogElement | null>(null), deleteTarget = ref<{ material: MaterialId; title: string } | null>(null);
+const deleteError = ref(""), deleting = ref(false);
+// A waiting draft save may name this material, and the server would refuse it once the material is gone.
+const deleteReason = computed(() => pendingDraftCount.value ? "Finish saving your skill drafts first." : "");
+/** What deleting the target changes, counted from the course read and the suggestions on screen. */
+const deleteEffects = computed(() => {
+  const target = deleteTarget.value?.material as string | undefined;
+  if (!target) return { unconfirmed: 0, confirmed: 0, stranded: 0 };
+  const sourcesOf = (skill: string) => data.value.skillSources.filter((row) => row.skill === skill).map((row) => row.material as string);
+  const kept = new Set<string>(data.value.materials.map((source) => source.material));
+  const fromTarget = data.value.skills.filter((skill) => sourcesOf(skill.skill).includes(target));
+  const confirmedSkills = fromTarget.filter((skill) => skill.status === "CONFIRMED");
+  return {
+    // Saved drafts are discarded on the server; suggestions not saved yet are dropped here.
+    unconfirmed: fromTarget.filter((skill) => skill.status === "DRAFT").length + (suggestionSource.value === target ? suggestions.value.length : 0),
+    confirmed: confirmedSkills.length,
+    stranded: confirmedSkills.filter((skill) => !sourcesOf(skill.skill).some((source) => source !== target && kept.has(source))).length,
+  };
+});
+const count = (n: number, one: string, many: string) => n === 1 ? `One ${one}` : `${n} ${many}`;
+function askDelete(source: { material: MaterialId; title: string }) {
+  if (busy.value || deleteReason.value) return;
+  deleteTarget.value = { material: source.material, title: source.title }; deleteError.value = "";
+  deleteDialog.value?.showModal();
+}
+async function confirmDelete() {
+  const target = deleteTarget.value;
+  if (!target || deleting.value) return;
+  const stranded = deleteEffects.value.stranded;
+  deleting.value = true; deleteError.value = "";
+  try {
+    // Read the queue again: it lives in session storage, so a save may have started since the dialog opened.
+    if (draftSaves.read().length) throw new Error("Finish saving your skill drafts first.");
+    await deleteMaterial(target.material);
+  } catch (problem) {
+    // The sentence stays in the dialog, so the learner sees why and can cancel.
+    deleteError.value = problem instanceof Error ? problem.message : "This material could not be deleted. Try again.";
+    deleting.value = false;
+    return;
+  }
+  deleteDialog.value?.close();
+  forgetMaterial(target.material);
+  await task(async () => {
+    await refresh();
+    if (!reviewItems.value.length) reviewOpen.value = false;
+    message.value = `“${target.title}” was deleted.${stranded ? ` Add another source to ${stranded === 1 ? "the skill that was" : "the skills that were"} taught only from it, under Manage skills, before ${stranded === 1 ? "its" : "their"} next lesson.` : ""}`;
+  });
+  deleting.value = false;
+}
+/** What this page kept for a deleted material: its unsaved suggestions, a graded-work review in progress, and its selection. */
+function forgetMaterial(source: MaterialId) {
+  if (suggestionSource.value === source) { suggestions.value = []; suggestionSource.value = ""; }
+  new KeptReviews(sessionStorage).remove(source);
+  if (material.value === source) {
+    material.value = ""; preview.value = null; jumpLocation.value = undefined;
+    try { sessionStorage.removeItem(sourceSelectionKey); } catch { /* The next read chooses another file. */ }
+  }
+  const { [source]: _, ...others } = kinds.value; kinds.value = others;
+}
 // Sources the lesson cites open here, on the Preview tab at the cited place.
 function openSource(source: OpenSource) {
   forestOpen.value = false; view.value = "setup"; matTab.value = "preview";
@@ -648,6 +722,7 @@ watch(view, (now) => { if (now === "setup" && material.value && !preview.value) 
               <div v-if="preview" class="file-chips"><button v-for="file in preview.originals" :key="file.file" class="file-chip" :disabled="busy" @click="download(file.file, file.name)">↓ {{ file.name }}</button></div>
               <GradedImport :key="selectedMaterial.material" :course="course.course" :material="selectedMaterial.material" :title="selectedMaterial.title" />
               <span v-if="!selectedMaterial.title.startsWith('Graded work: ')" class="find-wrap"><button class="secondary sand" :disabled="busy || !!suggestReason" :aria-describedby="suggestReason ? 'suggest-reason' : undefined" @click="suggestFrom(selectedMaterial.material)">Find skills</button><p v-if="suggestReason" id="suggest-reason" class="hint reason">{{ suggestReason }}</p></span>
+              <span class="delete-wrap"><button type="button" class="quiet delete-material" aria-haspopup="dialog" :disabled="busy || !!deleteReason" :aria-describedby="deleteReason ? 'delete-reason' : undefined" @click="askDelete(selectedMaterial)">Delete material…</button><p v-if="deleteReason" id="delete-reason" class="hint reason">{{ deleteReason }}</p></span>
             </div>
             <div class="mat-tabs" role="tablist" aria-label="Material views">
               <button id="mat-tab-preview" type="button" role="tab" :aria-selected="matTab === 'preview'" aria-controls="mat-panel" @click="matTab = 'preview'">Preview</button>
@@ -679,13 +754,27 @@ watch(view, (now) => { if (now === "setup" && material.value && !preview.value) 
     <!-- Mounted each time it opens, so its curves draw once on the way in and are read fresh. -->
     <MemoryView v-if="view === 'memory'" :course="course.course" @open="openSkill" @navigate="navigate" />
     <div v-show="view === 'chat'" class="lesson-view">
-      <KeepAlive :max="12"><SkillStudy v-if="current?.status === 'CONFIRMED'" ref="study" :key="current.skill" :skill="current.skill" :course="course.course" :learner="username" :materials="data.materials" :ai-available="ai.available" :ai-reason="ai.reason" :active="view === 'chat'" :initial-draft="lessonDraft?.skill === current.skill ? lessonDraft.text : undefined" @changed="progressChanged" @back="showOnTree(current.skill)" @open-source="openSource" @session="sessionShown" @tutor="emit('tutor')" /></KeepAlive>
+      <KeepAlive :max="12"><SkillStudy v-if="current?.status === 'CONFIRMED'" ref="study" :key="current.skill" :skill="current.skill" :course="course.course" :learner="username" :materials="data.materials" :deleted-materials="deletedIds" :skill-materials="currentSources" :ai-available="ai.available" :ai-reason="ai.reason" :active="view === 'chat'" :initial-draft="lessonDraft?.skill === current.skill ? lessonDraft.text : undefined" @changed="progressChanged" @back="showOnTree(current.skill)" @open-source="openSource" @session="sessionShown" @tutor="emit('tutor')" /></KeepAlive>
       <div v-if="current?.status !== 'CONFIRMED'" class="no-lesson"><h2 class="display" tabindex="-1">Choose a leaf to begin.</h2><button class="primary meadow" @click="view = 'home'">Go to your tree</button></div>
     </div>
   </section>
   </div>
   <ForestView v-if="forestOpen" :course-title="course.title" :units="viewUnits" :design="design" :selected="selectedSkill"
     @close="forestOpen = false" @open="openSkill" @practice="practise" @select="selectedSkill = $event" @plant="plant" @regrow="regrow" />
+  <dialog ref="deleteDialog" class="delete-dialog" aria-labelledby="delete-title" aria-describedby="delete-text">
+    <h2 id="delete-title" class="display">Delete “{{ deleteTarget?.title }}”?</h2>
+    <div id="delete-text" class="delete-text">
+      <p>The material and its files leave your library for good. This can't be undone.</p>
+      <p>The tutor stops using it for new lessons, practice and skill suggestions. Past lessons and practice keep their text, and their citations of it will say that it was deleted.</p>
+      <p v-if="deleteEffects.unconfirmed">{{ count(deleteEffects.unconfirmed, "suggested skill", "suggested skills") }} from it that you haven't confirmed will be discarded.</p>
+      <p v-if="deleteEffects.confirmed">{{ deleteEffects.confirmed === 1 ? "The confirmed skill" : "Confirmed skills" }} taught from it keep{{ deleteEffects.confirmed === 1 ? "s its" : " their" }} progress.<template v-if="deleteEffects.stranded">{{ " " }}{{ deleteEffects.stranded === 1 ? (deleteEffects.confirmed === 1 ? "It has" : "One of them has") : `${deleteEffects.stranded} of them have` }} no other source, so add another source under Manage skills before {{ deleteEffects.stranded === 1 ? "its" : "their" }} next lesson.</template></p>
+    </div>
+    <p v-if="deleteError" class="error" role="alert">{{ deleteError }}</p>
+    <div class="delete-actions">
+      <button type="button" class="quiet" :disabled="deleting" @click="deleteDialog?.close()">Cancel</button>
+      <button type="button" class="primary delete-confirm" :disabled="deleting" @click="confirmDelete">{{ deleting ? 'Deleting…' : 'Delete material' }}</button>
+    </div>
+  </dialog>
 </template>
 
 <style scoped>
@@ -772,6 +861,18 @@ watch(view, (now) => { if (now === "setup" && material.value && !preview.value) 
 .detail-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 14px; }
 .detail-meta > .hint { margin: 0; }
 .file-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+/* Deleting is set apart from the material's other actions, in the error colours both themes define. */
+.delete-wrap { margin-left: auto; }
+.quiet.delete-material, .quiet.delete-material:hover:not(:disabled) { color: var(--coral-text); }
+.quiet.delete-material:disabled { color: var(--faint); }
+.delete-dialog { border: 0; border-radius: 22px; padding: 24px; width: min(480px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow-y: auto; box-shadow: 0 20px 50px rgb(var(--shadow) / .18); color: var(--ink); background: var(--card); }
+.delete-dialog::backdrop { background: var(--backdrop); }
+.delete-dialog h2 { margin: 0 0 10px; font-size: 24px; overflow-wrap: anywhere; }
+.delete-text p { margin: 0 0 10px; color: var(--soft); font-size: 15px; line-height: 1.5; }
+.delete-dialog .error { margin: 12px 0 0; }
+.delete-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px 20px; margin-top: 18px; }
+.primary.delete-confirm { --bg-color: var(--coral-wash); --text-color: var(--coral-text); --edge-color: var(--coral-text); --hover-color: var(--coral-wash); margin-top: 0; }
+.primary.delete-confirm:hover:not(:disabled) { box-shadow: 0 3px 0 var(--edge-color), inset 0 0 0 1px var(--coral-text); }
 .file-chip { border: 0; border-radius: 999px; background: var(--inset-2); padding: 5px 12px; font-size: 12px; font-weight: 600; color: var(--soft); }
 .file-chip:hover:not(:disabled) { background: var(--sand-soft); color: var(--sand-soft-text); }
 .mat-tabs { display: flex; gap: 18px; border-bottom: 1px solid var(--line); margin-bottom: 14px; overflow-x: auto; }

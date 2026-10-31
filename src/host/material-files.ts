@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { extname } from "node:path";
 import type { ImportOperation } from "../storage/MaterialImportStore.ts";
-import type { MediaValue } from "../media.ts";
+import type { MediaList, MediaValue } from "../media.ts";
 import { bytesNeeded, classify, extract, START_BYTES, type Detected } from "./extract.ts";
 import { fileStore, type FileStore, type StoreCall } from "./file-store.ts";
 import { Refusal } from "./refusal.ts";
@@ -24,6 +24,8 @@ export const FILES_CHANGED = "The uploaded files differ from the original reques
 export const FILE_GONE = "This saved file is no longer available.";
 
 const digest = (value: string | Uint8Array) => createHash("sha256").update(value).digest("hex");
+/** A retained file reference: the import key, then the file's SHA-256 digest and extension. */
+const RETAINED = /^([a-f0-9-]{36})\/([a-f0-9]{64}\.[a-z0-9]{1,10})$/;
 const safeExtension = (name: string) => /^\.[a-z0-9]{1,10}$/i.test(extname(name)) ? extname(name).toLowerCase() : ".bin";
 
 /** Hashes a received file while streaming it, without another full copy. */
@@ -128,11 +130,20 @@ export class MaterialFiles {
     }
   }
 
+  /**
+   * Deletes a material's retained originals and the image renditions they refer to. It is used for a deleted material
+   * whose import was not recorded; deleteImport covers the rest. A reference in another form names no stored file.
+   */
+  async deleteRetained(owner: string, originals: MediaList, call: StoreCall = {}): Promise<void> {
+    const references = new Set(originals.flatMap((item) => [item.file, ...item.renditions.flatMap((part) => part.kind === "IMAGE" ? [part.file] : [])]));
+    for (const file of references) if (RETAINED.test(file)) await this.store.delete(this.key(owner, file), call);
+  }
+
   /** The file-store key of a retained file. Keys group files by learner digest and import key. */
   storeKey(owner: string, file: string): string { return this.key(owner, file); }
 
   private key(owner: string, file: string) {
-    const match = /^([a-f0-9-]{36})\/([a-f0-9]{64}\.[a-z0-9]{1,10})$/.exec(file);
+    const match = RETAINED.exec(file);
     if (!match) throw new Refusal("Invalid retained file reference.");
     return `${digest(owner)}/${match[1]}/${match[2]}`;
   }

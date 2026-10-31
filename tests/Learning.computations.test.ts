@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import { createHash } from "node:crypto";
-import { estimateTimeline, planRequest, responseInput } from "../src/computations/learning.ts";
+import { estimateTimeline, planRequest, responseInput, selectSources } from "../src/computations/learning.ts";
 import type { EstimateExplanation, ProgressRow } from "../src/concepts/MasteryEstimating/MasteryEstimating.ts";
+import type { SourceContext } from "../src/tutor-types.ts";
 import { D0, S0, g0 } from "./fixtures/fsrs.ts";
 
 const DAY = 86_400_000, start = new Date("2026-10-13T12:00:00Z");
@@ -22,6 +23,20 @@ describe("responseInput", () => {
   test("one failing entry invalidates the whole response", () => {
     for (const attachments of [["a", "a"], ["a", "unknown"], ["unknown"], "a"]) expect(respond("Text", attachments)).toMatchObject({ valid: false, media: [] });
     expect(respond("   ", []).valid).toBe(false);
+  });
+});
+
+describe("selectSources", () => {
+  const sources = [{ material: "a", data: {} }, { material: "b", data: {} }, { material: "c", data: {} }] as unknown as SourceContext[];
+  const [a, b, c] = sources as [SourceContext, SourceContext, SourceContext];
+  test("selects the requested materials that remain and lists each once, in the requested order", () => {
+    expect(selectSources({ sources, materials: ["c", "a"] })).toEqual({ selected: [a, c], remaining: ["c", "a"], valid: true });
+    // A material the learner deleted is no longer among the sources, so it is left out.
+    expect(selectSources({ sources, materials: ["deleted", "b", "b"] })).toEqual({ selected: [b], remaining: ["b"], valid: true });
+  });
+  test("is invalid when none of the requested materials remains, or none was requested", () => {
+    expect(selectSources({ sources, materials: ["deleted"] })).toEqual({ selected: [], remaining: [], valid: false });
+    expect(selectSources({ sources, materials: [] })).toEqual({ selected: [], remaining: [], valid: false });
   });
 });
 

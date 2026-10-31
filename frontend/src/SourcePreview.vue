@@ -2,21 +2,24 @@
 import { nextTick, ref, shallowRef } from "vue";
 import MaterialViewer from "./MaterialViewer.vue";
 import { placeLabel } from "./locations.ts";
+import { DELETED_MATERIAL } from "./labels.ts";
 import type { AskAboutPage, OpenSource } from "./revamp-types.ts";
 
 // A cited source previewed in place on the lesson page on narrow screens (wide screens use SourcePane.vue beside the
 // conversation): a dialog holding the viewer in its page-only mode, opened at the cited place and showing only the file
 // there. "Open in Materials" leaves for the full page. Focus moves to the dialog when it opens and returns to the
 // control that opened it when it closes.
-const props = defineProps<{ titles: Record<string, string> }>();
+// `deleted` lists the materials the learner deleted. A deleted material shows a sentence saying so and no link into
+// Materials, as it does when the viewer's read finds it deleted since the course was read.
+const props = withDefaults(defineProps<{ titles: Record<string, string>; deleted?: readonly string[] }>(), { deleted: () => [] });
 const emit = defineEmits<{ "open-materials": [source: OpenSource]; ask: [request: AskAboutPage] }>();
-const dialog = ref<HTMLDialogElement | null>(null), source = shallowRef<OpenSource | null>(null);
+const dialog = ref<HTMLDialogElement | null>(null), source = shallowRef<OpenSource | null>(null), gone = ref(false);
 let opener: HTMLElement | null = null;
 
 async function open(next: OpenSource) {
   const active = document.activeElement;
   opener = active instanceof HTMLElement && active !== document.body ? active : null;
-  source.value = next;
+  source.value = next; gone.value = props.deleted.includes(next.material);
   await nextTick();
   if (!dialog.value?.open) dialog.value?.showModal();
   dialog.value?.focus();
@@ -48,12 +51,13 @@ defineExpose({ open });
       <header class="preview-head">
         <div class="preview-heading">
           <p class="eyebrow">Source · {{ placeLabel(source.location) }}</p>
-          <h2 id="source-preview-title" class="display">{{ titles[source.material] || 'Course material' }}</h2>
+          <h2 id="source-preview-title" class="display">{{ gone ? DELETED_MATERIAL : titles[source.material] || 'Course material' }}</h2>
         </div>
-        <button type="button" class="quiet open-materials" @click="openMaterials">Open in Materials</button>
+        <button v-if="!gone" type="button" class="quiet open-materials" @click="openMaterials">Open in Materials</button>
         <button type="button" class="preview-close" aria-label="Close the preview" @click="close"><span aria-hidden="true">✕</span></button>
       </header>
-      <MaterialViewer :key="`${source.material}\n${source.location}`" class="preview-page" mode="page" :material="source.material" :title="props.titles[source.material] ?? ''" :skills="[]" :initial-location="source.location" @ask="ask" />
+      <p v-if="props.deleted.includes(source.material)" class="preview-gone">This material was deleted, so it can no longer be shown.</p>
+      <MaterialViewer v-else :key="`${source.material}\n${source.location}`" class="preview-page" mode="page" :material="source.material" :title="props.titles[source.material] ?? ''" :skills="[]" :initial-location="source.location" @ask="ask" @deleted="gone = true" />
     </template>
   </dialog>
 </template>
@@ -69,6 +73,7 @@ defineExpose({ open });
 .preview-heading .eyebrow { margin-bottom: 4px; }
 .preview-heading h2 { margin: 0; font-size: 24px; overflow-wrap: anywhere; }
 .open-materials { flex: none; padding: 8px 0; white-space: nowrap; }
+.preview-gone { margin: 0; color: var(--muted); font-size: 14px; }
 .preview-close { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 36px; height: 36px; padding: 0; border: 0; border-radius: 10px; background: var(--inset); color: var(--ink); font-size: 16px; line-height: 1; }
 .preview-close:hover { background: var(--inset-2); }
 @media (max-width: 520px) {

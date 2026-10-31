@@ -100,6 +100,8 @@ const stages: readonly ImportStage[] = ["CREATED", "SOURCES_SAVED", "TRANSCRIBIN
 /** Forward order for replay checks. A discarded operation is never past another stage. */
 const rank = (stage: ImportStage) => stage === "DISCARDED" ? -1 : stages.indexOf(stage);
 const order = { createdAt: 1, requestId: 1 } as const;
+/** What an import read from its files: the prepared material, partial readings, and transcripts. Deleting a material removes it. */
+const READ_CONTENT = { prepared: "", partial: "", recordings: "" } as const;
 const allDone = { "recordings.0": { $exists: true }, recordings: { $not: { $elemMatch: { status: { $ne: "DONE" } } } } };
 const noFinalFailure = {
   "failure.retryable": { $ne: false },
@@ -336,22 +338,57 @@ export class MaterialImportStore {
 
   /**
    * Removes an unfinished import. A READY import is removed only with the host's report that AddMaterial
-   * refused its prepared input as invalid, so no material can hold its key.
+   * refused its prepared input as invalid, so no material can hold its key, or that AddMaterial refused it because
+   * the learner deleted the material saved under its key. In the second case the text read from the files is
+   * removed with it, as it is when a saved material is deleted.
    */
-  async discard(input: ImportIdentity & { invalidInput?: boolean }): Promise<ImportOperation | null> {
-    const { owner, requestId, invalidInput = false } = input;
+  async discard(input: ImportIdentity & { invalidInput?: boolean; materialDeleted?: boolean }): Promise<ImportOperation | null> {
+    const { owner, requestId, invalidInput = false, materialDeleted = false } = input;
     for (let attempt = 0; attempt < 5; attempt++) {
       const current = await this.get({ owner, requestId });
       if (!current) return null;
       if (current.stage === "DISCARDED") return current;
-      if (current.stage === "COMPLETE" || (current.stage === "READY" && !invalidInput)) throw new ImportAlreadySaved();
+      if (current.stage === "COMPLETE" || (current.stage === "READY" && !invalidInput && !materialDeleted)) throw new ImportAlreadySaved();
       const update: UpdateFilter<ImportOperation> = { $set: { stage: "DISCARDED", filesDeleted: false }, $inc: { revision: 1 } };
+      if (materialDeleted && current.stage === "READY") update.$unset = { ...READ_CONTENT };
       // A claim does not change the revision, so the update removes any claim made since the read.
-      if (current.recordings?.length) update.$unset = { "recordings.$[].claim": "" } as UpdateFilter<ImportOperation>["$unset"];
+      else if (current.recordings?.length) update.$unset = { "recordings.$[].claim": "" } as UpdateFilter<ImportOperation>["$unset"];
       const result = await this.operations.updateOne({ owner, requestId, stage: current.stage, revision: current.revision }, update);
       if (result.matchedCount === 1) return this.#reread({ owner, requestId });
     }
     throw new ImportProgressConflict();
+  }
+
+  /**
+   * Removes the saved import of a material the learner deleted, with the text read from its files. The record keeps
+   * the request, so a repeated upload is answered as removed and the files it names can still be deleted. Returns the
+   * removed import, the same import when it was already removed, or null when no import saved this material, as for
+   * materials saved before imports were recorded.
+   */
+  async discardSaved(input: { owner: string; material: string }): Promise<ImportOperation | null> {
+    const { owner, material } = input;
+    if (!nonblank(owner) || !nonblank(material)) throw new InvalidImportRequest();
+    await this.#ready();
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const found = await this.operations.findOne({ owner, material, stage: { $in: ["COMPLETE", "DISCARDED"] } });
+      if (!found) return null;
+      const current = checked(found);
+      if (current.stage === "DISCARDED") return current;
+      const result = await this.operations.updateOne({ owner, requestId: current.requestId, stage: "COMPLETE", revision: current.revision }, {
+        $set: { stage: "DISCARDED", filesDeleted: false }, $unset: { ...READ_CONTENT }, $inc: { revision: 1 },
+      });
+      if (result.matchedCount === 1) return this.#reread({ owner, requestId: current.requestId });
+    }
+    throw new ImportProgressConflict();
+  }
+
+  /** The saved imports, still COMPLETE, of the listed materials. The host finishes deleting them when a deletion was cut short. */
+  async savedFor(input: { owner: string; materials: readonly string[] }): Promise<ImportOperation[]> {
+    const { owner, materials } = input;
+    if (!nonblank(owner) || !Array.isArray(materials) || !materials.every(nonblank)) throw new InvalidImportRequest();
+    if (!materials.length) return [];
+    const rows = await this.operations.find({ owner, stage: "COMPLETE", material: { $in: [...materials] } }).sort(order).toArray();
+    return rows.map(checked);
   }
 
   /** Removed imports whose retained files are not yet recorded as deleted, oldest first. */

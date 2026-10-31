@@ -2,23 +2,29 @@
 import { computed, onBeforeUnmount, reactive } from "vue";
 import { api, errorMessage, failureText } from "./api.ts";
 import { materialFile } from "./host-api.ts";
-import { sourceLabel } from "./labels.ts";
+import { DELETED_MATERIAL, DELETED_PASSAGE, deletedRead, sourceLabel } from "./labels.ts";
 import type { StillGotItHttp } from "../../generated/wire.ts";
 import type { OpenSource } from "./revamp-types.ts";
 type Citation = StillGotItHttp["/learning/read"]["output"]["data"]["sessions"][number]["citations"][number];
 type MaterialData = StillGotItHttp["/courses/materials/read"]["output"];
 type Rendition = MaterialData["originals"][number]["renditions"][number];
 type Loaded<T> = { state: "loading" } | { state: "ready"; value: T } | { state: "failed"; message: string };
+// A material the learner deleted: nothing of it can be shown, and trying again cannot help.
+type Read = Loaded<MaterialData> | { state: "deleted"; message: string };
 type Part = { kind: "TEXT"; text: string } | { kind: "IMAGE"; image: Loaded<string> } | { kind: "PAGE"; page: number };
-// `titles` names each course material, for labels before its passage is opened. `idPrefix` keeps element ids unique.
+// `titles` names each course material, for labels before its passage is opened. `deleted` lists the materials the learner
+// deleted from the course: their citations read "Deleted material · Page 3" and open to a sentence saying so, with no
+// link into Materials. A material deleted since the course was read is found the same way when its read answers that it
+// was deleted. `idPrefix` keeps element ids unique.
 // `variant` picks the look: "chips" under a tutor answer ("From <source> ↗"), or "rail" for the Taught from card.
 // `compact` lays the chips out in one wrapping row with a single "From", for the sources under each tutor reply.
 // Choosing a chip opens its passage below the row, and the passage's "Show in the material" emits `open`. Choosing a
 // source in the rail emits `open` at once. The lesson page answers `open` with a preview of the material in place.
-const props = withDefaults(defineProps<{ citations: readonly Citation[]; titles: Record<string, string>; idPrefix: string; variant?: "chips" | "rail"; compact?: boolean }>(), { variant: "chips", compact: false });
+const props = withDefaults(defineProps<{ citations: readonly Citation[]; titles: Record<string, string>; deleted?: readonly string[]; idPrefix: string; variant?: "chips" | "rail"; compact?: boolean }>(),
+  { deleted: () => [], variant: "chips", compact: false });
 const emit = defineEmits<{ open: [source: OpenSource] }>();
 const open = reactive(new Set<string>());
-const reads = reactive(new Map<string, Loaded<MaterialData>>());
+const reads = reactive(new Map<string, Read>());
 const images = reactive(new Map<string, Loaded<string>>());
 const objectUrls: string[] = [];
 
@@ -38,28 +44,32 @@ function readFailure(result: { error: unknown; detail?: unknown }) {
 }
 
 const entries = computed(() => props.citations.map((citation, index) => {
-  const read = reads.get(citation.material);
-  const label = sourceLabel(citation.location, read?.state === "ready" ? read.value.title : props.titles[citation.material]);
+  const listed = props.deleted.includes(citation.material);
+  const read: Read | undefined = listed ? { state: "deleted", message: DELETED_PASSAGE } : reads.get(citation.material);
+  const deleted = read?.state === "deleted";
+  const label = sourceLabel(citation.location, deleted ? DELETED_MATERIAL : read?.state === "ready" ? read.value.title : props.titles[citation.material]);
   // A scanned page has no text to quote here; Materials shows the page itself.
   const parts: Part[] = read?.state === "ready" ? matching(citation, read.value).map((part): Part => part.kind === "TEXT"
     ? { kind: "TEXT", text: part.text } : part.kind === "PAGE" ? { kind: "PAGE", page: part.page }
       : { kind: "IMAGE", image: images.get(imageKey(citation, part.file)) ?? { state: "loading" } }) : [];
-  return { citation, key: keyOf(citation), id: `${props.idPrefix}-${index}`, label, open: open.has(keyOf(citation)),
-    read: read ?? { state: "loading" } as Loaded<MaterialData>, parts };
+  return { citation, key: keyOf(citation), id: `${props.idPrefix}-${index}`, label, open: open.has(keyOf(citation)), deleted,
+    read: read ?? { state: "loading" } as Read, parts };
 }));
 
 // Two citations into one material share its read, including one that is still loading.
 const readsInFlight = new Map<string, Promise<void>>();
 function readMaterial(citation: Citation): Promise<void> {
   const material = citation.material;
-  if (reads.get(material)?.state === "ready") return Promise.resolve();
+  const known = reads.get(material)?.state;
+  if (known === "ready" || known === "deleted" || props.deleted.includes(material)) return Promise.resolve();
   const running = readsInFlight.get(material);
   if (running) return running;
   reads.set(material, { state: "loading" });
   const reading = (async () => {
     try {
       const result = await api.courses.materials.read({ material });
-      reads.set(material, "error" in result ? { state: "failed", message: readFailure(result) } : { state: "ready", value: result });
+      reads.set(material, !("error" in result) ? { state: "ready", value: result }
+        : deletedRead(result) ? { state: "deleted", message: DELETED_PASSAGE } : { state: "failed", message: readFailure(result) });
     } catch {
       reads.set(material, { state: "failed", message: errorMessage("NETWORK_ERROR") });
     } finally { readsInFlight.delete(material); }
@@ -101,11 +111,14 @@ onBeforeUnmount(() => objectUrls.forEach((url) => URL.revokeObjectURL(url)));
     <ul class="source-list" :aria-label="variant === 'rail' ? 'Sources this skill is taught from' : 'Sources used'">
       <li v-for="(entry, index) in entries" :key="entry.key" :class="{ open: entry.open }">
         <span v-if="variant === 'chips' && (!compact || index === 0)" class="from" aria-hidden="true">From</span>
-        <button v-if="variant === 'rail'" type="button" class="source-toggle" aria-haspopup="dialog" @click="preview(entry.citation)"><span class="file-tag" aria-hidden="true">FILE</span><span class="source-name">{{ entry.label }}</span><span aria-hidden="true"> ↗</span></button>
+        <!-- A deleted material has nothing to open, so its rail entry is plain text. -->
+        <span v-if="variant === 'rail' && entry.deleted" class="source-toggle gone"><span class="file-tag" aria-hidden="true">FILE</span><span class="source-name">{{ entry.label }}</span></span>
+        <button v-else-if="variant === 'rail'" type="button" class="source-toggle" aria-haspopup="dialog" @click="preview(entry.citation)"><span class="file-tag" aria-hidden="true">FILE</span><span class="source-name">{{ entry.label }}</span><span aria-hidden="true"> ↗</span></button>
         <button v-else type="button" class="source-toggle" :aria-expanded="entry.open" :aria-controls="entry.id" @click="toggle(entry.citation)"><span class="source-name">{{ entry.label }}</span><span aria-hidden="true"> ↗</span></button>
         <div v-if="variant === 'chips'" v-show="entry.open" :id="entry.id" class="passage" role="region" :aria-label="entry.label">
           <template v-if="entry.open">
             <p v-if="entry.read.state === 'loading'" class="hint" role="status">Opening the passage…</p>
+            <p v-else-if="entry.read.state === 'deleted'" class="passage-gone">{{ entry.read.message }}</p>
             <div v-else-if="entry.read.state === 'failed'" class="passage-problem" role="alert">
               <p>{{ entry.read.message }}</p><button type="button" class="source-retry" @click="show(entry.citation)">Try again</button>
             </div>
@@ -161,6 +174,8 @@ onBeforeUnmount(() => objectUrls.forEach((url) => URL.revokeObjectURL(url)));
 .passage-figure img{display:block;max-width:100%;max-height:420px;height:auto;border-radius:6px;border:1px solid var(--line);background:var(--inset)}
 .passage-problem{font-size:13px;border-left:3px solid var(--coral);padding:4px 0 4px 10px;margin:0 0 8px}
 .passage-problem p{margin:0 0 4px}
+.passage-gone{margin:0;font-size:13px;color:var(--muted)}
+.rail .source-toggle.gone,.rail .source-toggle.gone:hover{color:var(--muted);background:var(--inset)}
 .source-more{border:0;background:transparent;padding:4px 0;font-size:12px;font-weight:600;color:var(--dawn-soft-text);text-decoration:underline;text-underline-offset:3px}
 .source-retry{border:0;background:transparent;padding:4px 0;font-size:12px;color:var(--ink);text-decoration:underline;text-underline-offset:3px}
 </style>

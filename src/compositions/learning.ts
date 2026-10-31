@@ -27,8 +27,9 @@ export const learnerWork = (owner: symbol, studySession: symbol, { text, channel
     : compute(C.responseInput, { data, text, channel, attachments, sources }, { valid: true, media }),
 ] as const;
 /**
- * Conditions that prepare a tutor request of one kind from the learner's open session. Every material saved with the
- * session must still be among the learner's sources in its course, and the learner's tutor choice is added last.
+ * Conditions that prepare a tutor request of one kind from the learner's open session. At least one material saved with
+ * the session must still be among the learner's sources in its course; the request carries only those, so a material the
+ * learner deleted is never sent. The learner's tutor choice is added last.
  */
 const sessionTutorRequest = (owner: symbol, studySession: symbol, kind: "REPLY" | "HINT", { data, sources, materials, selected, draft, choice, status, prepared }:
   Symbols<"data" | "sources" | "materials" | "selected" | "draft" | "choice" | "status" | "prepared">) => [
@@ -38,8 +39,8 @@ const sessionTutorRequest = (owner: symbol, studySession: symbol, kind: "REPLY" 
 ] as const;
 /**
  * Conditions that prepare the opening explanation of an unexplained lesson from the request it was saved with, the
- * current context of its skill, and the materials saved with the lesson, which must still be among the learner's sources
- * in its course. The learner's tutor choice is added last.
+ * current context of its skill, and those materials saved with the lesson that are still among the learner's sources in
+ * its course; at least one must be. The learner's tutor choice is added last.
  */
 const openingTutorRequest = (owner: symbol, studySession: symbol, { data, sources, skill, context, request, materials, selected, draft, choice, status, prepared }:
   Symbols<"data" | "sources" | "skill" | "context" | "request" | "materials" | "selected" | "draft" | "choice" | "status" | "prepared">) => [
@@ -49,12 +50,14 @@ const openingTutorRequest = (owner: symbol, studySession: symbol, { data, source
   ...usingTutorChoice(owner, draft, choice, status, prepared),
 ] as const;
 /**
- * Conditions that prepare a grading request for a saved case from its work, the materials saved with its session, and the
- * learner's sources in its course. Assess, RetryAssessment, and Regrade share them; each reads the case its own way first.
+ * Conditions that prepare a grading request for a saved case from its work, the materials saved with its session that are
+ * still among the learner's sources in its course, and the case's saved criteria. Assess, RetryAssessment, and Regrade share
+ * them; each reads the case its own way first. Grading needs no source: when the learner deleted every material of the
+ * task, the attempt is still graded against the criteria saved with it.
  */
 const gradeRequest = (owner: symbol, { data, sessionData, sources, materials, selected, draft, choice, status, prepared }:
   Symbols<"data" | "sessionData" | "sources" | "materials" | "selected" | "draft" | "choice" | "status" | "prepared">) => [
-  compute(C.sessionMaterials, { data: sessionData }, materials), compute(C.selectSources, { sources, materials }, { selected, valid: true }),
+  compute(C.sessionMaterials, { data: sessionData }, materials), compute(C.selectSources, { sources, materials }, { selected }),
   compute(C.gradeRequest, { selected, data }, draft), ...usingTutorChoice(owner, draft, choice, status, prepared),
 ] as const;
 /**
@@ -92,16 +95,17 @@ const Confidence = endpoint("/learning/confidence", ({ session, skill, confidenc
   ), options);
 
 // The lesson is saved with the learner's request before any tutor work, so the request is kept when the tutor is slow or
-// fails. The page then asks Reply for the opening explanation, and Reply retries it after a failure.
-const Lesson = endpoint("/learning/lesson", ({ session, skill, request, owner, definition, context, sources, materials, lesson }) => receive({ session, skill, request })
+// fails. The page then asks Reply for the opening explanation, and Reply retries it after a failure. The lesson is saved
+// with the skill's sources that remain, so a source the learner deleted never grounds it.
+const Lesson = endpoint("/learning/lesson", ({ session, skill, request, owner, definition, context, sources, materials, remaining, lesson }) => receive({ session, skill, request })
   .then(Sessioning.use({ session }).responds({ subject: owner }))
   .then(
     where(R.ActiveSkill({ owner, skill })).then(useAgain(session, owner)).named("ready"),
     where(no(R.ActiveSkill({ owner, skill }))).then(respond({ error: "SKILL_UNAVAILABLE" })).named("missing"),
   )
   .then(where(R.ActiveSkill({ owner, skill }).is({ definition }), R.SkillContext({ owner, skill }).is({ context, sources }),
-    compute(C.selectSkillMaterials, { context }, materials), compute(C.selectSources, { sources, materials }, { valid: true }))
-    .then(Tutoring.requestLesson({ owner, topic: skill, definition, request, materials }).responds({ lesson }))
+    compute(C.selectSkillMaterials, { context }, materials), compute(C.selectSources, { sources, materials }, { valid: true, remaining }))
+    .then(Tutoring.requestLesson({ owner, topic: skill, definition, request, materials: remaining }).responds({ lesson }))
     .then(respond({ lesson }))), options);
 const Task = endpoint("/learning/task", ({ session, skill, owner, definition, context, skills, tracks, sources, materials, selected, sessions, draft, choice, status, prepared, answer, question, citations, criteria, task }) => receive({ session, skill })
   .then(Sessioning.use({ session }).responds({ subject: owner }))

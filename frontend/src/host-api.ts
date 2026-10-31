@@ -143,6 +143,11 @@ export async function removeImport(requestId: string): Promise<void> {
   await hostRequest<Record<string, never>>("/courses/materials/imports/remove", { requestId });
 }
 
+/** Deletes one of the learner's materials and its saved files for good. Deleting it again succeeds and changes nothing. */
+export async function deleteMaterial(material: MaterialId): Promise<void> {
+  await hostRequest<Record<string, never>>("/courses/materials/delete", { material });
+}
+
 /**
  * Reads one saved file of a material through the file route, which checks the learner's access to the material and
  * this exact file reference first. The bytes come back as a local object of the saved media type the caller passes,

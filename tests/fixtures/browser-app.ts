@@ -28,8 +28,9 @@ const fixtureTutor: Pick<CourseTutor, "suggest" | "generate"> = {
     { title: "Check matrix dimensions", outcome: "Decide whether two matrices can be multiplied and state the output dimensions.", gate: "Check three unfamiliar pairs and explain each decision." },
   ] }),
   generate: async (_owner, sources, _instruction, context, schema) => {
-    const properties = schema.properties as Record<string, unknown>, source = sources[0]!;
-    const citations = [{ material: source.material, location: source.data.originals[0]?.renditions[0]?.location ?? "content" }];
+    // A grading request carries no source once the learner deleted every source of its task; every other request has one.
+    const properties = schema.properties as Record<string, unknown>, source = sources[0];
+    const citations = source ? [{ material: source.material, location: source.data.originals[0]?.renditions[0]?.location ?? "content" }] : [];
     // Graded-work extraction: three marked questions, two mapped to the course's first skills and one left unmapped.
     if (properties.rows) {
       const skills = ((context as { skills?: { skill: string }[] }).skills ?? []).map((row) => row.skill);

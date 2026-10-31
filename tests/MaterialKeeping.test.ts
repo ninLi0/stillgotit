@@ -353,3 +353,94 @@ describe("MaterialKeeping material storage", () => {
     expect(await separate._materials(input)).toEqual([]);
   });
 });
+
+describe("MaterialKeeping deletion", () => {
+  test("the owner deletes a material: it leaves every read, only its identity, owner, scope, and key remain, and its key stays taken", async () => {
+    const { library, records } = setup();
+    const notes = request({ importKey: "import-week-3", title: "Week 3 notes", originals: [source()] });
+    const kept = request({ title: "Week 4 notes" });
+    const saved = await library.add(notes);
+    const other = await library.add(kept);
+
+    expect(await library.delete({ owner: notes.owner, material: saved.material })).toEqual({});
+
+    // The material leaves the list, the read, and the source set; the other material is untouched.
+    expect(await library._materials(notes)).toEqual([{ material: other.material, title: kept.title, locator: kept.locator, origin: kept.origin }]);
+    expect(await library._material(saved)).toEqual([]);
+    expect(await library._sourceSet(notes)).toEqual({ sources: [{ material: other.material, data: materialData(kept) }] });
+    expect(await library._material(other)).toEqual([materialData(kept)]);
+
+    // Only the fact of the deletion remains, for the owner's pages that cited it.
+    expect(await library._deleted(saved)).toEqual([{ owner: notes.owner, scope: notes.scope }]);
+    expect(await library._deleted(other)).toEqual([]);
+    expect(await library._deletions(notes)).toEqual([{ material: saved.material }]);
+    expect(await library._deletions({ owner: "learner-leo", scope: notes.scope })).toEqual([]);
+    expect(await library._deletions({ owner: notes.owner, scope: "course-physics" })).toEqual([]);
+    expect(await records.findOne({ _id: saved.material })).toEqual({
+      _id: saved.material, owner: notes.owner, scope: notes.scope, importKey: notes.importKey, deleted: true,
+    } as never);
+
+    // A late retry of the original import is refused instead of bringing the notes back, and changes nothing.
+    const before = await records.find().toArray();
+    await expect(library.add(structuredClone(notes))).rejects.toMatchObject({
+      code: "MATERIAL_DELETED", message: "This material was deleted. Import the files again to use them.",
+    });
+    await expect(library.add({ ...notes, title: "Changed" })).rejects.toMatchObject({ code: "MATERIAL_DELETED" });
+    expect(await records.find().toArray()).toEqual(before);
+
+    // Importing the same files again under a new key makes a new material.
+    const again = await library.add({ ...notes, importKey: randomUUID() });
+    expect(again.material).not.toBe(saved.material);
+    expect(await library._material(again)).toEqual([materialData(notes)]);
+  });
+
+  test("only the owner can delete, and an unknown or already deleted material is refused without a change", async () => {
+    const { library, records } = setup();
+    const notes = request();
+    const saved = await library.add(notes);
+    const before = await records.find().toArray();
+    const refused = { code: "MATERIAL_DELETE_UNAVAILABLE", message: "Choose one of your materials to delete." };
+
+    await expect(library.delete({ owner: "learner-leo", material: saved.material })).rejects.toMatchObject(refused);
+    await expect(library.delete({ owner: notes.owner, material: randomUUID() as Material })).rejects.toMatchObject(refused);
+    for (const value of [null, undefined, "", " ", { $ne: "" }, ["x"]]) {
+      await expect(library.delete({ owner: notes.owner, material: value as Material })).rejects.toMatchObject(refused);
+      await expect(library.delete({ owner: value as string, material: saved.material })).rejects.toMatchObject(refused);
+    }
+    expect(await records.find().toArray()).toEqual(before);
+    expect(await library._deleted(saved)).toEqual([]);
+
+    await library.delete({ owner: notes.owner, material: saved.material });
+    const deleted = await records.find().toArray();
+    await expect(library.delete({ owner: notes.owner, material: saved.material })).rejects.toMatchObject(refused);
+    expect(await records.find().toArray()).toEqual(deleted);
+  });
+
+  test("another owner's request under a deleted material's key saves a material of their own", async () => {
+    const { library } = setup();
+    const notes = request();
+    const saved = await library.add(notes);
+    await library.delete({ owner: notes.owner, material: saved.material });
+    const leos = await library.add({ ...notes, owner: "learner-leo" });
+    expect(leos.material).not.toBe(saved.material);
+    expect(await library._material(leos)).toEqual([{ ...materialData(notes), owner: "learner-leo" }]);
+    expect(await library._deleted(leos)).toEqual([]);
+  });
+
+  test("competing deletes of one material settle with one success and one refusal", async () => {
+    const { library } = setup();
+    const saved = await library.add(request());
+    const results = await Promise.allSettled([1, 2].map(() => library.delete({ owner: request().owner, material: saved.material })));
+    expect(results.filter(({ status }) => status === "fulfilled")).toHaveLength(1);
+    expect(results.filter(({ status }) => status === "rejected")).toMatchObject([{ reason: { code: "MATERIAL_DELETE_UNAVAILABLE" } }]);
+  });
+
+  test("deletion queries reject malformed identifiers instead of MongoDB operators", async () => {
+    const { library } = setup();
+    for (const value of [null, undefined, "", " ", { $ne: "" }, ["learner-sam"]]) {
+      await expect(library._deleted({ material: value as Material })).rejects.toBeInstanceOf(TypeError);
+      await expect(library._deletions({ owner: value as string, scope: request().scope })).rejects.toBeInstanceOf(TypeError);
+      await expect(library._deletions({ owner: request().owner, scope: value as string })).rejects.toBeInstanceOf(TypeError);
+    }
+  });
+});

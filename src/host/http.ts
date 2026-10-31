@@ -1,4 +1,5 @@
 import { admissions, composition as Access } from "../compositions/access.ts";
+import { composition as Courses } from "../compositions/courses.ts";
 import { tutorRefusals } from "../compositions/settings.ts";
 import { gradedConfirmInput, gradedExtractInput, learningInput, structuredInput, tutorChoiceInput } from "../compositions/reusable/inputs.ts";
 import { levelSupported, modelOffered } from "../computations/tutor.ts";
@@ -190,6 +191,16 @@ export function createApplicationHttp({ application, recovery, publicOrigin, clo
       finally { await rawGateway.whenIdle(); }
     },
     readMaterial: (token, material) => rawGateway.invoke("/courses/materials/read", { session: token, material } as never),
+    deleteReady: async (owner, material) => !!await application.form(Access.DeleteReady({ owner, material })),
+    // The private delete endpoint, run to completion so DiscardDeletedDrafts has finished before the answer.
+    deleteMaterial: async (input) => {
+      try { return await rawGateway.invoke("/internal/materials/delete", input as never); }
+      finally { await rawGateway.whenIdle(); }
+    },
+    deletedMaterials: async (owner, course) => {
+      const rows = await application.form(Courses.DeletedMaterials({ owner, course })) as { material: string }[] | null;
+      return (rows ?? []).map((row) => row.material);
+    },
     recordingsAvailable: () => gemini?.status().available ?? false,
     wake: () => transcription?.wake(),
   }) : null;
@@ -204,6 +215,7 @@ export function createApplicationHttp({ application, recovery, publicOrigin, clo
     const route = materials && {
       "/api/courses/materials/file": materials.file, "/api/courses/materials/imports": materials.list,
       "/api/courses/materials/imports/retry": materials.retry, "/api/courses/materials/imports/remove": materials.remove,
+      "/api/courses/materials/delete": materials.delete,
     }[path];
     if (route) return route(request, owner, body);
     return path.startsWith("/api/courses/materials/") ? failure("UNAVAILABLE", 503) : failure("INVALID_REQUEST", 404);
@@ -323,7 +335,8 @@ export function createApplicationHttp({ application, recovery, publicOrigin, clo
         const code = !modelOffered({ model }) ? "UNKNOWN_TUTOR_MODEL" : !levelSupported({ model, level }) ? "UNSUPPORTED_THINKING_LEVEL" : null;
         return code ? Response.json({ error: "INVALID_REQUEST", detail: tutorRefusals[code] }, { status: 400, headers: { "Cache-Control": "no-store" } }) : response;
       }
-      if (path.startsWith("/api/ai/") || path === "/api/courses/materials/file" || path.startsWith("/api/courses/materials/imports")) {
+      if (path.startsWith("/api/ai/") || path === "/api/courses/materials/file" || path === "/api/courses/materials/delete" ||
+        path.startsWith("/api/courses/materials/imports")) {
         return await providerRequest(request, path);
       }
       if (path === "/api/auth/commons/resume" || path === "/api/auth/commons/choose") {

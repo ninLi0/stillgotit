@@ -26,6 +26,19 @@ describe("Browser draft save recovery", () => {
     expect(reloaded.read()).toEqual([]);
   });
 
+  test("waiting saves from a deleted material are dropped, and the others keep their keys and order", () => {
+    const saved = storage(), queue = new DraftSaveQueue(saved, "course");
+    queue.start([draft, { ...draft, material: "other" as Material, title: "Check dimensions" }, { ...draft, title: "Transpose" }]);
+    const initial = queue.read();
+    expect(queue.forget(new Set(["unrelated"]))).toBe(0);
+    expect(queue.read()).toEqual(initial);
+    expect(queue.forget(new Set(["source"]))).toBe(2);
+    expect(queue.read()).toEqual([initial[1]!]);
+    expect(queue.forget(new Set(["other"]))).toBe(1);
+    expect(queue.read()).toEqual([]);
+    expect(saved.getItem("course")).toBeNull();
+  });
+
   test("an interrupted acknowledgment cannot lose the request key", async () => {
     const saved = storage(), queue = new DraftSaveQueue(saved, "course");
     queue.start([draft]); const initial = queue.read();

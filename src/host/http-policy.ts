@@ -13,6 +13,8 @@ import { skillMapping } from "../concepts/SkillMapping.registry.ts";
 import { budgeting } from "../concepts/Budgeting/registry.ts";
 
 export const SESSION_COOKIE = "__Host-stillgotit-session";
+/** The sentence for reading a material the learner deleted, as a citation of it does. */
+export const MATERIAL_DELETED_READ = "This material was deleted, so it can no longer be shown.";
 export const ATTEMPT_COOKIE = "__Host-stillgotit-sign-in";
 export const BODY_LIMIT = 16_384;
 
@@ -136,6 +138,9 @@ export function stillGotItPolicy(publicOrigin: string, requestBodyBytes = BODY_L
       INVALID_TUTORING_MATERIAL: "INVALID_REQUEST",
       INVALID_MATERIAL_IMPORT_KEY: "INVALID_REQUEST",
       MATERIAL_IMPORT_CONFLICT: "CONFLICT",
+      // A deleted material is gone for good, so the browser can tell a deletion apart from a material it may not see.
+      MATERIAL_DELETED: "NOT_FOUND",
+      MATERIAL_DELETE_UNAVAILABLE: "FORBIDDEN",
       UNIT_COURSE_UNAVAILABLE: "FORBIDDEN",
       INVALID_UNIT_TITLE: "INVALID_REQUEST",
       PROPOSAL_UNIT_UNAVAILABLE: "FORBIDDEN",
@@ -237,6 +242,8 @@ export const scopedRefusalDetails: Readonly<Record<string, { readonly applies: (
   // Learning.md, "Archiving a conversation": archiving and restoring accept any of the learner's own conversations, so
   // they answer one that is not the learner's with this sentence.
   SESSION_UNAVAILABLE: { applies: (path) => path === "/learning/archive" || path === "/learning/restore", detail: "This conversation is not one of yours. Choose one of your own conversations." },
+  // Courses.md: reading a material the learner deleted. Elsewhere the code keeps MaterialKeeping's sentence.
+  MATERIAL_DELETED: { applies: (path) => path === "/courses/materials/read", detail: MATERIAL_DELETED_READ },
 };
 
 /**

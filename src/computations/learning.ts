@@ -13,9 +13,16 @@ export function selectSkill({ skills, skill }: { skills: SkillRows; skill: strin
   if (!result) throw new Error("Unavailable skill");
   return result;
 }
+/**
+ * The requested materials found among the supplied sources. A requested material the learner deleted is no longer among
+ * them and is left out. The selection is valid when at least one requested material remains; `remaining` lists those
+ * materials once each, in the requested order.
+ */
 export function selectSources({ sources, materials }: { sources: SourceContext[]; materials: string[] }) {
   const selected = sources.filter((source) => materials.includes(source.material));
-  return { selected, valid: materials.length > 0 && new Set(selected.map((source) => source.material)).size === new Set(materials).size };
+  const found = new Set<string>(selected.map((source) => source.material));
+  const remaining = [...new Set(materials)].filter((material) => found.has(material));
+  return { selected, remaining, valid: remaining.length > 0 };
 }
 export function studyDetail({ context, tracks, sessions, cases }: { context: SkillInfo; tracks: Tracks; sessions: Sessions; cases: Cases }) {
   const track = tracks.find((row) => row.subject === context.skill && row.definition === context.current) ?? null;

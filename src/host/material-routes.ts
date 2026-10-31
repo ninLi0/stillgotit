@@ -1,5 +1,5 @@
 import type { InvocationResult } from "@mit-sdg/sync-engine/boundary";
-import type { MediaList } from "../media.ts";
+import { isMediaList, type MediaList } from "../media.ts";
 import {
   ImportAlreadySaved, ImportNotRetryable, ImportRequestConflict, type ImportOperation, type MaterialImportStore,
 } from "../storage/MaterialImportStore.ts";
@@ -19,6 +19,10 @@ export const REMOVE_FAILED = "This import could not be removed. Ask the app owne
 export const SAVE_INVALID = "This import could not be saved. Remove it and upload the files again.";
 /** A refusal that does not go away: a material may already hold the key. */
 export const SAVE_STUCK = "This import could not be saved yet. Your files are kept. Ask the app owner for help.";
+/** The delete route's answer for a material that is unknown, another learner's, or outside the learner's courses. */
+export const MATERIAL_DELETE_UNAVAILABLE = "This material isn't one of yours, so it can't be deleted. Reload the page to see your materials.";
+/** The delete route could not finish asking the application, so the material may or may not be deleted. */
+export const DELETE_FAILED = "This material could not be deleted right now. Reload the page, and try again if it is still listed.";
 /** A listing stops waiting for locks after this long and leaves the rest of its imports SAVING. */
 export const LIST_WAIT_MS = 60_000;
 /** After the upload's answer, a stuck store or database call holds the upload queue for at most this long. */
@@ -42,7 +46,9 @@ export interface ImportEntry {
 type SaveOutcome =
   | { kind: "saved"; material: string }
   | { kind: "invalid" | "refused"; code: string }
-  | { kind: "unauthorized" | "forbidden" | "temporary" };
+  | { kind: "unauthorized" | "forbidden" | "temporary" }
+  // The learner deleted the material already saved under this import's key, in the moment before the import recorded it.
+  | { kind: "deleted" };
 
 export interface MaterialRouteOptions {
   imports: MaterialImportStore;
@@ -56,6 +62,12 @@ export interface MaterialRouteOptions {
   /** The private AddMaterial endpoint, run to completion. */
   addMaterial(input: Record<string, unknown>): Promise<InvocationResult>;
   readMaterial(session: string | null, material: string): Promise<InvocationResult>;
+  /** Request admission for deleting: the learner's own kept material in a course they own (Access.DeleteReady). */
+  deleteReady(owner: string, material: string): Promise<boolean>;
+  /** The private DeleteMaterial endpoint, run to completion. */
+  deleteMaterial(input: { session: string; material: string }): Promise<InvocationResult>;
+  /** The materials the learner deleted from the course (Courses.DeletedMaterials). */
+  deletedMaterials(owner: string, course: string): Promise<string[]>;
   /** Whether the server has a Gemini key, which recordings and videos need. */
   recordingsAvailable(): boolean;
   /** Asks the transcription worker for a turn. */
@@ -141,6 +153,10 @@ export function createMaterialRoutes(options: MaterialRouteOptions) {
       const code = refusalCode(result.error);
       if (code === "NOT_SIGNED_IN") return { kind: "unauthorized" };
       if (code === "COURSE_UNAVAILABLE") return { kind: "forbidden" };
+      if (code === "MATERIAL_DELETED") {
+        log(`Saving import ${requestId} (import key ${importKey}) was refused: the learner deleted the material saved under this key.`);
+        return { kind: "deleted" };
+      }
       if (INVALID_INPUT.has(code)) {
         log(`Saving import ${requestId} (import key ${importKey}) was refused: ${code}. No material was saved for this key.`);
         return { kind: "invalid", code };
@@ -215,6 +231,10 @@ export function createMaterialRoutes(options: MaterialRouteOptions) {
         if (outcome.kind === "saved") return answer({ material: outcome.material });
         if (outcome.kind === "unauthorized") return failure("UNAUTHORIZED", 401);
         if (outcome.kind === "forbidden") return failure("FORBIDDEN", 403);
+        if (outcome.kind === "deleted") {
+          await discardDeleted(owner, requestId);
+          throw new Refusal(IMPORT_REMOVED, "IMPORT_REMOVED", 409);
+        }
         // The import is READY. The listing shows it and saves it, or explains why it can't.
         return unfinished(requestId, "SAVING");
       }, budget.signal);
@@ -248,7 +268,10 @@ export function createMaterialRoutes(options: MaterialRouteOptions) {
         outcome = await locks.run(`import:${owner}:${ready.requestId}`, async () => {
           // Another request may have saved it while this one waited.
           const operation = await imports.get({ owner, requestId: ready.requestId });
-          return operation?.stage === "READY" ? save(request, owner, operation, wait) : null;
+          if (operation?.stage !== "READY") return null;
+          const saving = await save(request, owner, operation, wait);
+          if (saving.kind === "deleted") await discardDeleted(owner, operation.requestId);
+          return saving;
         }, wait);
       } catch (error) {
         if (!wait.aborted) throw error;
@@ -261,6 +284,7 @@ export function createMaterialRoutes(options: MaterialRouteOptions) {
       else if (outcome.kind === "invalid") invalid.add(ready.requestId);
       else if (outcome.kind === "refused") stuck.add(ready.requestId);
     }
+    await finishInterrupted(owner, course);
     const now = clock();
     const listed = (await imports.pending({ owner, course })).map((operation) => entry(operation, now, invalid.has(operation.requestId), stuck.has(operation.requestId)));
     return answer({ imports: listed, saved });
@@ -318,6 +342,10 @@ export function createMaterialRoutes(options: MaterialRouteOptions) {
         if (outcome.kind === "saved") return refusal(new Refusal(IMPORT_ALREADY_SAVED, "IMPORT_ALREADY_SAVED", 409));
         if (outcome.kind === "unauthorized") return failure("UNAUTHORIZED", 401);
         if (outcome.kind === "forbidden") return refusal(new Refusal(IMPORT_UNAVAILABLE, "IMPORT_UNAVAILABLE", 404));
+        if (outcome.kind === "deleted") {
+          const discarded = await imports.discard({ owner, requestId, materialDeleted: true });
+          return discarded ? await deleteFiles(discarded) : refusal(new Refusal(IMPORT_UNAVAILABLE, "IMPORT_UNAVAILABLE", 404));
+        }
         if (outcome.kind !== "invalid") return refusal(new Refusal(REMOVE_FAILED));
         const discarded = await imports.discard({ owner, requestId, invalidInput: true });
         return discarded ? await deleteFiles(discarded) : refusal(new Refusal(IMPORT_UNAVAILABLE, "IMPORT_UNAVAILABLE", 404));
@@ -333,13 +361,94 @@ export function createMaterialRoutes(options: MaterialRouteOptions) {
 
   /** Deletes a removed import's files. The import is removed even when a deletion fails; the worker finishes it. */
   async function deleteFiles(operation: ImportOperation): Promise<Response> {
-    if (!operation.filesDeleted) {
-      try {
-        await files.deleteImport(operation);
-        await imports.markFilesDeleted(operation);
-      } catch (error) { log(`Deleting the files of removed import ${operation.requestId} failed (${errorName(error)}); the worker tries again.`); }
-    }
+    await removeFiles(operation);
     return answer({});
+  }
+
+  async function removeFiles(operation: ImportOperation): Promise<void> {
+    if (operation.filesDeleted) return;
+    try {
+      await files.deleteImport(operation);
+      await imports.markFilesDeleted(operation);
+    } catch (error) { log(`Deleting the files of removed import ${operation.requestId} failed (${errorName(error)}); the worker tries again.`); }
+  }
+
+  /** Removes a READY import whose material the learner deleted, with its files. The caller holds the import's lock. */
+  async function discardDeleted(owner: string, requestId: string): Promise<void> {
+    const discarded = await imports.discard({ owner, requestId, materialDeleted: true });
+    if (discarded) await removeFiles(discarded);
+  }
+
+  /**
+   * After a material is deleted, removes its saved import with the text read from it, and deletes its retained files.
+   * A material saved before imports were recorded has no import, so its files are deleted from its own references; the
+   * worker cannot retry those, so a failure is only logged.
+   */
+  async function finishDeletion(owner: string, material: string, originals: MediaList): Promise<void> {
+    let operation: ImportOperation | null = null;
+    try { operation = await imports.discardSaved({ owner, material }); }
+    catch (error) { log(`Removing the import of deleted material ${material} failed (${errorName(error)}); the next listing of its course tries again.`); }
+    // The import names every stored file, and the worker retries a deletion of its files that fails.
+    if (operation) { await removeFiles(operation); return; }
+    if (!originals.length) return;
+    try { await files.deleteRetained(owner, originals); }
+    catch (error) { log(`Deleting the files of deleted material ${material} failed (${errorName(error)}).`); }
+  }
+
+  /** Finishes deletions cut short after the material was deleted but before its import was removed. */
+  async function finishInterrupted(owner: string, course: string): Promise<void> {
+    try {
+      const deleted = await options.deletedMaterials(owner, course);
+      for (const operation of await imports.savedFor({ owner, materials: deleted })) await finishDeletion(owner, operation.material!, []);
+    } catch (error) { log(`Finishing interrupted material deletions failed (${errorName(error)}); the next listing tries again.`); }
+  }
+
+  /**
+   * `/api/courses/materials/delete`. Under the learner's lock, request admission checks the material and ReadMaterial
+   * names its retained files, which cannot change while the lock is held. DeleteMaterial then deletes it, and
+   * DiscardDeletedDrafts removes its draft skills; last, its import and retained files are removed. A material the
+   * learner already deleted is answered the same way, after finishing any of that cleanup an earlier request left, so a
+   * retry after a lost answer succeeds.
+   */
+  async function deleteMaterial(request: Request, owner: string, body: Record<string, unknown>): Promise<Response> {
+    const material = body.material;
+    if (!validRequestId(material)) return failure("INVALID_REQUEST", 400);
+    try {
+      return await locks.run(`user:${owner}`, async () => {
+        const session = options.session(request);
+        if (!session || await options.learner(request) !== owner) return failure("UNAUTHORIZED", 401);
+        if (!await options.deleteReady(owner, material)) {
+          const read = await options.readMaterial(session, material);
+          if (read.ok || refusalCode(read.error) !== "MATERIAL_DELETED") {
+            return refusal(new Refusal(MATERIAL_DELETE_UNAVAILABLE, "MATERIAL_UNAVAILABLE", 404));
+          }
+          await finishDeletion(owner, material, []);
+          return answer({});
+        }
+        let result: InvocationResult, originals: MediaList = [];
+        try {
+          const read = await options.readMaterial(session, material);
+          const saved = read.ok ? (read.value as { originals?: unknown } | null)?.originals : undefined;
+          if (isMediaList(saved)) originals = saved;
+          result = await options.deleteMaterial({ session, material });
+        } catch (error) {
+          log(`Deleting material ${material} failed (${errorName(error)}).`);
+          return refusal(new Refusal(DELETE_FAILED, "DELETE_FAILED", 503));
+        }
+        if (!result.ok) {
+          const code = refusalCode(result.error);
+          if (code === "NOT_SIGNED_IN") return failure("UNAUTHORIZED", 401);
+          if (result.error.kind === "domain") return refusal(new Refusal(MATERIAL_DELETE_UNAVAILABLE, "MATERIAL_UNAVAILABLE", 404));
+          log(`Deleting material ${material} failed (${code}).`);
+          return refusal(new Refusal(DELETE_FAILED, "DELETE_FAILED", 503));
+        }
+        await finishDeletion(owner, material, originals);
+        return answer({});
+      });
+    } finally {
+      // The worker finishes any file deletion that failed here.
+      options.wake();
+    }
   }
 
   /** `/api/courses/materials/file`: checks access through ReadMaterial, then streams the exact saved file. */
@@ -357,7 +466,7 @@ export function createMaterialRoutes(options: MaterialRouteOptions) {
     } });
   }
 
-  return { upload, list, retry, remove, file, save };
+  return { upload, list, retry, remove, file, save, delete: deleteMaterial };
 }
 
 /** The library's view of one TRANSCRIBING or READY import. */

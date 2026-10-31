@@ -559,6 +559,51 @@ describe("Transcription progress", () => {
     await expect(store.discard({ ...identity(other), invalidInput: true })).rejects.toBeInstanceOf(ImportAlreadySaved);
   });
 
+  test("deleting a material removes its saved import with the text read from it, once, and keeps the request", async () => {
+    const { store } = transcriptionFixture();
+    // Two saved imports for Sam and one for Leo, each read into a material.
+    const saved = async (owner: string, requestId: string, material: string) => {
+      const input = { ...start(), owner, requestId }, id = identity(input), created = await store.getOrCreate(input);
+      const source = [{ file: `${created.importKey}/${"a".repeat(64)}.pdf`, name: "lesson.pdf", mediaType: "application/pdf", renditions: [], limitations: [] }];
+      const withSources = await store.saveSources({ ...id, revision: 0, sources: source });
+      const ready = await store.savePrepared({ ...id, revision: withSources.revision, prepared: { owner, importKey: created.importKey, scope: input.request.scope,
+        title: input.request.title, locator: `upload:${created.importKey}`, content: "Matrix multiplication", originals: source, origin: input.request.origin } });
+      return store.complete({ ...id, revision: ready.revision, material });
+    };
+    const first = await saved("sam", "r1", "m1"), second = await saved("sam", "r2", "m2");
+    await saved("leo", "r3", "m3");
+    expect((await store.savedFor({ owner: "sam", materials: ["m1", "m2", "m3", "unknown"] })).map((item) => item.requestId)).toEqual(["r1", "r2"]);
+    expect(await store.savedFor({ owner: "sam", materials: [] })).toEqual([]);
+
+    // Another learner's material, and a material no import saved, find nothing and change nothing.
+    expect(await store.discardSaved({ owner: "leo", material: "m1" })).toBeNull();
+    expect(await store.discardSaved({ owner: "sam", material: "unknown" })).toBeNull();
+    const removed = (await store.discardSaved({ owner: "sam", material: "m1" }))!;
+    expect(removed).toMatchObject({ requestId: "r1", stage: "DISCARDED", filesDeleted: false, material: "m1", request: first.request, revision: first.revision + 1 });
+    expect(removed.prepared).toBeUndefined();
+    // A repeated call returns the removed import unchanged, and the worker lists its files for deletion.
+    expect(await store.discardSaved({ owner: "sam", material: "m1" })).toEqual(removed);
+    expect((await store.deletable()).map((item) => item.requestId)).toEqual(["r1"]);
+    expect((await store.savedFor({ owner: "sam", materials: ["m1", "m2"] })).map((item) => item.requestId)).toEqual(["r2"]);
+    expect(await store.get({ owner: "sam", requestId: "r2" })).toEqual(second);
+    for (const input of [{ owner: " ", material: "m2" }, { owner: "sam", material: "" }]) await expect(store.discardSaved(input)).rejects.toBeInstanceOf(InvalidImportRequest);
+    await expect(store.savedFor({ owner: "sam", materials: [" "] })).rejects.toBeInstanceOf(InvalidImportRequest);
+  });
+
+  test("a READY import whose material the learner deleted is discarded with the host's report, without the text read from it", async () => {
+    const { store } = transcriptionFixture();
+    const input = start(), id = identity(input), created = await store.getOrCreate(input);
+    const source = [{ file: `${created.importKey}/${"a".repeat(64)}.pdf`, name: "lesson.pdf", mediaType: "application/pdf", renditions: [], limitations: [] }];
+    const withSources = await store.saveSources({ ...id, revision: 0, sources: source });
+    const ready = await store.savePrepared({ ...id, revision: withSources.revision, prepared: { owner: input.owner, importKey: created.importKey, scope: input.request.scope,
+      title: input.request.title, locator: `upload:${created.importKey}`, content: "Matrix multiplication", originals: source, origin: input.request.origin } });
+    await expect(store.discard(id)).rejects.toBeInstanceOf(ImportAlreadySaved);
+    const discarded = (await store.discard({ ...id, materialDeleted: true }))!;
+    expect(discarded).toMatchObject({ stage: "DISCARDED", filesDeleted: false, revision: ready.revision + 1, request: input.request });
+    expect(discarded.prepared).toBeUndefined();
+    expect(await store.discard({ ...id, materialDeleted: true })).toEqual(discarded);
+  });
+
   test("the pending list holds one learner's TRANSCRIBING and READY imports in one course, oldest first, and reads create nothing", async () => {
     const { store, setNow } = transcriptionFixture();
     const freshName = `MaterialImport_${randomUUID()}`, fresh = new MaterialImportStore(connection!.db, freshName);

@@ -46,6 +46,12 @@ const Materials = former("the source summaries for (owner) in (course)", ({ owne
     .form({ material, title, locator, origin }),
 );
 
+// Materials the learner deleted from this course. Only their identities remain, so the page can say that a citation or a
+// skill's source names a deleted material instead of showing nothing.
+const DeletedMaterials = former("the materials (owner) deleted from (course)", ({ owner, course }, { material }) =>
+  each(Library._deletions({ owner, scope: course }).is({ material })).arranged(material).form({ material }),
+);
+
 const Units = former("the units in (course)", ({ course }, { unit, title, emphasized }) =>
   each(SkillMapping._units({ course }).is({ unit, title, emphasized })).arranged(unit).form({ unit, title, emphasized }),
 );
@@ -94,8 +100,9 @@ const Looks = former("the tree kinds (owner) chose for the units in (course)", (
 // The read answers at the settlement frontier, after RepairRevisedTrack has finished.
 const ReadCourse = endpoint("/courses/read", ({ session, course, owner }) =>
   receive({ session, course }).then(Sessioning.use({ session }).responds({ subject: owner })).afterFlowSettles().then(
-    where(OwnedCourse({ owner, course })).then(respond({ materials: Materials({ owner, course }), units: Units({ course }), skills: Skills({ course }),
-      prerequisites: Prerequisites({ course }), skillSources: SkillSources({ course }), versions: Versions({ course }), looks: Looks({ owner, course }) })).named("owned"),
+    where(OwnedCourse({ owner, course })).then(respond({ materials: Materials({ owner, course }), deletedMaterials: DeletedMaterials({ owner, course }),
+      units: Units({ course }), skills: Skills({ course }), prerequisites: Prerequisites({ course }), skillSources: SkillSources({ course }),
+      versions: Versions({ course }), looks: Looks({ owner, course }) })).named("owned"),
     where(no(OwnedCourse({ owner, course }))).then(respond({ error: "COURSE_UNAVAILABLE" })).named("missing"),
   ), { validators: { ...validators, output: structuredOutput } },
 );
@@ -106,11 +113,14 @@ const AddUnit = endpoint("/courses/units/add", ({ session, course, title, owner,
   { validators: { ...validators, input: courseInput, output: recordOutput(["unit"]) } },
 );
 
+// A material the learner deleted answers MATERIAL_DELETED, so a citation of it can say so. Another learner's deleted
+// material answers MATERIAL_UNAVAILABLE, like any material that is not theirs.
 const ReadMaterial = endpoint("/courses/materials/read", ({ session, material, owner, course, title, locator, content, originals, origin }) =>
   receive({ session, material }).then(Sessioning.use({ session }).responds({ subject: owner })).then(
     where(Library._material({ material }).is({ owner, scope: course, title, locator, content, originals, origin }), OwnedCourse({ owner, course }))
       .then(respond({ title, locator, content, originals, origin })).named("owned"),
-    where(no(Library._material({ material }).is({ owner }))).then(respond({ error: "MATERIAL_UNAVAILABLE" })).named("missing"),
+    where(no(Library._material({ material }).is({ owner })), no(Library._deleted({ material }).is({ owner }))).then(respond({ error: "MATERIAL_UNAVAILABLE" })).named("missing"),
+    where(Library._deleted({ material }).is({ owner })).then(respond({ error: "MATERIAL_DELETED" })).named("deleted"),
     where(Library._material({ material }).is({ owner, scope: course }), no(OwnedCourse({ owner, course }))).then(respond({ error: "COURSE_UNAVAILABLE" })).named("course"),
   ), { validators: { ...validators, output: structuredOutput } },
 );
@@ -124,6 +134,25 @@ const AddMaterial = endpoint("/internal/materials/add", ({ session, course, impo
       where(no(OwnedCourse({ owner, course }))).then(respond({ error: "COURSE_UNAVAILABLE" })).named("missing"),
     ), { validators: { ...validators, input: materialInput, output: recordOutput(["material"]) } },
 );
+
+// The host's delete route reads the material's retained files, calls this private endpoint, and then deletes those files.
+// Nothing the material contained is kept; DiscardDeletedDrafts removes the draft skills saved from it in the same flow.
+const DeleteMaterial = endpoint("/internal/materials/delete", ({ session, material, owner, course }) =>
+  receive({ session, material }).then(Sessioning.use({ session }).responds({ subject: owner })).then(
+    where(Library._material({ material }).is({ owner, scope: course }), OwnedCourse({ owner, course }))
+      .then(Library.delete({ owner, material }).responds({})).then(respond({})).named("owned"),
+    where(no(Library._material({ material }).is({ owner }))).then(respond({ error: "MATERIAL_UNAVAILABLE" })).named("missing"),
+    where(Library._material({ material }).is({ owner, scope: course }), no(OwnedCourse({ owner, course }))).then(respond({ error: "COURSE_UNAVAILABLE" })).named("course"),
+  ), { validators },
+);
+
+// A draft skill has exactly one source, and it cannot be confirmed once that source is deleted, so the drafts saved from
+// a deleted material are discarded with it. Confirmed and archived skills keep the deleted material among their sources.
+const DiscardDeletedDrafts = reaction(({ owner, material, course, unit, skill }) =>
+  when(Library.delete({ owner, material }).responds({}))
+    .where(Library._deleted({ material }).is({ owner, scope: course }), SkillMapping._units({ course }).is({ unit }),
+      SkillMapping._skills({ unit }).is({ skill, status: "DRAFT" }), SkillMapping._materials({ skill }).is({ material }))
+    .then(SkillMapping.discardDraft({ owner, skill })));
 
 // The graded-work check applies only to the learner's own material in the unit's course: graded work is evidence, not a teaching source.
 const ProposeSkill = endpoint("/courses/skills/propose", ({ session, unit, proposalKey, material, materials, title, outcome, gate, owner, course, skill, materialTitle, graded }) =>
@@ -306,6 +335,7 @@ const ClearUnitLook = endpoint("/courses/units/look/clear", ({ session, unit, ow
 );
 
 export const composition = { OwnedCourse, OwnedUnit, OwnedSkill, CourseList, ListCourses, CreateCourse,
-  UnavailableSkillMaterial, Materials, Units, Skills, Prerequisites, SkillSources, Versions, Looks, ReadCourse, ChooseUnitLook, ClearUnitLook, ReadMaterial, AddUnit, AddMaterial, ProposeSkill, ConfirmSkill, DiscardDraft, EditDraft,
+  UnavailableSkillMaterial, Materials, DeletedMaterials, Units, Skills, Prerequisites, SkillSources, Versions, Looks, ReadCourse, ChooseUnitLook, ClearUnitLook, ReadMaterial, AddUnit, AddMaterial,
+  DeleteMaterial, DiscardDeletedDrafts, ProposeSkill, ConfirmSkill, DiscardDraft, EditDraft,
   EditSkillDetails, ReviseSkill, RevisedTrack, RepairRevisedTrack, AddSkillSource, SetSkillPrerequisites, ArchiveSkill, RestoreSkill, SetUnitEmphasis,
   CourseActivityInProgress, ArchiveCourse, RestoreCourse };
