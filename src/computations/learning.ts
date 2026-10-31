@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type { SkillRows, SkillInfo, Sessions, StudySession, Cases, CaseInfo, Tracks, Schedule, TutorRequest } from "../learning-data.ts";
 import { isMediaList } from "../media.ts";
+import { RECENT_PAGE } from "./conversation-pages.ts";
 import type { SourceContext } from "../tutor-types.ts";
 import type { Candidate, CutValue } from "../concepts/Budgeting/Budgeting.ts";
 import type { ResponseValue, Help } from "../concepts/AssessmentReviewing/AssessmentReviewing.ts";
@@ -162,6 +163,13 @@ export function sessionActivity({ data }: { data: StudySession }): { kind: "LESS
 /** The confirmed skills of a course map: the topics whose conversations the sidebar lists. */
 export function studyTopics({ skills }: { skills: SkillRows }): string[] {
   return skills.filter((skill) => skill.status === "CONFIRMED").map((skill) => skill.skill);
+}
+/** How many conversations the sidebar asks for: one page of 40 for each page it shows. */
+export function recentLimit({ pages }: { pages: number }): number { return pages * RECENT_PAGE; }
+/** The identities of the sessions in `sessions` that the learner has archived, in the order of `sessions`. */
+export function archivedAmong({ sessions, items }: { sessions: Sessions; items: readonly string[] }): string[] {
+  const archived = new Set<string>(items);
+  return sessions.map((session) => String(session.session)).filter((session) => archived.has(session));
 }
 const TITLE_LENGTH = 60;
 /** Text shortened to about 60 characters at a word boundary, with an ellipsis when it was cut. */

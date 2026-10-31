@@ -1,5 +1,6 @@
 import type { EndpointValidator } from "@mit-sdg/sync-engine/boundary";
 import { isMediaList } from "../../media.ts";
+import { RECENT_PAGES } from "../../computations/conversation-pages.ts";
 
 /** ConceptBox's text-only boundary, with a bound on each submitted field. */
 export const textInput: EndpointValidator = (value) => {
@@ -137,6 +138,8 @@ export const learningInput: EndpointValidator = (value) => {
   const flags = new Set(["reviewed", "unseen", "outsideHelp", "gateMet"]);
   const ok = Object.entries(record).every(([key, field]) => key === "session" ? field === null || typeof field === "string"
     : numeric.has(key) ? typeof field === "number" && Number.isFinite(field) && field >= 0
+    // The sidebar's pages of 40 conversations: a whole number from 1 to 25, so one read lists at most 1,000.
+    : key === "pages" ? Number.isInteger(field) && (field as number) >= 1 && (field as number) <= RECENT_PAGES
     // An adjustment's range is the concept's rule, so its refusal message explains a value outside 0 to 100.
     : key === "value" ? typeof field === "number" && Number.isFinite(field)
     // Material identities in attached order; admission checks ownership, course, and duplicates.

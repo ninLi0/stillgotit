@@ -55,6 +55,26 @@ No public code says "this is a practice task", so request admission does the exp
 
 A finished lesson keeps its request, explanation, and dialogue, and Read still returns it with status CLOSED. Respond, Question, Reply, and Transcript refuse it, because OpenSession no longer holds, and [Continue](reaction:Reads.Continue) no longer lists it. A lesson cannot be opened again; the learner starts a new lesson to keep going. No reaction is triggered by `GroundedTutoring.close`. CloseSubmitted and RepairReadClosure call it only for a task with a submitted case, which a lesson never has, so finishing a lesson changes no case, estimate, or plan.
 
+## Archiving a conversation
+
+The sidebar lists every conversation in the course, so after a few weeks it fills with lessons and practice the learner is done with. Archiving puts a conversation away: it leaves the sidebar and Home's Continue card and waits under "Archived conversations", at the end of the sidebar's Conversations group, until the learner restores it.
+
+**The rule for open conversations.** Archiving puts a conversation away exactly as it is, whether it is open or finished, a lesson or practice. It finishes nothing and submits nothing. While a conversation is archived, it is read-only: it opens from the archived list to be read, but nothing can be added to it. Restoring it puts it back exactly as it was, so an open lesson or practice task can be continued once it is restored. Archive and Restore therefore undo each other, which is the simplest rule a learner can hold: archiving only moves a conversation out of the way. Two other rules were considered. Finishing a lesson when it is archived could not be undone by restoring it, so Restore would not bring back what the learner archived. Allowing only finished conversations to be archived would leave an abandoned practice task in the sidebar for good, because a task finishes only when its attempt is submitted, and submitting work just to tidy the list would add evidence the learner never meant to give.
+
+**Where the archive lives.** Whether a conversation is archived is kept in its own concept, [Archiving](../concepts/Archiving.md), which the application binds as `ConversationArchiving`, with the learner as its user and the GroundedTutoring session as its item. GroundedTutoring's purpose is to help a learner understand and practice a topic from sources they can inspect. Which of the learner's conversations a list shows is a different purpose, keeping the learner's workspace tidy, so an archived flag on the session would mix two concerns in one concept, and it would also need an exception to GroundedTutoring's rule that a closed session never changes. Archiving is generic, as Styling and Preferring are: it stores the learner and the session as keys and never reads or changes the session. GroundedTutoring gains only a parameter on one query, `hidden` on `_recent`, so the sidebar's order and cap still come from a single query, as the [shared reads](LearningReads.md) describe. Because archiving writes only to its own collection, and no reaction follows `archive` or `restore`, the conversation's dialogue and citations, its practice case and judgments, the mastery estimates built from them, and the plan are all left untouched.
+
+[ArchiveConversation](reaction:Learning.ArchiveConversation) takes `studySession`.
+
+- When the request arrives, `Sessioning.use` turns the session into the acting learner. No request field can name another learner.
+- Where [OwnedSession](view:Reads.OwnedSession) holds for that learner and session, the endpoint calls `ConversationArchiving.archive` with the learner as owner and the session as item, and answers `{}`. The session may be open or closed, a lesson or a practice task. Archiving a conversation that is already archived changes nothing and keeps the time it was first archived, so a retry after a lost reply is safe.
+- Where OwnedSession does not hold, because the session is unknown or belongs to another learner, the endpoint answers `SESSION_UNAVAILABLE` and changes nothing.
+
+[RestoreConversation](reaction:Learning.RestoreConversation) has the same shape and calls `ConversationArchiving.restore` instead. Restoring a conversation that is not archived changes nothing, so a retry is safe here too.
+
+On these two endpoints, `SESSION_UNAVAILABLE` carries its own sentence, "This conversation is not one of yours. Choose one of your own conversations.", because they accept a closed or archived conversation. Request admission declines both first with the sentence of [ConversationReady](former:Access.ConversationReady), as the [request admission](LearningAccess.md) describes.
+
+An archived conversation is read-only because [OpenSession](view:Reads.OpenSession) leaves it out. Respond, Question, Reply, Hint, Transcript, FinishLesson, and Assess therefore refuse it as they refuse a closed session, and Continue no longer lists it. Read still returns it, and names it in `archived`, so the lesson page shows it without its message box and without the buttons that act on the conversation, and offers "Restore conversation" in their place. RetryAssessment, Correct, and Regrade act on a submitted attempt's case rather than on the conversation, so they keep their own rules.
+
 ## Assessment
 
 [Assess](reaction:Learning.Assess) requires the learner to review the complete attempt and declare freshness and outside help. Confirmation triggers submission and closure. The endpoint waits for those actions, asks the provider to judge the saved original work, rechecks the session, and records the judgment. It waits for the resulting progress reactions before responding. A provider failure leaves a closed, unjudged case. When the session is not one of the learner's open sessions, Assess answers `SESSION_UNAVAILABLE` before confirming anything. [RetryAssessment](reaction:Learning.RetryAssessment) grades that saved case without changing its work, date, criteria, or identity. Its session is already closed, so RetryAssessment answers `SESSION_UNAVAILABLE` only when the session is not one of the learner's own. The UI reads completed judgments instead of submitting them again.
@@ -65,7 +85,7 @@ A finished lesson keeps its request, explanation, and dialogue, and Read still r
 
 Each of these refusals reaches the learner with one sentence, which the host adds as `detail`, as the [runtime contract](../runtime.md) describes:
 
-- `SESSION_UNAVAILABLE`, from Respond, Question, Reply, Hint, Transcript, FinishLesson, Assess, and RetryAssessment: "This session is closed or is not one of yours. Choose one of your open sessions."
+- `SESSION_UNAVAILABLE`, from Respond, Question, Reply, Hint, Transcript, FinishLesson, Assess, and RetryAssessment: "This session is closed, archived, or not one of yours. Choose one of your open sessions." From ArchiveConversation and RestoreConversation: "This conversation is not one of yours. Choose one of your own conversations."
 - `SESSION_CHANGED`, from Question, Reply, and Hint when the session closes while the tutor answers: "This session closed before the tutor's answer could be saved. Your own work in it is still saved."
 - `SKILL_CHANGED`, from Task when the skill's requirements change, or the skill stops being one of the learner's confirmed skills, while the tutor answers: "This skill changed while the tutor was answering, so nothing was saved. Try again."
 - `MATERIAL_UNAVAILABLE`, from Suggest, and from the material read and the skill endpoints of the [course composition](Courses.md): "This material is not available in this course. Reload the page to see its materials."
@@ -147,6 +167,8 @@ Learning.Reply at /learning/reply
 Learning.Hint at /learning/hint
 Learning.Transcript at /learning/transcript
 Learning.FinishLesson at /learning/finish
+Learning.ArchiveConversation at /learning/archive
+Learning.RestoreConversation at /learning/restore
 Learning.Assess at /learning/assess
 Learning.RetryAssessment at /learning/retry
 Learning.Correct at /learning/correct

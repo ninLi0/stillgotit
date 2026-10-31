@@ -6,7 +6,7 @@ import { composition as Settings, usingTutorChoice } from "./settings.ts";
 import * as R from "./learning-reads.ts";
 import { ActivityInProgress } from "./planning.ts";
 import { learningInput, structuredOutput, validators } from "./reusable/inputs.ts";
-const { Sessioning, Library, GroundedTutoring: Tutoring, AssessmentReviewing: Assessment, MasteryEstimating: Mastery, StudyPlanning: Planning, TutorGenerating: AI } = concepts;
+const { Sessioning, Library, GroundedTutoring: Tutoring, AssessmentReviewing: Assessment, MasteryEstimating: Mastery, StudyPlanning: Planning, TutorGenerating: AI, ConversationArchiving: Archive } = concepts;
 const options = { validators: { ...validators, input: learningInput, output: structuredOutput } };
 
 const useAgain = (session: symbol, owner: symbol) => Sessioning.use({ session }).responds({ subject: owner });
@@ -198,6 +198,21 @@ const FinishLesson = endpoint("/learning/finish", ({ session, studySession, owne
     where(no(R.OpenSession({ owner, studySession }))).then(respond({ error: "SESSION_UNAVAILABLE" })).named("missing"),
   ), options);
 
+// A learner archives or restores one of their own conversations, open or finished, lesson or practice. Archiving changes
+// nothing in the conversation: OpenSession leaves an archived one out, so it is read-only until it is restored, and no
+// reaction follows either action, so no case, estimate, or plan changes. Both actions are idempotent, so a retry after a
+// lost reply changes nothing.
+const ArchiveConversation = endpoint("/learning/archive", ({ session, studySession, owner }) => receive({ session, studySession })
+  .then(Sessioning.use({ session }).responds({ subject: owner })).then(
+    where(R.OwnedSession({ owner, studySession })).then(Archive.archive({ owner, item: studySession }).responds({})).then(respond({})).named("owned"),
+    where(no(R.OwnedSession({ owner, studySession }))).then(respond({ error: "SESSION_UNAVAILABLE" })).named("missing"),
+  ), options);
+const RestoreConversation = endpoint("/learning/restore", ({ session, studySession, owner }) => receive({ session, studySession })
+  .then(Sessioning.use({ session }).responds({ subject: owner })).then(
+    where(R.OwnedSession({ owner, studySession })).then(Archive.restore({ owner, item: studySession }).responds({})).then(respond({})).named("owned"),
+    where(no(R.OwnedSession({ owner, studySession }))).then(respond({ error: "SESSION_UNAVAILABLE" })).named("missing"),
+  ), options);
+
 // Admission also checks the dialogue length and the attempt's content with attemptIsReady; the endpoint checks only the
 // learner's review and declarations, and Tutoring.confirmAttempt checks the dialogue length itself. Confirming the attempt
 // submits it, and CloseSubmitted closes the session, so the grading stage reads PendingGrade rather than an open session.
@@ -309,4 +324,4 @@ const Suggest = endpoint("/courses/skills/suggest", ({ session, material, owner,
     .then(AI.generate({ owner, request: prepared }).responds({ answer })))
   .then(Sessioning.use({ session }).responds({ subject: owner }))
   .then(where(compute(C.generationFields, { answer }, { suggestions })).then(respond({ suggestions, tutor: Settings.SentTutor({ request: prepared }) }))), options);
-export const composition = { Read, Progress, Confidence, Lesson, Task, Respond, Question, Reply, Hint, Transcript, FinishLesson, Assess, RetryAssessment, Correct, Regrade, Adjust, ReplanAfterAdjustment, Suggest };
+export const composition = { Read, Progress, Confidence, Lesson, Task, Respond, Question, Reply, Hint, Transcript, FinishLesson, ArchiveConversation, RestoreConversation, Assess, RetryAssessment, Correct, Regrade, Adjust, ReplanAfterAdjustment, Suggest };

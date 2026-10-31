@@ -441,13 +441,41 @@ export type StillGotItWire = {
     };
     error: { error: AppWideError | "ADJUSTMENT_KEY_CONFLICT" | "ADJUSTMENT_TRACK_UNAVAILABLE" | "DEADLINE_TRADEOFF_CONFIRMATION_REQUIRED" | "INVALID_ADJUSTMENT_KEY" | "INVALID_INPUT" | "INVALID_MASTERY_ADJUSTMENT" | "INVALID_PLAN_INPUT" | "NOT_SIGNED_IN" | "PLAN_PREFERENCES_UNAVAILABLE" | "PLAN_SESSION_IN_PROGRESS" | "ROUTINE_PLAN_OUTDATED" | "ROUTINE_PLAN_UNAVAILABLE" | "ROUTINE_SESSION_IN_PROGRESS" | "SKILL_UNAVAILABLE" };
   };
+  "/learning/archive": {
+    input: {
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+      "studySession": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ConversationArchiving"]["archive"]>[0], ["item"]>>;
+    };
+    output: Record<string, never>;
+    error: { error: AppWideError | "INVALID_INPUT" | "NOT_SIGNED_IN" | "SESSION_UNAVAILABLE" };
+  };
+  "/learning/archived": {
+    input: {
+      "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_unit"]>>>, ["course"]>]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+    };
+    output: {
+      "sessions": {
+        "archivedAt": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ConversationArchiving"]["_items"]>>>, ["archivedAt"]>>;
+        "kind": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["recentSession"]["fn"]>>, ["kind"]>>;
+        "lastActivity": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["recentSession"]["fn"]>>, ["lastActivity"]>>;
+        "skill": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_skill"]>[0], ["skill"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_session"]>>>, ["topic"]>]>>;
+        "skillTitle": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["recentSession"]["fn"]>[0], ["skillTitle"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_skill"]>>>, ["title"]>]>>;
+        "startedAt": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["recentSession"]["fn"]>>, ["startedAt"]>>;
+        "status": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_session"]>>>, ["status"]>>;
+        "studySession": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_session"]>[0], ["session"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_sessionData"]>[0], ["session"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ConversationArchiving"]["_items"]>>>, ["item"]>]>>;
+        "title": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["recentSession"]["fn"]>>, ["title"]>>;
+      }[];
+    };
+    error: { error: AppWideError | "COURSE_UNAVAILABLE" | "INVALID_INPUT" | "NOT_SIGNED_IN" };
+  };
   "/learning/assess": {
     input: {
       "dialogueLength": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["confirmAttempt"]>[0], ["dialogueLength"]>>;
       "outsideHelp": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["confirmAttempt"]>[0], ["outsideHelp"]>>;
       "reviewed": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["reviewApproved"]["fn"]>[0], ["reviewed"]>>;
       "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
-      "studySession": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_byTask"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_session"]>[0], ["session"]>]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["confirmAttempt"]>[0], ["task"]>]>>;
+      "studySession": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_byTask"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ConversationArchiving"]["_archived"]>[0], ["item"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_session"]>[0], ["session"]>]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["confirmAttempt"]>[0], ["task"]>]>>;
       "unseen": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["confirmAttempt"]>[0], ["unseen"]>>;
     };
     output: {
@@ -482,7 +510,7 @@ export type StillGotItWire = {
         "kind": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["sessionActivity"]["fn"]>>, ["kind"]>>;
         "lastActive": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["sessionActivity"]["fn"]>>, ["lastActive"]>>;
         "skill": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_skill"]>[0], ["skill"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_session"]>>>, ["topic"]>]>>;
-        "studySession": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_byTask"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_session"]>[0], ["session"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_sessionData"]>[0], ["session"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_sessions"]>>>, ["session"]>]>>;
+        "studySession": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_byTask"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ConversationArchiving"]["_archived"]>[0], ["item"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_session"]>[0], ["session"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_sessionData"]>[0], ["session"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_sessions"]>>>, ["session"]>]>>;
         "title": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_skills"]>>>, ["title"]>>;
       }[];
     };
@@ -519,7 +547,7 @@ export type StillGotItWire = {
   "/learning/finish": {
     input: {
       "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
-      "studySession": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["close"]>[0], ["session"]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_byTask"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_lesson"]>[0], ["lesson"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_session"]>[0], ["session"]>]>]>>;
+      "studySession": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["close"]>[0], ["session"]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_byTask"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ConversationArchiving"]["_archived"]>[0], ["item"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_lesson"]>[0], ["lesson"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_session"]>[0], ["session"]>]>]>>;
     };
     output: Record<string, never>;
     error: { error: AppWideError | "INVALID_INPUT" | "NOT_SIGNED_IN" | "SESSION_CLOSE_UNAVAILABLE" | "SESSION_UNAVAILABLE" };
@@ -527,7 +555,7 @@ export type StillGotItWire = {
   "/learning/hint": {
     input: {
       "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
-      "studySession": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_byTask"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_session"]>[0], ["session"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_sessionData"]>[0], ["session"]>]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["requestHint"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["giveHint"]>[0], ["task"]>]>>;
+      "studySession": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_byTask"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ConversationArchiving"]["_archived"]>[0], ["item"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_session"]>[0], ["session"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_sessionData"]>[0], ["session"]>]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["requestHint"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["giveHint"]>[0], ["task"]>]>>;
     };
     output: {
       "tutor": {
@@ -596,7 +624,7 @@ export type StillGotItWire = {
       "channel": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["respond"]>[0], ["channel"]>>;
       "dialogueLength": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["dialogueIsCurrent"]["fn"]>[0], ["dialogueLength"]>>;
       "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
-      "studySession": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_byTask"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_session"]>[0], ["session"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_sessionData"]>[0], ["session"]>]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["respond"]>[0], ["session"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["answerLesson"]>[0], ["lesson"]>]>>;
+      "studySession": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_byTask"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ConversationArchiving"]["_archived"]>[0], ["item"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_session"]>[0], ["session"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_sessionData"]>[0], ["session"]>]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["respond"]>[0], ["session"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["answerLesson"]>[0], ["lesson"]>]>>;
       "text": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["respond"]>[0], ["text"]>>;
     };
     output: {
@@ -614,10 +642,11 @@ export type StillGotItWire = {
     };
     output: {
       "data": {
+        "archived": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["archivedAmong"]["fn"]>>, []>>;
         "cases": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["studyDetail"]["fn"]>[0], ["cases"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_history"]>>>, ["cases"]>]>>;
         "estimate": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["studyDetail"]["fn"]>>, ["estimate"]>>;
         "explanation": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["estimateTimeline"]["fn"]>>, []>>;
-        "sessions": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["studyDetail"]["fn"]>[0], ["sessions"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_study"]>>>, ["sessions"]>]>>;
+        "sessions": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["archivedAmong"]["fn"]>[0], ["sessions"]>, AtPath<Parameters<(typeof ApplicationConceptSet.computations)["studyDetail"]["fn"]>[0], ["sessions"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_study"]>>>, ["sessions"]>]>>;
         "skill": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["studyDetail"]["fn"]>[0], ["context"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["selectSkill"]["fn"]>>, []>]>>;
         "track": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["studyDetail"]["fn"]>>, ["track"]>>;
       };
@@ -627,6 +656,7 @@ export type StillGotItWire = {
   "/learning/recent": {
     input: {
       "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_map"]>[0], ["course"]>]>>;
+      "pages"?: Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["recentLimit"]["fn"]>[0], ["pages"]>>;
       "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
     };
     output: {
@@ -662,7 +692,7 @@ export type StillGotItWire = {
   "/learning/reply": {
     input: {
       "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
-      "studySession": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_byTask"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_session"]>[0], ["session"]>]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["explainLesson"]>[0], ["lesson"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["answerLesson"]>[0], ["lesson"]>]>>;
+      "studySession": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_byTask"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ConversationArchiving"]["_archived"]>[0], ["item"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_session"]>[0], ["session"]>]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["explainLesson"]>[0], ["lesson"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["answerLesson"]>[0], ["lesson"]>]>>;
     };
     output: {
       "tutor": {
@@ -683,6 +713,14 @@ export type StillGotItWire = {
     };
     output: Record<string, never>;
     error: { error: AppWideError | "INVALID_INPUT" | "INVALID_LEARNER_RESPONSE" | "NOT_SIGNED_IN" | "RESPONSE_SESSION_UNAVAILABLE" | "SESSION_UNAVAILABLE" };
+  };
+  "/learning/restore": {
+    input: {
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+      "studySession": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ConversationArchiving"]["restore"]>[0], ["item"]>>;
+    };
+    output: Record<string, never>;
+    error: { error: AppWideError | "INVALID_INPUT" | "NOT_SIGNED_IN" | "SESSION_UNAVAILABLE" };
   };
   "/learning/retry": {
     input: {
@@ -1373,12 +1411,38 @@ export type StillGotItHttp = {
     };
     error: { error: HttpAppWideError | "CONFLICT" | "INVALID_REQUEST" | "UNAUTHORIZED" };
   };
+  "/learning/archive": {
+    input: {
+      "studySession": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ConversationArchiving"]["archive"]>[0], ["item"]>>;
+    };
+    output: Record<string, never>;
+    error: { error: HttpAppWideError | "INVALID_REQUEST" | "UNAUTHORIZED" };
+  };
+  "/learning/archived": {
+    input: {
+      "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_unit"]>>>, ["course"]>]>>;
+    };
+    output: {
+      "sessions": {
+        "archivedAt": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ConversationArchiving"]["_items"]>>>, ["archivedAt"]>>;
+        "kind": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["recentSession"]["fn"]>>, ["kind"]>>;
+        "lastActivity": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["recentSession"]["fn"]>>, ["lastActivity"]>>;
+        "skill": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_skill"]>[0], ["skill"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_session"]>>>, ["topic"]>]>>;
+        "skillTitle": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["recentSession"]["fn"]>[0], ["skillTitle"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_skill"]>>>, ["title"]>]>>;
+        "startedAt": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["recentSession"]["fn"]>>, ["startedAt"]>>;
+        "status": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_session"]>>>, ["status"]>>;
+        "studySession": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_session"]>[0], ["session"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_sessionData"]>[0], ["session"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ConversationArchiving"]["_items"]>>>, ["item"]>]>>;
+        "title": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["recentSession"]["fn"]>>, ["title"]>>;
+      }[];
+    };
+    error: { error: HttpAppWideError | "FORBIDDEN" | "INVALID_REQUEST" | "UNAUTHORIZED" };
+  };
   "/learning/assess": {
     input: {
       "dialogueLength": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["confirmAttempt"]>[0], ["dialogueLength"]>>;
       "outsideHelp": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["confirmAttempt"]>[0], ["outsideHelp"]>>;
       "reviewed": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["reviewApproved"]["fn"]>[0], ["reviewed"]>>;
-      "studySession": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_byTask"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_session"]>[0], ["session"]>]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["confirmAttempt"]>[0], ["task"]>]>>;
+      "studySession": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_byTask"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ConversationArchiving"]["_archived"]>[0], ["item"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_session"]>[0], ["session"]>]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["confirmAttempt"]>[0], ["task"]>]>>;
       "unseen": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["confirmAttempt"]>[0], ["unseen"]>>;
     };
     output: {
@@ -1411,7 +1475,7 @@ export type StillGotItHttp = {
         "kind": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["sessionActivity"]["fn"]>>, ["kind"]>>;
         "lastActive": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["sessionActivity"]["fn"]>>, ["lastActive"]>>;
         "skill": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_skill"]>[0], ["skill"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_session"]>>>, ["topic"]>]>>;
-        "studySession": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_byTask"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_session"]>[0], ["session"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_sessionData"]>[0], ["session"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_sessions"]>>>, ["session"]>]>>;
+        "studySession": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_byTask"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ConversationArchiving"]["_archived"]>[0], ["item"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_session"]>[0], ["session"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_sessionData"]>[0], ["session"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_sessions"]>>>, ["session"]>]>>;
         "title": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_skills"]>>>, ["title"]>>;
       }[];
     };
@@ -1446,14 +1510,14 @@ export type StillGotItHttp = {
   };
   "/learning/finish": {
     input: {
-      "studySession": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["close"]>[0], ["session"]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_byTask"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_lesson"]>[0], ["lesson"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_session"]>[0], ["session"]>]>]>>;
+      "studySession": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["close"]>[0], ["session"]>, AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_byTask"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ConversationArchiving"]["_archived"]>[0], ["item"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_lesson"]>[0], ["lesson"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_session"]>[0], ["session"]>]>]>>;
     };
     output: Record<string, never>;
     error: { error: HttpAppWideError | "INVALID_REQUEST" | "UNAUTHORIZED" };
   };
   "/learning/hint": {
     input: {
-      "studySession": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_byTask"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_session"]>[0], ["session"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_sessionData"]>[0], ["session"]>]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["requestHint"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["giveHint"]>[0], ["task"]>]>>;
+      "studySession": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_byTask"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ConversationArchiving"]["_archived"]>[0], ["item"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_session"]>[0], ["session"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_sessionData"]>[0], ["session"]>]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["requestHint"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["giveHint"]>[0], ["task"]>]>>;
     };
     output: {
       "tutor": {
@@ -1518,7 +1582,7 @@ export type StillGotItHttp = {
       "attachments": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["responseInput"]["fn"]>[0], ["attachments"]>>;
       "channel": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["respond"]>[0], ["channel"]>>;
       "dialogueLength": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["dialogueIsCurrent"]["fn"]>[0], ["dialogueLength"]>>;
-      "studySession": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_byTask"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_session"]>[0], ["session"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_sessionData"]>[0], ["session"]>]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["respond"]>[0], ["session"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["answerLesson"]>[0], ["lesson"]>]>>;
+      "studySession": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_byTask"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ConversationArchiving"]["_archived"]>[0], ["item"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_session"]>[0], ["session"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_sessionData"]>[0], ["session"]>]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["respond"]>[0], ["session"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["answerLesson"]>[0], ["lesson"]>]>>;
       "text": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["respond"]>[0], ["text"]>>;
     };
     output: {
@@ -1535,10 +1599,11 @@ export type StillGotItHttp = {
     };
     output: {
       "data": {
+        "archived": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["archivedAmong"]["fn"]>>, []>>;
         "cases": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["studyDetail"]["fn"]>[0], ["cases"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_history"]>>>, ["cases"]>]>>;
         "estimate": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["studyDetail"]["fn"]>>, ["estimate"]>>;
         "explanation": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["estimateTimeline"]["fn"]>>, []>>;
-        "sessions": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["studyDetail"]["fn"]>[0], ["sessions"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_study"]>>>, ["sessions"]>]>>;
+        "sessions": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["archivedAmong"]["fn"]>[0], ["sessions"]>, AtPath<Parameters<(typeof ApplicationConceptSet.computations)["studyDetail"]["fn"]>[0], ["sessions"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_study"]>>>, ["sessions"]>]>>;
         "skill": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["studyDetail"]["fn"]>[0], ["context"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["selectSkill"]["fn"]>>, []>]>>;
         "track": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["studyDetail"]["fn"]>>, ["track"]>>;
       };
@@ -1548,6 +1613,7 @@ export type StillGotItHttp = {
   "/learning/recent": {
     input: {
       "course": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_course"]>[0], ["course"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["SkillMapping"]["_map"]>[0], ["course"]>]>>;
+      "pages"?: Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["recentLimit"]["fn"]>[0], ["pages"]>>;
     };
     output: {
       "sessions": {
@@ -1580,7 +1646,7 @@ export type StillGotItHttp = {
   };
   "/learning/reply": {
     input: {
-      "studySession": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_byTask"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_session"]>[0], ["session"]>]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["explainLesson"]>[0], ["lesson"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["answerLesson"]>[0], ["lesson"]>]>>;
+      "studySession": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_byTask"]>[0], ["task"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ConversationArchiving"]["_archived"]>[0], ["item"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["_session"]>[0], ["session"]>]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["explainLesson"]>[0], ["lesson"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["answerLesson"]>[0], ["lesson"]>]>>;
     };
     output: {
       "tutor": {
@@ -1597,6 +1663,13 @@ export type StillGotItHttp = {
       "dialogueLength": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["dialogueIsCurrent"]["fn"]>[0], ["dialogueLength"]>>;
       "studySession": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["respond"]>[0], ["session"]>>;
       "text": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["respond"]>[0], ["text"]>>;
+    };
+    output: Record<string, never>;
+    error: { error: HttpAppWideError | "INVALID_REQUEST" | "UNAUTHORIZED" };
+  };
+  "/learning/restore": {
+    input: {
+      "studySession": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ConversationArchiving"]["restore"]>[0], ["item"]>>;
     };
     output: Record<string, never>;
     error: { error: HttpAppWideError | "INVALID_REQUEST" | "UNAUTHORIZED" };

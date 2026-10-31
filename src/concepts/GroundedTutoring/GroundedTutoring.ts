@@ -164,16 +164,18 @@ export class GroundedTutoring<Learner extends string = string, Material extends 
   }
 
   /**
-   * At most `limit` of the owner's sessions in the given topics, most recently active first. A session's activity is its
-   * latest turn's time, or, before its first turn, the time it started, which its identity records. Sessions whose
-   * identity records no time and that have no turn come last; ties keep the newest start first.
+   * At most `limit` of the owner's sessions in the given topics, leaving out the sessions in `hidden`, most recently active
+   * first. A session's activity is its latest turn's time, or, before its first turn, the time it started, which its
+   * identity records. Sessions whose identity records no time and that have no turn come last; ties keep the newest start
+   * first. Leaving out `hidden` before the limit applies keeps the limit for the sessions that are listed.
    */
-  async _recent({ owner, topics, limit }: { owner: Learner; topics: readonly Topic[]; limit: number }) {
+  async _recent({ owner, topics, hidden, limit }: { owner: Learner; topics: readonly Topic[]; hidden: readonly Session[]; limit: number }) {
     requireIdentity(owner);
-    if (!Array.isArray(topics) || !topics.every((topic) => nonblank(topic)) || !Number.isInteger(limit) || limit < 0) throw new TypeError("Provide a list of topic identities and a whole limit.");
+    if (!Array.isArray(topics) || !topics.every((topic) => nonblank(topic)) || !Array.isArray(hidden) || !hidden.every((session) => nonblank(session)) ||
+      !Number.isInteger(limit) || limit < 0) throw new TypeError("Provide lists of topic and session identities and a whole limit.");
     if (!topics.length || !limit) return [];
     // The filter is cast because the driver's types cannot match $in against a generic identity type.
-    const filter = { owner, topic: { $in: [...topics] } } as Filter<SessionDocument<Learner, Material, Topic, Definition>>;
+    const filter = { owner, topic: { $in: [...topics] }, ...(hidden.length ? { _id: { $nin: [...hidden] } } : {}) } as Filter<SessionDocument<Learner, Material, Topic, Definition>>;
     // Only the latest turn is read, since its time is all the order needs.
     const records = await this.sessions.find(filter, { projection: { topic: 1, status: 1, dialogue: { $slice: -1 } } }).toArray();
     const activity = (record: (typeof records)[number]) => record.dialogue.at(-1)?.at.getTime() ?? startedAt(record._id) ?? -Infinity;
