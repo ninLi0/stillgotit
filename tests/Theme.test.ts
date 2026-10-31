@@ -175,6 +175,26 @@ test("every color the dark palette sets also has a light value", () => {
   expect(missing).toEqual([]);
 });
 
+/** The WCAG contrast ratio of two #RRGGBB colors. */
+function contrast(a: string, b: string) {
+  const luminance = (hex: string) => {
+    const [r, g, bl] = [1, 3, 5].map((at) => parseInt(hex.slice(at, at + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * r! + 0.7152 * g! + 0.0722 * bl!;
+  };
+  const [high, low] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (high! + 0.05) / (low! + 0.05);
+}
+
+test("a dark tooltip's text and its quieter second line stay readable on the tooltip in both themes", () => {
+  // The second line of a chart tooltip (a mark's date, a flag's "Review in 2 days") once used --ring, which is a border
+  // color: 13.6:1 on the light theme's tooltip but 1.1:1 on the dark one, so the line vanished at night.
+  for (const palette of [declarations(":root {"), declarations(':root[data-theme="dark"] {')]) {
+    const tip = palette.get("--tip")!;
+    expect(contrast(palette.get("--tip-text")!, tip)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(palette.get("--tip-soft")!, tip)).toBeGreaterThanOrEqual(4.5);
+  }
+});
+
 // The inline script in index.html runs before the first paint, so it must reach the same answer as theme.ts.
 const html = readFileSync(new URL("../frontend/index.html", import.meta.url), "utf8");
 const inline = html.match(/<script>([\s\S]*?)<\/script>/)?.[1] ?? "";

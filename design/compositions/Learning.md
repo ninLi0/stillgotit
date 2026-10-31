@@ -94,7 +94,7 @@ An adjustment never makes a skill ready by itself. The concept's readiness rule 
 Planning sees adjustments because the tracks PlanContext reads now list each track's adjustments. The intended effect of this replan is:
 
 - The adjusted skill gets a review candidate whose priority comes from the adjusted estimate, when its next review falls within the seven-day horizon that planRequest uses. A lowered estimate moves that review ahead when the daily budget is short, and a raised one moves it back.
-- The review's days still follow the latest evidence, because an adjustment is not practice. An activity already finished for that evidence within its window is not offered again.
+- After an independent success, the review starts on the review day of the due instant the adjustment moved, as [Shared learning reads](LearningReads.md), "The review day", describes. An adjustment changes neither the memory's stability nor its difficulty, but the estimate's forgetting restarts from it, so the memory is due one stability after the adjustment, and the Memory view names that same day. After a slip, a gap, or supported work, the review still starts the next calendar day after that result. An activity already finished for that evidence within its window is not offered again, because finishing an activity records time, not evidence.
 - The fingerprint includes adjustments, so a proposal made before the adjustment can no longer be activated as current. ActivateRoutine activates the new proposal when nothing else blocks it.
 
 [planRequest](computation:planRequest) states how candidate keys and the fingerprint carry adjustments.

@@ -1,10 +1,11 @@
 // Computations for the memory read (design/compositions/LearningReads.md, "Memory curves") and the course score. They
 // only place, compare and gather values that MasteryEstimating answers. None of them computes a score or a forgetting
 // curve: every value on a curve comes from MasteryEstimating._estimate or MasteryEstimating._withoutPractice, and the
-// review day comes from the explanation's due instant.
+// review day comes from the explanation's due instant, placed on a calendar day by the plan request's own dueDay.
 import type { EstimateExplanation } from "../concepts/MasteryEstimating/MasteryEstimating.ts";
 import type { SkillRows, Tracks } from "../learning-data.ts";
 import { averageEstimate } from "./course-score.ts";
+import { daysFrom, dueDay, studyDate } from "./review-day.ts";
 
 const DAY = 86_400_000;
 /** The days after the read's instant at which each projection is sampled. */
@@ -19,34 +20,39 @@ export function memoryInstants({ at }: { at: Date }) {
 }
 
 /**
- * The instant of the first whole day after `at` at or after the explanation's `due`, when the memory's retention reaches the
- * desired retention. When `due` is at or before `at` there is no such day, and the read's instant itself is answered so the
- * estimate read that follows still has an instant; memoryCurve then answers no review day.
+ * The skill's review day (design/compositions/LearningReads.md, "The review day"): `day` is the calendar day in New York on
+ * which the explanation's due instant falls, given by the dueDay the plan request uses, so the Memory view and the Plan
+ * name the same day; `days` is the whole calendar days from the read's day to it, 0 when the memory is due later today.
+ * `instant` is `days` whole days of 24 hours after `at`, where the projection's time line places that day, so the estimate
+ * read there sits on the projected curve. When `due` is at or before `at` the memory is due now: the day is today, `days`
+ * is 0 and `instant` is `at`, and memoryCurve answers no review day.
  */
-export function reviewInstant({ at, explanation }: { at: Date; explanation: EstimateExplanation }): Date {
-  const ahead = (explanation.due.getTime() - at.getTime()) / DAY;
-  return ahead > 0 ? after(at, Math.ceil(ahead)) : at;
+export function reviewDay({ at, explanation }: { at: Date; explanation: EstimateExplanation }): { day: string; days: number; instant: Date } {
+  const today = studyDate(at), day = dueDay(explanation.due, today), days = daysFrom(today, day);
+  return { day, days, instant: after(at, days) };
 }
 
 /** One projected value: whole days after the read's instant, that instant, and the estimate then. */
 export interface CurvePoint { days: number; at: Date; value: number }
+/** The day to review a skill by: the calendar day, the calendar days until it, and the projected estimate on it. */
+export interface ReviewPoint { day: string; days: number; value: number }
 /** What the memory read says about one skill's curve. */
 export interface MemoryCurve {
   estimate: number;
   projection: CurvePoint[];
-  /** The first whole day after the read's instant at or after the FSRS due instant, or null when that instant has passed. */
-  reviewBy: CurvePoint | null;
+  /** The calendar day the FSRS due instant falls on, or null when that instant has passed. */
+  reviewBy: ReviewPoint | null;
   /** True when the due instant is at or before the read's instant. */
   belowNow: boolean;
 }
 /** Gathers the estimate now, the samples, and the review day with the estimate on it. */
-export function memoryCurve({ at, explanation, review, reviewValue, ...values }: { at: Date; explanation: EstimateExplanation; review: Date; reviewValue: number } & Samples): MemoryCurve {
+export function memoryCurve({ at, explanation, day, days, reviewValue, ...values }: { at: Date; explanation: EstimateExplanation; day: string; days: number; reviewValue: number } & Samples): MemoryCurve {
   const projected = sampleValues(values);
   const belowNow = explanation.due.getTime() <= at.getTime();
   return {
     estimate: explanation.value,
-    projection: SAMPLE_DAYS.map((days, index) => ({ days, at: after(at, days), value: projected[index]! })),
-    reviewBy: belowNow ? null : { days: Math.round((review.getTime() - at.getTime()) / DAY), at: review, value: reviewValue },
+    projection: SAMPLE_DAYS.map((sample, index) => ({ days: sample, at: after(at, sample), value: projected[index]! })),
+    reviewBy: belowNow ? null : { day, days, value: reviewValue },
     belowNow,
   };
 }

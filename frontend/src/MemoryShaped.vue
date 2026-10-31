@@ -3,8 +3,8 @@ import { computed, onBeforeUnmount, ref } from "vue";
 import PixelIcon from "./PixelIcon.vue";
 import { arrivalStyle, useBoxWidth } from "./box-width.ts";
 import { CHART, KIND_MARKS, KIND_NAMES, valueY, type ChartPoint } from "./estimate-chart.ts";
-import { planDay } from "./labels.ts";
-import { DEFAULT_LINE, HORIZON, THRESHOLD_LINE, layoutShaped, type DayValue, type TimedValue } from "./memory-chart.ts";
+import { dayAfter, dayTime, planDay } from "./labels.ts";
+import { DEFAULT_LINE, HORIZON, THRESHOLD_LINE, layoutShaped, reviewDistance, type DayValue, type TimedValue } from "./memory-chart.ts";
 import { MARKS, PAL, SPRITES, iconRects, ringOf, type MarkName } from "./pixel-art.ts";
 
 // "How your curve was shaped" on the Memory view (design/visual-design.md, "Charts and summaries"). One skill's estimate
@@ -25,7 +25,8 @@ const glyphs = Object.fromEntries((Object.keys(MARKS) as MarkName[]).map((name) 
 const flag = iconRects(SPRITES.flag);
 
 const short = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", timeZone: "America/New_York" });
-const dayAt = (days: number) => new Date(Date.parse(props.asOf) + days * 86_400_000);
+// A day ahead is the plan day that many calendar days after today, the way the read counts a review day.
+const dayAt = (days: number) => dayTime(dayAfter(props.asOf, days));
 function percent(value: number) { return `${Math.round(value)}%`; }
 function values(point: ChartPoint) { return point.before === null ? percent(point.after) : `${percent(point.before)} → ${percent(point.after)}`; }
 function spoken(point: ChartPoint) {
@@ -34,7 +35,7 @@ function spoken(point: ChartPoint) {
 }
 const reviewText = computed(() => {
   const f = layout.value.flag;
-  return f ? `Review by ${planDay(dayAt(f.days).toISOString())}, in ${f.days} ${f.days === 1 ? "day" : "days"}` : "";
+  return f ? `Review by ${planDay(dayAfter(props.asOf, f.days))}, ${reviewDistance(f.days)}` : "";
 });
 // The date row: the starting point's day on the left when there is room for it, "Today" at the split, and the last
 // projected day on the right.
@@ -58,7 +59,8 @@ const active = computed(() => (dismissed.value ? null : hovered.value ?? focused
 const tip = computed(() => {
   const l = layout.value;
   if (active.value === "flag" && l.flag) {
-    return { title: `Review by ${short.format(dayAt(l.flag.days))}`, lines: [`In ${l.flag.days} ${l.flag.days === 1 ? "day" : "days"}`], below: true,
+    const distance = reviewDistance(l.flag.days);
+    return { title: `Review by ${short.format(dayAt(l.flag.days))}`, lines: [distance[0]!.toUpperCase() + distance.slice(1)], below: true,
       style: { left: `${Math.min(Math.max(l.flag.x, 84), l.frame.width - 84)}px`, top: `${l.flag.y + 10}px` } };
   }
   const marker = l.markers.find((m) => m.index === active.value);
@@ -138,7 +140,7 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", outside, true)
       <tbody>
         <tr v-for="(p, i) in points" :key="`p${i}`"><td>{{ planDay(p.at) }}</td><td>{{ p.label }}</td><td>{{ values(p) }}</td></tr>
         <tr><td>Today</td><td>Estimate now</td><td>{{ percent(estimate) }}</td></tr>
-        <tr v-for="p in projection" :key="`f${p.days}`"><td>{{ planDay(dayAt(p.days).toISOString()) }}</td><td>In {{ p.days }} {{ p.days === 1 ? "day" : "days" }} without practice</td><td>{{ percent(p.value) }}</td></tr>
+        <tr v-for="p in projection" :key="`f${p.days}`"><td>{{ planDay(dayAfter(asOf, p.days)) }}</td><td>In {{ p.days }} {{ p.days === 1 ? "day" : "days" }} without practice</td><td>{{ percent(p.value) }}</td></tr>
         <tr v-for="(p, i) in leftAlone" :key="`a${i}`"><td>{{ i === 1 ? "Today" : planDay(p.at) }}</td><td>Left alone from the starting point</td><td>{{ percent(p.value) }}</td></tr>
       </tbody>
     </table>
@@ -168,7 +170,7 @@ onBeforeUnmount(() => document.removeEventListener("pointerdown", outside, true)
 .tip{position:absolute;z-index:3;display:flex;flex-direction:column;gap:1px;width:max-content;max-width:180px;padding:7px 10px;border-radius:10px;background:var(--tip);color:var(--tip-text);font-size:12px;line-height:1.35;transform:translate(-50%,-100%);pointer-events:none;box-shadow:0 10px 24px rgb(var(--shadow) / .22)}
 .tip.below{transform:translateX(-50%)}
 .tip strong{font-size:13px;font-weight:700}
-.tip-day{color:var(--ring)}
+.tip-day{color:var(--tip-soft)}
 .legend{display:flex;flex-wrap:wrap;gap:4px 14px;margin:8px 0 0;padding:0;list-style:none;color:var(--muted);font-size:12px;line-height:1.4}
 .legend li{display:inline-flex;align-items:center;gap:5px}
 .key{flex:none}

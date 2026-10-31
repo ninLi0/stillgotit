@@ -155,7 +155,7 @@ onBeforeUnmount(() => { observer?.disconnect(); document.removeEventListener("po
 .tip{position:absolute;z-index:3;display:flex;flex-direction:column;gap:1px;width:max-content;max-width:180px;padding:7px 10px;border-radius:10px;background:var(--tip);color:var(--tip-text);font-size:12px;line-height:1.35;transform:translate(-50%,-100%);pointer-events:none;box-shadow:0 10px 24px rgb(var(--shadow) / .22)}
 .tip.below{transform:translateX(-50%)}
 .tip strong{font-size:13px;font-weight:700}
-.tip-day{color:var(--ring)}
+.tip-day{color:var(--tip-soft)}
 .note{margin:4px 0 0;color:var(--soft);font-size:12px;line-height:1.45}
 .legend{display:flex;flex-wrap:wrap;gap:4px 12px;margin:6px 0 0;padding:0;list-style:none;color:var(--muted);font-size:11px;line-height:1.4}
 .legend li{display:inline-flex;align-items:center;gap:5px}

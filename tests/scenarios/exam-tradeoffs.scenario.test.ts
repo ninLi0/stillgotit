@@ -21,8 +21,10 @@ import { examProblem, examRefusal, PlanningFailure, sentences, settle, tradeoffR
 const ORIGIN = "http://localhost:5173", cleanups: (() => Promise<void>)[] = [];
 afterAll(async () => { for (const cleanup of cleanups.reverse()) await cleanup(); });
 
-// A fixed instant keeps study dates stable: 11:00 in New York on 2026-11-02.
-const NOW = new Date("2026-11-02T16:00:00Z"), TODAY = "2026-11-02";
+// A fixed instant keeps study dates stable: 11:00 in New York on Monday, 2030-11-04, the day after daylight saving time
+// ends, as 2026-11-02 was. It sits years ahead because MongoDB removes expired sessions and sign-in attempts by the real
+// clock: with a past instant they could vanish in the middle of a test.
+const NOW = new Date("2030-11-04T16:00:00Z"), TODAY = "2030-11-04";
 const day = (offset: number) => new Date(Date.parse(TODAY) + offset * 86_400_000).toISOString().slice(0, 10);
 // The exam is three days ahead, so today and the next two days are study days before it.
 const EXAM_DAY = day(3);

@@ -9,7 +9,7 @@ import { arrivalStyle, useBoxWidth } from "./box-width.ts";
 import { KIND_MARKS, KIND_NAMES, type ChartPoint } from "./estimate-chart.ts";
 import { changeText, kindLabel, type SkillData } from "./evidence-text.ts";
 import { planDay, sessionLabels } from "./labels.ts";
-import { DEFAULT_LINE, HORIZON, THRESHOLD_LINE, layoutDefault, reviewOrder, standing } from "./memory-chart.ts";
+import { DEFAULT_LINE, HORIZON, THRESHOLD_LINE, layoutDefault, reviewDistance, reviewOrder, standing } from "./memory-chart.ts";
 import { MARKS, stageOf } from "./pixel-art.ts";
 import type { StillGotItHttp } from "../../generated/wire.ts";
 
@@ -56,12 +56,15 @@ const flagged = ref<string[] | null>(null), hoveredRow = ref<string | null>(null
 const highlighted = computed(() => (hoveredRow.value ? [hoveredRow.value] : flagged.value));
 
 // ---- Review by ----
+// A review day is a plan day: after an independent success it is the day the Plan starts the skill's review.
 const rows = computed(() => reviewOrder(skills.value));
+/** "In 3 days", or "Later today". */
+function distance(count: number) { const text = reviewDistance(count); return text[0]!.toUpperCase() + text.slice(1); }
 function dayText(row: MemorySkill) {
   const state = standing(row);
   if (state === "DUE") return { text: "Due now", detail: `Retention under ${retention.value}%` };
-  if (state === "COMING") return { text: `By ${planDay(row.reviewBy!.at)}`, detail: `In ${days(row.reviewBy!.days)}` };
-  if (state === "HOLDS") return { text: `By ${planDay(row.reviewBy!.at)}`, detail: `More than ${HORIZON} days away` };
+  if (state === "COMING") return { text: `By ${planDay(row.reviewBy!.day)}`, detail: distance(row.reviewBy!.days) };
+  if (state === "HOLDS") return { text: `By ${planDay(row.reviewBy!.day)}`, detail: `More than ${HORIZON} days away` };
   return { text: "No starting point yet", detail: "" };
 }
 
@@ -108,8 +111,10 @@ const summary = computed(() => {
     : gap < 0 ? `The changes below have left it ${-gap} ${gap === -1 ? "point" : "points"} below that.`
     : evidence.value.some((row) => row.mark !== "time") ? "It is where time alone would have left it." : "Nothing but time has moved it yet.";
   const state = standing(s);
-  const third = state === "DUE" ? `Its retention has already fallen to ${retention.value}%, so it is due for review.`
-    : `Without practice its retention falls to ${retention.value}% on ${planDay(s.reviewBy!.at)}, in ${days(s.reviewBy!.days)}, so review it by then.`;
+  const review = s.reviewBy;
+  const third = state === "DUE" || !review ? `Its retention has already fallen to ${retention.value}%, so it is due for review.`
+    : review.days <= 0 ? `Without practice its retention falls to ${retention.value}% later today, so review it today.`
+    : `Without practice its retention falls to ${retention.value}% on ${planDay(review.day)}, ${reviewDistance(review.days)}, so review it by then.`;
   return [first, second, third];
 });
 </script>
