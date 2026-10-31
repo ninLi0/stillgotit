@@ -5,9 +5,9 @@ import { api, failureText } from "./api.ts";
 import { uploadMaterial } from "./host-api.ts";
 import { focusedControl, restoreFocus } from "./focus.ts";
 import {
-  GRADED_PREFIX, KeptReviews, NAME_LIMIT, alreadyImported, confirmRow, dateProblem, earlierLabels, estimateStart, filesProblem, importBusy,
+  GRADED_PREFIX, KeptReviews, NAME_LIMIT, alreadyImported, confirmRow, dateProblem, earlierImportSentence, earlierLabels, estimateStart, filesProblem, importBusy,
   isCalendarDate, isGradedTitle, listText, newRows, readableDay, resultLabels, results, reviewRequest, rowProblem, sentences,
-  type ImportedRow, type KeptReview, type KeptRow, type Material,
+  type EarlierImport, type ImportedRow, type KeptReview, type KeptRow, type Material,
 } from "./graded-import.ts";
 import type { StillGotItHttp } from "../../generated/wire.ts";
 
@@ -46,6 +46,8 @@ const reviewing = ref<Material | null>(null), review = ref<KeptReview | null>(nu
 const skills = ref<Skill[]>([]), skillsRead = ref(false), imports = ref<ImportedRow[]>([]), today = ref(""), contextLoaded = ref(false);
 const rowErrors = ref<Record<number, string>>({}), dateError = ref(""), confirmError = ref("");
 const dateInput = ref<HTMLInputElement | null>(null);
+// The oldest import of this paper from another upload of the same files. While there is one, this upload cannot be imported.
+const earlierImport = ref<EarlierImport | null>(null), earlierBox = ref<HTMLElement | null>(null);
 // Each mapped skill's estimate start as a New York date; null when the skill has no estimate yet.
 const starts = ref<Record<string, string | null>>({});
 const startReads = new Set<string>();
@@ -105,7 +107,7 @@ async function readCourse() {
 async function readImports(material: Material) {
   const result = await api.courses.graded.read({ material });
   if ("error" in result) throw new Error(explain(result));
-  imports.value = result.imported; today.value = result.today;
+  imports.value = result.imported; today.value = result.today; earlierImport.value = result.earlier[0] ?? null;
 }
 async function readWorkFile(material: Material) {
   const result = await api.courses.materials.read({ material });
@@ -156,8 +158,25 @@ async function loadStarts() {
   }));
 }
 
+/**
+ * This paper's marks were already imported from another upload, so none of its rows can be imported here. The kept rows are
+ * let go, and the screen shows why in their place (design/compositions/Importing.md, "The same paper uploaded twice").
+ */
+function showEarlier(material: Material) {
+  store.remove(material);
+  review.value = null; rowErrors.value = {}; dateError.value = ""; confirmError.value = ""; notice.value = "";
+  focusLater(() => earlierBox.value);
+}
+/** After a declined Extract or Confirm, whether the reason is an earlier import of this paper, which another tab may have made. */
+async function importedElsewhere(material: Material) {
+  try { await readImports(material); } catch { return false; }
+  if (!earlierImport.value) return false;
+  showEarlier(material);
+  return true;
+}
+
 function resetReview() {
-  review.value = null; workFile.value = null; imports.value = []; today.value = ""; contextLoaded.value = false;
+  review.value = null; workFile.value = null; imports.value = []; today.value = ""; contextLoaded.value = false; earlierImport.value = null;
   rowErrors.value = {}; dateError.value = ""; confirmError.value = ""; starts.value = {}; storageError.value = "";
 }
 
@@ -175,6 +194,7 @@ async function loadReview(material: Material, saved = false) {
   await Promise.all([readCourse(), readWorkFile(material)]);
   if (reviewing.value !== material) return;
   contextLoaded.value = true;
+  if (earlierImport.value) { showEarlier(material); return; }
   const kept = store.read(material);
   if (kept) {
     review.value = kept; reconcile(); void loadStarts();
@@ -191,7 +211,10 @@ async function extract(material: Material, saved = false) {
   const result = await api.courses.graded.extract({ material });
   if (reviewing.value !== material) return;
   // With a confirmed skill checked above, a 400 without a detail means the tutor found no marked questions.
-  if ("error" in result) throw new Error(explain(result, sentences.marksMissing));
+  if ("error" in result) {
+    if (await importedElsewhere(material)) return;
+    throw new Error(explain(result, sentences.marksMissing));
+  }
   const previous = review.value, outsideHelp = previous?.outsideHelp ?? false;
   review.value = { performedOn: previous?.performedOn ?? "", outsideHelp, started: false, rows: newRows(result.rows, imports.value, confirmedIds.value, outsideHelp) };
   rowErrors.value = {}; confirmError.value = ""; dateError.value = "";
@@ -300,6 +323,7 @@ async function confirmImport() {
     confirming.value = true;
     // Current imports, date, and skills, so these checks match the ones Confirm makes.
     await readImports(material);
+    if (earlierImport.value) { showEarlier(material); return; }
     await readCourse();
     reconcile();
     const queue = current.rows.map((row, index) => ({ row, index })).filter(({ row }) => row.checked && row.skill && !isImported(row));
@@ -332,6 +356,8 @@ async function confirmImport() {
         try {
           await readImports(material);
           if (alreadyImported(row, imports.value)) { markImported(current, row); done.push(row); continue; }
+          // Another tab imported this paper from another upload: nothing more can be imported here.
+          if (earlierImport.value) { showEarlier(material); if (done.length) emit("changed"); return; }
         } catch (problem) { reason = problem instanceof Error ? problem.message : reason; }
       }
       // Stop here. This row and the later ones stay checked, so the learner can fix it and confirm again.
@@ -421,7 +447,7 @@ defineExpose({ startUpload });
         </ul>
         <p id="graded-files-hint" class="hint">A PDF, with or without a text layer, or photos of the pages (PNG, JPEG, WebP, HEIC, or HEIF). Each file can be up to 15 MB, and all files together up to 25 MB.</p>
         <div v-if="filesError.length" id="graded-files-error" ref="filesErrorBox" class="field-error" role="alert" tabindex="-1"><p v-for="line in filesError" :key="line">{{ line }}</p></div>
-        <p class="graded-info"><InfoBubble label="About long papers" :text="`One import reads at most 50 questions, so upload a longer paper in parts. ${sentences.separateUploads}`" /></p>
+        <p class="graded-info"><InfoBubble label="About long papers" :text="`One import reads at most 50 questions, so upload a longer paper in parts. ${sentences.sameFiles}`" /></p>
         <div class="graded-actions"><div class="action"><button class="primary sand" :disabled="busy || !!uploadReason" :aria-describedby="uploadReason ? 'graded-upload-reason' : undefined">{{ busy ? 'Uploading…' : 'Upload and read the marks' }}</button></div></div>
       </form>
 
@@ -434,7 +460,12 @@ defineExpose({ startUpload });
           <p v-else class="hint">This work has no readable text. The tutor reads its pages as images.</p>
         </details>
 
-        <div v-if="review" class="graded-review">
+        <div v-if="earlierImport" ref="earlierBox" class="graded-earlier" tabindex="-1">
+          <p>{{ earlierImportSentence(earlierImport) }}</p>
+          <p class="hint">This upload stays in your course materials, where you can delete it if you don't need it.</p>
+          <div v-if="earlierImport.title" class="graded-actions start"><button type="button" class="secondary sand" :disabled="busy" @click="open(earlierImport.material)">Review “{{ earlierImport.title }}”</button></div>
+        </div>
+        <div v-else-if="review" class="graded-review">
           <fieldset class="graded-when" :disabled="busy || locked">
             <legend class="sr-only">When you did this work, and whether you had help</legend>
             <label for="graded-date">Date you did this work</label>
@@ -497,7 +528,7 @@ defineExpose({ startUpload });
           <button v-else type="button" class="primary sand" @click="open(reviewing)">Try again</button>
         </div>
 
-        <section v-if="contextLoaded" class="graded-history" aria-labelledby="graded-history-title">
+        <section v-if="contextLoaded && !earlierImport" class="graded-history" aria-labelledby="graded-history-title">
           <h3 id="graded-history-title">Imported from this work</h3>
           <p v-if="!imports.length" class="hint">Nothing from this work has been imported yet.</p>
           <ul v-else>
@@ -537,4 +568,5 @@ select{width:100%;font:inherit;font-size:14px;padding:9px 12px;border:1px solid 
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
 @media(max-width:650px){.graded-panel.open{padding:14px;border-radius:14px}.graded-row{padding:12px}.row-facts div{grid-template-columns:1fr;gap:2px}.row-choices{grid-template-columns:1fr}.graded-actions .action,.graded-actions .action button{width:100%}.graded-actions .action{align-items:stretch}}
 .graded-title-row{display:flex;align-items:center;gap:6px}.graded-info{margin:0 0 4px}
+.graded-earlier{margin:16px 0 0;padding:12px 14px;border-left:3px solid var(--sand-edge);background:var(--inset);font-size:14px}.graded-earlier p{margin:0}.graded-earlier .hint{margin-top:8px}.graded-earlier .graded-actions{margin-top:12px}
 </style>

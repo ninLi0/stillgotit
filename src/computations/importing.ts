@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { SkillRows, TutorAnswer, TutorRequest } from "../learning-data.ts";
 import type { SourceContext } from "../tutor-types.ts";
 import type { Material } from "../concepts/MaterialKeeping/MaterialKeeping.ts";
@@ -20,8 +21,14 @@ export interface GradedRow {
 export type GradedStatus = "READY" | "DATE_INVALID" | "DATE_FUTURE" | "ROW_INVALID" | "UNMAPPED" | "HELP_CONFLICT" | "SKILL_UNAVAILABLE";
 /** The first failing date or row check, or READY with the performance instant. */
 export interface GradedReview { status: GradedStatus; performedAt: Date | null }
-/** The skill and source key of the row. */
-export interface GradedKey { skill: string; sourceKey: string }
+/**
+ * The skill and source key of the row, and every key under which the same question counts as imported: the source key and,
+ * for a question imported before keys named the paper, the key that named the material. `materialKeys` holds only that older
+ * key, when it differs from the source key; the concept's own rule cannot refuse it, because no import writes it any more.
+ */
+export interface GradedKey { skill: string; sourceKey: string; keys: string[]; materialKeys: string[] }
+/** Whether a saved case came from another upload of the same paper, and the material it cites. */
+export interface GradedElsewhere { found: boolean; from: string }
 /** The importGraded input built from the row, without its author. */
 export interface GradedImport {
   subject: string; definition: string; sourceKey: string; question: string; criteria: string; response: ResponseValue;
@@ -69,9 +76,30 @@ export function gradedReview({ row, outsideHelp, performedOn, at, skills }: {
   return { status: "READY", performedAt: zoneMidnight(day) };
 }
 
-/** The source key names the material, the trimmed label, and the skill, so a repeated question for the same skill is refused. */
-export function gradedKey({ material, row }: { material: Material; row: GradedRow }): GradedKey {
-  return { skill: row.skill, sourceKey: sourceKey(material, row) };
+/**
+ * The source key names the paper, the trimmed label, and the skill, so a repeated question for the same skill is refused,
+ * from this upload or from another upload of the same files. `keys` adds the key that named the material, which questions
+ * imported before the key named the paper still carry.
+ */
+export function gradedKey({ material, originals, row }: { material: Material; originals: MediaList; row: GradedRow }): GradedKey {
+  const key = sourceKey(material, originals, row), before = materialKey(material, row);
+  return key === before ? { skill: row.skill, sourceKey: key, keys: [key], materialKeys: [] } : { skill: row.skill, sourceKey: key, keys: [key, before], materialKeys: [before] };
+}
+
+/** True when a saved source key is one of the keys under which the question counts as imported. */
+export function gradedKeyUsed({ sourceKey, keys }: { sourceKey: string; keys: string[] }): boolean {
+  return Array.isArray(keys) && keys.includes(sourceKey);
+}
+
+/**
+ * True, with the cited material, when a saved case's work came from another upload of this material's paper: the work's
+ * attachments, which are the originals of the upload it was imported from, make the same paper, and it cites another material.
+ */
+export function gradedElsewhere({ material, originals, response }: { material: Material; originals: MediaList; response: ResponseValue }): GradedElsewhere {
+  const paper = paperOf(originals), work: Record<string, unknown> = isRecord(response) ? response : {};
+  const cited = Array.isArray(work.citations) && isRecord(work.citations[0]) ? work.citations[0].material : undefined;
+  if (paper === null || typeof cited !== "string" || cited === material) return { found: false, from: "" };
+  return { found: paperOf(work.attachments) === paper, from: cited };
 }
 
 /** The importGraded input for a row that gradedReview accepted. */
@@ -81,24 +109,54 @@ export function gradedImport({ material, originals, row, outsideHelp, performedA
   const skill = skills.find((item) => item.skill === row.skill);
   if (!skill) throw new Error("Unavailable skill");
   return {
-    subject: row.skill, definition: skill.current, sourceKey: sourceKey(material, row), question: row.label.trim(), criteria: taskCriteria(skill),
+    subject: row.skill, definition: skill.current, sourceKey: sourceKey(material, originals, row), question: row.label.trim(), criteria: taskCriteria(skill),
     response: { text: row.excerpt, attachments: JSON.parse(JSON.stringify(originals)) as JsonValue[], conversation: [], citations: [{ material }], reviewedDialogueLength: 0 },
     help: outsideHelp ? "HINT" : "NONE", fresh: true, performedAt, mark: row.mark, feedback: row.feedback, result: row.result, gateMet: false,
     rationale: importRationale(row),
   };
 }
 
-/** True when gradedKey made the source key for this material. */
-export function gradedSource({ sourceKey, material }: { sourceKey: string; material: Material }): boolean {
+/**
+ * True when gradedKey made the source key for this material: the key names the material's paper, or, for a question imported
+ * before keys named the paper, the material itself.
+ */
+export function gradedSource({ sourceKey, material, originals }: { sourceKey: string; material: Material; originals: MediaList }): boolean {
   if (typeof sourceKey !== "string" || !sourceKey.startsWith("graded")) return false;
   try {
     const parts: unknown = JSON.parse(sourceKey.slice("graded".length));
-    return Array.isArray(parts) && parts.length === 3 && parts.every((part) => typeof part === "string") &&
-      parts[0] === material && `graded${JSON.stringify(parts)}` === sourceKey;
+    if (!Array.isArray(parts) || parts.length !== 3 || !parts.every((part) => typeof part === "string") || `graded${JSON.stringify(parts)}` !== sourceKey) return false;
+    const paper = paperOf(originals);
+    return parts[0] === material || (paper !== null && parts[0] === paper);
   } catch { return false; }
 }
 
-function sourceKey(material: Material, row: GradedRow): string {
+/** A retained file reference as the upload route writes it: the import key, then the SHA-256 digest of the bytes and the extension. */
+const RETAINED = /^[a-f0-9-]{36}\/([a-f0-9]{64})\.[a-z0-9]{1,10}$/;
+
+/**
+ * The paper a graded material holds, named by the content of its files rather than by the upload: `sha256:` followed by the
+ * SHA-256 digest of its originals' distinct byte digests, sorted and joined by commas. The same files make the same paper
+ * under any file name, in any order, and in any upload. Null when an original's reference does not carry its digest, which
+ * only a reference saved before retained references took their current form can lack (design/material-data.md).
+ */
+function paperOf(originals: unknown): string | null {
+  if (!Array.isArray(originals) || !originals.length) return null;
+  const digests = new Set<string>();
+  for (const original of originals) {
+    const match = isRecord(original) && typeof original.file === "string" ? RETAINED.exec(original.file) : null;
+    if (!match) return null;
+    digests.add(match[1]!);
+  }
+  return `sha256:${createHash("sha256").update([...digests].sort().join(",")).digest("hex")}`;
+}
+
+/** The key names the paper, or the material when its paper cannot be named. */
+function sourceKey(material: Material, originals: MediaList, row: GradedRow): string {
+  return `graded${JSON.stringify([paperOf(originals) ?? material, row.label.trim(), row.skill])}`;
+}
+
+/** The key as it was before keys named the paper: the material, the trimmed label, and the skill. */
+function materialKey(material: Material, row: GradedRow): string {
   return `graded${JSON.stringify([material, row.label.trim(), row.skill])}`;
 }
 

@@ -495,18 +495,20 @@ Concrete types:
 - `estimateTimeline(explanation?: MasteryEstimating.EstimateExplanation, tracks: MasteryEstimating.ProgressRows) : EstimateTimeline` — [Learning computations](../design/compositions/LearningComputations.md), line 92.
 - `evidenceAttribution(origin: AssessmentReviewing.Origin, rationale: String) : String` — [P2 learning journey](../design/stages/materials.md), line 140.
 - `evidenceUpdate(data: AssessmentReviewing.CaseRecord, tracks: MasteryEstimating.ProgressRows) : EvidenceUpdate` — [Learning computations](../design/compositions/LearningComputations.md), line 27.
-- `extractRequest(selected: Library.SourceRecords, skills: SkillMapping.SkillMapRows) : TutorRequest` — [Importing graded work](../design/compositions/Importing.md), line 112.
+- `extractRequest(selected: Library.SourceRecords, skills: SkillMapping.SkillMapRows) : TutorRequest` — [Importing graded work](../design/compositions/Importing.md), line 137.
 - `generationDefinition(request: TutorRequest) : GenerationDefinition` — [Learning computations](../design/compositions/LearningComputations.md), line 30.
 - `generationFields(answer: TutorAnswer) : TutorAnswer` — [Learning computations](../design/compositions/LearningComputations.md), line 33.
 - `gradeRequest(selected: Library.SourceRecords, data: AssessmentReviewing.CaseRecord) : TutorRequest` — [Learning computations](../design/compositions/LearningComputations.md), line 36.
-- `gradedImport(material: Library.Material, originals: Library.MediaList, row: GradedRow, outsideHelp: Flag, performedAt: DateTime, skills: SkillMapping.SkillMapRows) : GradedImport` — [Importing graded work](../design/compositions/Importing.md), line 127.
-- `gradedKey(material: Library.Material, row: GradedRow) : GradedKey` — [Importing graded work](../design/compositions/Importing.md), line 124.
-- `gradedReview(row: GradedRow, outsideHelp: Flag, performedOn: String, at: DateTime, skills: SkillMapping.SkillMapRows) : GradedReview` — [Importing graded work](../design/compositions/Importing.md), line 121.
-- `gradedSource(sourceKey: String, material: Library.Material) : Flag` — [Importing graded work](../design/compositions/Importing.md), line 130.
-- `gradedTitle(title: String) : Flag` — [Importing graded work](../design/compositions/Importing.md), line 106.
-- `gradedToday(at: DateTime) : String` — [Importing graded work](../design/compositions/Importing.md), line 118.
-- `hasConfirmedSkill(skills: SkillMapping.SkillMapRows) : Flag` — [Importing graded work](../design/compositions/Importing.md), line 109.
-- `hasGradedRows(answer: TutorAnswer) : Flag` — [Importing graded work](../design/compositions/Importing.md), line 115.
+- `gradedElsewhere(material: Library.Material, originals: Library.MediaList, response: AssessmentReviewing.ResponseValue) : GradedElsewhere` — [Importing graded work](../design/compositions/Importing.md), line 155.
+- `gradedImport(material: Library.Material, originals: Library.MediaList, row: GradedRow, outsideHelp: Flag, performedAt: DateTime, skills: SkillMapping.SkillMapRows) : GradedImport` — [Importing graded work](../design/compositions/Importing.md), line 158.
+- `gradedKey(material: Library.Material, originals: Library.MediaList, row: GradedRow) : GradedKey` — [Importing graded work](../design/compositions/Importing.md), line 149.
+- `gradedKeyUsed(sourceKey: String, keys: KeyList) : Flag` — [Importing graded work](../design/compositions/Importing.md), line 152.
+- `gradedReview(row: GradedRow, outsideHelp: Flag, performedOn: String, at: DateTime, skills: SkillMapping.SkillMapRows) : GradedReview` — [Importing graded work](../design/compositions/Importing.md), line 146.
+- `gradedSource(sourceKey: String, material: Library.Material, originals: Library.MediaList) : Flag` — [Importing graded work](../design/compositions/Importing.md), line 161.
+- `gradedTitle(title: String) : Flag` — [Importing graded work](../design/compositions/Importing.md), line 131.
+- `gradedToday(at: DateTime) : String` — [Importing graded work](../design/compositions/Importing.md), line 143.
+- `hasConfirmedSkill(skills: SkillMapping.SkillMapRows) : Flag` — [Importing graded work](../design/compositions/Importing.md), line 134.
+- `hasGradedRows(answer: TutorAnswer) : Flag` — [Importing graded work](../design/compositions/Importing.md), line 140.
 - `hasLessonQuestion(data: GroundedTutoring.StudyRecord) : Flag` — [Learning computations](../design/compositions/LearningComputations.md), line 39.
 - `homeViewOffered(view: String) : Flag` — [Settings](../design/compositions/Settings.md), line 142.
 - `itemOrder(day: Date, candidate: StudyPlanning.Candidate) : String` — [Daily planning flows](../design/compositions/Planning.md), line 117.
@@ -526,7 +528,7 @@ Concrete types:
 - `planDetail(schedule: StudyPlanning.ScheduleValue) : PlanDetail` — [Learning computations](../design/compositions/LearningComputations.md), line 54.
 - `planRequest(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows, schedule: StudyPlanning.ScheduleValue) : ReviewProposal` — [Learning computations](../design/compositions/LearningComputations.md), line 57.
 - `prerequisiteSet(prerequisites: SkillList) : SkillMapping.SkillSet` — [Courses, materials, and skills](../design/compositions/Courses.md), line 77.
-- `prerequisiteToPractice(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows, skill: SkillMapping.Skill) : PrerequisiteChoice` — [Request admission](../design/compositions/LearningAccess.md), line 65.
+- `prerequisiteToPractice(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows, skill: SkillMapping.Skill) : PrerequisiteChoice` — [Request admission](../design/compositions/LearningAccess.md), line 66.
 - `prerequisitesReady(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows, skill: SkillMapping.Skill) : Flag` — [Learning computations](../design/compositions/LearningComputations.md), line 62.
 - `progressRows(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows) : SkillProgress` — [Learning computations](../design/compositions/LearningComputations.md), line 65.
 - `recentLimit(pages: Number) : Number` — [Shared learning reads](../design/compositions/LearningReads.md), line 80.
@@ -559,16 +561,18 @@ Concrete types:
 
 _Views name reusable conditions. Multiple `where` blocks are alternatives._
 
-### (owner) already imported (sourceKey) for (skill)
+### (owner) already imported a question under one of (keys) for (skill)
 
 Authored path: `Importing.AlreadyImported`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 54.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 77.
 
 ```view
-(owner) already imported (sourceKey) for (skill) — inputs (owner, skill, sourceKey); outputs (); bindings (assessment)
+(owner) already imported a question under one of (keys) for (skill) — inputs (owner, skill, keys); outputs (); bindings (assessment, sourceKey, used)
   where
     AssessmentReviewing._cases (author: owner, subject: skill) has (case: assessment)
     AssessmentReviewing._case (case: assessment) has (sourceKey)
+    used is gradedKeyUsed (keys, sourceKey)
+    used is among [true]
 ```
 
 ### (owner) owns (course) with (title)
@@ -754,6 +758,34 @@ Authored path: `Importing.GradedMaterial`.
     view "(owner) owns (course) with (title)" with (course, owner)
     graded is gradedTitle (title)
     graded is among [true]
+```
+
+### (owner) imported the paper of graded work (material) from (earlier) at (importedAt)
+
+Authored path: `Importing.ImportedElsewhere`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 30.
+
+```view
+(owner) imported the paper of graded work (material) from (earlier) at (importedAt) — inputs (owner, material); outputs (earlier, importedAt); bindings (course, originals, unit, skill, assessment, response) — answers any number of (earlier, importedAt)
+  where
+    view "(owner) imported graded work (material)" with (material, owner) has (course, originals)
+    SkillMapping._units (course) has (unit)
+    SkillMapping._skills (unit) has (skill)
+    AssessmentReviewing._cases (author: owner, subject: skill) has (case: assessment, imported: true)
+    AssessmentReviewing._work (case: assessment) has (response)
+    (found: true, from: earlier) is gradedElsewhere (material, originals, response)
+    AssessmentReviewing._judgments (case: assessment) has (recordedAt: importedAt, revision: 1)
+```
+
+### (owner) imported the paper of graded work (material) from another upload
+
+Authored path: `Importing.PaperImported`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 30.
+- Covered by [Request admission](../design/compositions/LearningAccess.md), line 39.
+
+```view
+(owner) imported the paper of graded work (material) from another upload — inputs (owner, material); outputs (); bindings ()
+  where view "(owner) imported the paper of graded work (material) from (earlier) at (importedAt)" with (material, owner)
 ```
 
 ### (owner) may start (item) in (course)
@@ -1031,7 +1063,7 @@ Former "admit a lesson for (owner) and (skill)" — inputs (owner, skill); bindi
 ### admit a question in (studySession)
 
 Authored path: `Access.QuestionReady`.
-- Covered by [Request admission](../design/compositions/LearningAccess.md), line 44.
+- Covered by [Request admission](../design/compositions/LearningAccess.md), line 45.
 
 ```former
 Former "admit a question in (studySession)" — inputs (owner, studySession, text, channel, attachments, dialogueLength); bindings (data, sources, currentDialogue); promises at most one record — forms:
@@ -1047,7 +1079,7 @@ Former "admit a question in (studySession)" — inputs (owner, studySession, tex
 ### admit a routine plan in (course)
 
 Authored path: `Access.PlanReady`.
-- Covered by [Request admission](../design/compositions/LearningAccess.md), line 40.
+- Covered by [Request admission](../design/compositions/LearningAccess.md), line 41.
 
 ```former
 Former "admit a routine plan in (course)" — inputs (owner, course); bindings (); promises at most one record — forms:
@@ -1100,7 +1132,7 @@ Former "admit a tutor request for (owner)" — inputs (owner); bindings (status)
 ### admit access to (course) for (owner)
 
 Authored path: `Access.CourseReady`.
-- Covered by [Request admission](../design/compositions/LearningAccess.md), line 39.
+- Covered by [Request admission](../design/compositions/LearningAccess.md), line 40.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 7.
 
 ```former
@@ -1176,6 +1208,20 @@ Former "admit graded work (material) for (owner)" — inputs (owner, material); 
     allowed: true
 ```
 
+### admit graded work (material) whose paper (owner) has not imported from another upload
+
+Authored path: `Access.PaperNotImported`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 7.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 30.
+- Covered by [Request admission](../design/compositions/LearningAccess.md), line 39.
+
+```former
+Former "admit graded work (material) whose paper (owner) has not imported from another upload" — inputs (owner, material); bindings (); promises at most one record — forms:
+  a record of
+    where no view "(owner) imported the paper of graded work (material) from another upload" with (material, owner)
+    allowed: true
+```
+
 ### admit learner work in (studySession)
 
 Authored path: `Access.ResponseReady`.
@@ -1195,7 +1241,7 @@ Former "admit learner work in (studySession)" — inputs (owner, studySession, t
 
 Authored path: `Access.TaskReady`.
 - Covered by [Request admission](../design/compositions/LearningAccess.md), line 25.
-- Covered by [Request admission](../design/compositions/LearningAccess.md), line 62.
+- Covered by [Request admission](../design/compositions/LearningAccess.md), line 63.
 
 ```former
 Former "admit practice for (owner) and (skill)" — inputs (owner, skill); bindings (definition, skills, tracks, context, sources, materials); promises at most one record — forms:
@@ -1212,7 +1258,7 @@ Former "admit practice for (owner) and (skill)" — inputs (owner, skill); bindi
 ### admit progress on (item) in (course)
 
 Authored path: `Access.ItemReady`.
-- Covered by [Request admission](../design/compositions/LearningAccess.md), line 41.
+- Covered by [Request admission](../design/compositions/LearningAccess.md), line 42.
 
 ```former
 Former "admit progress on (item) in (course)" — inputs (owner, course, item); bindings (); promises at most one record — forms:
@@ -1291,7 +1337,7 @@ Former "admit revision of (assessment)" — inputs (owner, assessment, basedOn);
 ### admit starting (item) in (course)
 
 Authored path: `Access.BeginReady`.
-- Covered by [Request admission](../design/compositions/LearningAccess.md), line 42.
+- Covered by [Request admission](../design/compositions/LearningAccess.md), line 43.
 
 ```former
 Former "admit starting (item) in (course)" — inputs (owner, course, item); bindings (); promises at most one record — forms:
@@ -1441,7 +1487,7 @@ Former "skill estimates for (owner) in (course)" — inputs (owner, course); bin
 ### study data for (owner) and (skill) at (at)
 
 Authored path: `Reads.SkillData`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 46.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 69.
 - Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 13.
 
 ```former
@@ -1606,18 +1652,18 @@ Former "the estimate policy and its reference curve" — inputs (); bindings (po
     reviewThreshold: readinessMinimum
 ```
 
-### the imports from (material) for (owner) in (course)
+### the imports from (material) with (originals) for (owner) in (course)
 
 Authored path: `Importing.ImportedRows`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 82.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 105.
 
 ```former
-Former "the imports from (material) for (owner) in (course)" — inputs (owner, material, course); bindings (unit, skill, assessment, performedAt, sourceKey, fromMaterial, label, mark, feedback, result); promises exactly one record — forms:
+Former "the imports from (material) with (originals) for (owner) in (course)" — inputs (owner, material, originals, course); bindings (unit, skill, assessment, performedAt, sourceKey, fromMaterial, label, mark, feedback, result); promises exactly one record — forms:
   each SkillMapping._units (course) has (unit)
     where SkillMapping._skills (unit) has (skill)
     where AssessmentReviewing._cases (author: owner, subject: skill) has (case: assessment, imported: true, performedAt)
     where AssessmentReviewing._case (case: assessment) has (sourceKey)
-    where fromMaterial is gradedSource (material, sourceKey)
+    where fromMaterial is gradedSource (material, originals, sourceKey)
     where fromMaterial is among [true]
     where AssessmentReviewing._work (case: assessment) has (originalFeedback: feedback, originalMark: mark, question: label)
     where AssessmentReviewing._effectiveJudgment (case: assessment) has (result)
@@ -1630,6 +1676,23 @@ Former "the imports from (material) for (owner) in (course)" — inputs (owner, 
       performedAt
       result
       skill
+```
+
+### the imports of the paper of (material) for (owner) from other uploads
+
+Authored path: `Importing.EarlierImports`.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 30.
+- Covered by [Request admission](../design/compositions/LearningAccess.md), line 39.
+
+```former
+Former "the imports of the paper of (material) for (owner) from other uploads" — inputs (owner, material); bindings (earlier, importedAt, title); promises exactly one record — forms:
+  each view "(owner) imported the paper of graded work (material) from (earlier) at (importedAt)" with (material, owner) has (earlier, importedAt)
+    where whether Library._material (material: earlier) has (owner, title)
+    arranged by importedAt
+    form a record of
+      importedAt
+      material: earlier
+      title
 ```
 
 ### the materials (owner) deleted from (course)
@@ -1691,7 +1754,7 @@ Former "the prerequisite links in (course)" — inputs (course); bindings (unit,
 ### the prerequisite to work on before practicing (skill) for (owner)
 
 Authored path: `Access.PracticePrerequisite`.
-- Covered by [Request admission](../design/compositions/LearningAccess.md), line 62.
+- Covered by [Request admission](../design/compositions/LearningAccess.md), line 63.
 
 ```former
 Former "the prerequisite to work on before practicing (skill) for (owner)" — inputs (owner, skill); bindings (skills, tracks, title); promises at most one record — forms:
@@ -2888,7 +2951,7 @@ then
 Authored path: `Courses.ReadCourse`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 9.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 132.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 37.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 58.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 128.
 
 ```reaction
@@ -2902,7 +2965,7 @@ then
 Authored path: `Courses.ReadCourse`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 9.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 132.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 37.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 58.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 128.
 
 ```reaction
@@ -2920,7 +2983,7 @@ then
 Authored path: `Courses.ReadCourse`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 9.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 132.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 37.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 58.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 128.
 
 ```reaction
@@ -3364,8 +3427,8 @@ then
 ### Importing.Confirm
 
 Authored path: `Importing.Confirm`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 73.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 115.
 
 ```reaction
 when RequestBoundary.request (material, outsideHelp, path: "/courses/graded/confirm", performedOn, requestId, row, session)
@@ -3376,8 +3439,8 @@ then
 ### Importing.Confirm:dateFuture#2
 
 Authored path: `Importing.Confirm`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 73.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 115.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Importing.Confirm
@@ -3394,8 +3457,8 @@ then
 ### Importing.Confirm:dateFuture#3
 
 Authored path: `Importing.Confirm`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 73.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 115.
 
 ```reaction
 when RequestBoundary.respond (error: "GRADED_DATE_FUTURE", requestId), asked by Importing.Confirm:dateFuture#2
@@ -3406,7 +3469,8 @@ where
   view "(owner) imported graded work (material)" with (material, owner) has (course, originals)
   SkillMapping._map (course) has (skills)
   (performedAt, status: "READY") is gradedReview (at, outsideHelp, performedOn, row, skills)
-  (skill, sourceKey) is gradedKey (material, row)
+  (keys, materialKeys, skill) is gradedKey (material, originals, row)
+  no view "(owner) already imported a question under one of (keys) for (skill)" with (keys: materialKeys, owner, skill)
   (criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject) is gradedImport (material, originals, outsideHelp, performedAt, row, skills)
 then
   AssessmentReviewing.importGraded (author: owner, criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject)
@@ -3415,8 +3479,8 @@ then
 ### Importing.Confirm:dateFuture#4
 
 Authored path: `Importing.Confirm`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 73.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 115.
 
 ```reaction
 when AssessmentReviewing.importGraded (author: owner, criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject, case: assessment), asked by Importing.Confirm:dateFuture#3
@@ -3430,8 +3494,8 @@ then
 ### Importing.Confirm:dateInvalid#2
 
 Authored path: `Importing.Confirm`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 73.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 115.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Importing.Confirm
@@ -3448,8 +3512,8 @@ then
 ### Importing.Confirm:dateInvalid#3
 
 Authored path: `Importing.Confirm`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 73.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 115.
 
 ```reaction
 when RequestBoundary.respond (error: "GRADED_DATE_INVALID", requestId), asked by Importing.Confirm:dateInvalid#2
@@ -3460,7 +3524,8 @@ where
   view "(owner) imported graded work (material)" with (material, owner) has (course, originals)
   SkillMapping._map (course) has (skills)
   (performedAt, status: "READY") is gradedReview (at, outsideHelp, performedOn, row, skills)
-  (skill, sourceKey) is gradedKey (material, row)
+  (keys, materialKeys, skill) is gradedKey (material, originals, row)
+  no view "(owner) already imported a question under one of (keys) for (skill)" with (keys: materialKeys, owner, skill)
   (criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject) is gradedImport (material, originals, outsideHelp, performedAt, row, skills)
 then
   AssessmentReviewing.importGraded (author: owner, criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject)
@@ -3469,8 +3534,8 @@ then
 ### Importing.Confirm:dateInvalid#4
 
 Authored path: `Importing.Confirm`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 73.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 115.
 
 ```reaction
 when AssessmentReviewing.importGraded (author: owner, criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject, case: assessment), asked by Importing.Confirm:dateInvalid#3
@@ -3484,8 +3549,8 @@ then
 ### Importing.Confirm:helpConflict#2
 
 Authored path: `Importing.Confirm`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 73.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 115.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Importing.Confirm
@@ -3502,8 +3567,8 @@ then
 ### Importing.Confirm:helpConflict#3
 
 Authored path: `Importing.Confirm`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 73.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 115.
 
 ```reaction
 when RequestBoundary.respond (error: "GRADED_HELP_CONFLICT", requestId), asked by Importing.Confirm:helpConflict#2
@@ -3514,7 +3579,8 @@ where
   view "(owner) imported graded work (material)" with (material, owner) has (course, originals)
   SkillMapping._map (course) has (skills)
   (performedAt, status: "READY") is gradedReview (at, outsideHelp, performedOn, row, skills)
-  (skill, sourceKey) is gradedKey (material, row)
+  (keys, materialKeys, skill) is gradedKey (material, originals, row)
+  no view "(owner) already imported a question under one of (keys) for (skill)" with (keys: materialKeys, owner, skill)
   (criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject) is gradedImport (material, originals, outsideHelp, performedAt, row, skills)
 then
   AssessmentReviewing.importGraded (author: owner, criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject)
@@ -3523,8 +3589,8 @@ then
 ### Importing.Confirm:helpConflict#4
 
 Authored path: `Importing.Confirm`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 73.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 115.
 
 ```reaction
 when AssessmentReviewing.importGraded (author: owner, criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject, case: assessment), asked by Importing.Confirm:helpConflict#3
@@ -3538,8 +3604,8 @@ then
 ### Importing.Confirm:missing#2
 
 Authored path: `Importing.Confirm`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 73.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 115.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Importing.Confirm
@@ -3553,8 +3619,8 @@ then
 ### Importing.Confirm:missing#3
 
 Authored path: `Importing.Confirm`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 73.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 115.
 
 ```reaction
 when RequestBoundary.respond (error: "GRADED_MATERIAL_UNAVAILABLE", requestId), asked by Importing.Confirm:missing#2
@@ -3565,7 +3631,8 @@ where
   view "(owner) imported graded work (material)" with (material, owner) has (course, originals)
   SkillMapping._map (course) has (skills)
   (performedAt, status: "READY") is gradedReview (at, outsideHelp, performedOn, row, skills)
-  (skill, sourceKey) is gradedKey (material, row)
+  (keys, materialKeys, skill) is gradedKey (material, originals, row)
+  no view "(owner) already imported a question under one of (keys) for (skill)" with (keys: materialKeys, owner, skill)
   (criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject) is gradedImport (material, originals, outsideHelp, performedAt, row, skills)
 then
   AssessmentReviewing.importGraded (author: owner, criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject)
@@ -3574,8 +3641,8 @@ then
 ### Importing.Confirm:missing#4
 
 Authored path: `Importing.Confirm`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 73.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 115.
 
 ```reaction
 when AssessmentReviewing.importGraded (author: owner, criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject, case: assessment), asked by Importing.Confirm:missing#3
@@ -3589,8 +3656,8 @@ then
 ### Importing.Confirm:ready#2
 
 Authored path: `Importing.Confirm`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 73.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 115.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Importing.Confirm
@@ -3600,8 +3667,8 @@ where
   view "(owner) imported graded work (material)" with (material, owner) has (course, originals)
   SkillMapping._map (course) has (skills)
   (performedAt, status: "READY") is gradedReview (at, outsideHelp, performedOn, row, skills)
-  (skill, sourceKey) is gradedKey (material, row)
-  no view "(owner) already imported (sourceKey) for (skill)" with (owner, skill, sourceKey)
+  (keys, materialKeys, skill) is gradedKey (material, originals, row)
+  no view "(owner) already imported a question under one of (keys) for (skill)" with (keys, owner, skill)
 then
   Sessioning.use (session)
 ```
@@ -3609,8 +3676,8 @@ then
 ### Importing.Confirm:ready#3
 
 Authored path: `Importing.Confirm`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 73.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 115.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Importing.Confirm:ready#2
@@ -3620,7 +3687,8 @@ where
   view "(owner) imported graded work (material)" with (material, owner) has (course, originals)
   SkillMapping._map (course) has (skills)
   (performedAt, status: "READY") is gradedReview (at, outsideHelp, performedOn, row, skills)
-  (skill, sourceKey) is gradedKey (material, row)
+  (keys, materialKeys, skill) is gradedKey (material, originals, row)
+  no view "(owner) already imported a question under one of (keys) for (skill)" with (keys: materialKeys, owner, skill)
   (criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject) is gradedImport (material, originals, outsideHelp, performedAt, row, skills)
 then
   AssessmentReviewing.importGraded (author: owner, criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject)
@@ -3629,8 +3697,8 @@ then
 ### Importing.Confirm:ready#4
 
 Authored path: `Importing.Confirm`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 73.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 115.
 
 ```reaction
 when AssessmentReviewing.importGraded (author: owner, criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject, case: assessment), asked by Importing.Confirm:ready#3
@@ -3644,8 +3712,8 @@ then
 ### Importing.Confirm:rowInvalid#2
 
 Authored path: `Importing.Confirm`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 73.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 115.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Importing.Confirm
@@ -3662,8 +3730,8 @@ then
 ### Importing.Confirm:rowInvalid#3
 
 Authored path: `Importing.Confirm`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 73.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 115.
 
 ```reaction
 when RequestBoundary.respond (error: "GRADED_ROW_INVALID", requestId), asked by Importing.Confirm:rowInvalid#2
@@ -3674,7 +3742,8 @@ where
   view "(owner) imported graded work (material)" with (material, owner) has (course, originals)
   SkillMapping._map (course) has (skills)
   (performedAt, status: "READY") is gradedReview (at, outsideHelp, performedOn, row, skills)
-  (skill, sourceKey) is gradedKey (material, row)
+  (keys, materialKeys, skill) is gradedKey (material, originals, row)
+  no view "(owner) already imported a question under one of (keys) for (skill)" with (keys: materialKeys, owner, skill)
   (criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject) is gradedImport (material, originals, outsideHelp, performedAt, row, skills)
 then
   AssessmentReviewing.importGraded (author: owner, criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject)
@@ -3683,8 +3752,8 @@ then
 ### Importing.Confirm:rowInvalid#4
 
 Authored path: `Importing.Confirm`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 73.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 115.
 
 ```reaction
 when AssessmentReviewing.importGraded (author: owner, criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject, case: assessment), asked by Importing.Confirm:rowInvalid#3
@@ -3698,8 +3767,8 @@ then
 ### Importing.Confirm:skillUnavailable#2
 
 Authored path: `Importing.Confirm`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 73.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 115.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Importing.Confirm
@@ -3716,8 +3785,8 @@ then
 ### Importing.Confirm:skillUnavailable#3
 
 Authored path: `Importing.Confirm`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 73.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 115.
 
 ```reaction
 when RequestBoundary.respond (error: "GRADED_SKILL_UNAVAILABLE", requestId), asked by Importing.Confirm:skillUnavailable#2
@@ -3728,7 +3797,8 @@ where
   view "(owner) imported graded work (material)" with (material, owner) has (course, originals)
   SkillMapping._map (course) has (skills)
   (performedAt, status: "READY") is gradedReview (at, outsideHelp, performedOn, row, skills)
-  (skill, sourceKey) is gradedKey (material, row)
+  (keys, materialKeys, skill) is gradedKey (material, originals, row)
+  no view "(owner) already imported a question under one of (keys) for (skill)" with (keys: materialKeys, owner, skill)
   (criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject) is gradedImport (material, originals, outsideHelp, performedAt, row, skills)
 then
   AssessmentReviewing.importGraded (author: owner, criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject)
@@ -3737,8 +3807,8 @@ then
 ### Importing.Confirm:skillUnavailable#4
 
 Authored path: `Importing.Confirm`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 73.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 115.
 
 ```reaction
 when AssessmentReviewing.importGraded (author: owner, criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject, case: assessment), asked by Importing.Confirm:skillUnavailable#3
@@ -3752,8 +3822,8 @@ then
 ### Importing.Confirm:unmapped#2
 
 Authored path: `Importing.Confirm`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 73.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 115.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Importing.Confirm
@@ -3770,8 +3840,8 @@ then
 ### Importing.Confirm:unmapped#3
 
 Authored path: `Importing.Confirm`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 73.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 115.
 
 ```reaction
 when RequestBoundary.respond (error: "GRADED_ROW_UNMAPPED", requestId), asked by Importing.Confirm:unmapped#2
@@ -3782,7 +3852,8 @@ where
   view "(owner) imported graded work (material)" with (material, owner) has (course, originals)
   SkillMapping._map (course) has (skills)
   (performedAt, status: "READY") is gradedReview (at, outsideHelp, performedOn, row, skills)
-  (skill, sourceKey) is gradedKey (material, row)
+  (keys, materialKeys, skill) is gradedKey (material, originals, row)
+  no view "(owner) already imported a question under one of (keys) for (skill)" with (keys: materialKeys, owner, skill)
   (criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject) is gradedImport (material, originals, outsideHelp, performedAt, row, skills)
 then
   AssessmentReviewing.importGraded (author: owner, criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject)
@@ -3791,8 +3862,8 @@ then
 ### Importing.Confirm:unmapped#4
 
 Authored path: `Importing.Confirm`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 73.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 115.
 
 ```reaction
 when AssessmentReviewing.importGraded (author: owner, criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject, case: assessment), asked by Importing.Confirm:unmapped#3
@@ -3806,8 +3877,8 @@ then
 ### Importing.Confirm:used#2
 
 Authored path: `Importing.Confirm`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 73.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 115.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Importing.Confirm
@@ -3817,8 +3888,8 @@ where
   view "(owner) imported graded work (material)" with (material, owner) has (course, originals)
   SkillMapping._map (course) has (skills)
   (performedAt, status: "READY") is gradedReview (at, outsideHelp, performedOn, row, skills)
-  (skill, sourceKey) is gradedKey (material, row)
-  view "(owner) already imported (sourceKey) for (skill)" with (owner, skill, sourceKey)
+  (keys, materialKeys, skill) is gradedKey (material, originals, row)
+  view "(owner) already imported a question under one of (keys) for (skill)" with (keys, owner, skill)
 then
   RequestBoundary.respond (error: "GRADED_SOURCE_USED", requestId)
 ```
@@ -3826,8 +3897,8 @@ then
 ### Importing.Confirm:used#3
 
 Authored path: `Importing.Confirm`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 73.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 115.
 
 ```reaction
 when RequestBoundary.respond (error: "GRADED_SOURCE_USED", requestId), asked by Importing.Confirm:used#2
@@ -3838,7 +3909,8 @@ where
   view "(owner) imported graded work (material)" with (material, owner) has (course, originals)
   SkillMapping._map (course) has (skills)
   (performedAt, status: "READY") is gradedReview (at, outsideHelp, performedOn, row, skills)
-  (skill, sourceKey) is gradedKey (material, row)
+  (keys, materialKeys, skill) is gradedKey (material, originals, row)
+  no view "(owner) already imported a question under one of (keys) for (skill)" with (keys: materialKeys, owner, skill)
   (criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject) is gradedImport (material, originals, outsideHelp, performedAt, row, skills)
 then
   AssessmentReviewing.importGraded (author: owner, criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject)
@@ -3847,8 +3919,8 @@ then
 ### Importing.Confirm:used#4
 
 Authored path: `Importing.Confirm`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 50.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 92.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 73.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 115.
 
 ```reaction
 when AssessmentReviewing.importGraded (author: owner, criteria, definition, feedback, fresh, gateMet, help, mark, performedAt: importedAt, question, rationale, response, result, sourceKey, subject, case: assessment), asked by Importing.Confirm:used#3
@@ -3862,8 +3934,8 @@ then
 ### Importing.Extract
 
 Authored path: `Importing.Extract`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 25.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 91.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 46.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 114.
 
 ```reaction
 when RequestBoundary.request (material, path: "/courses/graded/extract", requestId, session)
@@ -3874,8 +3946,8 @@ then
 ### Importing.Extract:missing#2
 
 Authored path: `Importing.Extract`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 25.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 91.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 46.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 114.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Importing.Extract
@@ -3889,8 +3961,8 @@ then
 ### Importing.Extract:missing#3
 
 Authored path: `Importing.Extract`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 25.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 91.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 46.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 114.
 
 ```reaction
 when RequestBoundary.respond (error: "GRADED_MATERIAL_UNAVAILABLE", requestId), asked by Importing.Extract:missing#2
@@ -3915,8 +3987,8 @@ then
 ### Importing.Extract:missing#4
 
 Authored path: `Importing.Extract`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 25.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 91.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 46.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 114.
 
 ```reaction
 when TutorGenerating.generate (owner, request: prepared, answer), asked by Importing.Extract:missing#3
@@ -3929,8 +4001,8 @@ then
 ### Importing.Extract:missing:rows#5
 
 Authored path: `Importing.Extract`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 25.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 91.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 46.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 114.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Importing.Extract:missing#4
@@ -3947,8 +4019,8 @@ then
 ### Importing.Extract:missing:total#5
 
 Authored path: `Importing.Extract`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 25.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 91.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 46.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 114.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Importing.Extract:missing#4
@@ -3964,8 +4036,8 @@ then
 ### Importing.Extract:ready#2
 
 Authored path: `Importing.Extract`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 25.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 91.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 46.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 114.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Importing.Extract
@@ -3982,8 +4054,8 @@ then
 ### Importing.Extract:ready#3
 
 Authored path: `Importing.Extract`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 25.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 91.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 46.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 114.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Importing.Extract:ready#2
@@ -4007,8 +4079,8 @@ then
 ### Importing.Extract:ready#4
 
 Authored path: `Importing.Extract`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 25.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 91.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 46.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 114.
 
 ```reaction
 when TutorGenerating.generate (owner, request: prepared, answer), asked by Importing.Extract:ready#3
@@ -4021,8 +4093,8 @@ then
 ### Importing.Extract:ready:rows#5
 
 Authored path: `Importing.Extract`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 25.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 91.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 46.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 114.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Importing.Extract:ready#4
@@ -4039,8 +4111,8 @@ then
 ### Importing.Extract:ready:total#5
 
 Authored path: `Importing.Extract`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 25.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 91.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 46.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 114.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Importing.Extract:ready#4
@@ -4056,8 +4128,8 @@ then
 ### Importing.Extract:unmapped#2
 
 Authored path: `Importing.Extract`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 25.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 91.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 46.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 114.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Importing.Extract
@@ -4074,8 +4146,8 @@ then
 ### Importing.Extract:unmapped#3
 
 Authored path: `Importing.Extract`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 25.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 91.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 46.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 114.
 
 ```reaction
 when RequestBoundary.respond (error: "GRADED_SKILLS_UNAVAILABLE", requestId), asked by Importing.Extract:unmapped#2
@@ -4100,8 +4172,8 @@ then
 ### Importing.Extract:unmapped#4
 
 Authored path: `Importing.Extract`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 25.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 91.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 46.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 114.
 
 ```reaction
 when TutorGenerating.generate (owner, request: prepared, answer), asked by Importing.Extract:unmapped#3
@@ -4114,8 +4186,8 @@ then
 ### Importing.Extract:unmapped:rows#5
 
 Authored path: `Importing.Extract`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 25.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 91.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 46.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 114.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Importing.Extract:unmapped#4
@@ -4132,8 +4204,8 @@ then
 ### Importing.Extract:unmapped:total#5
 
 Authored path: `Importing.Extract`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 25.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 91.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 46.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 114.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Importing.Extract:unmapped#4
@@ -4149,9 +4221,9 @@ then
 ### Importing.ReadImports
 
 Authored path: `Importing.ReadImports`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 37.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 82.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 93.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 58.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 105.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 116.
 
 ```reaction
 when RequestBoundary.request (material, path: "/courses/graded/read", requestId, session)
@@ -4162,9 +4234,9 @@ then
 ### Importing.ReadImports:graded#2
 
 Authored path: `Importing.ReadImports`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 37.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 82.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 93.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 58.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 105.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 116.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Importing.ReadImports
@@ -4172,17 +4244,17 @@ where
   at is the current flow's instant
   today is gradedToday (at)
   earlier, RequestBoundary.request (material, path: "/courses/graded/read", requestId, session)
-  view "(owner) imported graded work (material)" with (material, owner) has (course)
+  view "(owner) imported graded work (material)" with (material, owner) has (course, originals)
 then
-  RequestBoundary.respond (imported: former "the imports from (material) for (owner) in (course)" with (course, material, owner), requestId, today)
+  RequestBoundary.respond (earlier: former "the imports of the paper of (material) for (owner) from other uploads" with (material, owner), imported: former "the imports from (material) with (originals) for (owner) in (course)" with (course, material, originals, owner), requestId, today)
 ```
 
 ### Importing.ReadImports:missing#2
 
 Authored path: `Importing.ReadImports`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 37.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 82.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 93.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 58.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 105.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 116.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Importing.ReadImports
@@ -4726,7 +4798,7 @@ then
 ### Learning.Correct
 
 Authored path: `Learning.Correct`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 109.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 104.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 197.
 
@@ -4739,7 +4811,7 @@ then
 ### Learning.Correct:imported#2
 
 Authored path: `Learning.Correct`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 109.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 104.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 197.
 
@@ -4756,7 +4828,7 @@ then
 ### Learning.Correct:imported:importedRevised#3
 
 Authored path: `Learning.Correct`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 109.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 104.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 197.
 
@@ -4775,7 +4847,7 @@ then
 ### Learning.Correct:imported:practiceRevised#3
 
 Authored path: `Learning.Correct`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 109.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 104.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 197.
 
@@ -4793,7 +4865,7 @@ then
 ### Learning.Correct:importedGate#2
 
 Authored path: `Learning.Correct`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 109.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 104.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 197.
 
@@ -4810,7 +4882,7 @@ then
 ### Learning.Correct:importedGate:importedRevised#3
 
 Authored path: `Learning.Correct`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 109.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 104.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 197.
 
@@ -4830,7 +4902,7 @@ then
 ### Learning.Correct:importedGate:practiceRevised#3
 
 Authored path: `Learning.Correct`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 109.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 104.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 197.
 
@@ -4849,7 +4921,7 @@ then
 ### Learning.Correct:missing#2
 
 Authored path: `Learning.Correct`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 109.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 104.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 197.
 
@@ -4865,7 +4937,7 @@ then
 ### Learning.Correct:missing:importedRevised#3
 
 Authored path: `Learning.Correct`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 109.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 104.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 197.
 
@@ -4885,7 +4957,7 @@ then
 ### Learning.Correct:missing:practiceRevised#3
 
 Authored path: `Learning.Correct`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 109.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 104.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 197.
 
@@ -4904,7 +4976,7 @@ then
 ### Learning.Correct:practice#2
 
 Authored path: `Learning.Correct`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 109.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 104.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 197.
 
@@ -4920,7 +4992,7 @@ then
 ### Learning.Correct:practice:importedRevised#3
 
 Authored path: `Learning.Correct`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 109.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 104.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 197.
 
@@ -4939,7 +5011,7 @@ then
 ### Learning.Correct:practice:practiceRevised#3
 
 Authored path: `Learning.Correct`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 109.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 104.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 197.
 
@@ -5639,7 +5711,7 @@ then
 ### Learning.Read
 
 Authored path: `Learning.Read`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 46.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 69.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 5.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 181.
 
@@ -5652,7 +5724,7 @@ then
 ### Learning.Read:missing#2
 
 Authored path: `Learning.Read`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 46.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 69.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 5.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 181.
 
@@ -5669,7 +5741,7 @@ then
 ### Learning.Read:owned#2
 
 Authored path: `Learning.Read`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 46.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 69.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 5.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 181.
 
@@ -5687,7 +5759,7 @@ then
 ### Learning.Regrade
 
 Authored path: `Learning.Regrade`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 109.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 168.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 198.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 143.
@@ -5701,7 +5773,7 @@ then
 ### Learning.Regrade:imported#2
 
 Authored path: `Learning.Regrade`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 109.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 168.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 198.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 143.
@@ -5718,7 +5790,7 @@ then
 ### Learning.Regrade:imported#3
 
 Authored path: `Learning.Regrade`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 109.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 168.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 198.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 143.
@@ -5745,7 +5817,7 @@ then
 ### Learning.Regrade:imported#4
 
 Authored path: `Learning.Regrade`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 109.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 168.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 198.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 143.
@@ -5761,7 +5833,7 @@ then
 ### Learning.Regrade:imported#5
 
 Authored path: `Learning.Regrade`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 109.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 168.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 198.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 143.
@@ -5779,7 +5851,7 @@ then
 ### Learning.Regrade:imported#6
 
 Authored path: `Learning.Regrade`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 109.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 168.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 198.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 143.
@@ -5797,7 +5869,7 @@ then
 ### Learning.Regrade:missing#2
 
 Authored path: `Learning.Regrade`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 109.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 168.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 198.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 143.
@@ -5814,7 +5886,7 @@ then
 ### Learning.Regrade:missing#3
 
 Authored path: `Learning.Regrade`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 109.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 168.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 198.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 143.
@@ -5841,7 +5913,7 @@ then
 ### Learning.Regrade:missing#4
 
 Authored path: `Learning.Regrade`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 109.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 168.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 198.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 143.
@@ -5857,7 +5929,7 @@ then
 ### Learning.Regrade:missing#5
 
 Authored path: `Learning.Regrade`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 109.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 168.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 198.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 143.
@@ -5875,7 +5947,7 @@ then
 ### Learning.Regrade:missing#6
 
 Authored path: `Learning.Regrade`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 109.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 168.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 198.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 143.
@@ -5893,7 +5965,7 @@ then
 ### Learning.Regrade:practice#2
 
 Authored path: `Learning.Regrade`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 109.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 168.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 198.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 143.
@@ -5912,7 +5984,7 @@ then
 ### Learning.Regrade:practice#3
 
 Authored path: `Learning.Regrade`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 109.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 168.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 198.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 143.
@@ -5937,7 +6009,7 @@ then
 ### Learning.Regrade:practice#4
 
 Authored path: `Learning.Regrade`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 109.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 168.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 198.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 143.
@@ -5953,7 +6025,7 @@ then
 ### Learning.Regrade:practice#5
 
 Authored path: `Learning.Regrade`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 109.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 168.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 198.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 143.
@@ -5972,7 +6044,7 @@ then
 ### Learning.Regrade:practice#6
 
 Authored path: `Learning.Regrade`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 86.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 109.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 168.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 198.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 143.
@@ -9078,7 +9150,7 @@ then
 ### Progress.InitializedEvidence
 
 Authored path: `Progress.InitializedEvidence`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 76.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 99.
 - Covered by [Progress reactions](../design/compositions/Progress.md), line 27.
 
 ```reaction
@@ -9113,7 +9185,7 @@ then
 ### Progress.RepairReadEvidence
 
 Authored path: `Progress.RepairReadEvidence`.
-- Covered by [Importing graded work](../design/compositions/Importing.md), line 78.
+- Covered by [Importing graded work](../design/compositions/Importing.md), line 101.
 - Covered by [Progress reactions](../design/compositions/Progress.md), line 69.
 
 ```reaction

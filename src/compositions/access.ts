@@ -70,6 +70,11 @@ const SuggestionReady = former("admit suggestions from (material)", ({ owner, ma
 ).form({ allowed: true })).optional();
 // The same answer for an unknown material, another learner's material, one outside the learner's courses, and an ungraded material.
 const GradedReady = former("admit graded work (material) for (owner)", ({ owner, material }) => where(Importing.GradedMaterial({ owner, material })).form({ allowed: true })).optional();
+// Graded work whose paper the learner already imported from another upload of the same files is declined before the tutor reads
+// it and before a question is imported, so its marks never count twice. EarlierImports names that upload and the date.
+const PaperNotImported = former("admit graded work (material) whose paper (owner) has not imported from another upload", ({ owner, material }) => where(
+  no(Importing.PaperImported({ owner, material })),
+).form({ allowed: true })).optional();
 const CourseReady = former("admit access to (course) for (owner)", ({ owner, course }) => where(Courses.OwnedCourse({ owner, course })).form({ allowed: true })).optional();
 // The host's delete route admits only the learner's own kept material in a course they own. An unknown material, another
 // learner's material, and one already deleted get the same answer.
@@ -92,8 +97,23 @@ const PracticePrerequisite = former("the prerequisite to work on before practici
 ).form({ title })).optional();
 /** The practice explanation that names the prerequisite PracticePrerequisite found. */
 export const prerequisiteDetail = ({ title }: { title: string }) => `Work on “${title}” first. This skill builds on it.`;
+/** PaperNotImported's sentence when EarlierImports names no upload; with PaperImported holding, it always names one. */
+export const PAPER_IMPORTED = "You already imported the marks from this paper from another upload of the same files, so importing it again would count them a second time.";
+const longDay = new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "America/New_York" });
+/**
+ * The graded-work explanation that names the upload this paper's marks were imported from, and the New York date of the
+ * oldest import, from EarlierImports' first row. A deleted upload has no title, so the sentence says it was deleted.
+ */
+export const earlierImportDetail = (earlier: readonly { title: string | null; importedAt: Date | string }[]): string | null => {
+  const first = earlier[0];
+  if (!first) return null;
+  const day = longDay.format(new Date(first.importedAt));
+  return first.title === null
+    ? `You already imported the marks from this paper on ${day}, from an upload you have since deleted, and they still count as evidence. This upload holds exactly the same files, so importing it would count those marks a second time.`
+    : `You already imported the marks from this paper on ${day}, from “${first.title}”. This upload holds exactly the same files, so importing it would count those marks a second time. To import a question you skipped, review “${first.title}” instead.`;
+};
 export const composition = { SkillSourcesLeft, SessionSourcesLeft, LessonReady, TaskReady, PracticePrerequisite, ResponseReady, QuestionReady, ReplyReady, HintReady, TranscriptReady, FinishReady,
-  ReopenReady, ConversationReady, AssessmentReady, RetryReady, RegradeReady, AdjustReady, SuggestionReady, GradedReady, CourseReady, DeleteReady, PlanReady, ItemReady, BeginReady };
+  ReopenReady, ConversationReady, AssessmentReady, RetryReady, RegradeReady, AdjustReady, SuggestionReady, GradedReady, PaperNotImported, CourseReady, DeleteReady, PlanReady, ItemReady, BeginReady };
 
 // Transport admission uses these same declared reads before starting a causal flow. Each path lists its formers in the
 // order they run; a command that asks the tutor passes TutorReady first, so a retired choice is refused before any write.
@@ -103,6 +123,9 @@ const skillSourcesLeft = { check: SkillSourcesLeft, fields: ["skill"],
   detail: "Every material this skill was taught from has been deleted. Add another material from this course as a source under Manage skills, then try again." } as const;
 const sessionSourcesLeft = { check: SessionSourcesLeft, fields: ["studySession"],
   detail: "The materials this session was grounded in have been deleted, so the tutor can no longer answer here. Your saved work stays, and you can still finish the lesson or submit the task." } as const;
+// Graded work is checked first for being the learner's own (GradedReady), then for a paper already imported from another upload.
+const paperNotImported = { check: PaperNotImported, fields: ["material"], detail: PAPER_IMPORTED,
+  prerequisite: { check: Importing.EarlierImports, detail: earlierImportDetail } } as const;
 export const admissions = {
   "/learning/lesson": [tutorReady, skillSourcesLeft, { check: LessonReady, fields: ["skill"], detail: "Confirm the skill and attach sources from this course before requesting a lesson." }],
   "/learning/task": [tutorReady, skillSourcesLeft, { check: TaskReady, fields: ["skill"], detail: "Set starting confidence and check the prerequisites before starting fresh practice.",
@@ -135,6 +158,6 @@ export const admissions = {
   "/planning/exams/remove": [{ check: CourseReady, fields: ["course"], detail: "Choose one of your own courses." }],
   "/planning/tradeoffs/confirm": [{ check: CourseReady, fields: ["course"], detail: "Choose one of your own courses." }],
   "/planning/tradeoffs/decline": [{ check: CourseReady, fields: ["course"], detail: "Choose one of your own courses." }],
-  "/courses/graded/extract": [tutorReady, { check: GradedReady, fields: ["material"], detail: "Choose graded work that you imported into one of your courses." }],
-  "/courses/graded/confirm": [{ check: GradedReady, fields: ["material"], detail: "Choose graded work that you imported into one of your courses." }],
+  "/courses/graded/extract": [tutorReady, { check: GradedReady, fields: ["material"], detail: "Choose graded work that you imported into one of your courses." }, paperNotImported],
+  "/courses/graded/confirm": [{ check: GradedReady, fields: ["material"], detail: "Choose graded work that you imported into one of your courses." }, paperNotImported],
 } as const;

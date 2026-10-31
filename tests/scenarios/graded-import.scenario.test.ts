@@ -310,7 +310,11 @@ describe("Import graded coursework as evidence", () => {
     expect(await native("/courses/graded/confirm", respaced)).toEqual(refused("GRADED_SOURCE_USED"));
     expect(await saved()).toEqual(before);
     const [kept] = await app.runtime.application.concepts.AssessmentReviewing._case({ case: first as never });
-    expect(kept?.sourceKey).toBe(`graded${JSON.stringify([graded, "Question 1", products])}`);
+    // The material is named by its paper, the content of its files, so another upload of the same files makes the same key
+    // (Importing.md, "The same paper uploaded twice"): the SHA-256 digest of its originals' distinct byte digests, sorted.
+    const { originals } = await learner.ok("/courses/materials/read", { material: graded }) as { originals: { file: string }[] };
+    const digests = [...new Set(originals.map(({ file }) => /\/([a-f0-9]{64})\./.exec(file)![1]!))].sort();
+    expect(kept?.sourceKey).toBe(`graded${JSON.stringify([`sha256:${createHash("sha256").update(digests.join(",")).digest("hex")}`, "Question 1", products])}`);
   }, LIMIT);
 
   test("The performance date is required and may not be after today.", async () => {

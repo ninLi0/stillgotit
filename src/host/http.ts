@@ -89,16 +89,18 @@ export function createApplicationHttp({ application, recovery, publicOrigin, clo
   /** Evaluates the path's admission formers in order and returns the first that declines, or null when all admit. */
   async function admission(path: string, body: Record<string, unknown>, owner: string) {
     const entries: readonly { check: (input: Record<string, unknown>) => Parameters<Application["form"]>[0]; fields: readonly string[]; detail: string;
-      prerequisite?: { check: (input: Record<string, unknown>) => Parameters<Application["form"]>[0]; detail: (input: { title: string }) => string } }[] =
+      prerequisite?: { check: (input: Record<string, unknown>) => Parameters<Application["form"]>[0]; detail: (found: never) => string | null } }[] =
       admissions[path as keyof typeof admissions] ?? [];
     for (const entry of entries) {
       const values = Object.fromEntries(entry.fields.map((field) => [field, field === "assessment" ? body.case : body[field]]));
       const missing = Object.values(values).some((value) => value === undefined);
       if (!missing && await application.form(entry.check({ ...values, owner }))) continue;
-      // A declined practice start names the prerequisite to work on first, when one is not ready.
+      // A declined entry may name what stands in the way: a practice start names the prerequisite to work on first, and graded
+      // work names the upload its paper was already imported from. When its former finds nothing, the entry's sentence stays.
       if (!missing && entry.prerequisite) {
-        const found = await application.form(entry.prerequisite.check({ ...values, owner })) as { title?: unknown } | null;
-        if (found && typeof found.title === "string") return { entry, detail: entry.prerequisite.detail({ title: found.title }) };
+        const found = await application.form(entry.prerequisite.check({ ...values, owner }));
+        const named = found === null || found === undefined ? null : entry.prerequisite.detail(found as never);
+        if (named) return { entry, detail: named };
       }
       return { entry, detail: entry.detail };
     }
