@@ -457,7 +457,7 @@ Concrete types:
 - `carriedEstimate(tracks: MasteryEstimating.ProgressRows, skill: SkillMapping.Skill, current: SkillMapping.Version) : CarriedEstimate` — [Courses, materials, and skills](../design/compositions/Courses.md), line 58.
 - `choiceOffered(choice: TutorChoice) : Flag` — [Settings](../design/compositions/Settings.md), line 44.
 - `correctionNote(reason: String) : AttemptClarification` — [Learning computations](../design/compositions/LearningComputations.md), line 21.
-- `courseScore(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows) : CourseScore` — [Shared learning reads](../design/compositions/LearningReads.md), line 128.
+- `courseScore(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows) : CourseScore` — [Shared learning reads](../design/compositions/LearningReads.md), line 130.
 - `coveredSkillsConfirmed(covered: StudyPlanning.SubjectSet, skills: SkillMapping.SkillMapRows) : Flag` — [Daily planning flows](../design/compositions/Planning.md), line 108.
 - `cutKey(cut: StudyPlanning.CutValue) : String` — [Daily planning flows](../design/compositions/Planning.md), line 120.
 - `defaultChoice() : TutorChoice` — [Settings](../design/compositions/Settings.md), line 32.
@@ -482,14 +482,14 @@ Concrete types:
 - `homeViewOffered(view: String) : Flag` — [Settings](../design/compositions/Settings.md), line 142.
 - `itemOrder(day: Date, candidate: StudyPlanning.Candidate) : String` — [Daily planning flows](../design/compositions/Planning.md), line 117.
 - `itemSubject(candidate: StudyPlanning.Candidate) : ItemSubject` — [Learning computations](../design/compositions/LearningComputations.md), line 48.
-- `leftAloneDays(explanation: MasteryEstimating.EstimateExplanation, at: DateTime) : LeftAloneDays` — [Shared learning reads](../design/compositions/LearningReads.md), line 107.
-- `leftAlonePath(explanation: MasteryEstimating.EstimateExplanation, at: DateTime, u0: Number, v1: Number, v3: Number, v7: Number, v14: Number, v30: Number, v60: Number, v90: Number) : LeftAlonePath` — [Shared learning reads](../design/compositions/LearningReads.md), line 110.
+- `leftAloneDays(explanation: MasteryEstimating.EstimateExplanation, at: DateTime) : LeftAloneDays` — [Shared learning reads](../design/compositions/LearningReads.md), line 109.
+- `leftAlonePath(explanation: MasteryEstimating.EstimateExplanation, at: DateTime, u0: Number, v1: Number, v3: Number, v7: Number, v14: Number, v30: Number, v60: Number, v90: Number) : LeftAlonePath` — [Shared learning reads](../design/compositions/LearningReads.md), line 112.
 - `lessonAwaitsTutor(data: GroundedTutoring.StudyRecord) : Flag` — [Learning computations](../design/compositions/LearningComputations.md), line 45.
 - `lessonRequest(selected: Library.SourceRecords, context: SkillContext, request: String) : TutorRequest` — [Learning computations](../design/compositions/LearningComputations.md), line 51.
 - `lessonUnexplained(data: GroundedTutoring.StudyRecord) : Flag` — [Learning computations](../design/compositions/LearningComputations.md), line 42.
 - `levelSupported(model: String, level: String) : Flag` — [Settings](../design/compositions/Settings.md), line 38.
-- `memoryCurve(at: DateTime, explanation: MasteryEstimating.EstimateExplanation, review: DateTime, reviewValue: Number, v1: Number, v3: Number, v7: Number, v14: Number, v30: Number, v60: Number, v90: Number) : MemoryCurve` — [Shared learning reads](../design/compositions/LearningReads.md), line 104.
-- `memoryInstants(at: DateTime) : SampleInstants` — [Shared learning reads](../design/compositions/LearningReads.md), line 98.
+- `memoryCurve(at: DateTime, explanation: MasteryEstimating.EstimateExplanation, review: DateTime, reviewValue: Number, v1: Number, v3: Number, v7: Number, v14: Number, v30: Number, v60: Number, v90: Number) : MemoryCurve` — [Shared learning reads](../design/compositions/LearningReads.md), line 106.
+- `memoryInstants(at: DateTime) : SampleInstants` — [Shared learning reads](../design/compositions/LearningReads.md), line 100.
 - `modelOffered(model: String) : Flag` — [Settings](../design/compositions/Settings.md), line 35.
 - `offeredChoice(model: String, level: String) : TutorChoice` — [Settings](../design/compositions/Settings.md), line 41.
 - `offeredHomeView(view: String) : HomeView` — [Settings](../design/compositions/Settings.md), line 145.
@@ -500,22 +500,22 @@ Concrete types:
 - `prerequisiteToPractice(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows, skill: SkillMapping.Skill) : PrerequisiteChoice` — [Request admission](../design/compositions/LearningAccess.md), line 50.
 - `prerequisitesReady(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows, skill: SkillMapping.Skill) : Flag` — [Learning computations](../design/compositions/LearningComputations.md), line 62.
 - `progressRows(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows) : SkillProgress` — [Learning computations](../design/compositions/LearningComputations.md), line 65.
-- `recentSession(data: GroundedTutoring.StudyRecord, skillTitle: String) : RecentSession` — [Shared learning reads](../design/compositions/LearningReads.md), line 60.
-- `referenceCurve(v0: Number, v1: Number, v3: Number, v7: Number, v14: Number, v30: Number, v60: Number, v90: Number) : ReferenceCurve` — [Shared learning reads](../design/compositions/LearningReads.md), line 95.
+- `recentSession(data: GroundedTutoring.StudyRecord, skillTitle: String) : RecentSession` — [Shared learning reads](../design/compositions/LearningReads.md), line 62.
+- `referenceCurve(v0: Number, v1: Number, v3: Number, v7: Number, v14: Number, v30: Number, v60: Number, v90: Number) : ReferenceCurve` — [Shared learning reads](../design/compositions/LearningReads.md), line 97.
 - `requestChoice(request: TutorRequest) : TutorChoice` — [Settings](../design/compositions/Settings.md), line 87.
 - `responseInput(data: GroundedTutoring.StudyRecord, text: String, channel: GroundedTutoring.Channel, attachments: AttachmentList, sources: Library.SourceRecords) : ResponseInput` — [Learning computations](../design/compositions/LearningComputations.md), line 68.
 - `reviewApproved(reviewed: Flag, unseen: Flag, outsideHelp: Flag) : Flag` — [Learning computations](../design/compositions/LearningComputations.md), line 71.
-- `reviewInstant(at: DateTime, explanation: MasteryEstimating.EstimateExplanation) : DateTime` — [Shared learning reads](../design/compositions/LearningReads.md), line 101.
+- `reviewInstant(at: DateTime, explanation: MasteryEstimating.EstimateExplanation) : DateTime` — [Shared learning reads](../design/compositions/LearningReads.md), line 103.
 - `selectSkill(skills: SkillMapping.SkillMapRows, skill: SkillMapping.Skill) : SkillContext` — [Learning computations](../design/compositions/LearningComputations.md), line 74.
 - `selectSkillMaterials(context: SkillContext) : GroundedTutoring.MaterialSet` — [Learning computations](../design/compositions/LearningComputations.md), line 77.
 - `selectSources(sources: Library.SourceRecords, materials: GroundedTutoring.MaterialSet) : SourceSelection` — [Learning computations](../design/compositions/LearningComputations.md), line 80.
-- `sessionActivity(data: GroundedTutoring.StudyRecord) : SessionActivity` — [Shared learning reads](../design/compositions/LearningReads.md), line 36.
+- `sessionActivity(data: GroundedTutoring.StudyRecord) : SessionActivity` — [Shared learning reads](../design/compositions/LearningReads.md), line 38.
 - `sessionMaterials(data: GroundedTutoring.StudyRecord) : GroundedTutoring.MaterialSet` — [Learning computations](../design/compositions/LearningComputations.md), line 83.
 - `sessionRequest(selected: Library.SourceRecords, data: GroundedTutoring.StudyRecord, kind: String) : TutorRequest` — [Learning computations](../design/compositions/LearningComputations.md), line 86.
 - `sessionSubject(identity: SessionIdentity) : SessionOwner` — [Learning computations](../design/compositions/LearningComputations.md), line 114.
 - `singleMaterial(material: Library.Material) : SkillMapping.MaterialSet` — [P2 learning journey](../design/stages/materials.md), line 133.
 - `studyDetail(context: SkillContext, tracks: MasteryEstimating.ProgressRows, sessions: GroundedTutoring.StudyRecords, cases: AssessmentReviewing.CaseRecords) : StudyDetail` — [Learning computations](../design/compositions/LearningComputations.md), line 89.
-- `studyTopics(skills: SkillMapping.SkillMapRows) : TopicList` — [Shared learning reads](../design/compositions/LearningReads.md), line 57.
+- `studyTopics(skills: SkillMapping.SkillMapRows) : TopicList` — [Shared learning reads](../design/compositions/LearningReads.md), line 59.
 - `submissionInput(data: GroundedTutoring.StudyRecord, unseen: Flag, outsideHelp: Flag) : SubmissionInput` — [Learning computations](../design/compositions/LearningComputations.md), line 102.
 - `suggestRequest(selected: Library.SourceRecords) : TutorRequest` — [Learning computations](../design/compositions/LearningComputations.md), line 105.
 - `taskRequest(selected: Library.SourceRecords, context: SkillContext, sessions: GroundedTutoring.StudyRecords) : TutorRequest` — [Learning computations](../design/compositions/LearningComputations.md), line 108.
@@ -547,9 +547,9 @@ Authored path: `Courses.OwnedCourse`.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 7.
 - Covered by [Courses, materials, and skills](../design/compositions/Courses.md), line 19.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 19.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 28.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 49.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 77.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 30.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 51.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 79.
 - Covered by [Importing and viewing materials](../design/compositions/Materials.md), line 7.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 3.
 - Covered by [P2 learning journey](../design/stages/materials.md), line 104.
@@ -608,7 +608,7 @@ Authored path: `Reads.OpenSession`.
 
 Authored path: `Reads.CanReplan`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 91.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 70.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 72.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 25.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 37.
 - Covered by [Progress reactions](../design/compositions/Progress.md), line 35.
@@ -795,7 +795,7 @@ Authored path: `Courses.UnavailableSkillMaterial`.
 ### assessment (assessment) needs evidence for (owner)
 
 Authored path: `Reads.NeedsEvidence`.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 70.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 72.
 - Covered by [Progress reactions](../design/compositions/Progress.md), line 17.
 
 ```view
@@ -812,7 +812,7 @@ assessment (assessment) needs evidence for (owner) — inputs (owner, assessment
 
 Authored path: `Reads.PlanContext`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 91.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 70.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 72.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 11.
 - Covered by [Progress reactions](../design/compositions/Progress.md), line 35.
 
@@ -879,7 +879,7 @@ the home view that applies to (owner) — inputs (owner); outputs (view); bindin
 ### the memory curve of (skill) at (definition) for (owner) at (at)
 
 Authored path: `Reads.SkillCurve`.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 82.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 84.
 
 ```view
 the memory curve of (skill) at (definition) for (owner) at (at) — inputs (owner, skill, definition, at); outputs (startingConfidence, startedAt, estimate, projection, reviewBy, belowNow, leftAlone); bindings (explanation, review, reviewValue, t1, t3, t7, t14, t30, t60, t90, v1, v3, v7, v14, v30, v60, v90, e0, e1, e3, e7, e14, e30, e60, e90, u0, u1, u3, u7, u14, u30, u60, u90) — answers at most one (startingConfidence, startedAt, estimate, projection, reviewBy, belowNow, leftAlone)
@@ -1196,7 +1196,7 @@ Former "admit suggestions from (material)" — inputs (owner, material); binding
 ### open study sessions for (owner) in (course)
 
 Authored path: `Reads.OpenStudy`.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 28.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 30.
 
 ```former
 Former "open study sessions for (owner) in (course)" — inputs (owner, course); bindings (unit, skill, title, studySession, data, kind, lastActive); promises exactly one record — forms:
@@ -1218,7 +1218,7 @@ Former "open study sessions for (owner) in (course)" — inputs (owner, course);
 ### recent study sessions for (owner) in (course)
 
 Authored path: `Reads.RecentStudy`.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 49.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 51.
 
 ```former
 Former "recent study sessions for (owner) in (course)" — inputs (owner, course); bindings (skills, topics, studySession, skill, status, skillTitle, data, kind, title, startedAt, lastActivity); promises exactly one record — forms:
@@ -1242,7 +1242,7 @@ Former "recent study sessions for (owner) in (course)" — inputs (owner, course
 ### saved study session (studySession)
 
 Authored path: `Reads.SessionData`.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 9.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 11.
 
 ```former
 Former "saved study session (studySession)" — inputs (studySession); bindings (data); promises exactly one record — forms:
@@ -1254,7 +1254,7 @@ Former "saved study session (studySession)" — inputs (studySession); bindings 
 ### skill estimates for (owner) in (course)
 
 Authored path: `Reads.Progress`.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 9.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 11.
 
 ```former
 Former "skill estimates for (owner) in (course)" — inputs (owner, course); bindings (skills, tracks, estimates); promises exactly one record — forms:
@@ -1269,7 +1269,7 @@ Former "skill estimates for (owner) in (course)" — inputs (owner, course); bin
 
 Authored path: `Reads.SkillData`.
 - Covered by [Importing graded work](../design/compositions/Importing.md), line 46.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 9.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 11.
 
 ```former
 Former "study data for (owner) and (skill) at (at)" — inputs (owner, skill, at); bindings (context, definition, tracks, sessions, cases, track, estimate, explanation, timeline); promises exactly one record — forms:
@@ -1291,7 +1291,7 @@ Former "study data for (owner) and (skill) at (at)" — inputs (owner, skill, at
 ### study plan for (owner) in (course)
 
 Authored path: `Reads.PlanData`.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 9.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 11.
 - Covered by [Daily planning flows](../design/compositions/Planning.md), line 7.
 
 ```former
@@ -1357,7 +1357,7 @@ Former "the activity in progress that keeps the plans of (owner) from changing" 
 ### the confidence in each active course of (owner)
 
 Authored path: `Reads.CourseScores`.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 123.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 125.
 
 ```former
 Former "the confidence in each active course of (owner)" — inputs (owner); bindings (course, skills, tracks, score, count, estimated); promises exactly one record — forms:
@@ -1408,7 +1408,7 @@ Former "the cuts of the proposal awaiting confirmation for (owner) in (course)" 
 ### the estimate policy and its reference curve
 
 Authored path: `Reads.MemoryPolicy`.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 77.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 79.
 
 ```former
 Former "the estimate policy and its reference curve" — inputs (); bindings (policy, desiredRetention, readinessMinimum, readinessDays, v0, v1, v3, v7, v14, v30, v60, v90, reference); promises exactly one record — forms:
@@ -1459,7 +1459,7 @@ Former "the imports from (material) for (owner) in (course)" — inputs (owner, 
 ### the memory curves of the confirmed skills in (course) for (owner) at (at)
 
 Authored path: `Reads.MemorySkills`.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 77.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 79.
 
 ```former
 Former "the memory curves of the confirmed skills in (course) for (owner) at (at)" — inputs (owner, course, at); bindings (unit, unitTitle, skill, title, definition, startingConfidence, startedAt, estimate, projection, reviewBy, belowNow, leftAlone); promises exactly one record — forms:
@@ -8809,8 +8809,9 @@ then
 
 Authored path: `Reads.Continue`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 56.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 25.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 41.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 9.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 27.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 43.
 
 ```reaction
 when RequestBoundary.request (course, path: "/learning/continue", requestId, session)
@@ -8822,8 +8823,9 @@ then
 
 Authored path: `Reads.Continue`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 56.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 25.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 41.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 9.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 27.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 43.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Reads.Continue
@@ -8838,8 +8840,9 @@ then
 
 Authored path: `Reads.Continue`.
 - Covered by [Learning flows](../design/compositions/Learning.md), line 56.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 25.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 41.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 9.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 27.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 43.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Reads.Continue
@@ -8853,8 +8856,9 @@ then
 ### Reads.Memory
 
 Authored path: `Reads.Memory`.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 74.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 115.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 9.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 76.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 117.
 
 ```reaction
 when RequestBoundary.request (course, path: "/learning/memory", requestId, session)
@@ -8865,8 +8869,9 @@ then
 ### Reads.Memory:missing#2
 
 Authored path: `Reads.Memory`.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 74.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 115.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 9.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 76.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 117.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Reads.Memory
@@ -8880,8 +8885,9 @@ then
 ### Reads.Memory:owned#2
 
 Authored path: `Reads.Memory`.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 74.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 115.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 9.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 76.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 117.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Reads.Memory
@@ -8897,8 +8903,9 @@ then
 ### Reads.Recent
 
 Authored path: `Reads.Recent`.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 46.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 65.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 9.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 48.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 67.
 
 ```reaction
 when RequestBoundary.request (course, path: "/learning/recent", requestId, session)
@@ -8909,8 +8916,9 @@ then
 ### Reads.Recent:missing#2
 
 Authored path: `Reads.Recent`.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 46.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 65.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 9.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 48.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 67.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Reads.Recent
@@ -8924,8 +8932,9 @@ then
 ### Reads.Recent:owned#2
 
 Authored path: `Reads.Recent`.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 46.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 65.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 9.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 48.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 67.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Reads.Recent
@@ -8939,8 +8948,9 @@ then
 ### Reads.Scores
 
 Authored path: `Reads.Scores`.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 120.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 133.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 9.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 122.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 135.
 
 ```reaction
 when RequestBoundary.request (path: "/courses/scores", requestId, session)
@@ -8951,8 +8961,9 @@ then
 ### Reads.Scores#2
 
 Authored path: `Reads.Scores`.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 120.
-- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 133.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 9.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 122.
+- Covered by [Shared learning reads](../design/compositions/LearningReads.md), line 135.
 
 ```reaction
 when Sessioning.use (session, subject: owner), asked by Reads.Scores

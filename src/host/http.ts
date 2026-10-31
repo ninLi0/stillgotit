@@ -27,8 +27,20 @@ type Application = ReturnType<typeof assembleApplication>;
 
 // Graded commands run like learning commands, with their own input check. Reading earlier imports is not a command.
 const gradedCommands: Record<string, EndpointValidator> = { "/courses/graded/extract": gradedExtractInput, "/courses/graded/confirm": gradedConfirmInput };
-/** Commands that run under the learner's lock after admission, with the tutor's failure reason added over HTTP. Paths exclude `/api`. */
-const learnerCommand = (path: string) => path.startsWith("/learning/") || path.startsWith("/planning/") || path === "/courses/skills/suggest" || Object.hasOwn(gradedCommands, path);
+/**
+ * Learning and planning reads that change nothing but the session's last use. They skip the learner's lock, so they answer
+ * while a tutor request holds it, from the records saved at that moment (design/runtime.md, "Accounts and requests").
+ * The skill read at /learning/read is not one: its repairs can save evidence and close a task, so it keeps the lock.
+ * Paths exclude `/api`.
+ */
+const plainReads = new Set(["/learning/progress", "/learning/continue", "/learning/recent", "/learning/memory", "/planning/read"]);
+/**
+ * Requests that run under the learner's lock after admission, with the tutor's failure reason added over HTTP: every
+ * learning and planning command, the skill read with its repairs, and the commands that ask the tutor about a material.
+ * Paths exclude `/api`.
+ */
+const learnerCommand = (path: string) => !plainReads.has(path) &&
+  (path.startsWith("/learning/") || path.startsWith("/planning/") || path === "/courses/skills/suggest" || Object.hasOwn(gradedCommands, path));
 const commandInput = (path: string, value: unknown) => (gradedCommands[path] ?? learningInput)(value);
 /** Course changes that run under the learner's lock, over HTTP and through the native gateway. Paths exclude `/api`. */
 const courseCommands = new Set(["/courses/create", "/courses/units/add", "/courses/units/emphasis", "/courses/skills/propose",
@@ -116,6 +128,7 @@ export function createApplicationHttp({ application, recovery, publicOrigin, clo
     async invoke(path, input, options = {}) {
       const learning = learnerCommand(path);
       const courseMutation = courseCommands.has(path);
+      // A plain read, like every route that takes no learner lock over HTTP, goes straight to the engine.
       if (!learning && !courseMutation) {
         return rawGateway.invoke(path, input, options);
       }
@@ -272,6 +285,11 @@ export function createApplicationHttp({ application, recovery, publicOrigin, clo
         const transcript = await gemini.transcribe(recording);
         return await learner(request) === owner ? Response.json(transcript) : failure("UNAUTHORIZED", 401);
       }
+      if (path.startsWith("/api/") && plainReads.has(path.slice(4))) {
+        // A plain read takes no lock, but it is refused without a session exactly as it was when it took one.
+        if (!await learner(request)) return failure("UNAUTHORIZED", 401);
+        return await explained(inner, request);
+      }
       if (path.startsWith("/api/") && learnerCommand(path.slice(4))) {
         const owner = await learner(request);
         if (!owner) return failure("UNAUTHORIZED", 401);
@@ -329,10 +347,12 @@ export function createApplicationHttp({ application, recovery, publicOrigin, clo
           finally { await rawGateway.whenIdle(); }
         });
       }
+      // Every other route takes no learner lock either, so none of them waits behind a tutor request.
       return await explained(inner, request);
     } catch (error) {
       if (error instanceof Refusal) return refusal(error);
-      if (multipart || path.startsWith("/api/ai/") || path.startsWith("/api/courses/materials/") || (path.startsWith("/api/") && learnerCommand(path.slice(4)))) {
+      if (multipart || path.startsWith("/api/ai/") || path.startsWith("/api/courses/materials/") ||
+        (path.startsWith("/api/") && (learnerCommand(path.slice(4)) || plainReads.has(path.slice(4))))) {
         const detail = error instanceof Error && !error.name.startsWith("Mongo") ? error.message : "This operation could not finish. Your saved work is available to retry.";
         return Response.json({ error: "OPERATION_FAILED", detail }, { status: 400, headers: { "Cache-Control": "no-store" } });
       }

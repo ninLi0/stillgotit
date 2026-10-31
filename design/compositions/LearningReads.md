@@ -6,6 +6,8 @@
 
 [SkillContext](view:Reads.SkillContext) supplies the current definition, course map, owned materials, and learner progress. Each concept query reads only its own records. Application computations combine the returned values without database calls.
 
+The four endpoints declared here, [Continue](reaction:Reads.Continue), [Recent](reaction:Reads.Recent), [Memory](reaction:Reads.Memory), and [Scores](reaction:Reads.Scores), change nothing except the session's time of last use. The host therefore answers them without the learner's lock, even while one of the learner's tutor requests holds it, so the sidebar, Home, the Memory view, and the course menu never wait for the tutor. Each answers from the records saved at that moment: a lesson whose opening the tutor is still writing is listed with its request, and an estimate that a running assessment will change keeps its earlier value until the next read. The [runtime responsibilities](../runtime.md) explain why such a read never sees part of a single change.
+
 [SkillData](former:Reads.SkillData) presents current requirements, the matching mastery track, saved sessions, original work, and judgment history. [SessionData](former:Reads.SessionData) presents a saved tutoring session. [Progress](former:Reads.Progress) builds the tree's estimate list. [PlanData](former:Reads.PlanData) presents preferences, today's budget, the next activity, and the active plan.
 
 ## Evidence behind the estimate
