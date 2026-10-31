@@ -37,7 +37,7 @@ const treeStyling = registerConcept({ class: TreeStyling, spec: stylingSpec, ref
 /** Archiving bound as the stage's ConversationArchiving instance: User is Registering.User, Item is GroundedTutoring.Session. */
 export class ConversationArchiving extends Archiving<User, Session> {}
 const conversationArchiving = registerConcept({ class: ConversationArchiving, spec: archivingSpec, refusals: {} });
-import { extractRequest, gradedImport, gradedKey, gradedReview, gradedSource, gradedTitle, gradedToday, hasConfirmedSkill, hasGradedRows } from "./computations/importing.ts";
+import { extractRequest, gradedElsewhere, gradedImport, gradedKey, gradedKeyUsed, gradedReview, gradedSource, gradedTitle, gradedToday, hasConfirmedSkill, hasGradedRows } from "./computations/importing.ts";
 import { courseScore, leftAloneDays, leftAlonePath, memoryCurve, memoryInstants, referenceCurve, reviewDay } from "./computations/memory.ts";
 
 export const applicationConceptSet = conceptSet({
@@ -58,6 +58,6 @@ export const applicationConceptSet = conceptSet({
 }, { singleMaterial, evidenceAttribution, carriedEstimate, prerequisiteSet, prerequisiteToPractice, sessionSubject, attemptIsReady, beginAllowed, correctionNote, coveredSkillsConfirmed, cutKey, dialogueIsCurrent, evidenceUpdate, generationDefinition, generationFields, gradeRequest, hasLessonQuestion, lessonUnexplained, lessonAwaitsTutor, itemOrder, itemSubject, lessonRequest, planDetail, planRequest, prerequisitesReady, progressRows, responseInput, reviewApproved, selectSkill, selectSkillMaterials, selectSources, sessionActivity, recentSession, studyTopics, recentLimit, archivedAmong, sessionMaterials, sessionRequest, studyDetail, submissionInput, suggestRequest, taskRequest, urgentExamItem, estimateTimeline,
   tutorCatalog, defaultChoice, modelOffered, levelSupported, offeredChoice, choiceOffered, withChoice, requestChoice, tutorStatus,
   homeViewOffered, offeredHomeView, defaultHomeView, treeKindOffered, offeredTreeKind,
-  gradedTitle, hasConfirmedSkill, extractRequest, hasGradedRows, gradedToday, gradedReview, gradedKey, gradedImport, gradedSource,
+  gradedTitle, hasConfirmedSkill, extractRequest, hasGradedRows, gradedToday, gradedReview, gradedKey, gradedKeyUsed, gradedElsewhere, gradedImport, gradedSource,
   memoryInstants, reviewDay, memoryCurve, leftAloneDays, leftAlonePath, referenceCurve, courseScore });
 export const { concepts, computations } = applicationConceptSet;

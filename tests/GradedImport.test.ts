@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import {
-  KeptReviews, alreadyImported, confirmRow, dateProblem, earlierLabels, estimateStart, isCalendarDate, newRows, rowProblem, sentences,
+  KeptReviews, alreadyImported, confirmRow, dateProblem, earlierImportSentence, earlierLabels, estimateStart, isCalendarDate, newRows, rowProblem, sentences,
   type ExtractedRow, type ImportedRow, type KeptReview, type Material,
 } from "../frontend/src/graded-import.ts";
+import { earlierImportDetail } from "../src/compositions/access.ts";
 
 function storage() {
   const values = new Map<string, string>();
@@ -161,5 +162,26 @@ describe("Where a skill's estimate starts", () => {
     expect(estimateStart(track("2026-10-10T15:00:00.000Z", [
       input("e1", 2, "2026-09-01T04:00:00.000Z", "SLIP"), input("e1", 1, "2026-09-01T04:00:00.000Z", "UNCERTAIN"),
     ]))).toBe("2026-09-01");
+  });
+});
+
+describe("The same paper uploaded twice", () => {
+  // Late in the evening in New York, already the next day in UTC, so a UTC date would be off by one.
+  const importedAt = "2026-10-02T02:30:00.000Z";
+
+  test("the screen's sentence is the one the server declines with, for a kept and a deleted earlier upload", () => {
+    for (const title of ["Graded: Quiz 3", null]) {
+      const shown = earlierImportSentence({ title, importedAt });
+      expect(shown).toBe(earlierImportDetail([{ title, importedAt: new Date(importedAt) }])!);
+      expect(shown).toContain("on October 1, 2026,");
+    }
+    expect(earlierImportSentence({ title: "Graded: Quiz 3", importedAt })).toContain("To import a question you skipped, review “Graded: Quiz 3” instead.");
+    expect(earlierImportSentence({ title: null, importedAt })).toContain("from an upload you have since deleted, and they still count as evidence.");
+  });
+
+  test("the server names the oldest import it is given, and nothing when there is none", () => {
+    expect(earlierImportDetail([])).toBeNull();
+    const oldest = { title: "Graded: Quiz 3", importedAt: new Date(importedAt) }, later = { title: "Graded: Quiz 3 again", importedAt: new Date("2026-10-20T15:00:00.000Z") };
+    expect(earlierImportDetail([oldest, later])).toBe(earlierImportSentence({ title: oldest.title, importedAt }));
   });
 });

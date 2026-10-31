@@ -8,7 +8,7 @@ Each `MediaValue` has these fields:
 
 | Field | Meaning |
 | --- | --- |
-| `file` | A nonblank, stable reference assigned by the host to a retained original file. |
+| `file` | A nonblank, stable reference assigned by the host to a retained original file. The upload route writes it as the import key, a slash, the SHA-256 digest of the file's bytes, and the file's extension, as described under [Retained file storage](#retained-file-storage). |
 | `name` | The original file's nonblank display name. |
 | `mediaType` | Its MIME type, such as `application/pdf`, `image/heic`, `audio/mp3`, or `video/mp4`. |
 | `renditions` | An ordered list of readable text, images, or pages derived from the original. It may be empty when extraction produced nothing usable. |
@@ -176,6 +176,8 @@ For example, a WebVTT file with a cue from `00:00:00.000` to `00:00:02.500` read
 ## Retained file storage
 
 Uploads are limited to 12 files and 95 MB in total. The server accepts an upload body of at most 96 MB: the files plus 1 MB for the other form fields. The real form fields and multipart framing add only a few kilobytes, so the largest accepted upload sends about 99.6 million bytes, which stays under a 100 MB edge limit whether the edge counts 1,000,000 or 1,048,576 bytes to the megabyte. In production, no bytes pass through the local disk. The upload route hashes each file while streaming it and streams the bytes to the file store, without a second full copy. Retained files live in a file store under `SHA-256(owner)/importKey/SHA-256(bytes).ext`. When `S3_BUCKET`, `S3_ACCESS_KEY_ID`, and `S3_SECRET_ACCESS_KEY` are set, the store is S3-compatible object storage; `S3_ENDPOINT`, `S3_REGION`, and `S3_SESSION_TOKEN` are optional. Partial S3 settings stop startup. Without them, development uses `.data/files`. In the upload route, each store call gets at most 30 seconds and never runs past the route's 85-second budget. During a tutor request, store calls keep their 30-second limit inside the request's own limit. Outside requests, the transcription worker's store calls get 30 seconds, or 120 seconds for a file larger than 25 MB. Storage errors reach the learner as one plain message.
+
+Because each reference ends with the digest of its bytes, a material's originals record what its files contain, and the compositions can read that from the material without asking the file store. The [graded import](compositions/Importing.md#the-same-paper-uploaded-twice) relies on this: it names a returned paper by the digests in its originals, so another upload of the same files is recognized and its marks are not counted twice. The digest therefore stays in the reference, which MaterialKeeping already keeps for every material, rather than in a field or a set of its own; the concept still treats each reference as an opaque string and never reads the digest.
 
 A download or view first checks the learner's access to the material and the exact file reference. It then streams the bytes from the store, without loading the whole file. Removing an unfinished import deletes every file that its declared sources can have under its import key, whether or not the upload had finished saving them. When that deletion fails, the transcription worker finishes it on a later turn.
 

@@ -14,7 +14,8 @@ import { refusalDetail } from "../src/host/http-policy.ts";
 import type { Material } from "../src/concepts/MaterialKeeping/MaterialKeeping.ts";
 import type { Result } from "../src/concepts/AssessmentReviewing/AssessmentReviewing.ts";
 import type { User } from "../src/concepts/Registering/Registering.ts";
-import { admissions, composition as Access } from "../src/compositions/access.ts";
+import { PAPER_IMPORTED, admissions, composition as Access, earlierImportDetail } from "../src/compositions/access.ts";
+import { composition as Importing } from "../src/compositions/importing.ts";
 
 const ORIGIN = "http://localhost:5173", DAY = 86_400_000, MB = 1024 * 1024, ZONE = "America/New_York", cleanups: (() => Promise<void>)[] = [];
 const SENTENCE = "Choose graded work that you imported into one of your courses.";
@@ -94,11 +95,11 @@ async function learnerWithSkill(app: Awaited<ReturnType<typeof setup>>, name: st
 
 /** Saves an imported case the way Confirm does, through the assembled concept so its progress reactions run. */
 async function importCase(app: Awaited<ReturnType<typeof setup>>, fixture: Awaited<ReturnType<typeof learnerWithSkill>>, label: string, result: Result, performedAt: Date,
-  { material = fixture.material, skill = fixture.skill, definition = fixture.definition }: { material?: Material; skill?: string; definition?: string } = {}) {
+  { material = fixture.material, skill = fixture.skill, definition = fixture.definition, originals = [] }: { material?: Material; skill?: string; definition?: string; originals?: unknown[] } = {}) {
   const imported = await app.runtime.application.concepts.AssessmentReviewing.importGraded({
     author: fixture.user, subject: skill, definition, sourceKey: `graded${JSON.stringify([material, label, skill])}`,
     question: label, criteria: "Multiply matrices\nFull demonstration gate: Two products and why",
-    response: { text: "My product was [[4,4],[10,8]].", attachments: [], conversation: [], citations: [{ material }], reviewedDialogueLength: 0 },
+    response: { text: "My product was [[4,4],[10,8]].", attachments: originals as never[], conversation: [], citations: [{ material }], reviewedDialogueLength: 0 },
     help: "NONE", fresh: true, performedAt, mark: "8/10", feedback: "Check the last entry.", result, gateMet: false,
     rationale: `You kept the tutor's proposed result, Slip, when importing graded work. Tutor's reason: One entry is wrong.`,
   });
@@ -183,7 +184,7 @@ test("ReadImports lists this material's imported rows with their current result,
   await learner.ok("/courses/skills/confirm", { skill: second });
   const secondDefinition = ((await learner.ok("/courses/read", { course: fixture.course })).skills as { skill: string; current: string }[]).find((row) => row.skill === second)!.current;
   const before = new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" });
-  expect(await learner.ok("/courses/graded/read", { material: graded })).toEqual({ imported: [], today: before });
+  expect(await learner.ok("/courses/graded/read", { material: graded })).toEqual({ imported: [], today: before, earlier: [] });
 
   const performedAt = new Date(Date.now() - 2 * DAY);
   const first = await importCase(app, fixture, "Question 1", "SLIP", performedAt, { material: graded });
@@ -196,6 +197,8 @@ test("ReadImports lists this material's imported rows with their current result,
     { case: other.case, skill: second, label: "Question 2", mark: "8/10", feedback: "Check the last entry.", performedAt: performedAt.toISOString(), result: "GAP" },
   ].sort((a, b) => a.case < b.case ? -1 : 1);
   expect(read.imported).toEqual(expected);
+  // These cases attach no files, so they name no paper, and nothing was imported from another upload of this one.
+  expect((read as unknown as { earlier: unknown[] }).earlier).toEqual([]);
   expect([before, new Date().toLocaleDateString("en-CA", { timeZone: "America/New_York" })]).toContain(read.today);
   // Imported cases stay in the skill's study data with their imported flag, original mark, and feedback.
   const data = await learner.ok("/learning/read", { skill: fixture.skill });
@@ -335,6 +338,11 @@ test("Suggest refuses graded work before contacting the tutor, after the ownersh
   expect(app.suggested).toBe(asked + 1);
 }, 60_000);
 
+/** The source key the design states: the paper, which is the SHA-256 digest of the originals' distinct byte digests, sorted and joined by commas. */
+const paperKey = (originals: { file: string }[], label: string, skill: string) => {
+  const digests = [...new Set(originals.map(({ file }) => /^[a-f0-9-]{36}\/([a-f0-9]{64})\.[a-z0-9]+$/.exec(file)![1]!))].sort();
+  return `graded${JSON.stringify([`sha256:${createHash("sha256").update(digests.join(",")).digest("hex")}`, label, skill])}`;
+};
 /** A calendar date written YYYY-MM-DD, moved by whole days. */
 const shift = (day: string, days: number) => new Date(Date.parse(`${day}T12:00:00Z`) + days * DAY).toISOString().slice(0, 10);
 const newYorkDate = (at: Date | number | string) => new Date(at).toLocaleDateString("en-CA", { timeZone: ZONE });
@@ -370,8 +378,9 @@ test("Confirm imports one question and applies its judgment to mastery as of the
   expect(newYorkDate(performedAt)).toBe(performedOn);
   expect(newYorkDate(performedAt.getTime() - 1)).toBe(shift(performedOn, -1));
   const definition = ((await learner.ok("/courses/read", { course })).skills as { skill: string; current: string }[]).find((item) => item.skill === skill)!.current;
-  expect(saved).toEqual({ author: user, subject: skill, definition, sourceKey: `graded${JSON.stringify([graded, "Question 2", skill])}`, help: "NONE", fresh: true, performedAt, imported: true });
-  const { originals } = await learner.ok("/courses/materials/read", { material: graded }) as { originals: unknown[] };
+  const { originals } = await learner.ok("/courses/materials/read", { material: graded }) as { originals: { file: string }[] };
+  // The key names the paper, the trimmed label, and the skill.
+  expect(saved).toEqual({ author: user, subject: skill, definition, sourceKey: paperKey(originals, "Question 2", skill), help: "NONE", fresh: true, performedAt, imported: true });
   expect(await Assessment._work({ case: confirmed.case as never }) as unknown).toEqual([{ question: "Question 2", criteria: "Multiply matrices\nFull demonstration gate: Two products and why",
     response: { text: "[[4,4],[10,8]]", attachments: originals, conversation: [], citations: [{ material: graded }], reviewedDialogueLength: 0 },
     originalMark: "4/5", originalFeedback: "Check the last entry." }]);
@@ -538,4 +547,174 @@ test("Extract tells the learner when an original is too large to send in full, b
   const { course: empty } = await learner.ok("/courses/create", { title: "No skills yet" });
   const unmapped = (await learner.ok("/courses/materials/add", upload(empty, "Graded work: Quiz")) as { material: Material }).material;
   expect(await learner.post("/courses/graded/extract", { material: unmapped })).toEqual({ status: 400, body: { error: "INVALID_REQUEST", detail: "Confirm at least one skill in this course before importing graded work." } });
+}, 60_000);
+
+// ---- The same paper uploaded twice (design/compositions/Importing.md, "The same paper uploaded twice") ----
+
+/** A returned paper: a PDF of two marked questions and a photo of a third page. `names` renames them; `extra` changes the PDF's bytes. */
+const paperFiles = ({ names = ["midterm.pdf", "page-3.png"], reversed = false, extra = "" }: { names?: string[]; reversed?: boolean; extra?: string } = {}) => {
+  const files = [new File([pdf(["Question 1 (4/5)", `Question 2 (2/5)${extra}`]) as Uint8Array<ArrayBuffer>], names[0]!, { type: "application/pdf" }),
+    new File([png as Uint8Array<ArrayBuffer>], names[1]!, { type: "image/png" })];
+  return reversed ? files.reverse() : files;
+};
+const paperForm = (course: string, title: string, files: File[], requestId: string = crypto.randomUUID()) => {
+  const form = new FormData(); form.set("course", course); form.set("title", title); form.set("requestId", requestId);
+  for (const file of files) form.append("files", file);
+  return form;
+};
+/** The New York date of an instant as the sentence writes it. */
+const longDay = (at: Date) => at.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: ZONE });
+type Earlier = { material: string; title: string | null; importedAt: string };
+
+test("admission checks the paper after the material, and its sentence names the upload and the date", () => {
+  for (const path of ["/courses/graded/extract", "/courses/graded/confirm"] as const) {
+    expect(admissions[path].at(-1), path).toMatchObject({ check: Access.PaperNotImported, fields: ["material"], detail: PAPER_IMPORTED,
+      prerequisite: { check: Importing.EarlierImports, detail: earlierImportDetail } });
+    expect(admissions[path].at(-2), path).toMatchObject({ check: Access.GradedReady });
+  }
+  const at = new Date("2026-10-28T03:30:00Z");
+  // The oldest import names the upload; its date is the New York calendar date, here still October 27.
+  expect(earlierImportDetail([{ title: "Graded work: Midterm 1", importedAt: at }, { title: "Graded work: Midterm 1", importedAt: new Date("2026-10-29T15:00:00Z") }]))
+    .toBe("You already imported the marks from this paper on October 27, 2026, from “Graded work: Midterm 1”. This upload holds exactly the same files, so importing it would count those marks a second time. To import a question you skipped, review “Graded work: Midterm 1” instead.");
+  expect(earlierImportDetail([{ title: null, importedAt: at.toISOString() }]))
+    .toBe("You already imported the marks from this paper on October 27, 2026, from an upload you have since deleted, and they still count as evidence. This upload holds exactly the same files, so importing it would count those marks a second time.");
+  expect(earlierImportDetail([])).toBeNull();
+});
+
+test("another upload of the same paper is declined before the tutor reads it, and its marks are never counted again", async () => {
+  const app = await setup(), fixture = await gradedFixture(app, "paper-twice"), { learner, course, skill, second, session, user, today } = fixture;
+  const Assessment = app.runtime.application.concepts.AssessmentReviewing, Mastery = app.runtime.application.concepts.MasteryEstimating;
+  await learner.ok("/learning/confidence", { skill, confidence: 50 });
+  await learner.ok("/learning/confidence", { skill: second, confidence: 50 });
+  const counted = async () => ({ cases: (await Assessment._cases({ author: user, subject: skill })).length + (await Assessment._cases({ author: user, subject: second })).length,
+    evidence: (await Mastery._progress({ learner: user })).tracks.flatMap((track) => track.inputs).length });
+  app.extract((context) => ({ rows: [extracted("Question 1", context.skills[0]!.skill), extracted("Question 2", context.skills[1]?.skill ?? ""), extracted("Question 3", "")] }));
+
+  // The first upload: the tutor reads it, and two of its questions are imported as evidence.
+  const first = (await learner.ok("/courses/materials/add", paperForm(course, "Graded work: Midterm 1", paperFiles())) as { material: Material }).material;
+  expect((await learner.ok("/courses/graded/extract", { material: first })).rows).toHaveLength(3);
+  const one = await learner.ok("/courses/graded/confirm", { material: first, performedOn: today, outsideHelp: false, row: question(skill, { label: "Question 1" }) }) as { case: string };
+  await learner.ok("/courses/graded/confirm", { material: first, performedOn: today, outsideHelp: false, row: question(second, { label: "Question 2" }) });
+  const importedAt = (await Assessment._judgments({ case: one.case as never }))[0]!.recordedAt;
+  const { originals } = await learner.ok("/courses/materials/read", { material: first }) as { originals: { file: string }[] };
+  expect((await Assessment._case({ case: one.case as never }))[0]!.sourceKey).toBe(paperKey(originals, "Question 1", skill));
+  const before = await counted();
+  expect(before).toEqual({ cases: 2, evidence: 2 });
+
+  // The same files again, renamed, in the other order, under another title.
+  const again = (await learner.ok("/courses/materials/add", paperForm(course, "Graded work: Midterm 1 (phone)", paperFiles({ names: ["scan.PDF", "photo.png"], reversed: true }))) as { material: Material }).material;
+  expect(again).not.toBe(first);
+  // ReadImports names the earlier upload, oldest import first.
+  const { earlier } = await learner.ok("/courses/graded/read", { material: again }) as { earlier: Earlier[] };
+  expect(earlier).toHaveLength(2);
+  expect(earlier[0]).toEqual({ material: first, title: "Graded work: Midterm 1", importedAt: importedAt.toISOString() });
+  expect(earlier.every((row) => row.material === first && row.title === "Graded work: Midterm 1")).toBe(true);
+  // Extract is declined before the tutor is asked, with a sentence that names the upload and the date of the import.
+  const sentence = `You already imported the marks from this paper on ${longDay(importedAt)}, from “Graded work: Midterm 1”. This upload holds exactly the same files, so importing it would count those marks a second time. To import a question you skipped, review “Graded work: Midterm 1” instead.`;
+  const asked = app.generated;
+  expect(await learner.post("/courses/graded/extract", { material: again })).toEqual({ status: 400, body: { error: "INVALID_REQUEST", detail: sentence } });
+  expect(await app.runtime.gateway.invoke("/courses/graded/extract", { session, material: again }, { timeoutMs: 5000 }))
+    .toEqual({ ok: false, error: { kind: "framework", code: "INVALID_INPUT", detail: sentence } });
+  expect(app.generated).toBe(asked);
+  // A forced confirm, with the same row, another label, or another skill and result, is declined the same way.
+  for (const row of [question(skill, { label: "Question 1" }), question(skill, { label: "Q1" }), question(second, { label: "Question 2", result: "GAP" })]) {
+    const body = { material: again, performedOn: today, outsideHelp: false, row };
+    expect(await learner.post("/courses/graded/confirm", body), row.label).toEqual({ status: 400, body: { error: "INVALID_REQUEST", detail: sentence } });
+    expect(await app.runtime.gateway.invoke("/courses/graded/confirm", { session, ...body }, { timeoutMs: 5000 }), row.label)
+      .toEqual({ ok: false, error: { kind: "framework", code: "INVALID_INPUT", detail: sentence } });
+  }
+  // A caller that skips admission meets the concept's rule: the same question from the same files has the same key.
+  expect(await app.raw.invoke("/courses/graded/confirm", { session, material: again, performedOn: today, outsideHelp: false, row: question(skill, { label: " Question 1 " }) }, { timeoutMs: 5000 }))
+    .toEqual({ ok: false, error: { kind: "domain", value: "GRADED_SOURCE_USED" } });
+  // No case and no evidence changed.
+  expect(await counted()).toEqual(before);
+  expect(await app.runtime.application.form(Access.PaperNotImported({ owner: user, material: again }))).toBeNull();
+  expect(await app.runtime.application.form(Access.PaperNotImported({ owner: user, material: first }))).toEqual({ allowed: true });
+
+  // The upload the marks came from is not declined: the tutor reads it again, and the question skipped there still imports.
+  expect((await learner.ok("/courses/graded/read", { material: first })).earlier).toEqual([]);
+  expect((await learner.ok("/courses/graded/extract", { material: first })).rows).toHaveLength(3);
+  await learner.ok("/courses/graded/confirm", { material: first, performedOn: today, outsideHelp: false, row: question(skill, { label: "Question 3" }) });
+  expect(await counted()).toEqual({ cases: 3, evidence: 3 });
+
+  // A different paper still imports, even with the same labels.
+  const other = (await learner.ok("/courses/materials/add", paperForm(course, "Graded work: Midterm 2", paperFiles({ extra: " (revised)" }))) as { material: Material }).material;
+  expect((await learner.ok("/courses/graded/read", { material: other })).earlier).toEqual([]);
+  expect((await learner.ok("/courses/graded/extract", { material: other })).rows).toHaveLength(3);
+  await learner.ok("/courses/graded/confirm", { material: other, performedOn: today, outsideHelp: false, row: question(skill, { label: "Question 1" }) });
+  expect(await counted()).toEqual({ cases: 4, evidence: 4 });
+
+  // Another learner's upload of the same files is their own paper.
+  const classmate = await learnerWithSkill(app, "paper-twice-classmate");
+  const theirs = (await classmate.learner.ok("/courses/materials/add", paperForm(classmate.course, "Graded work: Midterm 1", paperFiles())) as { material: Material }).material;
+  expect((await classmate.learner.ok("/courses/graded/read", { material: theirs })).earlier).toEqual([]);
+  expect((await classmate.learner.ok("/courses/graded/extract", { material: theirs })).rows).toHaveLength(3);
+  await classmate.learner.ok("/courses/graded/confirm", { material: theirs, performedOn: today, outsideHelp: false, row: question(classmate.skill, { label: "Question 1" }) });
+}, 120_000);
+
+test("a retried upload returns the same material, which is not declined, and a lost confirm reply is retried as before", async () => {
+  const app = await setup(), fixture = await gradedFixture(app, "paper-retry"), { learner, course, skill, user, today } = fixture;
+  app.extract((context) => ({ rows: [extracted("Question 1", context.skills[0]!.skill)] }));
+  const requestId = crypto.randomUUID();
+  const first = (await learner.ok("/courses/materials/add", paperForm(course, "Graded work: Quiz 3", paperFiles(), requestId)) as { material: Material }).material;
+  const body = { material: first, performedOn: today, outsideHelp: false, row: question(skill, { label: "Question 1" }) };
+  await learner.ok("/courses/graded/confirm", body);
+  // The upload's reply was lost: the same request answers the same material, and it is still the paper's own upload.
+  expect(await learner.ok("/courses/materials/add", paperForm(course, "Graded work: Quiz 3", paperFiles(), requestId))).toEqual({ material: first });
+  expect((await learner.ok("/courses/graded/read", { material: first })).earlier).toEqual([]);
+  expect((await learner.ok("/courses/graded/extract", { material: first })).rows).toHaveLength(1);
+  // The confirm's reply was lost: its retry is refused as already imported, which the import screen counts as imported.
+  expect(await learner.post("/courses/graded/confirm", body))
+    .toEqual({ status: 400, body: { error: "INVALID_REQUEST", detail: refusalDetail("/courses/graded/confirm", "GRADED_SOURCE_USED") } });
+  expect(await app.runtime.application.concepts.AssessmentReviewing._cases({ author: user, subject: skill })).toHaveLength(1);
+}, 60_000);
+
+test("after the earlier upload is deleted, the same files are still recognized, and the sentence says the upload was deleted", async () => {
+  const app = await setup(), fixture = await gradedFixture(app, "paper-deleted"), { learner, course, skill, user, today } = fixture;
+  app.extract((context) => ({ rows: [extracted("Question 1", context.skills[0]!.skill)] }));
+  const first = (await learner.ok("/courses/materials/add", paperForm(course, "Graded work: Quiz 4", paperFiles())) as { material: Material }).material;
+  const imported = await learner.ok("/courses/graded/confirm", { material: first, performedOn: today, outsideHelp: false, row: question(skill, { label: "Question 1" }) }) as { case: string };
+  const importedAt = (await app.runtime.application.concepts.AssessmentReviewing._judgments({ case: imported.case as never }))[0]!.recordedAt;
+  expect(await learner.post("/courses/materials/delete", { material: first })).toEqual({ status: 200, body: {} });
+  const again = (await learner.ok("/courses/materials/add", paperForm(course, "Graded work: Quiz 4", paperFiles())) as { material: Material }).material;
+  expect((await learner.ok("/courses/graded/read", { material: again })).earlier).toEqual([{ material: first, title: null, importedAt: importedAt.toISOString() }]);
+  const sentence = `You already imported the marks from this paper on ${longDay(importedAt)}, from an upload you have since deleted, and they still count as evidence. This upload holds exactly the same files, so importing it would count those marks a second time.`;
+  expect(await learner.post("/courses/graded/extract", { material: again })).toEqual({ status: 400, body: { error: "INVALID_REQUEST", detail: sentence } });
+  expect(await learner.post("/courses/graded/confirm", { material: again, performedOn: today, outsideHelp: false, row: question(skill, { label: "Question 1" }) }))
+    .toEqual({ status: 400, body: { error: "INVALID_REQUEST", detail: sentence } });
+  expect(await app.runtime.application.concepts.AssessmentReviewing._cases({ author: user, subject: skill })).toHaveLength(1);
+}, 60_000);
+
+test("questions imported before keys named the paper stay recognized, from their own upload and from another one", async () => {
+  const app = await setup(), fixture = await gradedFixture(app, "paper-before"), { learner, course, skill, session, user, today } = fixture;
+  const Assessment = app.runtime.application.concepts.AssessmentReviewing;
+  const first = (await learner.ok("/courses/materials/add", paperForm(course, "Graded work: Midterm 1", paperFiles())) as { material: Material }).material;
+  const { originals } = await learner.ok("/courses/materials/read", { material: first }) as { originals: { file: string }[] };
+  // Saved the way Confirm saved a question before: the key names the material, and the work attaches the upload's originals.
+  const before = await importCase(app, fixture, "Question 1", "SLIP", new Date(Date.now() - DAY), { material: first, originals });
+  expect((await Assessment._case({ case: before.case as never }))[0]!.sourceKey).toBe(`graded${JSON.stringify([first, "Question 1", skill])}`);
+  // Its upload still lists it, and confirming the same question there again is refused rather than counted.
+  const read = await learner.ok("/courses/graded/read", { material: first }) as { imported: { case: string }[]; earlier: Earlier[] };
+  expect(read.imported.map((row) => row.case)).toEqual([before.case]);
+  expect(read.earlier).toEqual([]);
+  const repeat = { material: first, performedOn: today, outsideHelp: false, row: question(skill, { label: " Question 1" }) };
+  expect(await learner.post("/courses/graded/confirm", repeat))
+    .toEqual({ status: 400, body: { error: "INVALID_REQUEST", detail: refusalDetail("/courses/graded/confirm", "GRADED_SOURCE_USED") } });
+  expect(await app.raw.invoke("/courses/graded/confirm", { session, ...repeat }, { timeoutMs: 5000 })).toEqual({ ok: false, error: { kind: "domain", value: "GRADED_SOURCE_USED" } });
+  expect(await Assessment._cases({ author: user, subject: skill })).toHaveLength(1);
+  // A question not imported yet still imports from that upload, under the key that names the paper.
+  const next = await learner.ok("/courses/graded/confirm", { ...repeat, row: question(skill, { label: "Question 2" }) }) as { case: string };
+  expect((await Assessment._case({ case: next.case as never }))[0]!.sourceKey).toBe(paperKey(originals, "Question 2", skill));
+  expect(await Assessment._cases({ author: user, subject: skill })).toHaveLength(2);
+  // Another upload of the same files is declined, naming the upload the question came from.
+  const again = (await learner.ok("/courses/materials/add", paperForm(course, "Graded work: Midterm 1 again", paperFiles())) as { material: Material }).material;
+  const importedAt = (await Assessment._judgments({ case: before.case as never }))[0]!.recordedAt;
+  const nextAt = (await Assessment._judgments({ case: next.case as never }))[0]!.recordedAt;
+  // Both questions came from the first upload, oldest first, whichever key each was saved under.
+  expect((await learner.ok("/courses/graded/read", { material: again })).earlier).toEqual([
+    { material: first, title: "Graded work: Midterm 1", importedAt: importedAt.toISOString() },
+    { material: first, title: "Graded work: Midterm 1", importedAt: nextAt.toISOString() },
+  ]);
+  expect(await learner.post("/courses/graded/extract", { material: again })).toEqual({ status: 400, body: { error: "INVALID_REQUEST",
+    detail: earlierImportDetail([{ title: "Graded work: Midterm 1", importedAt }]) } });
 }, 60_000);

@@ -7,6 +7,8 @@ export type ExtractedRow = Wire["/courses/graded/extract"]["output"]["rows"][num
 export type ConfirmRow = Wire["/courses/graded/confirm"]["input"]["row"];
 export type Result = ConfirmRow["result"];
 export type ImportedRow = Wire["/courses/graded/read"]["output"]["imported"][number];
+/** A question of this paper imported from another upload of the same files, with that upload and when it was imported. */
+export type EarlierImport = Wire["/courses/graded/read"]["output"]["earlier"][number];
 type Track = Wire["/learning/read"]["output"]["data"]["track"];
 type TrackInput = NonNullable<Track>["inputs"][number];
 
@@ -32,7 +34,7 @@ export const sentences = {
   photosInstead: "Upload photos of the pages instead.",
   pdfTooLarge: "This PDF is larger than 15 MB, so the tutor cannot see its marks. Upload photos of its pages instead.",
   photoTooLarge: "This photo is larger than 15 MB, so the tutor cannot read it. Upload a smaller photo of the page.",
-  separateUploads: "Each upload is separate. Uploading the same paper again lets its questions be imported again.",
+  sameFiles: "If you upload the same files again, they are recognized, and their marks still count only once.",
 } as const;
 
 export const results = ["INDEPENDENT", "SUPPORTED", "SLIP", "GAP", "UNCERTAIN"] as const satisfies readonly Result[];
@@ -198,6 +200,18 @@ export function estimateStart(track: Track): string | null {
   const times = [track.initializedAt, ...[...latest.values()].filter((input) => input.signal !== "UNCERTAIN").map((input) => input.performedAt)]
     .map((value) => Date.parse(value)).filter((time) => !Number.isNaN(time));
   return times.length ? calendarDay(Math.min(...times)) : null;
+}
+
+/**
+ * Why this upload cannot be imported: the learner already imported its paper's marks from another upload of the same files.
+ * The words match the sentence the server gives when it declines Extract or Confirm (Access.earlierImportDetail), built here from
+ * ReadImports' oldest earlier import so the screen can say it without asking the tutor. A deleted upload has no title.
+ */
+export function earlierImportSentence(earlier: Pick<EarlierImport, "title" | "importedAt">): string {
+  const day = readableDay(earlier.importedAt);
+  return earlier.title === null
+    ? `You already imported the marks from this paper on ${day}, from an upload you have since deleted, and they still count as evidence. This upload holds exactly the same files, so importing it would count those marks a second time.`
+    : `You already imported the marks from this paper on ${day}, from “${earlier.title}”. This upload holds exactly the same files, so importing it would count those marks a second time. To import a question you skipped, review “${earlier.title}” instead.`;
 }
 
 /** "A", "A and B", or "A, B, and C". */

@@ -148,10 +148,15 @@ export type StillGotItWire = {
   };
   "/courses/graded/read": {
     input: {
-      "material": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["gradedSource"]["fn"]>[0], ["material"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>[0], ["material"]>]>>;
+      "material": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["gradedElsewhere"]["fn"]>[0], ["material"]>, AtPath<Parameters<(typeof ApplicationConceptSet.computations)["gradedSource"]["fn"]>[0], ["material"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>[0], ["material"]>]>>;
       "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
     };
     output: {
+      "earlier": ({
+        "importedAt": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_judgments"]>>>, ["recordedAt"]>>;
+        "material": Jsonify<AllOf<[AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["gradedElsewhere"]["fn"]>>, ["from"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>[0], ["material"]>]>>;
+        "title": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>>>, ["title"]>> | null;
+      })[];
       "imported": {
         "case": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_case"]>[0], ["case"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_effectiveJudgment"]>[0], ["case"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_work"]>[0], ["case"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_cases"]>>>, ["case"]>]>>;
         "feedback": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_work"]>>>, ["originalFeedback"]>>;
@@ -1152,9 +1157,14 @@ export type StillGotItHttp = {
   };
   "/courses/graded/read": {
     input: {
-      "material": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["gradedSource"]["fn"]>[0], ["material"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>[0], ["material"]>]>>;
+      "material": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["gradedElsewhere"]["fn"]>[0], ["material"]>, AtPath<Parameters<(typeof ApplicationConceptSet.computations)["gradedSource"]["fn"]>[0], ["material"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>[0], ["material"]>]>>;
     };
     output: {
+      "earlier": ({
+        "importedAt": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_judgments"]>>>, ["recordedAt"]>>;
+        "material": Jsonify<AllOf<[AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["gradedElsewhere"]["fn"]>>, ["from"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>[0], ["material"]>]>>;
+        "title": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Library"]["_material"]>>>, ["title"]>> | null;
+      })[];
       "imported": {
         "case": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_case"]>[0], ["case"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_effectiveJudgment"]>[0], ["case"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_work"]>[0], ["case"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_cases"]>>>, ["case"]>]>>;
         "feedback": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["AssessmentReviewing"]["_work"]>>>, ["originalFeedback"]>>;

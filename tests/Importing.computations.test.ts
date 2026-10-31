@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { extractRequest, gradedImport, gradedKey, gradedReview, gradedSource, gradedTitle, gradedToday, hasConfirmedSkill, hasGradedRows, type GradedRow } from "../src/computations/importing.ts";
+import { createHash } from "node:crypto";
+import { extractRequest, gradedElsewhere, gradedImport, gradedKey, gradedKeyUsed, gradedReview, gradedSource, gradedTitle, gradedToday, hasConfirmedSkill, hasGradedRows, type GradedRow } from "../src/computations/importing.ts";
 import type { SkillRows, TutorAnswer } from "../src/learning-data.ts";
 import type { Material } from "../src/concepts/MaterialKeeping/MaterialKeeping.ts";
 import type { MediaList } from "../src/media.ts";
@@ -127,17 +128,80 @@ describe("confirm review order", () => {
 });
 
 describe("source keys and imports", () => {
-  test("the key names the material, the trimmed label, and the skill", () => {
-    expect(gradedKey({ material, row: row({ label: "  Question 1 " }) })).toEqual({ skill: "s-a", sourceKey: 'graded["material-1","Question 1","s-a"]' });
-    expect(gradedKey({ material, row: row({ label: "Question 1", skill: "s-b" }) })).toEqual({ skill: "s-b", sourceKey: 'graded["material-1","Question 1","s-b"]' });
+  // Retained references as the upload route writes them: the import key, then the SHA-256 digest of the bytes and the extension.
+  const digest = (text: string) => createHash("sha256").update(text).digest("hex");
+  const original = (importKey: string, bytes: string, extension = ".pdf", name = `paper${extension}`) =>
+    ({ file: `${importKey}/${digest(bytes)}${extension}`, name, mediaType: "application/pdf", renditions: [], limitations: [] });
+  const firstKey = "11111111-1111-4111-8111-111111111111", secondKey = "22222222-2222-4222-8222-222222222222";
+  const paperOf = (...bytes: string[]) => `sha256:${digest([...new Set(bytes.map(digest))].sort().join(","))}`;
+  const keyFor = (first: string, label = "Question 1", skillId = "s-a") => `graded${JSON.stringify([first, label, skillId])}`;
+  const work = (attachments: unknown[], cited: unknown = "material-2") =>
+    ({ text: "", attachments, conversation: [], citations: cited === null ? [] : [{ material: cited }], reviewedDialogueLength: 0 }) as never;
+
+  test("the key names the paper, the trimmed label, and the skill, so the same files make the same key in any upload", () => {
+    const originals: MediaList = [original(firstKey, "page one")];
+    const paper = paperOf("page one");
+    expect(gradedKey({ material, originals, row: row({ label: "  Question 1 " }) }))
+      .toEqual({ skill: "s-a", sourceKey: keyFor(paper), keys: [keyFor(paper), 'graded["material-1","Question 1","s-a"]'], materialKeys: ['graded["material-1","Question 1","s-a"]'] });
+    expect(gradedKey({ material, originals, row: row({ label: "Question 1", skill: "s-b" }) }).sourceKey).toBe(keyFor(paper, "Question 1", "s-b"));
+    // Another upload of the same bytes, under another import key, file name, and extension case, and as another material.
+    const again: MediaList = [original(secondKey, "page one", ".pdf", "Midterm (copy).PDF")];
+    expect(gradedKey({ material: "material-2" as Material, originals: again, row: row() }).sourceKey).toBe(keyFor(paper));
+    // The same files in another order, or one of them twice, are the same paper; another set of files is not.
+    const two: MediaList = [original(firstKey, "page one", ".png"), original(firstKey, "page two", ".png")];
+    const swapped: MediaList = [original(secondKey, "page two", ".jpg"), original(secondKey, "page one", ".jpg"), original(secondKey, "page two", ".jpg")];
+    expect(gradedKey({ material, originals: two, row: row() }).sourceKey).toBe(keyFor(paperOf("page one", "page two")));
+    expect(gradedKey({ material: "material-2" as Material, originals: swapped, row: row() }).sourceKey).toBe(keyFor(paperOf("page one", "page two")));
+    expect(gradedKey({ material, originals: [...two, original(firstKey, "page three", ".png")], row: row() }).sourceKey).not.toBe(keyFor(paperOf("page one", "page two")));
+    expect(gradedKey({ material, originals: [original(firstKey, "page one rescanned")], row: row() }).sourceKey).not.toBe(keyFor(paper));
     // JSON keeps labels with quotes or brackets unambiguous.
-    expect(gradedKey({ material, row: row({ label: 'Q "1" [a]' }) }).sourceKey).toBe('graded["material-1","Q \\"1\\" [a]","s-a"]');
-    expect(gradedSource({ sourceKey: 'graded["material-1","Question 1","s-a"]', material })).toBe(true);
-    expect(gradedSource({ sourceKey: gradedKey({ material, row: row({ label: 'Q "1" [a]' }) }).sourceKey, material })).toBe(true);
-    expect(gradedSource({ sourceKey: 'graded["material-2","Question 1","s-a"]', material })).toBe(false);
-    for (const sourceKey of ["practice:session-1", "graded", 'graded["material-1","Question 1"]', 'graded[ "material-1","Question 1","s-a"]', 'graded["material-1","Q",1]', "graded{}"]) {
-      expect(gradedSource({ sourceKey, material }), sourceKey).toBe(false);
+    expect(gradedKey({ material, originals, row: row({ label: 'Q "1" [a]' }) }).sourceKey).toBe(`graded${JSON.stringify([paper, 'Q "1" [a]', "s-a"])}`);
+    // The import saves the same key.
+    expect(gradedImport({ material, originals, row: row({ label: " Question 1" }), outsideHelp: false, performedAt: new Date("2026-10-20T04:00:00Z"), skills }).sourceKey).toBe(keyFor(paper));
+  });
+
+  test("without a digest in every reference, the material stands in for the paper", () => {
+    const unnamed: MediaList[] = [[], [{ file: "files/midterm.pdf", name: "Midterm.pdf", mediaType: "application/pdf", renditions: [], limitations: [] }],
+      [original(firstKey, "page one"), { ...original(firstKey, "page two"), file: "not-a-uuid/abc.pdf" }]];
+    for (const originals of unnamed) {
+      expect(gradedKey({ material, originals, row: row() })).toEqual({ skill: "s-a", sourceKey: 'graded["material-1","Question 1","s-a"]', keys: ['graded["material-1","Question 1","s-a"]'], materialKeys: [] });
     }
+  });
+
+  test("a key counts as used when it is one of the question's keys", () => {
+    const { keys } = gradedKey({ material, originals: [original(firstKey, "page one")], row: row() });
+    expect(gradedKeyUsed({ sourceKey: keys[0]!, keys })).toBe(true);
+    expect(gradedKeyUsed({ sourceKey: 'graded["material-1","Question 1","s-a"]', keys })).toBe(true);
+    expect(gradedKeyUsed({ sourceKey: 'graded["material-2","Question 1","s-a"]', keys })).toBe(false);
+    expect(gradedKeyUsed({ sourceKey: keyFor(paperOf("page one"), "Question 2"), keys })).toBe(false);
+  });
+
+  test("a source key came from this material when it names its paper or, before keys named the paper, the material", () => {
+    const originals: MediaList = [original(firstKey, "page one")], paper = paperOf("page one");
+    expect(gradedSource({ sourceKey: keyFor(paper), material, originals })).toBe(true);
+    expect(gradedSource({ sourceKey: 'graded["material-1","Question 1","s-a"]', material, originals })).toBe(true);
+    expect(gradedSource({ sourceKey: gradedKey({ material, originals, row: row({ label: 'Q "1" [a]' }) }).sourceKey, material, originals })).toBe(true);
+    expect(gradedSource({ sourceKey: 'graded["material-2","Question 1","s-a"]', material, originals })).toBe(false);
+    expect(gradedSource({ sourceKey: keyFor(paperOf("page two")), material, originals })).toBe(false);
+    // Without a nameable paper only the material's own key matches.
+    expect(gradedSource({ sourceKey: keyFor(paper), material, originals: [] })).toBe(false);
+    expect(gradedSource({ sourceKey: 'graded["material-1","Question 1","s-a"]', material, originals: [] })).toBe(true);
+    for (const sourceKey of ["practice:session-1", "graded", 'graded["material-1","Question 1"]', 'graded[ "material-1","Question 1","s-a"]', 'graded["material-1","Q",1]', "graded{}"]) {
+      expect(gradedSource({ sourceKey, material, originals }), sourceKey).toBe(false);
+    }
+  });
+
+  test("saved work came from elsewhere when it cites another material and attaches the same paper", () => {
+    const originals: MediaList = [original(firstKey, "page one"), original(firstKey, "page two")];
+    const sameFiles = [original(secondKey, "page two", ".jpg"), original(secondKey, "page one", ".jpg")];
+    expect(gradedElsewhere({ material, originals, response: work(sameFiles) })).toEqual({ found: true, from: "material-2" });
+    // Its own work, another paper, work that cites nothing, and work without nameable files are not from elsewhere.
+    expect(gradedElsewhere({ material, originals, response: work(sameFiles, "material-1") })).toEqual({ found: false, from: "" });
+    expect(gradedElsewhere({ material, originals, response: work([original(secondKey, "page one")]) })).toEqual({ found: false, from: "material-2" });
+    expect(gradedElsewhere({ material, originals, response: work(sameFiles, null) })).toEqual({ found: false, from: "" });
+    expect(gradedElsewhere({ material, originals, response: work([]) })).toEqual({ found: false, from: "material-2" });
+    expect(gradedElsewhere({ material, originals: [], response: work([]) })).toEqual({ found: false, from: "" });
+    expect(gradedElsewhere({ material, originals, response: "text" as never })).toEqual({ found: false, from: "" });
   });
 
   test("the row becomes one importGraded input with the stated values", () => {
