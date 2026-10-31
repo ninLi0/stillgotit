@@ -21,7 +21,7 @@ import { ProviderFiles } from "./provider-files.ts";
 import { TranscriptionWorker, type TranscriptionWorkerOptions } from "./transcription-worker.ts";
 import type { MaterialRouteOptions } from "./material-routes.ts";
 import { TutorGenerating } from "../concepts/Generating/registry.ts";
-import { ConversationArchiving, TreeStyling, TutorPreferring, ViewPreferring } from "../concepts.ts";
+import { AnswerPreferring, ConversationArchiving, TreeStyling, TutorPreferring, ViewPreferring } from "../concepts.ts";
 import { TutorFailures, tutorGenerator } from "./tutor-generation.ts";
 
 /**
@@ -49,6 +49,7 @@ export async function createRuntime({ database, provider, providerOrigin, public
     TutorGenerating: new TutorGenerating(tutorGenerator(tutor, failures)),
     TutorPreferring: new TutorPreferring(database, "TutorPreferring"),
     ViewPreferring: new ViewPreferring(database, "ViewPreferring"),
+    AnswerPreferring: new AnswerPreferring(database, "AnswerPreferring"),
     TreeStyling: new TreeStyling(database, "TreeStyling"),
     ConversationArchiving: new ConversationArchiving(database, "ConversationArchiving", clock),
     Registering: new RegisteringConcept(database),

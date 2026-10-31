@@ -1,8 +1,8 @@
 import { endpoint, receive, respond } from "@mit-sdg/sync-engine/boundary";
 import { compute, former, is, no, view, where } from "@mit-sdg/sync-engine/language";
 import { concepts, computations as C } from "../concepts.ts";
-import { homeViewInput, recordOutput, structuredOutput, tutorChoiceInput, validators } from "./reusable/inputs.ts";
-const { Sessioning, TutorPreferring: Preferring, ViewPreferring } = concepts;
+import { answerStyleInput, homeViewInput, recordOutput, structuredOutput, tutorChoiceInput, validators } from "./reusable/inputs.ts";
+const { Sessioning, TutorPreferring: Preferring, ViewPreferring, AnswerPreferring } = concepts;
 const options = { validators: { ...validators, output: structuredOutput } };
 
 /** The design's sentences for the two ChooseTutor refusals. The HTTP adapter reports only a category, so the host adds them as `detail`. */
@@ -90,4 +90,41 @@ const SetHomeView = endpoint("/settings/view/set", ({ session, view: requested, 
     where(compute(C.homeViewOffered, { view: requested }, offered), is.among(offered, [false])).then(respond({ error: "UNKNOWN_HOME_VIEW" })).named("unknown"),
   ), { validators: { ...homeViewOptions.validators, input: homeViewInput } });
 
-export const composition = { TutorStatus, TutorSettings, TutorReady, SentTutor, ReadTutor, ChooseTutor, ClearTutor, AppliedHomeView, ReadHomeView, SetHomeView };
+/** The design's sentence for the SetAnswerStyle refusal. The HTTP adapter reports only a category, so the host adds it as `detail`. */
+export const answerStyleRefusals = {
+  UNKNOWN_ANSWER_STYLE: "Choose plain text or interactive examples.",
+} as const;
+
+/** Exactly one case holds for each learner: a saved style that is still offered, a saved style that is not, or no saved style. */
+const AppliedAnswerStyle = view("the answer style that applies to (owner)", ({ owner }, { style: shown }, { saved, offered }) => [
+  where(AnswerPreferring._choice({ user: owner }).is({ option: shown }), compute(C.answerStyleOffered, { style: shown }, offered), is.among(offered, [true])),
+  where(AnswerPreferring._choice({ user: owner }).is({ option: saved }), compute(C.answerStyleOffered, { style: saved }, offered), is.among(offered, [false]),
+    compute(C.defaultAnswerStyle, {}, shown)),
+  where(no(AnswerPreferring._choice({ user: owner })), compute(C.defaultAnswerStyle, {}, shown)),
+]).one();
+
+/**
+ * Conditions that mark a prepared lesson request with the learner's answer style. With plain text, the default,
+ * withAnswerStyle returns the request unchanged. Reply and Question add it to a lesson's opening and its replies, before
+ * the tutor choice.
+ */
+export const usingAnswerStyle = (owner: symbol, draft: symbol, style: symbol, styled: symbol) => [
+  AppliedAnswerStyle({ owner }).is({ style }), compute(C.withAnswerStyle, { request: draft, style }, styled),
+] as const;
+
+const answerStyleOptions = { validators: { ...validators, output: recordOutput(["style"]) } };
+
+const ReadAnswerStyle = endpoint("/settings/answers", ({ session, owner, shown }) => receive({ session })
+  .then(Sessioning.use({ session }).responds({ subject: owner }))
+  .then(where(AppliedAnswerStyle({ owner }).is({ style: shown })).then(respond({ style: shown }))), answerStyleOptions);
+
+const SetAnswerStyle = endpoint("/settings/answers/set", ({ session, style: requested, owner, offered, chosen }) => receive({ session, style: requested })
+  .then(Sessioning.use({ session }).responds({ subject: owner })).then(
+    where(compute(C.answerStyleOffered, { style: requested }, offered), is.among(offered, [true]), compute(C.offeredAnswerStyle, { style: requested }, chosen))
+      .then(AnswerPreferring.set({ user: owner, option: chosen }).responds({}))
+      .then(respond({ style: chosen })).named("offered"),
+    where(compute(C.answerStyleOffered, { style: requested }, offered), is.among(offered, [false])).then(respond({ error: "UNKNOWN_ANSWER_STYLE" })).named("unknown"),
+  ), { validators: { ...answerStyleOptions.validators, input: answerStyleInput } });
+
+export const composition = { TutorStatus, TutorSettings, TutorReady, SentTutor, ReadTutor, ChooseTutor, ClearTutor, AppliedHomeView, ReadHomeView, SetHomeView,
+  AppliedAnswerStyle, ReadAnswerStyle, SetAnswerStyle };

@@ -3,6 +3,8 @@ import { GeminiError } from "./gemini.ts";
 import type { TutorRequest, TutorAnswer } from "../learning-data.ts";
 import type { PassageSet } from "../concepts/GroundedTutoring/dialogue.ts";
 import type { ExtractContext, ExtractedRow } from "../tutor-types.ts";
+import { WIDGET_FENCE, WIDGET_LIMITS, WIDGET_PROBLEMS, answerProse, checkAnswerWidgets, type WidgetSource } from "../answer-widgets.ts";
+import { FORMULA_FUNCTIONS } from "../widget-formula.ts";
 const text = { type: "string" };
 const results = ["INDEPENDENT", "SUPPORTED", "SLIP", "GAP", "UNCERTAIN"] as const;
 const cited = (field: string) => objectSchema({ [field]: text, citations: { type: "array", minItems: 1, items: objectSchema({ material: text, location: text }) } });
@@ -32,6 +34,25 @@ const prompts = {
     `Explain that result in one plain sentence addressed to the learner. Do not expose internal field names or uppercase status codes. ${plainMaths} ` +
     "Keep each label under 100 characters, each mark under 50, the feedback under 2,000, and the excerpt and the explanation under 500.",
 };
+/**
+ * Added to a lesson's opening (LESSON) and to a lesson reply (REPLY) only for a learner who turned on interactive examples
+ * (design/compositions/Learning.md, "Interactive examples"). Without it, those requests send exactly the instructions above.
+ * The limits come from the module that checks the answer, so the instruction and the check cannot disagree.
+ */
+const L = WIDGET_LIMITS;
+export const WIDGET_INSTRUCTION = "Interactive examples are on for this learner. When a small interactive example would help the learner see the idea, you may add one to this answer; " +
+  "many answers need none, and an answer never has more than one. " +
+  `Write it as a fenced code block on lines of its own: a line with \`\`\`${WIDGET_FENCE}, then one JSON object, then a line with \`\`\`. ` +
+  "This block is the only other Markdown allowed. Put it after the paragraph it illustrates, never inside a list, and keep explaining in the text, because the example only illustrates it. " +
+  "Inside the JSON, write plain text with Unicode symbols, such as x² − 4, never LaTeX, dollar signs, or backslashes. " +
+  "Every example has \"source\": {\"material\": ..., \"location\": ...}, one exact supplied material/location pair for the passage it illustrates. The example is your illustration, not a quotation, so the answer's citations still name the passages the text relies on. " +
+  "The JSON object is one of four kinds. " +
+  `A slider: {"kind": "slider", "title": ..., "formula": ..., "variables": [{"name": ..., "label": ..., "min": ..., "max": ..., "step": ..., "value": ...}], "output": ..., "source": ...} with ${L.variables.min} or ${L.variables.max} variables, each moved by its own slider from min to max in steps of step, with at most ${L.positions} positions, starting at value, and "output" naming what the formula gives. ` +
+  `The formula uses only the variable names, numbers, + - * / ^, parentheses, pi, e, and the functions ${Object.keys(FORMULA_FUNCTIONS).join(", ")}, where log is base 10 and ln is natural. Write every multiplication with *, as in 0.5 * m * v^2. ` +
+  `A table: {"kind": "table", "caption": ..., "columns": [...], "rows": [[...], ...], "source": ...} with at most ${L.columns.max} columns and ${L.rows.max} rows of short strings or numbers. ` +
+  `Steps: {"kind": "steps", "title": ..., "steps": [...], "source": ...} with ${L.steps.min} to ${L.steps.max} short steps that the learner reveals one at a time. ` +
+  `A choice: {"kind": "choice", "question": ..., "options": [...], "answer": ..., "explanation": ..., "source": ...} with ${L.options.min} to ${L.options.max} different options, "answer" exactly the text of the one correct option, and a one-sentence explanation shown after the learner picks. ` +
+  `Keep every string short: a title, caption, or question within ${L.heading} characters, a label, column, or cell within ${L.label}, an option within ${L.option}, a step within ${L.step}, and the explanation within ${L.explanation}.`;
 const extractSchema = objectSchema({ rows: { type: "array", maxItems: EXTRACT_ROW_LIMIT, items: objectSchema({
   label: text, mark: text, feedback: text, excerpt: text, skill: text, result: { type: "string", enum: [...results] }, rationale: text,
 }) } });
@@ -84,7 +105,10 @@ function validated(tutor: Pick<CourseTutor, "generate" | "suggest">) {
     const field = request.kind === "LESSON" ? "explanation" : request.kind === "TASK" ? "question" : "text";
     const schema = request.kind === "GRADE" ? objectSchema({ result: { type: "string", enum: ["INDEPENDENT", "SUPPORTED", "SLIP", "GAP", "UNCERTAIN"] }, gateMet: { type: "boolean" }, rationale: text })
       : request.kind === "HINT" ? objectSchema({ text }) : cited(field);
-    const result = await tutor.generate(owner, request.sources, prompts[request.kind], request.context, schema, request.work, request.tutor) as Record<string, unknown>;
+    const lesson = request.kind === "LESSON" || request.kind === "REPLY";
+    // A learner who never turned examples on gets the instruction exactly as it was before examples existed.
+    const instruction = lesson && request.style === "interactive" ? `${prompts[request.kind]} ${WIDGET_INSTRUCTION}` : prompts[request.kind];
+    const result = await tutor.generate(owner, request.sources, instruction, request.context, schema, request.work, request.tutor) as Record<string, unknown>;
     if (request.kind === "GRADE") {
       const context = request.context as { help: string; fresh: boolean };
       if (typeof result.rationale !== "string" || !result.rationale.trim() || typeof result.gateMet !== "boolean" ||
@@ -101,14 +125,30 @@ function validated(tutor: Pick<CourseTutor, "generate" | "suggest">) {
       const cited = result.citations.filter((part: PassageSet[number]) => !(part && part.material === SUBMITTED_WORK));
       if (!cited.length) throw new AnswerNotGrounded();
       answer.citations = cited.map((part: PassageSet[number]) => {
-        const source = request.sources.find((source) => source.material === part.material);
-        if (!source || typeof part.location !== "string" || !(part.location === "content" && source.data.content.trim()) &&
-          !source.data.originals.some((file) => file.renditions.some((rendition) => rendition.location === part.location))) throw new Error("Invalid citation");
+        if (!part || !citable(request, part)) throw new Error("Invalid citation");
         return { material: part.material, location: part.location };
       });
     }
+    // Interactive examples are checked like citations, in every lesson answer whatever the learner's style, because the
+    // page shows any example a saved answer holds. A failing example is dropped and the rest of the answer is kept.
+    if (lesson) {
+      const checked = checkAnswerWidgets(answer.text, (source) => citable(request, source));
+      for (const problem of checked.dropped) console.warn(`Tutor answer example dropped: ${WIDGET_PROBLEMS[problem]}.`);
+      if (!answerProse(checked.text).trim()) throw new Error("Incomplete content");
+      answer.text = checked.text;
+    }
     return answer;
   };
+}
+
+/**
+ * Whether a citation, or an example's source, names one of the request's course materials and a location in it: `content`
+ * when the material has text, or one of its rendition locations. The learner's attached work is never a course material.
+ */
+function citable(request: TutorRequest, part: Partial<WidgetSource>): boolean {
+  const source = part.material === SUBMITTED_WORK ? undefined : request.sources.find((item) => item.material === part.material);
+  return !!source && typeof part.location === "string" && ((part.location === "content" && !!source.data.content.trim()) ||
+    source.data.originals.some((file) => file.renditions.some((rendition) => rendition.location === part.location)));
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);

@@ -103,3 +103,28 @@ function describe(file: UploadedFile) {
   return { name: file.name, displayName: file.displayName, mimeType: file.mimeType, sizeBytes: String(file.size), createTime: "2026-10-23T12:00:00.000000Z",
     updateTime: "2026-10-23T12:00:00.000000Z", expirationTime: file.expirationTime, sha256Hash: "ZmFrZQ==", uri: file.uri, state: file.state, source: "UPLOADED" };
 }
+
+// ---- Canned interactive examples ----
+// One lesson example of each kind, about matrix products like the browser fixture's canned lesson. The browser fixture
+// (browser-app.ts) adds them to its lesson answers when the instruction carries the interactive-example instruction, one
+// kind per answer in this order, and tests/AnswerWidgets.test.ts checks that the host accepts every one of them.
+
+/** The four canned examples, each pointing at `source`, the passage the canned answer cites. */
+export function cannedWidgets(source: { material: string; location: string }) {
+  return [
+    { kind: "slider", title: "One entry of a product", formula: "a * 3 + 2 * b",
+      variables: [{ name: "a", label: "First entry of row 1 of A", min: -5, max: 5, step: 1, value: 1 },
+        { name: "b", label: "Second entry of column 1 of B", min: -5, max: 5, step: 1, value: 4 }], output: "Entry in row 1, column 1 of AB", source },
+    { kind: "table", caption: "Which products are defined", columns: ["A", "B", "AB"],
+      rows: [["2 × 3", "3 × 4", "2 × 4"], ["3 × 2", "2 × 2", "3 × 2"], ["1 × 3", "3 × 1", "1 × 1"], ["2 × 3", "2 × 3", "Not defined"]], source },
+    { kind: "steps", title: "Forming the entry in row 1, column 1 of AB", steps: ["Take row 1 of A: [1, 2].", "Take column 1 of B: [3, 4].",
+      "Multiply the matching entries: 1 × 3 = 3 and 2 × 4 = 8.", "Add the products: 3 + 8 = 11, the entry in row 1, column 1."], source },
+    { kind: "choice", question: "A is 2 × 3 and B is 3 × 4. What size is AB?", options: ["2 × 4", "3 × 3", "4 × 2", "AB is not defined"], answer: "2 × 4",
+      explanation: "The inner sizes, 3 and 3, match, so AB keeps the outer ones: 2 rows and 4 columns.", source },
+  ] as const;
+}
+
+/** An example as the tutor writes it into an answer: a fenced block with the example's JSON. */
+export function widgetBlock(widget: unknown): string {
+  return `\`\`\`stillgotit-widget\n${JSON.stringify(widget, null, 2)}\n\`\`\``;
+}

@@ -10,6 +10,8 @@ import type { TutorChoice } from "../src/tutor-types.ts";
 import type { HomeView } from "../src/computations/home-view.ts";
 import type { User } from "../src/concepts/Registering/Registering.ts";
 import { openLesson } from "./fixtures/open-lesson.ts";
+import { WIDGET_INSTRUCTION } from "../src/host/tutor-generation.ts";
+import type { AnswerStyle } from "../src/computations/answer-style.ts";
 const ORIGIN = "http://localhost:5173", cleanups: (() => Promise<void>)[] = [];
 afterAll(async () => { for (const cleanup of cleanups.reverse()) await cleanup(); });
 
@@ -18,6 +20,7 @@ const UNKNOWN_MODEL = "That model isn't offered. Choose one of the models in the
 const UNSUPPORTED_LEVEL = "That model doesn't offer this thinking level. Choose one of the levels shown for it.";
 const NO_LONGER_OFFERED = "The tutor model or thinking level you chose is no longer offered. Choose another one in the Tutor panel.";
 const VIEW_REFUSED = "Choose the skill tree or the task list.";
+const STYLE_REFUSED = "Choose plain text or interactive examples.";
 // Sessioning's sentence for NOT_SIGNED_IN, which reaches the browser as the refusal's `detail`.
 const SIGNED_OUT = "Your session has ended. Sign in again.";
 const DEFAULT = defaultChoice({});
@@ -29,16 +32,19 @@ const settings = (choice: TutorChoice, status: string) => ({ settings: { models:
 async function setup() {
   const connection = await connectMongo({ uri: process.env.MONGODB_TEST_URI ?? localMongoUri, database: `stillgotit_test_${crypto.randomUUID().replaceAll("-", "")}` });
   const sent: { kind: string; choice: TutorChoice | undefined }[] = [];
+  // The instruction each tutor request carried, to check which requests carried the interactive-example instruction.
+  const instructions: { kind: string; instruction: string }[] = [];
   let failNext: string | undefined, beforeGenerate: (() => Promise<void>) | undefined, questions = 0;
   const tutor: Pick<CourseTutor, "generate" | "suggest"> = {
     suggest: async (_owner, _source, choice) => {
       sent.push({ kind: "SUGGEST", choice });
       return { unitTitle: "Products", skills: [{ title: "Multiply matrices", outcome: "Compute products.", gate: "Solve two new products and explain why order matters." }] };
     },
-    generate: async (_owner, sources, _instruction, context, schema, _work, choice) => {
+    generate: async (_owner, sources, instruction, context, schema, _work, choice) => {
       const properties = schema.properties as Record<string, unknown>;
       const kind = properties.explanation ? "LESSON" : properties.question ? "TASK" : properties.rationale ? "GRADE" : properties.citations ? "REPLY" : "HINT";
       sent.push({ kind, choice });
+      instructions.push({ kind, instruction });
       if (beforeGenerate) { const work = beforeGenerate; beforeGenerate = undefined; await work(); }
       if (failNext === kind) { failNext = undefined; throw new Error("Fixture provider interruption"); }
       const citations = [{ material: sources[0]!.material, location: "content" }];
@@ -82,7 +88,7 @@ async function setup() {
     const dialogueLength = async (studySession: string) => (await read()).sessions.find((item: { session: string }) => item.session === studySession).dialogue.length;
     return { ...learner, course, material, skill, read, dialogueLength };
   }
-  return { runtime, sent, browser, learner, failNext: (kind: string) => { failNext = kind; }, duringGeneration: (work: () => Promise<void>) => { beforeGenerate = work; } };
+  return { runtime, sent, instructions, browser, learner, failNext: (kind: string) => { failNext = kind; }, duringGeneration: (work: () => Promise<void>) => { beforeGenerate = work; } };
 }
 
 test("the settings endpoints read, choose, and clear the signed-in learner's choice", async () => {
@@ -395,4 +401,117 @@ test("saving the home view does not wait for a running lesson", async () => {
   expect(await learner.ok("/settings/view")).toEqual({ view: "tasks" });
   release.resolve();
   expect(await running).toEqual({ status: 200, body: { tutor: DEFAULT } });
+}, 30_000);
+
+test("the answer style endpoints read and save the signed-in learner's style, with plain text as the default", async () => {
+  const app = await setup(), laptop = await app.browser(), phone = await app.browser(laptop.user), { AnswerPreferring } = app.runtime.application.concepts;
+  // Nothing saved: plain text.
+  expect(await laptop.ok("/settings/answers")).toEqual({ style: "plain" });
+  expect(await AnswerPreferring._choice({ user: laptop.user })).toEqual([]);
+
+  // Saving answers the saved style, a second device reads it, and saving the same style again changes nothing.
+  expect(await laptop.ok("/settings/answers/set", { style: "interactive" })).toEqual({ style: "interactive" });
+  expect(await phone.ok("/settings/answers")).toEqual({ style: "interactive" });
+  expect(await laptop.ok("/settings/answers/set", { style: "interactive" })).toEqual({ style: "interactive" });
+  expect(await AnswerPreferring._choice({ user: laptop.user })).toEqual([{ option: "interactive" }]);
+
+  // Any other style is refused with the design's sentence, matched exactly including case, and nothing is saved.
+  for (const style of ["widgets", "Interactive", "PLAIN", " plain", "plain ", "", "x".repeat(100)]) {
+    expect(await laptop.post("/settings/answers/set", { style }), JSON.stringify(style)).toEqual({ status: 400, body: { error: "INVALID_REQUEST", detail: STYLE_REFUSED } });
+  }
+  // The boundary refuses other input as invalid before the flow starts, without a refusal sentence.
+  for (const input of [{}, { style: 3 }, { style: null }, { style: true }, { style: ["plain"] }, { style: { style: "plain" } }, { style: "x".repeat(101) }, { style: "plain", user: laptop.user }]) {
+    expect(await laptop.post("/settings/answers/set", input), JSON.stringify(input).slice(0, 80)).toEqual({ status: 400, body: { error: "INVALID_REQUEST" } });
+  }
+  expect(await laptop.ok("/settings/answers")).toEqual({ style: "interactive" });
+  // The other settings are separate, so saving a style leaves them as they were.
+  expect(await laptop.ok("/settings/tutor")).toEqual(settings(DEFAULT, "DEFAULT"));
+  expect(await laptop.ok("/settings/view")).toEqual({ view: "tree" });
+
+  // Choosing plain text saves it as the learner's own choice.
+  expect(await phone.ok("/settings/answers/set", { style: "plain" })).toEqual({ style: "plain" });
+  expect(await laptop.ok("/settings/answers")).toEqual({ style: "plain" });
+  expect(await AnswerPreferring._choice({ user: laptop.user })).toEqual([{ option: "plain" }]);
+
+  // A saved style that is no longer offered is never answered; plain text applies until the learner saves again.
+  await AnswerPreferring.set({ user: laptop.user, option: "widgets" as AnswerStyle });
+  expect(await laptop.ok("/settings/answers")).toEqual({ style: "plain" });
+  expect(await laptop.ok("/settings/answers/set", { style: "interactive" })).toEqual({ style: "interactive" });
+
+  // Without a session both endpoints are refused, and the native gateway reports the refusal code with its sentence.
+  for (const [path, input] of [["/settings/answers", {}], ["/settings/answers/set", { style: "plain" }]] as const) {
+    expect(await laptop.post(path, input, false), path).toEqual({ status: 401, body: { error: "UNAUTHORIZED", detail: SIGNED_OUT } });
+  }
+  expect(await app.runtime.gateway.invoke("/settings/answers/set", { session: laptop.session, style: "widgets" }))
+    .toEqual({ ok: false, error: { kind: "domain", value: "UNKNOWN_ANSWER_STYLE", detail: STYLE_REFUSED } });
+  expect(await app.runtime.gateway.invoke("/settings/answers/set", { session: laptop.session, style: "plain" })).toEqual({ ok: true, value: { style: "plain" } });
+  expect(await app.runtime.gateway.invoke("/settings/answers", { session: laptop.session })).toEqual({ ok: true, value: { style: "plain" } });
+  expect(await app.runtime.gateway.invoke("/settings/answers", { session: "ended-session" })).toEqual({ ok: false, error: { kind: "domain", value: "NOT_SIGNED_IN", detail: SIGNED_OUT } });
+}, 30_000);
+
+test("another learner can neither read nor change the learner's answer style", async () => {
+  const app = await setup(), maya = await app.browser(), sam = await app.browser(), { AnswerPreferring } = app.runtime.application.concepts;
+  await maya.ok("/settings/answers/set", { style: "interactive" });
+  expect(await sam.ok("/settings/answers")).toEqual({ style: "plain" });
+  // Fields naming Maya are ignored on a read and refused on a save; the session decides whose style it is.
+  expect(await sam.ok("/settings/answers", { owner: maya.user, user: maya.user, subject: maya.user })).toEqual({ style: "plain" });
+  expect((await sam.post("/settings/answers/set", { style: "plain", user: maya.user })).status).toBe(400);
+  expect((await sam.post("/settings/answers/set", { style: "plain", owner: maya.user })).status).toBe(400);
+  expect(await sam.ok("/settings/answers/set", { style: "plain" })).toEqual({ style: "plain" });
+  expect(await maya.ok("/settings/answers")).toEqual({ style: "interactive" });
+  expect(await AnswerPreferring._choice({ user: maya.user })).toEqual([{ option: "interactive" }]);
+  expect(await AnswerPreferring._choice({ user: sam.user })).toEqual([{ option: "plain" }]);
+}, 15_000);
+
+test("only a lesson's opening and its replies carry the example instruction, and only once the learner turns examples on", async () => {
+  const app = await setup(), learner = await app.learner();
+  const asked = () => app.instructions.splice(0).map(({ kind, instruction }) => [kind, instruction.includes(WIDGET_INSTRUCTION)]);
+  const question = async (lesson: string, text: string) => learner.ok("/learning/question", { studySession: lesson, text, channel: "TEXT", attachments: [], dialogueLength: await learner.dialogueLength(lesson) });
+  const practice = async () => {
+    const { task } = await learner.ok("/learning/task", { skill: learner.skill });
+    await learner.ok("/learning/hint", { studySession: task });
+    await learner.ok("/learning/respond", { studySession: task, text: "My work", channel: "TEXT", attachments: [], dialogueLength: await learner.dialogueLength(task) });
+    await learner.ok("/learning/assess", { studySession: task, dialogueLength: await learner.dialogueLength(task), reviewed: true, unseen: true, outsideHelp: false });
+  };
+
+  // A learner who never touched the switch: no request carries the instruction.
+  const { lesson } = await openLesson(learner.ok, { skill: learner.skill, request: "Explain products." });
+  await question(lesson, "Why does order matter?");
+  await practice();
+  await learner.ok("/courses/skills/suggest", { material: learner.material });
+  expect(asked()).toEqual([["LESSON", false], ["REPLY", false], ["TASK", false], ["HINT", false], ["GRADE", false]]);
+
+  // With examples on, a new lesson's opening, a question in it, a retried reply, and a question in an older lesson carry it.
+  await learner.ok("/settings/answers/set", { style: "interactive" });
+  const { lesson: second } = await openLesson(learner.ok, { skill: learner.skill, request: "Show me an example." });
+  await question(second, "And for vectors?");
+  app.failNext("REPLY");
+  expect((await learner.post("/learning/question", { studySession: lesson, text: "Once more?", channel: "TEXT", attachments: [], dialogueLength: await learner.dialogueLength(lesson) })).status).toBe(400);
+  await learner.ok("/learning/reply", { studySession: lesson });
+  // Practice, hints, grading, and suggestions never do.
+  await practice();
+  await learner.ok("/courses/skills/suggest", { material: learner.material });
+  expect(asked()).toEqual([["LESSON", true], ["REPLY", true], ["REPLY", true], ["REPLY", true], ["TASK", false], ["HINT", false], ["GRADE", false]]);
+
+  // Turning it off returns to the instruction from before examples.
+  await learner.ok("/settings/answers/set", { style: "plain" });
+  await question(second, "Thanks. Why?");
+  expect(asked()).toEqual([["REPLY", false]]);
+}, 60_000);
+
+test("saving the answer style does not wait for a running lesson, which keeps the style it read", async () => {
+  const app = await setup(), learner = await app.learner();
+  const entered = Promise.withResolvers<void>(), release = Promise.withResolvers<void>();
+  app.duringGeneration(async () => { entered.resolve(); await release.promise; });
+  const { lesson } = await learner.ok("/learning/lesson", { skill: learner.skill, request: "Explain products." });
+  const running = learner.post("/learning/reply", { studySession: lesson });
+  await entered.promise;
+  // The learner lock is held by the lesson's opening, but saving and reading the style do not take it.
+  expect(await learner.ok("/settings/answers/set", { style: "interactive" })).toEqual({ style: "interactive" });
+  expect(await learner.ok("/settings/answers")).toEqual({ style: "interactive" });
+  release.resolve();
+  expect(await running).toEqual({ status: 200, body: { tutor: DEFAULT } });
+  // The opening was prepared before the change, so it carried no example instruction; the next question does.
+  await learner.ok("/learning/question", { studySession: lesson, text: "Why?", channel: "TEXT", attachments: [], dialogueLength: 0 });
+  expect(app.instructions.map(({ kind, instruction }) => [kind, instruction.includes(WIDGET_INSTRUCTION)])).toEqual([["LESSON", false], ["REPLY", true]]);
 }, 30_000);

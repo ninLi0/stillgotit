@@ -17,6 +17,11 @@ export type Schedule = Awaited<ReturnType<Budgeting["_schedule"]>>["schedule"];
 export interface TutorRequest {
   kind: "SUGGEST" | "LESSON" | "TASK" | "REPLY" | "HINT" | "GRADE" | "EXTRACT";
   sources: SourceContext[]; context: unknown; work: MediaList; definition?: string; criteria?: string;
+  /**
+   * Present only on a lesson's opening (LESSON) or reply (REPLY) for a learner who turned on interactive examples
+   * (withAnswerStyle in src/computations/answer-style.ts). Its absence means plain text, the tutor's answers as before.
+   */
+  style?: "interactive";
 }
 export interface TutorAnswer {
   text: string; citations: PassageSet; materials: MaterialSet;

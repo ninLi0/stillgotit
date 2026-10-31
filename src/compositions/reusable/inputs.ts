@@ -120,6 +120,15 @@ export const homeViewInput: EndpointValidator = (value) => {
   return ok ? { ok: true } : { ok: false, detail: "Choose the skill tree or the task list." };
 };
 
+/** An answer style choice names one style, a string of at most 100 characters. The flow checks it against the offered styles. */
+export const answerStyleInput: EndpointValidator = (value) => {
+  if (!structuredInput(value).ok) return { ok: false };
+  const record = value as Record<string, unknown>;
+  const ok = Object.entries(record).every(([key, field]) => key === "session" ? field === null || typeof field === "string"
+    : key === "style" && typeof field === "string" && field.length <= 100) && typeof record.style === "string";
+  return ok ? { ok: true } : { ok: false, detail: "Choose plain text or interactive examples." };
+};
+
 /** A tree kind choice names one unit and one kind, each a string of at most 100 characters. The flow checks the kind against the offered kinds. */
 export const lookInput: EndpointValidator = (value) => {
   if (!structuredInput(value).ok) return { ok: false };
