@@ -137,7 +137,9 @@ test("Adjust saves one adjustment that Read shows with its reason and the new es
   // Request validation still refuses a value that is not a number.
   expect(await learner.post("/learning/adjust", { ...input, adjustmentKey: crypto.randomUUID(), value: "70" })).toMatchObject({ status: 400 });
   expect(await adjustments(app, track)).toHaveLength(1);
-  expect((await learner.ok("/learning/read", { skill })).estimate.value).toBeCloseTo(70, 4);
+  // The estimate decays from the adjusted value while the requests above complete, so compare to two decimals: on a
+  // loaded machine the read can come several seconds after the adjustment.
+  expect((await learner.ok("/learning/read", { skill })).estimate.value).toBeCloseTo(70, 2);
   // An adjustment alone never makes the skill ready; readiness needs recent independent work.
   await learner.ok("/learning/adjust", { ...input, adjustmentKey: crypto.randomUUID(), value: 100 });
   expect((await learner.ok("/learning/read", { skill })).estimate).toMatchObject({ ready: false });
