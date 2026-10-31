@@ -81,7 +81,14 @@ export function importFailure(entry: ImportEntry) {
   return failed ? `Couldn't transcribe ${failed.name}. ${entry.detail}` : entry.detail;
 }
 
-/** The library's announcement for the materials a listing saved, with their titles from the reloaded course. */
-export function readyNotice(saved: MaterialId[], materials: { material: string; title: string }[]) {
-  return saved.map((id) => `“${materials.find((item) => item.material === id)?.title ?? "Your material"}” is ready. Check the transcript, then find skills in it.`).join(" ");
+/**
+ * The library's announcement for the materials a listing saved, with their titles from the reloaded course. A recording
+ * attached to an answer is the learner's own work, which has no skills to find, so it says where to find it instead.
+ */
+export function readyNotice(saved: MaterialId[], materials: { material: string; title: string }[], work: { material: string; title: string }[] = []) {
+  return saved.map((id) => {
+    const own = work.find((item) => item.material === id);
+    if (own) return `“${own.title}” is ready. It is listed under Your work, below the course's files.`;
+    return `“${materials.find((item) => item.material === id)?.title ?? "Your material"}” is ready. Check the transcript, then find skills in it.`;
+  }).join(" ");
 }

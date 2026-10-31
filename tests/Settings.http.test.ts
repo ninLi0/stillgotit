@@ -73,7 +73,7 @@ async function setup() {
     const learner = await browser();
     const { course } = await learner.ok("/courses/create", { title: "Linear algebra" });
     const { material } = await runtime.application.concepts.Library.add({ owner: learner.user, importKey: crypto.randomUUID(), scope: course,
-      title: "Matrix multiplication", locator: "upload:test", content: "Multiply rows by columns. Inner dimensions must match.", originals: [], origin: "COURSE" });
+      title: "Matrix multiplication", locator: "upload:test", content: "Multiply rows by columns. Inner dimensions must match.", originals: [], origin: "COURSE", purpose: "SOURCE" });
     const { unit } = await learner.ok("/courses/units/add", { course, title: "Products" });
     const { skill } = await learner.ok("/courses/skills/propose", { proposalKey: crypto.randomUUID(), unit, material, title: "Products", outcome: "Multiply matrices", gate: "Two products and why" });
     await learner.ok("/courses/skills/confirm", { skill });

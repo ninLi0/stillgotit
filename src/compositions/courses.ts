@@ -41,9 +41,17 @@ const OwnedSkill = view("(owner) owns (skill) in (course)", ({ owner, skill }, {
 ).optional();
 
 const Materials = former("the source summaries for (owner) in (course)", ({ owner, course }, { material, title, locator, origin }) =>
-  each(Library._materials({ owner, scope: course }).is({ material, title, locator, origin }))
+  each(Library._materials({ owner, scope: course }).is({ material, title, locator, origin, purpose: "SOURCE" }))
     .arranged(material)
     .form({ material, title, locator, origin }),
+);
+
+// The learner's own work in this course, such as photos attached to answers, newest first: material identities are
+// time-ordered. It is listed apart from the course's materials because it is evidence, not a source.
+const Work = former("the work (owner) saved in (course), newest first", ({ owner, course }, { material, title, locator }) =>
+  each(Library._materials({ owner, scope: course }).is({ material, title, locator, purpose: "WORK" }))
+    .arranged(material, "descending")
+    .form({ material, title, locator }),
 );
 
 // Materials the learner deleted from this course. Only their identities remain, so the page can say that a citation or a
@@ -100,7 +108,7 @@ const Looks = former("the tree kinds (owner) chose for the units in (course)", (
 // The read answers at the settlement frontier, after RepairRevisedTrack has finished.
 const ReadCourse = endpoint("/courses/read", ({ session, course, owner }) =>
   receive({ session, course }).then(Sessioning.use({ session }).responds({ subject: owner })).afterFlowSettles().then(
-    where(OwnedCourse({ owner, course })).then(respond({ materials: Materials({ owner, course }), deletedMaterials: DeletedMaterials({ owner, course }),
+    where(OwnedCourse({ owner, course })).then(respond({ materials: Materials({ owner, course }), work: Work({ owner, course }), deletedMaterials: DeletedMaterials({ owner, course }),
       units: Units({ course }), skills: Skills({ course }), prerequisites: Prerequisites({ course }), skillSources: SkillSources({ course }),
       versions: Versions({ course }), looks: Looks({ owner, course }) })).named("owned"),
     where(no(OwnedCourse({ owner, course }))).then(respond({ error: "COURSE_UNAVAILABLE" })).named("missing"),
@@ -125,11 +133,11 @@ const ReadMaterial = endpoint("/courses/materials/read", ({ session, material, o
   ), { validators: { ...validators, output: structuredOutput } },
 );
 
-const AddMaterial = endpoint("/internal/materials/add", ({ session, course, importKey, title, locator, content, originals, origin, owner, material }) =>
-  receive({ session, course, importKey, title, locator, content, originals, origin })
+const AddMaterial = endpoint("/internal/materials/add", ({ session, course, importKey, title, locator, content, originals, origin, purpose, owner, material }) =>
+  receive({ session, course, importKey, title, locator, content, originals, origin, purpose })
     .then(Sessioning.use({ session }).responds({ subject: owner })).then(
       where(OwnedCourse({ owner, course }))
-        .then(Library.add({ owner, scope: course, importKey, title, locator, content, originals, origin }).responds({ material }))
+        .then(Library.add({ owner, scope: course, importKey, title, locator, content, originals, origin, purpose }).responds({ material }))
         .then(respond({ material })).named("owned"),
       where(no(OwnedCourse({ owner, course }))).then(respond({ error: "COURSE_UNAVAILABLE" })).named("missing"),
     ), { validators: { ...validators, input: materialInput, output: recordOutput(["material"]) } },
@@ -154,19 +162,22 @@ const DiscardDeletedDrafts = reaction(({ owner, material, course, unit, skill })
       SkillMapping._skills({ unit }).is({ skill, status: "DRAFT" }), SkillMapping._materials({ skill }).is({ material }))
     .then(SkillMapping.discardDraft({ owner, skill })));
 
-// The graded-work check applies only to the learner's own material in the unit's course: graded work is evidence, not a teaching source.
+// The graded-work and work checks apply only to the learner's own material in the unit's course: graded work and the
+// learner's own work are evidence, not teaching sources.
 const ProposeSkill = endpoint("/courses/skills/propose", ({ session, unit, proposalKey, material, materials, title, outcome, gate, owner, course, skill, materialTitle, graded }) =>
   receive({ session, unit, proposalKey, material, title, outcome, gate }).then(Sessioning.use({ session }).responds({ subject: owner })).then(
-    where(OwnedUnit({ owner, unit }).is({ course }), Library._material({ material }).is({ owner, scope: course, title: materialTitle }),
+    where(OwnedUnit({ owner, unit }).is({ course }), Library._material({ material }).is({ owner, scope: course, title: materialTitle, purpose: "SOURCE" }),
       compute(computations.gradedTitle, { title: materialTitle }, graded), is.among(graded, [false]), compute(computations.singleMaterial, { material }, materials))
       .then(SkillMapping.propose({ owner, unit, proposalKey, title, outcome, gate, materials }).responds({ skill }))
       .then(respond({ skill })).named("owned"),
     where(no(OwnedUnit({ owner, unit }))).then(respond({ error: "COURSE_UNAVAILABLE" })).named("missing"),
     where(OwnedUnit({ owner, unit }).is({ course }), no(Library._material({ material }).is({ owner, scope: course })))
       .then(respond({ error: "MATERIAL_UNAVAILABLE" })).named("source"),
-    where(OwnedUnit({ owner, unit }).is({ course }), Library._material({ material }).is({ owner, scope: course, title: materialTitle }),
+    where(OwnedUnit({ owner, unit }).is({ course }), Library._material({ material }).is({ owner, scope: course, title: materialTitle, purpose: "SOURCE" }),
       compute(computations.gradedTitle, { title: materialTitle }, graded), is.among(graded, [true]))
       .then(respond({ error: "GRADED_MATERIAL_NOT_SOURCE" })).named("graded"),
+    where(OwnedUnit({ owner, unit }).is({ course }), Library._material({ material }).is({ owner, scope: course, purpose: "WORK" }))
+      .then(respond({ error: "WORK_MATERIAL_NOT_SOURCE" })).named("work"),
   ), { validators: { ...validators, input: proposalSaveInput, output: recordOutput(["skill"]) } },
 );
 
@@ -191,19 +202,21 @@ const DiscardDraft = endpoint("/courses/skills/discard", ({ session, skill, owne
   ), { validators },
 );
 
-// The same refusals as ProposeSkill, then the graded-work check for the learner's own material in that course.
+// The same refusals as ProposeSkill, then the graded-work and work checks for the learner's own material in that course.
 const EditDraft = endpoint("/courses/skills/edit", ({ session, skill, unit, material, materials, title, outcome, gate, owner, course, materialTitle, graded }) =>
   receive({ session, skill, unit, material, title, outcome, gate }).then(Sessioning.use({ session }).responds({ subject: owner })).then(
-    where(OwnedUnit({ owner, unit }).is({ course }), Library._material({ material }).is({ owner, scope: course, title: materialTitle }),
+    where(OwnedUnit({ owner, unit }).is({ course }), Library._material({ material }).is({ owner, scope: course, title: materialTitle, purpose: "SOURCE" }),
       compute(computations.gradedTitle, { title: materialTitle }, graded), is.among(graded, [false]), compute(computations.singleMaterial, { material }, materials))
       .then(SkillMapping.reviseDraft({ owner, skill, unit, title, outcome, gate, materials }).responds({}))
       .then(respond({})).named("owned"),
     where(no(OwnedUnit({ owner, unit }))).then(respond({ error: "COURSE_UNAVAILABLE" })).named("missing"),
     where(OwnedUnit({ owner, unit }).is({ course }), no(Library._material({ material }).is({ owner, scope: course })))
       .then(respond({ error: "MATERIAL_UNAVAILABLE" })).named("source"),
-    where(OwnedUnit({ owner, unit }).is({ course }), Library._material({ material }).is({ owner, scope: course, title: materialTitle }),
+    where(OwnedUnit({ owner, unit }).is({ course }), Library._material({ material }).is({ owner, scope: course, title: materialTitle, purpose: "SOURCE" }),
       compute(computations.gradedTitle, { title: materialTitle }, graded), is.among(graded, [true]))
       .then(respond({ error: "GRADED_MATERIAL_NOT_SOURCE" })).named("graded"),
+    where(OwnedUnit({ owner, unit }).is({ course }), Library._material({ material }).is({ owner, scope: course, purpose: "WORK" }))
+      .then(respond({ error: "WORK_MATERIAL_NOT_SOURCE" })).named("work"),
   ), { validators: { ...validators, input: proposalInput } },
 );
 
@@ -247,14 +260,16 @@ const RepairRevisedTrack = reaction(({ identity, owner, course, unit, skill, cur
       MasteryEstimating._progress({ learner: owner }).is({ tracks }), compute(computations.carriedEstimate, { tracks, skill, current }, { found: true, confidence }))
     .then(MasteryEstimating.initialize({ learner: owner, subject: skill, definition: current, confidence, basis: "PREVIOUS_DEFINITION" })));
 
-// Like ProposeSkill, the material must belong to the learner and to the skill's course.
+// Like ProposeSkill, the material must belong to the learner and to the skill's course, and the learner's own work is refused.
 const AddSkillSource = endpoint("/courses/skills/sources/add", ({ session, skill, material, owner, course }) =>
   receive({ session, skill, material }).then(Sessioning.use({ session }).responds({ subject: owner })).then(
-    where(OwnedSkill({ owner, skill }).is({ course }), Library._material({ material }).is({ owner, scope: course }))
+    where(OwnedSkill({ owner, skill }).is({ course }), Library._material({ material }).is({ owner, scope: course, purpose: "SOURCE" }))
       .then(SkillMapping.attachMaterial({ owner, skill, material }).responds({})).then(respond({})).named("owned"),
     where(no(OwnedSkill({ owner, skill }))).then(respond({ error: "COURSE_UNAVAILABLE" })).named("missing"),
     where(OwnedSkill({ owner, skill }).is({ course }), no(Library._material({ material }).is({ owner, scope: course })))
       .then(respond({ error: "MATERIAL_UNAVAILABLE" })).named("source"),
+    where(OwnedSkill({ owner, skill }).is({ course }), Library._material({ material }).is({ owner, scope: course, purpose: "WORK" }))
+      .then(respond({ error: "WORK_MATERIAL_NOT_SOURCE" })).named("work"),
   ), { validators },
 );
 
@@ -335,7 +350,7 @@ const ClearUnitLook = endpoint("/courses/units/look/clear", ({ session, unit, ow
 );
 
 export const composition = { OwnedCourse, OwnedUnit, OwnedSkill, CourseList, ListCourses, CreateCourse,
-  UnavailableSkillMaterial, Materials, DeletedMaterials, Units, Skills, Prerequisites, SkillSources, Versions, Looks, ReadCourse, ChooseUnitLook, ClearUnitLook, ReadMaterial, AddUnit, AddMaterial,
+  UnavailableSkillMaterial, Materials, Work, DeletedMaterials, Units, Skills, Prerequisites, SkillSources, Versions, Looks, ReadCourse, ChooseUnitLook, ClearUnitLook, ReadMaterial, AddUnit, AddMaterial,
   DeleteMaterial, DiscardDeletedDrafts, ProposeSkill, ConfirmSkill, DiscardDraft, EditDraft,
   EditSkillDetails, ReviseSkill, RevisedTrack, RepairRevisedTrack, AddSkillSource, SetSkillPrerequisites, ArchiveSkill, RestoreSkill, SetUnitEmphasis,
   CourseActivityInProgress, ArchiveCourse, RestoreCourse };

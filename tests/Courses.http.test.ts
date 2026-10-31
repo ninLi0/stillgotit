@@ -102,9 +102,10 @@ async function setup({ clock, tutor = {
     return { post, ok, signIn, invoke, get user() { return user; } };
   }
 
-  /** Imports one text material into a course and returns its identity. */
-  async function material(learner: ReturnType<typeof browser>, course: string, title = "Matrix notes") {
+  /** Imports one text material into a course, as a source unless `purpose` says it is the learner's work, and returns its identity. */
+  async function material(learner: ReturnType<typeof browser>, course: string, title = "Matrix notes", purpose?: "WORK") {
     const form = new FormData(); form.set("course", course); form.set("title", title); form.set("requestId", crypto.randomUUID());
+    if (purpose) form.set("purpose", purpose);
     form.append("files", new File([`# ${title}\nMultiply rows by columns. Inner dimensions must match.`], "notes.md", { type: "text/markdown" }));
     return (await learner.ok("/courses/materials/add", form)).material as string;
   }
@@ -580,8 +581,11 @@ test("SetUnitEmphasis sets the flag, repeats without change, and refuses a value
 test("ReadCourse lists prerequisites, sources, and versions in the designed order, unchanged by database row order", async () => {
   const app = await setup(), { learner, course, unit, other, source, skills } = await app.course("read-order", ["One", "Two", "Three", "Four"]);
   const empty = await learner.ok("/courses/create", { title: "Empty course" });
-  expect(await learner.ok("/courses/read", { course: empty.course })).toEqual({ materials: [], deletedMaterials: [], units: [], skills: [], prerequisites: [], skillSources: [], versions: [], looks: [] });
+  expect(await learner.ok("/courses/read", { course: empty.course })).toEqual({ materials: [], work: [], deletedMaterials: [], units: [], skills: [], prerequisites: [], skillSources: [], versions: [], looks: [] });
   const second = await app.material(learner, course, "Second notes");
+  // The learner's own work is listed apart from the sources, newest first.
+  const olderWork = await app.material(learner, course, "My work: first answer", "WORK");
+  const newerWork = await app.material(learner, course, "My work: second answer", "WORK");
   const [one, two, three, four] = skills as [string, string, string, string];
   // Spread the skills over both units so unit order and skill order disagree.
   await learner.ok("/courses/skills/details", { skill: two, unit: other, title: "Two" });
@@ -606,6 +610,11 @@ test("ReadCourse lists prerequisites, sources, and versions in the designed orde
 
   const all = [...skills, draft].sort();
   const read = await learner.ok("/courses/read", { course });
+  expect(read.materials.map((row: { material: string }) => row.material)).toEqual([source, second].sort());
+  expect(read.work).toEqual([
+    { material: newerWork, title: "My work: second answer", locator: expect.any(String) },
+    { material: olderWork, title: "My work: first answer", locator: expect.any(String) },
+  ]);
   expect(read.units).toEqual([{ unit, title: "Products", emphasized: false }, { unit: other, title: "Inverses", emphasized: true }]
     .sort((x, y) => (x.unit < y.unit ? -1 : 1)));
   expect(read.skills.map((row: { skill: string }) => row.skill)).toEqual(all);

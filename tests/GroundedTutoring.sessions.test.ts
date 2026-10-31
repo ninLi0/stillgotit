@@ -10,7 +10,7 @@ afterAll(async () => { if (connection) { await connection.db.dropDatabase(); awa
 /** Saves Sam's notes in a library of their own, as the application does before any session cites them. */
 async function notes() {
   const library = new MaterialKeeping(connection.db, `Library_${crypto.randomUUID()}`);
-  return library.add({ owner: "sam", importKey: "lesson", scope: "math", title: "Matrices", locator: "lesson", content: "Rows multiply columns.", originals: [], origin: "COURSE" });
+  return library.add({ owner: "sam", importKey: "lesson", scope: "math", title: "Matrices", locator: "lesson", content: "Rows multiply columns.", originals: [], origin: "COURSE", purpose: "SOURCE" });
 }
 
 type LessonInput = { owner: string; topic: string; definition: string; materials: readonly string[]; citations: readonly { material: string; location: string }[]; request: string; explanation: string };

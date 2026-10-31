@@ -70,7 +70,7 @@ async function setup({ limits }: { limits?: Parameters<typeof createRuntime>[0][
     }
     const { course } = await ok("/courses/create", { title: "Linear algebra" });
     const { material } = await runtime.application.concepts.Library.add({ owner: user, importKey: crypto.randomUUID(), scope: course,
-      title: "Matrix multiplication", locator: "upload:test", content: "Multiply rows by columns. Inner dimensions must match.", originals: [], origin: "COURSE" });
+      title: "Matrix multiplication", locator: "upload:test", content: "Multiply rows by columns. Inner dimensions must match.", originals: [], origin: "COURSE", purpose: "SOURCE" });
     const { unit } = await ok("/courses/units/add", { course, title: "Products" });
     const { skill } = await ok("/courses/skills/propose", { proposalKey: crypto.randomUUID(), unit, material, title: "Products", outcome: "Multiply matrices", gate: "Two products and why" });
     await ok("/courses/skills/confirm", { skill });

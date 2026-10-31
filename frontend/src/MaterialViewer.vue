@@ -26,7 +26,8 @@ import {
 // beside the transcript segments, or the photo with a download when the browser cannot draw it.
 // With `mode="page"` (a cited source beside a lesson) it shows only the file at its place and the pager: no zoom, no
 // "Ask about", no thumbnail rail, no skills, and no readable text beside a PDF page or a photo. It fills its parent's height.
-const props = defineProps<{ material: string; title: string; skills: ViewerSkill[]; initialLocation?: string; mode?: "full" | "page" }>();
+// `askable: false` leaves out "Ask about" in full mode too, for the learner's own work, which is not taught from.
+const props = withDefaults(defineProps<{ material: string; title: string; skills: ViewerSkill[]; initialLocation?: string; mode?: "full" | "page"; askable?: boolean }>(), { askable: true });
 // `deleted` says that the read found the material deleted, so a pane around the viewer can drop its link into Materials.
 const emit = defineEmits<{ ask: [request: AskAboutPage]; "open-skill": [skill: string]; "review-draft": [skill: string]; deleted: [] }>();
 
@@ -365,7 +366,7 @@ onBeforeUnmount(() => {
         <button type="button" class="tool" :disabled="zoom <= ZOOM_MIN" aria-label="Zoom out" @click="zoomBy(-ZOOM_STEP)">−</button>
         <span class="zoom-label" aria-live="polite">{{ zoom }}%</span>
         <button type="button" class="tool" :disabled="zoom >= ZOOM_MAX" aria-label="Zoom in" @click="zoomBy(ZOOM_STEP)">+</button>
-        <button type="button" class="secondary sand ask" :disabled="status !== 'ready' || !page" @click="ask">{{ askLabel(page) }}</button>
+        <button v-if="askable" type="button" class="secondary sand ask" :disabled="status !== 'ready' || !page" @click="ask">{{ askLabel(page) }}</button>
       </div>
     </div>
 

@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { MongoError, MongoServerError } from "mongodb";
-import { MaterialKeeping, type Material, type MaterialData, type MaterialImport } from "../src/concepts/MaterialKeeping/MaterialKeeping.ts";
+import { MaterialKeeping, type Material, type MaterialData, type MaterialImport, type MaterialPurpose } from "../src/concepts/MaterialKeeping/MaterialKeeping.ts";
 import { InvalidTutoringMaterial } from "../src/concepts/MaterialKeeping/refusals.ts";
 import type { MediaValue } from "../src/media.ts";
 import { connectMongo, localMongoUri } from "../src/storage/mongo.ts";
@@ -33,11 +33,16 @@ function request(overrides: Partial<MaterialImport> = {}): MaterialImport {
     importKey: randomUUID(),
     owner: "learner-sam", scope: "course-linear-algebra", title: "Matrix multiplication",
     locator: "source:matrix-lesson", content: "Each product entry combines a row with a column.",
-    originals: [], origin: "COURSE", ...overrides,
+    originals: [], origin: "COURSE", purpose: "SOURCE", ...overrides,
   };
 }
 
-function materialData({ importKey: _, ...data }: MaterialImport): MaterialData { return data; }
+/** What `_material` answers for a saved input: everything but the import key. */
+function materialData({ importKey: _, ...data }: MaterialImport): MaterialData & { purpose: MaterialPurpose } { return data; }
+/** What a source or work set holds for a saved input: the material's data, without its key or purpose. */
+function setData({ importKey: _, purpose: __, ...data }: MaterialImport): MaterialData { return data; }
+/** What `_materials` lists for a saved input. */
+function summary(material: Material, { title, locator, origin, purpose }: MaterialImport) { return { material, title, locator, origin, purpose }; }
 
 // Metadata fixtures only. File extraction and byte access are outside this concept step.
 function source(): MediaValue {
@@ -57,9 +62,7 @@ describe("MaterialKeeping principle", () => {
     // Sam adds his week 3 notes with readable text and the retained slides, under the import key the application chose.
     const notes = request({ importKey: "import-week-3", title: "Week 3 notes", locator: "upload:week-3", originals: [source()] });
     const saved = await library.add(notes);
-    expect(await library._materials({ owner: notes.owner, scope: notes.scope })).toEqual([{
-      material: saved.material, title: notes.title, locator: notes.locator, origin: notes.origin,
-    }]);
+    expect(await library._materials({ owner: notes.owner, scope: notes.scope })).toEqual([summary(saved.material, notes)]);
     expect(await library._material(saved)).toEqual([materialData(notes)]);
 
     // The reply was lost, so the same import arrives again and returns the saved material instead of a copy.
@@ -76,6 +79,16 @@ describe("MaterialKeeping principle", () => {
     expect(await library._material(saved)).toEqual([materialData(notes)]);
     // A read names the owner, so the application can refuse to show Sam's notes to Leo.
     expect((await library._material(saved))[0]!.owner).toBe("learner-sam");
+
+    // Sam's photo of his answer is added as his work. It is listed and read back marked as work, but his sources
+    // still hold only the notes, so it is never taught from.
+    const photo = request({ importKey: "attach-answer", title: "My work: answer.jpg", locator: "upload:answer", purpose: "WORK" });
+    const work = await library.add(photo);
+    expect(await library._materials({ owner: notes.owner, scope: notes.scope }))
+      .toEqual([summary(saved.material, notes), summary(work.material, photo)]);
+    expect(await library._material(work)).toEqual([materialData(photo)]);
+    expect(await library._sourceSet(notes)).toEqual({ sources: [{ material: saved.material, data: setData(notes) }] });
+    expect(await library._workSet(notes)).toEqual({ work: [{ material: work.material, data: setData(photo) }] });
   });
 });
 
@@ -88,9 +101,7 @@ describe("MaterialKeeping material storage", () => {
     expect(result.material).toMatch(/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/);
     expect(await records.findOne({ _id: result.material })).toEqual({ _id: result.material, ...input });
     expect(await library._material(result)).toEqual([materialData(input)]);
-    expect(await library._materials(input)).toEqual([{
-      material: result.material, title: input.title, locator: input.locator, origin: input.origin,
-    }]);
+    expect(await library._materials(input)).toEqual([summary(result.material, input)]);
   });
 
   test("stores readable renditions, original order, locations, and extraction gaps when content is blank", async () => {
@@ -151,6 +162,7 @@ describe("MaterialKeeping material storage", () => {
       { ...request(), owner: { $ne: "" } }, { ...request(), scope: "" },
       { ...request(), title: 3 }, { ...request(), locator: null },
       { ...request(), content: null }, { ...request(), origin: "UNKNOWN" },
+      { ...request(), purpose: undefined }, { ...request(), purpose: "EVIDENCE" }, { ...request(), purpose: "work" },
       { ...request(), originals: null }, { ...request(), originals: new Array(1) },
       ...[
         { ...source(), file: " " }, { ...source(), name: "" },
@@ -265,9 +277,7 @@ describe("MaterialKeeping material storage", () => {
     const saved = await Promise.all(inputs.map((input) => library.add(input)));
     await library.add(request({ owner: "learner-leo" }));
     await library.add(request({ scope: "course-physics" }));
-    const expected = saved.map(({ material }, index) => ({
-      material, title: inputs[index]!.title, locator: inputs[index]!.locator, origin: inputs[index]!.origin,
-    })).sort((a, b) => a.material.localeCompare(b.material));
+    const expected = saved.map(({ material }, index) => summary(material, inputs[index]!)).sort((a, b) => a.material.localeCompare(b.material));
     expect(await library._materials(request())).toEqual(expected);
     expect(await library._materials({ owner: "learner-missing", scope: request().scope })).toEqual([]);
     expect(await library._materials({ owner: request().owner, scope: "course-missing" })).toEqual([]);
@@ -279,7 +289,7 @@ describe("MaterialKeeping material storage", () => {
     const saved = await Promise.all(inputs.map((input) => library.add(input)));
     await library.add(request({ owner: "learner-leo" }));
     await library.add(request({ scope: "course-physics" }));
-    const expected = saved.map(({ material }, index) => ({ material, data: materialData(inputs[index]!) }))
+    const expected = saved.map(({ material }, index) => ({ material, data: setData(inputs[index]!) }))
       .sort((a, b) => a.material.localeCompare(b.material));
     expect(await library._sourceSet(request())).toEqual({ sources: expected });
     expect(await library._sourceSet({ owner: "learner-missing", scope: request().scope })).toEqual({ sources: [] });
@@ -345,12 +355,89 @@ describe("MaterialKeeping material storage", () => {
       new Response(child.stdout).text(), new Response(child.stderr).text(), child.exited,
     ]);
     expect({ exitCode, errors }).toEqual({ exitCode: 0, errors: "" });
-    expect(JSON.parse(output)).toEqual({ saved: materialData(input), materials: [{
-      ...saved, title: input.title, locator: input.locator, origin: input.origin,
-    }] });
+    expect(JSON.parse(output)).toEqual({ saved: materialData(input), materials: [summary(saved.material, input)] });
     const separate = new MaterialKeeping(connection!.db, `${name}_other`);
     expect(await separate._material(saved)).toEqual([]);
     expect(await separate._materials(input)).toEqual([]);
+  });
+});
+
+describe("MaterialKeeping purpose", () => {
+  test("each material keeps its purpose; the source set leaves the owner's work out, and the work set holds only work", async () => {
+    const { library, records } = setup();
+    const notes = request({ title: "Week 3 notes", originals: [source()] });
+    const answer = request({ title: "My work: answer.jpg", locator: "upload:answer", purpose: "WORK" });
+    const second = request({ title: "My work: page-2.jpg", locator: "upload:page-2", purpose: "WORK" });
+    const [savedNotes, savedAnswer, savedSecond] = [await library.add(notes), await library.add(answer), await library.add(second)];
+    // Another owner's work and the owner's work in another course stay out of every answer below.
+    await library.add(request({ owner: "learner-leo", purpose: "WORK" }));
+    await library.add(request({ scope: "course-physics", purpose: "WORK" }));
+
+    expect(await records.findOne({ _id: savedAnswer.material })).toEqual({ _id: savedAnswer.material, ...answer });
+    expect(await library._material(savedAnswer)).toEqual([materialData(answer)]);
+    expect(await library._material(savedNotes)).toEqual([materialData(notes)]);
+    expect(await library._materials(notes)).toEqual([summary(savedNotes.material, notes), summary(savedAnswer.material, answer), summary(savedSecond.material, second)]);
+    expect(await library._sourceSet(notes)).toEqual({ sources: [{ material: savedNotes.material, data: setData(notes) }] });
+    expect(await library._workSet(notes)).toEqual({ work: [
+      { material: savedAnswer.material, data: setData(answer) }, { material: savedSecond.material, data: setData(second) },
+    ] });
+    expect(await library._workSet({ owner: "learner-missing", scope: notes.scope })).toEqual({ work: [] });
+  });
+
+  test("a material saved before purposes were recorded reads as a source, and its retry is answered as before", async () => {
+    const { library, records } = setup();
+    const input = request({ importKey: "before-purposes" });
+    const { purpose: _, ...stored } = input;
+    const material = randomUUID() as Material;
+    await records.insertOne({ _id: material, ...stored } as never);
+
+    expect(await library._materials(input)).toEqual([summary(material, input)]);
+    expect(await library._material({ material })).toEqual([materialData(input)]);
+    expect(await library._sourceSet(input)).toEqual({ sources: [{ material, data: setData(input) }] });
+    expect(await library._workSet(input)).toEqual({ work: [] });
+    // A retry as a source recovers it unchanged; a retry as work is changed input under the same key.
+    expect(await library.add(input)).toEqual({ material });
+    await expect(library.add({ ...input, purpose: "WORK" })).rejects.toMatchObject({ code: "MATERIAL_IMPORT_CONFLICT" });
+    expect(await records.findOne({ _id: material })).toEqual({ _id: material, ...stored });
+  });
+
+  test("a retry under the same key with another purpose is refused and changes nothing", async () => {
+    const { library, records } = setup();
+    const answer = request({ purpose: "WORK" });
+    const saved = await library.add(answer);
+    const before = await records.find().toArray();
+    await expect(library.add({ ...answer, purpose: "SOURCE" })).rejects.toMatchObject({ code: "MATERIAL_IMPORT_CONFLICT" });
+    expect(await library.add(structuredClone(answer))).toEqual(saved);
+    expect(await records.find().toArray()).toEqual(before);
+  });
+
+  test("deleting the owner's work removes its purpose with everything else it contained", async () => {
+    const { library, records } = setup();
+    const answer = request({ purpose: "WORK" });
+    const saved = await library.add(answer);
+    await library.delete({ owner: answer.owner, material: saved.material });
+    expect(await records.findOne({ _id: saved.material })).toEqual({
+      _id: saved.material, owner: answer.owner, scope: answer.scope, importKey: answer.importKey, deleted: true,
+    } as never);
+    expect(await library._workSet(answer)).toEqual({ work: [] });
+    expect(await library._materials(answer)).toEqual([]);
+  });
+
+  test("new identities begin with the time they were made, so they sort in the order the materials were added", async () => {
+    const { name } = setup();
+    let now = Date.UTC(2026, 9, 30, 12);
+    const library = new MaterialKeeping(connection!.db, name, () => new Date(now));
+    const added: Material[] = [];
+    for (const title of ["First", "Second", "Third"]) {
+      added.push((await library.add(request({ title, purpose: "WORK" }))).material);
+      now += 1000;
+    }
+    for (const [index, material] of added.entries()) {
+      expect(material).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+      expect(parseInt(material.replace(/-/g, "").slice(0, 12), 16)).toBe(Date.UTC(2026, 9, 30, 12) + index * 1000);
+    }
+    expect((await library._materials(request())).map((row) => row.material)).toEqual(added);
+    expect((await library._workSet(request())).work.map((row) => row.material)).toEqual(added);
   });
 });
 
@@ -365,9 +452,9 @@ describe("MaterialKeeping deletion", () => {
     expect(await library.delete({ owner: notes.owner, material: saved.material })).toEqual({});
 
     // The material leaves the list, the read, and the source set; the other material is untouched.
-    expect(await library._materials(notes)).toEqual([{ material: other.material, title: kept.title, locator: kept.locator, origin: kept.origin }]);
+    expect(await library._materials(notes)).toEqual([summary(other.material, kept)]);
     expect(await library._material(saved)).toEqual([]);
-    expect(await library._sourceSet(notes)).toEqual({ sources: [{ material: other.material, data: materialData(kept) }] });
+    expect(await library._sourceSet(notes)).toEqual({ sources: [{ material: other.material, data: setData(kept) }] });
     expect(await library._material(other)).toEqual([materialData(kept)]);
 
     // Only the fact of the deletion remains, for the owner's pages that cited it.

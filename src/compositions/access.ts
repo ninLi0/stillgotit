@@ -27,12 +27,12 @@ const TaskReady = former("admit practice for (owner) and (skill)", ({ owner, ski
 ).form({ allowed: true })).optional();
 // Respond, Question, Reply, and RetryAssessment are admitted by the same views and condition helpers their endpoints state
 // (learning.ts and learning-reads.ts), so admission and the endpoints cannot drift apart. Every attachment must be listed
-// once and be the learner's own material in the session's course.
-const ResponseReady = former("admit learner work in (studySession)", ({ owner, studySession, text, channel, attachments, dialogueLength }, { data, sources, currentDialogue }) => where(
-  ...learnerWork(owner, studySession, { text, channel, attachments, dialogueLength, data, sources, currentDialogue }),
+// once and be the learner's own material in the session's course, a source or their own work.
+const ResponseReady = former("admit learner work in (studySession)", ({ owner, studySession, text, channel, attachments, dialogueLength }, { data, sources, work, currentDialogue }) => where(
+  ...learnerWork(owner, studySession, { text, channel, attachments, dialogueLength, data, sources, work, currentDialogue }),
 ).form({ allowed: true })).optional();
-const QuestionReady = former("admit a question in (studySession)", ({ owner, studySession, text, channel, attachments, dialogueLength }, { data, sources, currentDialogue }) => where(
-  ...learnerWork(owner, studySession, { text, channel, attachments, dialogueLength, data, sources, currentDialogue }), Tutoring._lesson({ lesson: studySession }),
+const QuestionReady = former("admit a question in (studySession)", ({ owner, studySession, text, channel, attachments, dialogueLength }, { data, sources, work, currentDialogue }) => where(
+  ...learnerWork(owner, studySession, { text, channel, attachments, dialogueLength, data, sources, work, currentDialogue }), Tutoring._lesson({ lesson: studySession }),
 ).form({ allowed: true })).optional();
 // Reply asks for an unexplained lesson's opening or for the answer to an unanswered question; lessonAwaitsTutor holds in
 // exactly those two cases, which the endpoint states with lessonUnexplained and hasLessonQuestion.
@@ -65,8 +65,9 @@ const RegradeReady = former("admit revision of (assessment)", ({ owner, assessme
 ).form({ allowed: true })).optional();
 // Only the skill is checked; the concept explains a bad key, value, or reason.
 const AdjustReady = former("admit an estimate adjustment for (owner) and (skill)", ({ owner, skill }) => where(R.ActiveSkill({ owner, skill })).form({ allowed: true })).optional();
+// Only one of the learner's sources: their own work is evidence, not a source, so it gets the same sentence.
 const SuggestionReady = former("admit suggestions from (material)", ({ owner, material }, { course }) => where(
-  Library._material({ material }).is({ owner, scope: course }), Courses.OwnedCourse({ owner, course }),
+  Library._material({ material }).is({ owner, scope: course, purpose: "SOURCE" }), Courses.OwnedCourse({ owner, course }),
 ).form({ allowed: true })).optional();
 // The same answer for an unknown material, another learner's material, one outside the learner's courses, and an ungraded material.
 const GradedReady = former("admit graded work (material) for (owner)", ({ owner, material }) => where(Importing.GradedMaterial({ owner, material })).form({ allowed: true })).optional();

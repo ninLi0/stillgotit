@@ -1,6 +1,6 @@
 import type { MediaRendition, MediaValue } from "../media.ts";
 import {
-  ImportProgressConflict, type ClaimedRecording, type ImportFailure, type ImportOperation, type MaterialImportStore, type TranscriptSegment,
+  ImportProgressConflict, requestPurpose, type ClaimedRecording, type ImportFailure, type ImportOperation, type MaterialImportStore, type TranscriptSegment,
 } from "../storage/MaterialImportStore.ts";
 import { AUDIO_LIMITATION, classify, joinContent, locationKey, MAX_TEXT, VIDEO_LIMITATION } from "./extract.ts";
 import { FilesApiError, GeminiError, objectSchema, type Gemini, type GeminiPart, type Reason } from "./gemini.ts";
@@ -236,6 +236,7 @@ export class TranscriptionWorker {
     // The worker does not call AddMaterial, because that endpoint needs the learner's session.
     await this.options.imports.savePrepared({ owner, requestId, revision, prepared: {
       owner, scope: request.scope, importKey, title: request.title, locator: `upload:${importKey}`, content, originals, origin: request.origin,
+      purpose: requestPurpose(request),
     } });
   }
 

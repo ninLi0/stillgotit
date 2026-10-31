@@ -79,7 +79,7 @@ const photo: MediaValue = {
 function notes(overrides: Partial<MaterialImport> = {}): MaterialImport {
   return {
     owner: "sam", importKey: "week-3-notes", scope: "linear-algebra", title: "Matrix products", locator: "course:week-3",
-    content: "Entry (i, j) of AB combines row i of A with column j of B.", originals: [slides], origin: "COURSE", ...overrides,
+    content: "Entry (i, j) of AB combines row i of A with column j of B.", originals: [slides], origin: "COURSE", purpose: "SOURCE", ...overrides,
   };
 }
 
@@ -217,7 +217,7 @@ describe("GroundedTutoring principle", () => {
     const { task } = await tutoring.prepareTask({ ...context, materials: [again.material],
       citations: [{ material: again.material, location: "slides/4" }], ...taskText, mode: "CHECK", fresh: true });
     expect(await tutoring._sources({ session: task })).toEqual(await tutoring._sources({ session: lesson }));
-    const { importKey: _, ...data } = notes();
+    const { importKey: _, purpose: __, ...data } = notes();
     expect(await library._sourceSet({ owner: "sam", scope: "linear-algebra" })).toEqual({ sources: [{ material: first.material, data }] });
   });
 

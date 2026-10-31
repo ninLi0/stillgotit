@@ -14,11 +14,18 @@ describe("responseInput", () => {
     { material: "a", data: { originals: [file("a-1.png"), file("a-2.png")] } },
     { material: "b", data: { originals: [file("b-1.png")] } },
   ] as never;
-  const respond = (text: string, attachments: unknown) => responseInput({ data: {} as never, text, channel: "TEXT", attachments: attachments as string[], sources });
+  // The learner's own work, such as a photo uploaded for this answer, can be attached like a source.
+  const work = [{ material: "w", data: { originals: [file("answer.jpg")] } }] as never;
+  const respond = (text: string, attachments: unknown) => responseInput({ data: {} as never, text, channel: "TEXT", attachments: attachments as string[], sources, work });
 
   test("keeps list order and each material's own file order", () => {
     expect(respond("", ["b", "a"])).toEqual({ valid: true, text: "", channel: "TEXT", media: [file("b-1.png"), file("a-1.png"), file("a-2.png")] });
     expect(respond("Only text", []).valid).toBe(true);
+  });
+  test("accepts the learner's own work beside the sources, in list order", () => {
+    expect(respond("", ["w"])).toEqual({ valid: true, text: "", channel: "TEXT", media: [file("answer.jpg")] });
+    expect(respond("Both", ["w", "b"])).toEqual({ valid: true, text: "Both", channel: "TEXT", media: [file("answer.jpg"), file("b-1.png")] });
+    expect(respond("Twice", ["w", "w"])).toMatchObject({ valid: false, media: [] });
   });
   test("one failing entry invalidates the whole response", () => {
     for (const attachments of [["a", "a"], ["a", "unknown"], ["unknown"], "a"]) expect(respond("Text", attachments)).toMatchObject({ valid: false, media: [] });

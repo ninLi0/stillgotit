@@ -58,7 +58,7 @@ export async function createRuntime({ database, provider, providerOrigin, public
     AssessmentReviewing: new AssessmentReviewing(database, "AssessmentReviewing", clock),
     MasteryEstimating: new MasteryEstimating(database, "MasteryEstimating", clock),
     StudyPlanning: new Budgeting(database, "StudyPlanning", () => clock().toLocaleDateString("en-CA", { timeZone: "America/New_York" })),
-    Library: new MaterialKeeping(database, "Library"),
+    Library: new MaterialKeeping(database, "Library", clock),
     GroundedTutoring: new GroundedTutoring(database, "GroundedTutoring", clock),
   }, clock);
   const recovery = new RegistrationRecoveryStore(database, providerOrigin);

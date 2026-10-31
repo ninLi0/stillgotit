@@ -22,10 +22,12 @@ export const ReopenableLesson = view("(owner) can reopen finished lesson (studyS
   OwnedSession({ owner, studySession }), Tutoring._session({ session: studySession }).is({ status: "CLOSED" }), Tutoring._lesson({ lesson: studySession }),
   no(Archive._archived({ owner, item: studySession })),
 )).holds();
-// The learner's open session with its saved dialogue and the learner's sources in its course. The two queries always
-// answer for an existing session, so this view holds exactly when OpenSession holds; OpenSession stays the refusal guard.
-export const SessionSources = view("(owner) can use open session (studySession) with its sources", ({ owner, studySession }, { course, data, sources }) => where(
+// The learner's open session with its saved dialogue, the learner's sources in its course, and the learner's own work there,
+// which a response may attach but which is never a source. The queries always answer for an existing session, so this
+// view holds exactly when OpenSession holds; OpenSession stays the refusal guard.
+export const SessionSources = view("(owner) can use open session (studySession) with its sources", ({ owner, studySession }, { course, data, sources, work }) => where(
   OpenSession({ owner, studySession }).is({ course }), Tutoring._sessionData({ session: studySession }).is({ data }), Library._sourceSet({ owner, scope: course }).is({ sources }),
+  Library._workSet({ owner, scope: course }).is({ work }),
 )).optional();
 // A submitted attempt in the learner's own session that has no judgment yet, with the case's work, the saved session, and
 // the learner's sources in its course: everything a grading request reads.

@@ -133,8 +133,9 @@ export function createMaterialRoutes(options: MaterialRouteOptions) {
       const prepared = operation.prepared!, { requestId, importKey } = operation;
       let result: InvocationResult;
       try {
+        // An input prepared before purposes were recorded is a source.
         result = await options.addMaterial({ session, course: prepared.scope, importKey: prepared.importKey, title: prepared.title,
-          locator: prepared.locator, content: prepared.content, originals: prepared.originals, origin: prepared.origin });
+          locator: prepared.locator, content: prepared.content, originals: prepared.originals, origin: prepared.origin, purpose: prepared.purpose ?? "SOURCE" });
       } catch (error) {
         log(`Saving import ${requestId} (import key ${importKey}) failed (${errorName(error)}); the next listing tries again.`);
         return { kind: "temporary" };
@@ -185,8 +186,10 @@ export function createMaterialRoutes(options: MaterialRouteOptions) {
       const form = await readForm(request, UPLOAD_BODY_LIMIT, TOO_LARGE_UPLOAD);
       if (!form) return failure("INVALID_REQUEST", 400);
       const course = form.get("course"), title = form.get("title"), id = form.get("requestId"), uploaded = form.getAll("files");
+      // What the material is for: a source by default, or the learner's own work, which the attach control sends.
+      const purpose = form.get("purpose") ?? "SOURCE";
       if (typeof course !== "string" || typeof title !== "string" || !title.trim() || title.length > 160 || !validRequestId(id) ||
-        !uploaded.every((file): file is File => file instanceof File)) return failure("INVALID_REQUEST", 400);
+        (purpose !== "SOURCE" && purpose !== "WORK") || !uploaded.every((file): file is File => file instanceof File)) return failure("INVALID_REQUEST", 400);
       requestId = id;
       if (!await options.courseReady(owner, course)) return failure("FORBIDDEN", 403);
       // "Before saving" checks. A refusal here saves nothing.
@@ -194,7 +197,9 @@ export function createMaterialRoutes(options: MaterialRouteOptions) {
       return locks.run(`import:${owner}:${requestId}`, async () => {
         let operation: ImportOperation;
         try {
-          operation = await imports.getOrCreate({ owner, requestId, request: { scope: course, title, origin: "COURSE", sources: inspected.sources } });
+          operation = await imports.getOrCreate({ owner, requestId, request: {
+            scope: course, title, origin: "COURSE", ...purpose === "WORK" ? { purpose } : {}, sources: inspected.sources,
+          } });
         } catch (error) {
           if (error instanceof ImportRequestConflict) throw new Refusal(IMPORT_REQUEST_CONFLICT, "IMPORT_REQUEST_CONFLICT", 409);
           throw error;
@@ -214,7 +219,7 @@ export function createMaterialRoutes(options: MaterialRouteOptions) {
           } else {
             operation = await imports.savePrepared({ owner, requestId, revision: operation.revision, prepared: {
               owner, scope: course, importKey: operation.importKey, title, locator: `upload:${operation.importKey}`,
-              content: read.content, originals: read.originals, origin: "COURSE",
+              content: read.content, originals: read.originals, origin: "COURSE", purpose,
             } });
           }
         } else leave();

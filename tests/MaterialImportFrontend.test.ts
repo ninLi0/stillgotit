@@ -9,6 +9,8 @@ import { sourceLabel } from "../frontend/src/labels.ts";
 import {
   HostError, hostRequest, importMaterial, listImports, materialFile, refusalStartsNewImport, removeImport, retryImport, uploadMaterial,
 } from "../frontend/src/host-api.ts";
+import { readyNotice } from "../frontend/src/material-imports.ts";
+import { useAttachUpload } from "../frontend/src/attach-upload.ts";
 
 /** Material IDs are branded strings in the browser's types. */
 const material = (id: string) => id as Parameters<typeof materialFile>[0];
@@ -121,7 +123,32 @@ describe("upload route", () => {
     answer(() => json({ requestId: "r1", state: "SAVING" }));
     expect((await failure(uploadMaterial(form()))).code).toBe("SAVING");
     answer(() => json({ requestId: "r1", state: "TRANSCRIBING" }));
-    expect((await failure(uploadMaterial(form()))).code).toBe("TRANSCRIBING");
+    const recording = await failure(uploadMaterial(form()));
+    expect([recording.code, recording.message]).toEqual(["TRANSCRIBING",
+      "This recording was added to Course materials to be transcribed, so it can't be attached here. Attach a photo of your work."]);
+    // The attach control saves the learner's own work, which Materials lists under "Your work", and the sentence says so.
+    const work = form(); work.set("purpose", "WORK");
+    expect((await failure(uploadMaterial(work))).message)
+      .toBe("This recording was added to Your work in Materials to be transcribed, so it can't be attached here. Attach a photo of your work.");
+  });
+  test("the attach control saves each file as the learner's own work, under one request ID until its material arrives", async () => {
+    const attach = useAttachUpload(() => "c1"), page = new File(["page"], "page-1.png", { type: "image/png" });
+    answer(() => json({ requestId: "r1", state: "SAVING" }));
+    expect((await failure(attach.upload(page))).code).toBe("SAVING");
+    const first = calls[0]!.init.body as FormData;
+    expect([first.get("course"), first.get("title"), first.get("purpose"), (first.get("files") as File).name]).toEqual(["c1", "My work: page-1.png", "WORK", "page-1.png"]);
+    answer(() => json({ material: "m4" }));
+    expect(await attach.upload(page)).toBe(material("m4"));
+    const again = calls[0]!.init.body as FormData;
+    expect([again.get("requestId"), again.get("purpose")]).toEqual([first.get("requestId"), "WORK"]);
+  });
+  test("the announcement for saved imports says where each one is listed", () => {
+    const sources = [{ material: "m1", title: "Lecture 5" }], work = [{ material: "m2", title: "My work: explanation.m4a" }];
+    expect(readyNotice([material("m1")], sources, work)).toBe("“Lecture 5” is ready. Check the transcript, then find skills in it.");
+    expect(readyNotice([material("m2")], sources, work)).toBe("“My work: explanation.m4a” is ready. It is listed under Your work, below the course's files.");
+    expect(readyNotice([material("m1"), material("m2")], sources, work)).toBe(
+      "“Lecture 5” is ready. Check the transcript, then find skills in it. “My work: explanation.m4a” is ready. It is listed under Your work, below the course's files.");
+    expect(readyNotice([material("m3")], sources)).toBe("“Your material” is ready. Check the transcript, then find skills in it.");
   });
 });
 

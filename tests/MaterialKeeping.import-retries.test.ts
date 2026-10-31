@@ -37,7 +37,7 @@ function request(overrides: Partial<MaterialImport> = {}): MaterialImport {
       ],
       limitations: ["Page 2 is available as an image."],
     }],
-    origin: "COURSE", ...overrides,
+    origin: "COURSE", purpose: "SOURCE", ...overrides,
   };
 }
 
@@ -101,7 +101,7 @@ describe("MaterialKeeping import retries", () => {
     const { importKey: _, ...material } = input;
     expect(await library._material(saved)).toEqual([material]);
     expect(await library._materials(input)).toEqual([{
-      ...saved, title: input.title, locator: input.locator, origin: input.origin,
+      ...saved, title: input.title, locator: input.locator, origin: input.origin, purpose: input.purpose,
     }]);
   });
 
@@ -123,7 +123,7 @@ describe("MaterialKeeping import retries", () => {
     const before = await records.find().toArray();
     const changes: Partial<MaterialImport>[] = [
       { scope: "course-physics" }, { title: "Different title" }, { locator: "source:other" },
-      { content: "Different explanation." }, { origin: "REFERENCE" }, { originals: [] },
+      { content: "Different explanation." }, { origin: "REFERENCE" }, { purpose: "WORK" }, { originals: [] },
       { content: `${input.content} ` },
     ];
     const source = input.originals[0]!;

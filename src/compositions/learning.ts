@@ -15,16 +15,17 @@ type Branch = ReturnType<ReturnType<typeof where>["then"]>;
 
 /**
  * Conditions that admit learner work in the open session: the dialogue the learner saw is still current, and the response
- * has text or attachments, each the learner's own source in the session's course and listed once. Respond and Question
- * state them, and so do their admission formers in access.ts, so admission and the endpoints cannot drift apart. The
- * endpoints also bind `media`, the saved files to send with the turn; admission only needs to know the input is valid.
+ * has text or attachments, each the learner's own material in the session's course, a source or their own work, and
+ * listed once. Respond and Question state them, and so do their admission formers in access.ts, so admission and the
+ * endpoints cannot drift apart. The endpoints also bind `media`, the saved files to send with the turn; admission only
+ * needs to know the input is valid.
  */
-export const learnerWork = (owner: symbol, studySession: symbol, { text, channel, attachments, dialogueLength, data, sources, currentDialogue, media }:
-  Symbols<"text" | "channel" | "attachments" | "dialogueLength" | "data" | "sources" | "currentDialogue"> & { media?: symbol }) => [
-  R.SessionSources({ owner, studySession }).is({ data, sources }),
+export const learnerWork = (owner: symbol, studySession: symbol, { text, channel, attachments, dialogueLength, data, sources, work, currentDialogue, media }:
+  Symbols<"text" | "channel" | "attachments" | "dialogueLength" | "data" | "sources" | "work" | "currentDialogue"> & { media?: symbol }) => [
+  R.SessionSources({ owner, studySession }).is({ data, sources, work }),
   compute(C.dialogueIsCurrent, { data, dialogueLength }, currentDialogue), is.among(currentDialogue, [true]),
-  media === undefined ? compute(C.responseInput, { data, text, channel, attachments, sources }, { valid: true })
-    : compute(C.responseInput, { data, text, channel, attachments, sources }, { valid: true, media }),
+  media === undefined ? compute(C.responseInput, { data, text, channel, attachments, sources, work }, { valid: true })
+    : compute(C.responseInput, { data, text, channel, attachments, sources, work }, { valid: true, media }),
 ] as const;
 /**
  * Conditions that prepare a tutor request of one kind from the learner's open session. At least one material saved with
@@ -126,15 +127,15 @@ const Task = endpoint("/learning/task", ({ session, skill, owner, definition, co
       .then(respond({ task, tutor: Settings.SentTutor({ request: prepared }) })),
     () => [compute(C.generationDefinition, { request: prepared }, { definition, criteria })])), options);
 
-const Respond = endpoint("/learning/respond", ({ session, studySession, text, channel, attachments, dialogueLength, owner, data, sources, media, currentDialogue }) => receive({ session, studySession, text, channel, attachments, dialogueLength })
+const Respond = endpoint("/learning/respond", ({ session, studySession, text, channel, attachments, dialogueLength, owner, data, sources, work, media, currentDialogue }) => receive({ session, studySession, text, channel, attachments, dialogueLength })
   .then(Sessioning.use({ session }).responds({ subject: owner })).then(
-    where(...learnerWork(owner, studySession, { text, channel, attachments, dialogueLength, data, sources, currentDialogue, media }))
+    where(...learnerWork(owner, studySession, { text, channel, attachments, dialogueLength, data, sources, work, currentDialogue, media }))
       .then(Tutoring.respond({ owner, session: studySession, text, channel, media }).responds({})).then(respond({})).named("ready"),
     where(no(R.OpenSession({ owner, studySession }))).then(respond({ error: "SESSION_UNAVAILABLE" })).named("missing"),
   ), options);
-const Question = endpoint("/learning/question", ({ session, studySession, text, channel, attachments, dialogueLength, owner, data, sources, media, currentDialogue, materials, selected, draft, choice, status, prepared, answer, reply, citations }) => receive({ session, studySession, text, channel, attachments, dialogueLength })
+const Question = endpoint("/learning/question", ({ session, studySession, text, channel, attachments, dialogueLength, owner, data, sources, work, media, currentDialogue, materials, selected, draft, choice, status, prepared, answer, reply, citations }) => receive({ session, studySession, text, channel, attachments, dialogueLength })
   .then(Sessioning.use({ session }).responds({ subject: owner })).then(
-    where(...learnerWork(owner, studySession, { text, channel, attachments, dialogueLength, data, sources, currentDialogue, media }), Tutoring._lesson({ lesson: studySession }))
+    where(...learnerWork(owner, studySession, { text, channel, attachments, dialogueLength, data, sources, work, currentDialogue, media }), Tutoring._lesson({ lesson: studySession }))
       .then(Tutoring.respond({ owner, session: studySession, text, channel, media }).responds({})).named("ready"),
     where(no(R.OpenSession({ owner, studySession }))).then(respond({ error: "SESSION_UNAVAILABLE" })).named("missing"),
   )
@@ -316,21 +317,23 @@ const Adjust = endpoint("/learning/adjust", ({ session, skill, adjustmentKey, va
 const ReplanAfterAdjustment = reaction(({ owner, skill, course, candidates, horizonEnd, basis, explanation }) => when(Mastery.adjust({ learner: owner, subject: skill }).responds({}))
   .afterFlowSettles().where(R.OwnedSkill({ owner, skill }).is({ course }), R.CanReplan({ owner, course }), no(ActivityInProgress({ owner })), R.PlanContext({ owner, course }).is({ candidates, horizonEnd, basis, explanation }))
   .then(Planning.replan({ owner, scope: course, candidates, horizonEnd, basis, explanation, workloadComplete: false })));
-// Graded work is evidence, not a teaching source. The check applies only to the learner's own material in a course they own;
-// any other material keeps the admission refusal, and the endpoint answers MATERIAL_UNAVAILABLE or COURSE_UNAVAILABLE
-// for a caller that skips admission, as the material read in the course composition does. Every branch shares the stages
-// that follow, so the tutor request lives there and repeats the source condition: the refusal branches have already
-// answered, and the source branch only rechecks the session.
+// Graded work and the learner's own work are evidence, not teaching sources. The checks apply only to the learner's own
+// material in a course they own; any other material keeps the admission refusal, and the endpoint answers
+// MATERIAL_UNAVAILABLE or COURSE_UNAVAILABLE for a caller that skips admission, as the material read in the course
+// composition does. Every branch shares the stages that follow, so the tutor request lives there and repeats the source
+// condition: the refusal branches have already answered, and the source branch only rechecks the session.
 const Suggest = endpoint("/courses/skills/suggest", ({ session, material, owner, course, sources, selected, materials, draft, choice, status, prepared, answer, suggestions, title, graded }) => receive({ session, material })
   .then(Sessioning.use({ session }).responds({ subject: owner })).then(
-    where(Library._material({ material }).is({ owner, scope: course, title }), Courses.OwnedCourse({ owner, course }), compute(C.gradedTitle, { title }, graded), is.among(graded, [true]))
+    where(Library._material({ material }).is({ owner, scope: course, title, purpose: "SOURCE" }), Courses.OwnedCourse({ owner, course }), compute(C.gradedTitle, { title }, graded), is.among(graded, [true]))
       .then(respond({ error: "GRADED_MATERIAL_NOT_SOURCE" })).named("graded"),
-    where(Library._material({ material }).is({ owner, scope: course, title }), Courses.OwnedCourse({ owner, course }), compute(C.gradedTitle, { title }, graded), is.among(graded, [false]))
+    where(Library._material({ material }).is({ owner, scope: course, title, purpose: "SOURCE" }), Courses.OwnedCourse({ owner, course }), compute(C.gradedTitle, { title }, graded), is.among(graded, [false]))
       .then(Sessioning.use({ session }).responds({ subject: owner })).named("source"),
+    where(Library._material({ material }).is({ owner, scope: course, purpose: "WORK" }), Courses.OwnedCourse({ owner, course }))
+      .then(respond({ error: "WORK_MATERIAL_NOT_SOURCE" })).named("work"),
     where(no(Library._material({ material }).is({ owner }))).then(respond({ error: "MATERIAL_UNAVAILABLE" })).named("missing"),
     where(Library._material({ material }).is({ owner, scope: course }), no(Courses.OwnedCourse({ owner, course }))).then(respond({ error: "COURSE_UNAVAILABLE" })).named("course"),
   )
-  .then(where(Library._material({ material }).is({ owner, scope: course, title }), Courses.OwnedCourse({ owner, course }), compute(C.gradedTitle, { title }, graded), is.among(graded, [false]),
+  .then(where(Library._material({ material }).is({ owner, scope: course, title, purpose: "SOURCE" }), Courses.OwnedCourse({ owner, course }), compute(C.gradedTitle, { title }, graded), is.among(graded, [false]),
     Library._sourceSet({ owner, scope: course }).is({ sources }), compute(C.singleMaterial, { material }, materials),
     compute(C.selectSources, { sources, materials }, { selected, valid: true }), compute(C.suggestRequest, { selected }, draft),
     ...usingTutorChoice(owner, draft, choice, status, prepared))
