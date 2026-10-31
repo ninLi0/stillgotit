@@ -977,6 +977,25 @@ export type StillGotItWire = {
     };
     error: { error: AppWideError | "COURSE_UNAVAILABLE" | "INVALID_INPUT" | "NOT_SIGNED_IN" | "PLAN_DECLINE_UNAVAILABLE" | "PROPOSAL_UNAVAILABLE" };
   };
+  "/settings/answers": {
+    input: {
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+    };
+    output: {
+      "style": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["answerStyleOffered"]["fn"]>[0], ["style"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["AnswerPreferring"]["_choice"]>>>, ["option"]>]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["defaultAnswerStyle"]["fn"]>>, []>]>>;
+    };
+    error: { error: AppWideError | "INVALID_INPUT" | "NOT_SIGNED_IN" };
+  };
+  "/settings/answers/set": {
+    input: {
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+      "style": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["answerStyleOffered"]["fn"]>[0], ["style"]>>;
+    };
+    output: {
+      "style": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AnswerPreferring"]["set"]>[0], ["option"]>>;
+    };
+    error: { error: AppWideError | "INVALID_INPUT" | "NOT_SIGNED_IN" | "UNKNOWN_ANSWER_STYLE" };
+  };
   "/settings/tutor": {
     input: {
       "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
@@ -1924,6 +1943,22 @@ export type StillGotItHttp = {
       "plan": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["declineTradeoffs"]>[0], ["plan"]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["StudyPlanning"]["declineTradeoffs"]>>, ["plan"]>]>>;
     };
     error: { error: HttpAppWideError | "FORBIDDEN" | "INVALID_REQUEST" | "UNAUTHORIZED" };
+  };
+  "/settings/answers": {
+    input: Record<string, never>;
+    output: {
+      "style": Jsonify<OneOf<[AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.computations)["answerStyleOffered"]["fn"]>[0], ["style"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["AnswerPreferring"]["_choice"]>>>, ["option"]>]>, AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["defaultAnswerStyle"]["fn"]>>, []>]>>;
+    };
+    error: { error: HttpAppWideError | "INVALID_REQUEST" | "UNAUTHORIZED" };
+  };
+  "/settings/answers/set": {
+    input: {
+      "style": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.computations)["answerStyleOffered"]["fn"]>[0], ["style"]>>;
+    };
+    output: {
+      "style": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AnswerPreferring"]["set"]>[0], ["option"]>>;
+    };
+    error: { error: HttpAppWideError | "INVALID_REQUEST" | "UNAUTHORIZED" };
   };
   "/settings/tutor": {
     input: Record<string, never>;

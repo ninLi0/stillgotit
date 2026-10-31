@@ -181,7 +181,7 @@ describe("CommonsFederating framework registration", () => {
       expect(await second.concepts.SkillMapping._course({ course }))
         .toEqual([{ owner: user, title: "Linear Algebra" }]);
       expect(Object.keys(second.concepts).sort())
-        .toEqual(["AssessmentReviewing", "CommonsFederating", "ConversationArchiving", "GroundedTutoring", "Library", "MasteryEstimating", "Registering", "Sessioning", "SkillMapping", "StudyPlanning", "TreeStyling", "TutorGenerating", "TutorPreferring", "ViewPreferring"]);
+        .toEqual(["AnswerPreferring", "AssessmentReviewing", "CommonsFederating", "ConversationArchiving", "GroundedTutoring", "Library", "MasteryEstimating", "Registering", "Sessioning", "SkillMapping", "StudyPlanning", "TreeStyling", "TutorGenerating", "TutorPreferring", "ViewPreferring"]);
       expect(Object.keys(second.publicInterface.routes)).toContain("/courses");
       expect(await links.countDocuments()).toBe(1);
     } finally {

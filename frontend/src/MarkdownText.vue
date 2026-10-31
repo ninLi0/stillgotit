@@ -1,19 +1,50 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, defineAsyncComponent, h } from "vue";
 import { loadedMarkdown, markdown, renderMarkdown } from "./markdown.ts";
+import { answerParts, readWidget, type Widget } from "../../src/answer-widgets.ts";
+import type { OpenSource } from "./revamp-types.ts";
+// The example components load only when an answer holds an example, so a learner who never sees one never loads them.
+const AnswerWidget = defineAsyncComponent({ loader: () => import("./AnswerWidget.vue"),
+  errorComponent: { render: () => h("p", { class: "example-missing" }, "This interactive example could not be loaded. Reload the page to try again.") } });
 // A tutor answer ("answer") or the learner's own message ("message"), rendered with its formulas by markdown.ts, which
 // also sets what each kind reads as Markdown. Until the renderer has loaded, or if it cannot load, the text shows as
 // written, with its line breaks.
-const props = withDefaults(defineProps<{ text: string; kind?: "answer" | "message" }>(), { kind: "answer" });
+//
+// `examples` is given for a lesson answer, the only text that can hold interactive examples. Each example block then
+// shows as an AnswerWidget in its place, and the Markdown around it renders as before; `examples` carries what the
+// example's source chip needs, and the chip's `open` comes back out. A text without a block renders exactly as it did
+// before examples existed. A block the page cannot read is left out, as the host would have dropped it.
+export interface ExampleContext { titles: Record<string, string>; deleted: readonly string[]; idPrefix: string }
+const props = withDefaults(defineProps<{ text: string; kind?: "answer" | "message"; examples?: ExampleContext | null }>(), { kind: "answer", examples: null });
+const emit = defineEmits<{ open: [source: OpenSource] }>();
 markdown(props.kind).catch(() => undefined);
-const html = computed(() => {
-  const parser = loadedMarkdown(props.kind);
-  return parser ? renderMarkdown(parser, props.text).html : null;
+const render = (text: string) => { const parser = loadedMarkdown(props.kind); return parser ? renderMarkdown(parser, text).html : null; };
+// Read as a flag, so a new context object for the same answer does not split and read the answer again.
+const withExamples = computed(() => !!props.examples);
+type Part = { kind: "text"; text: string } | { kind: "widget"; widget: Widget };
+const parts = computed<Part[] | null>(() => {
+  if (!withExamples.value) return null;
+  const split = answerParts(props.text);
+  if (split.length === 1 && split[0]!.kind === "text") return null;
+  return split.flatMap((part): Part[] => {
+    if (part.kind === "text") return part.text.trim() ? [{ kind: "text", text: part.text }] : [];
+    const read = part.closed ? readWidget(part.body) : null;
+    return read?.ok ? [{ kind: "widget", widget: read.widget }] : [];
+  });
 });
+const html = computed(() => parts.value ? null : render(props.text));
+const partHtml = computed(() => parts.value?.map((part) => part.kind === "text" ? render(part.text) : null) ?? []);
 </script>
 
 <template>
-  <div v-if="html !== null" class="markdown-text" v-html="html" />
+  <div v-if="parts" class="markdown-parts">
+    <template v-for="(part, index) in parts" :key="index">
+      <AnswerWidget v-if="part.kind === 'widget'" :widget="part.widget" :titles="examples!.titles" :deleted="examples!.deleted" :id-prefix="`${examples!.idPrefix}-${index}`" @open="emit('open', $event)" />
+      <div v-else-if="partHtml[index] != null" class="markdown-text" v-html="partHtml[index]" />
+      <div v-else class="markdown-text"><p class="as-written">{{ part.text.trim() }}</p></div>
+    </template>
+  </div>
+  <div v-else-if="html !== null" class="markdown-text" v-html="html" />
   <div v-else class="markdown-text"><p class="as-written">{{ text }}</p></div>
 </template>
 
@@ -22,7 +53,10 @@ const html = computed(() => {
    between a paragraph and a code block. Raw HTML is off, so only Markdown's own elements appear. */
 .markdown-text :deep(> *), .markdown-text :deep(:is(li, blockquote) > p) { margin: 0; }
 .markdown-text :deep(> * + *) { margin-top: 14px; }
+/* An answer with an example: its Markdown and its example, 14 px apart like the blocks within the Markdown. */
+.markdown-parts > * + * { margin-top: 14px; }
 .as-written { white-space: pre-wrap; }
+.example-missing { margin: 0; color: var(--muted); font-size: 13px; }
 .markdown-text :deep(ul), .markdown-text :deep(ol) { padding-left: 22px; }
 .markdown-text :deep(li + li) { margin-top: 4px; }
 .markdown-text :deep(:is(h1, h2, h3, h4, h5, h6)) { font-family: var(--font-body); font-size: 1.07em; font-weight: 700; line-height: 1.4; color: inherit; text-wrap: wrap; }

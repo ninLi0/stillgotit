@@ -9,6 +9,8 @@ import { connectMongo, localMongoUri } from "../../src/storage/mongo.ts";
 import { CourseTutor } from "../../src/host/tutor.ts";
 import { Gemini } from "../../src/host/gemini.ts";
 import { MaterialFiles } from "../../src/host/material-files.ts";
+import { WIDGET_INSTRUCTION } from "../../src/host/tutor-generation.ts";
+import { cannedWidgets, widgetBlock } from "./fake-gemini.ts";
 if (process.env.ALLOW_UI_FIXTURES !== "1") throw new Error("This server requires ALLOW_UI_FIXTURES=1.");
 // FIXTURE_PORT and FIXTURE_HOST let several checkouts run this fixture at once (defaults 5174 and 127.0.0.1). Cookies
 // ignore the port, so two fixtures on one host sign each other out: give each its own loopback host as well as a port.
@@ -22,15 +24,23 @@ class UIProvider extends MemoryProvider {
 }
 const provider = new UIProvider();
 const { client, db } = await connectMongo({ uri: process.env.MONGODB_TEST_URI ?? localMongoUri, database: `stillgotit_test_ui_${crypto.randomUUID().replaceAll("-", "")}` });
+// A learner who turned on interactive examples gets one canned example in each lesson answer, after its first paragraph:
+// a slider, then a table, then steps, then a choice, and round again. Every other learner gets the answers below unchanged.
+let exampleTurn = 0;
 const fixtureTutor: Pick<CourseTutor, "suggest" | "generate"> = {
   suggest: async () => ({ unitTitle: "Matrix multiplication", skills: [
     { title: "Multiply matrices", outcome: "Compute a matrix product and explain how its entries are formed.", gate: "Solve two fresh products with correct reasoning and results. Explain why multiplication order matters." },
     { title: "Check matrix dimensions", outcome: "Decide whether two matrices can be multiplied and state the output dimensions.", gate: "Check three unfamiliar pairs and explain each decision." },
   ] }),
-  generate: async (_owner, sources, _instruction, context, schema) => {
+  generate: async (_owner, sources, instruction, context, schema) => {
     // A grading request carries no source once the learner deleted every source of its task; every other request has one.
     const properties = schema.properties as Record<string, unknown>, source = sources[0];
     const citations = source ? [{ material: source.material, location: source.data.originals[0]?.renditions[0]?.location ?? "content" }] : [];
+    const withExample = (text: string) => {
+      if (!instruction.includes(WIDGET_INSTRUCTION) || !citations[0]) return text;
+      const [first, ...rest] = text.split("\n\n");
+      return [first, widgetBlock(cannedWidgets(citations[0])[exampleTurn++ % 4]), ...rest].join("\n\n");
+    };
     // Graded-work extraction: three marked questions, two mapped to the course's first skills and one left unmapped.
     if (properties.rows) {
       const skills = ((context as { skills?: { skill: string }[] }).skills ?? []).map((row) => row.skill);
@@ -40,11 +50,11 @@ const fixtureTutor: Pick<CourseTutor, "suggest" | "generate"> = {
         { label: "Question 3", mark: "3/10", feedback: "The dimensions were not checked before multiplying.", excerpt: "", skill: "", result: "GAP", rationale: "The approach did not fit the problem." },
       ] };
     }
-    if (properties.explanation) return { explanation: "A matrix product combines rows from the first matrix with columns from the second.\n\nFor example, the row [1, 2] and column [3, 4] produce $1 \\cdot 3 + 2 \\cdot 4 = 11$. Each output entry uses one row and one column:\n\n$$\n(AB)_{ij} = \\sum_k A_{ik} B_{kj}\n$$\n\nThe inner dimensions must match. A 2 × 3 matrix times a 3 × 4 matrix produces a 2 × 4 matrix.\n\nWhy would changing the order change the result?", citations };
+    if (properties.explanation) return { explanation: withExample("A matrix product combines rows from the first matrix with columns from the second.\n\nFor example, the row [1, 2] and column [3, 4] produce $1 \\cdot 3 + 2 \\cdot 4 = 11$. Each output entry uses one row and one column:\n\n$$\n(AB)_{ij} = \\sum_k A_{ik} B_{kj}\n$$\n\nThe inner dimensions must match. A 2 × 3 matrix times a 3 × 4 matrix produces a 2 × 4 matrix.\n\nWhy would changing the order change the result?"), citations };
     if (properties.question) return { question: "1. Multiply A = [[1, 2], [3, 4]] by B = [[2, 0], [1, 2]].\n\n2. Multiply C = [[2, 1], [0, 3]] by D = [[1, 2], [4, 0]].\n\nShow how you form each entry. Explain why changing the order can change the answer.", citations };
     if (properties.rationale) return { result: (context as { help: string }).help === "NONE" ? "INDEPENDENT" : "SUPPORTED", gateMet: (context as { help: string }).help === "NONE",
       rationale: "Fixture assessment: both products and the explanation meet the stated requirements. This canned result tests the interface and persistence; it does not test AI grading." };
-    return { text: "The order selects different rows and columns, so in general $AB \\neq BA$. The resulting sums can change, and one order might not be defined.", citations };
+    return { text: withExample("The order selects different rows and columns, so in general $AB \\neq BA$. The resulting sums can change, and one order might not be defined."), citations };
   },
 };
 // STILLGOTIT_LIVE_AI=1 uses the real Gemini key from .env. All learning state still belongs to the test database.

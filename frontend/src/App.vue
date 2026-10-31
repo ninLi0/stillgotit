@@ -7,6 +7,7 @@ import CourseWorkspace from "./CourseWorkspace.vue";
 import TutorPanel from "./TutorPanel.vue";
 import TutorDialog from "./TutorDialog.vue";
 import AppearanceChoice from "./AppearanceChoice.vue";
+import AnswerStyleSwitch from "./AnswerStyleSwitch.vue";
 import WelcomeScene from "./WelcomeScene.vue";
 import { HOME_VIEW_KEY, type HomeView } from "./revamp-types.ts";
 
@@ -196,11 +197,13 @@ async function restoreCourse(course: Course) {
 
 const settingsDialog = ref<HTMLDialogElement | null>(null);
 const tutorPanel = ref<InstanceType<typeof TutorPanel> | null>(null), tutorDialog = ref<InstanceType<typeof TutorDialog> | null>(null);
-// Settings opens with its Tutor section on the latest choice, which the Tutor dialog may have changed, and focus stays
-// at the top of Settings.
+const answerStyle = ref<InstanceType<typeof AnswerStyleSwitch> | null>(null);
+// Settings opens with its Tutor section on the latest choice, which the Tutor dialog may have changed, and on the saved
+// answer style, which another browser may have changed. Focus stays at the top of Settings.
 function openSettings() {
   settingsDialog.value?.showModal();
   void tutorPanel.value?.open(false);
+  void answerStyle.value?.refresh();
 }
 // The tutor button in the lesson's message box opens the Tutor dialog, which holds only the model and thinking level.
 function openTutor() { void tutorDialog.value?.open(); }
@@ -354,7 +357,7 @@ onMounted(async () => {
       <p v-if="viewNote" class="view-note" role="status">{{ viewNote }}</p>
     </section>
     <section class="settings-section"><AppearanceChoice /></section>
-    <section class="settings-section"><TutorPanel ref="tutorPanel" inline /></section>
+    <section class="settings-section"><TutorPanel ref="tutorPanel" inline /><AnswerStyleSwitch ref="answerStyle" /></section>
     <section class="settings-section">
       <h3 class="eyebrow">Account</h3>
       <p class="account-line">Signed in as <strong>{{ username }}</strong> with your 6.1040 Commons account.</p>

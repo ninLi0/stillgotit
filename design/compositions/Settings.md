@@ -2,7 +2,7 @@
 
 A learner chooses which Gemini model the tutor uses and how much it thinks before answering, which Gemini calls the thinking level. `TutorPreferring`, an instance of [Preferring](../concepts/Preferring.md), keeps that choice on the server for the signed-in learner, so it follows them to every browser. Every tutor request reads the choice on the server and sends that model and level to Gemini. No request uses a model name or level from the browser until the server has checked it against its own catalog. Dictation is the one exception: it keeps the server's configured model with no thinking level and its own error sentences. The [application stage](../stages/materials.md) binds the instance.
 
-The learner also chooses which view Home shows: the skill tree or the task list. `ViewPreferring`, a second instance of Preferring, keeps that choice on the server in the same way, so it also follows the learner to every browser. [The home view](#the-home-view) describes it. The appearance (System, Light, or Dark) is different: it stays in the browser and never reaches the server, because whether a dark page suits the learner depends on the device and the room it is used in, and System already follows each device's own setting ([Dark mode](../visual-design.md#dark-mode)).
+The learner also chooses which view Home shows: the skill tree or the task list. `ViewPreferring`, a second instance of Preferring, keeps that choice on the server in the same way, so it also follows the learner to every browser. [The home view](#the-home-view) describes it. A third instance, `AnswerPreferring`, keeps whether the tutor may add an interactive example to a lesson answer, which is off unless the learner turns it on; [Interactive examples](#interactive-examples) describes it. The appearance (System, Light, or Dark) is different: it stays in the browser and never reaches the server, because whether a dark page suits the learner depends on the device and the room it is used in, and System already follows each device's own setting ([Dark mode](../visual-design.md#dark-mode)).
 
 ## The model catalog
 
@@ -168,6 +168,45 @@ A refusal saves nothing, so the learner's earlier view, or the lack of one, stay
 
 Like choosing or clearing the tutor model, saving the home view does not take the learner's lock, so it never waits behind a running lesson; this is safe because no learning flow reads the view.
 
+## Interactive examples
+
+A learner can let the tutor add one interactive example to a lesson answer: a slider over a formula, a small table, steps revealed one at a time, or a question with a few options. This is an experiment, and it stays off unless the learner turns it on. `AnswerPreferring`, a third instance of [Preferring](../concepts/Preferring.md), keeps the learner's answer style on the server, the way the other two instances keep the tutor choice and the home view, so the choice follows the learner to every browser. The browser and the server name the two styles `plain` and `interactive`. The styles are fixed in the server's code, so they do not change while the server runs. A learner who has chosen no style gets plain text, and the tutor then receives exactly the request it received before examples existed. The [learning flows](Learning.md#interactive-examples) describe what an example contains, how the host checks it, and how the lesson page shows it.
+
+```computations
+answerStyleOffered(style: String) : Flag
+  Holds when style is exactly `plain` or `interactive`, including case.
+
+offeredAnswerStyle(style: String) : AnswerStyle
+  Names an offered answer style. Flows use it only after answerStyleOffered holds.
+
+defaultAnswerStyle() : AnswerStyle
+  Produces `plain`, plain text.
+
+withAnswerStyle(request: TutorRequest, style: AnswerStyle) : TutorRequest
+  Marks a prepared lesson opening or lesson reply for interactive examples when style is `interactive`. With `plain`, it returns the request unchanged, with no field added.
+```
+
+[AppliedAnswerStyle](view:Settings.AppliedAnswerStyle) relates a learner to the style that applies to them. Exactly one case holds for each learner:
+
+- `AnswerPreferring._choice` returns a style, and [answerStyleOffered](computation:answerStyleOffered) holds for it. The saved style applies.
+- `AnswerPreferring._choice` returns a style that is no longer offered. The style from [defaultAnswerStyle](computation:defaultAnswerStyle) applies, so a style that a later version of the code removes never reaches the tutor.
+- `AnswerPreferring._choice` returns no row. The style from defaultAnswerStyle applies.
+
+Both endpoints call `Sessioning.use` and use the returned user, like the other settings endpoints, so one learner can neither read nor change another learner's style. A missing or ended session is refused with `NOT_SIGNED_IN`.
+
+[ReadAnswerStyle](reaction:Settings.ReadAnswerStyle) takes only the session. It responds with `style`, the style from AppliedAnswerStyle, and changes nothing.
+
+[SetAnswerStyle](reaction:Settings.SetAnswerStyle) takes the session and `style`. The boundary first checks that `style` is a string of at most 100 characters and that no other field is sent, and refuses any other input as invalid before the flow starts. Then exactly one case applies:
+
+- When answerStyleOffered holds, [offeredAnswerStyle](computation:offeredAnswerStyle) names the style, `AnswerPreferring.set` saves it, and the endpoint responds with `style`, the style it saved.
+- When answerStyleOffered does not hold, the endpoint refuses with `UNKNOWN_ANSWER_STYLE`: "Choose plain text or interactive examples."
+
+A refusal saves nothing. Saving is one write keyed by the learner, the endpoint responds only after that write is saved, and saving the same style again changes nothing, so a browser whose reply was lost can send it again. Across devices the later write wins. No endpoint clears the style, because choosing plain text has the same effect as having no choice. Like the other settings, saving the style does not take the learner's lock, so it never waits behind a running lesson. A lesson request that has already read the style keeps it, and the next request uses the new one.
+
+**Which requests read the style.** Only a lesson's opening and a lesson's replies read it. [Reply](reaction:Learning.Reply), for the opening and for a reply, and [Question](reaction:Learning.Question) read AppliedAnswerStyle in the same `where` condition that prepares the request, and [withAnswerStyle](computation:withAnswerStyle) marks the request before [withChoice](computation:withChoice) adds the tutor choice. Practice tasks, hints, grading, skill suggestions, and graded-work extraction never read the style, so they are the same in both styles. The style changes only the instruction the tutor receives. How the host checks an answer and how the page shows it are the same in both styles, so a learner who turns examples off still sees the examples saved in earlier answers.
+
+**The switch.** Settings shows a switch labelled "Interactive examples" in its Tutor section, below the model and thinking level. One sentence under it explains what changes: "When this is on, the tutor may add one interactive example to a lesson answer, such as a slider, a table, steps, or a quick question, and each example is the tutor's own illustration of a passage in your materials, not a citation of it." The switch reads the saved style each time Settings opens, so a second browser shows the same style, and it saves as soon as the learner changes it. After a save, a status line says "Saved. Your next lesson answers may include an interactive example." or "Saved. Your next lesson answers will be plain text." After a refusal or a lost connection, the switch returns to the saved style and an alert under it gives the reason. The switch is a native checkbox with the switch role, so it is reached with Tab and changed with Space, and the status line is announced to screen readers.
+
 ## Tests
 
 The tests use a fake `fetch` and the controlled tutor responses described in the [runtime contract](../runtime.md). They cover:
@@ -180,7 +219,9 @@ The tests use a fake `fetch` and the controlled tutor responses described in the
 - a refusal that names the chosen model produces the model sentence, a key-wide refusal keeps the setup sentence, and an unclear refusal keeps the current sentence;
 - a dictation timeout and a dictation model problem keep their current sentences;
 - a tutor request without a pair, and a suggestion request without a pair, are each refused without contacting Google;
-- the home view: the skill tree when nothing is saved, a saved view read on a second browser, a refused view with its sentence over HTTP and through the runtime gateway, a repeated save, and another learner's isolation.
+- the home view: the skill tree when nothing is saved, a saved view read on a second browser, a refused view with its sentence over HTTP and through the runtime gateway, a repeated save, and another learner's isolation;
+- the answer style: plain text when nothing is saved, a saved style read on a second browser, a refused style with its sentence over HTTP and through the runtime gateway, plain text for a saved style that is no longer offered, a repeated save, a save that does not wait for a running lesson, and another learner's isolation;
+- the default style sends the tutor exactly the instruction it received before examples existed, for a lesson's opening and for a reply, and only those two requests carry the example instruction once the learner turns examples on.
 
 ## Endpoints
 
@@ -192,4 +233,6 @@ Settings.ChooseTutor at /settings/tutor/choose
 Settings.ClearTutor at /settings/tutor/clear
 Settings.ReadHomeView at /settings/view
 Settings.SetHomeView at /settings/view/set
+Settings.ReadAnswerStyle at /settings/answers
+Settings.SetAnswerStyle at /settings/answers/set
 ```

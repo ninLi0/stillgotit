@@ -8,7 +8,8 @@ import ReplyActions from "./ReplyActions.vue";
 import EstimatePanel from "./EstimatePanel.vue";
 import PixelIcon from "./PixelIcon.vue";
 import MasteryCells from "./MasteryCells.vue";
-import MarkdownText from "./MarkdownText.vue";
+import MarkdownText, { type ExampleContext } from "./MarkdownText.vue";
+import { answerWithWidgetsAs, widgetHeading, widgetPlainText } from "../../src/answer-widgets.ts";
 import InfoBubble from "./InfoBubble.vue";
 import SourcePreview from "./SourcePreview.vue";
 import SourcePane from "./SourcePane.vue";
@@ -110,6 +111,11 @@ const labels = computed(() => sessionLabels(data.value?.sessions ?? []));
 const hasEvidence = computed(() => !!data.value && (!!data.value.explanation || data.value.cases.length > 0));
 const estimateText = computed(() => data.value?.estimate ? `${Math.round(data.value.estimate.value)}% estimated mastery` : "");
 const materialTitles = computed(() => Object.fromEntries(props.materials.map((item) => [item.material, item.title])));
+// A lesson answer can hold one interactive example (MarkdownText.vue), whose source chip names materials like the
+// answer's citations do. Copy writes the example out as plain text and Listen says one is shown, so neither gives raw JSON.
+const examplesIn = (idPrefix: string): ExampleContext => ({ titles: materialTitles.value, deleted: props.deletedMaterials, idPrefix });
+const copyText = (text: string, lesson: boolean) => lesson ? answerWithWidgetsAs(text, widgetPlainText) : text;
+const listenText = (text: string, lesson: boolean) => lesson ? answerWithWidgetsAs(text, (widget) => `There is an interactive example here: ${widgetHeading(widget)}.`) : text;
 // Why a disabled action is unavailable. Empty when it is available or the app is only busy.
 const aiOff = computed(() => props.aiAvailable ? "" : props.aiReason || "Checking whether the AI tutor is available…");
 const practiceReason = computed(() => recording.value ? "Finish recording first." : !props.aiAvailable ? "The AI tutor is unavailable right now."
@@ -680,22 +686,22 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
                 <div v-if="current.lesson" class="message from-you"><span class="sr-only">You</span><MarkdownText class="prose" kind="message" :text="current.lesson.request" /></div>
                 <article v-if="!unexplained" class="message from-tutor opening-card" :class="{ latest: !current.dialogue.length }" :title="openingTime?.label">
                   <div class="speaker-row"><span class="speaker"><span class="avatar"><PixelIcon name="leaf" :size="16" /></span> StillGotIt<span v-if="openingTime" class="sr-only">, <time :datetime="openingTime.iso">{{ openingTime.label }}</time></span><span v-if="current.task" class="tag task">Practice task</span></span></div>
-                  <MarkdownText class="prose" :text="current.lesson?.explanation || current.task?.question || ''" />
+                  <MarkdownText class="prose" :text="current.lesson?.explanation || current.task?.question || ''" :examples="current.lesson ? examplesIn(`example-${current.session}`) : null" @open="openSource" />
                   <SourcesUsed v-if="current.citations.length" :key="current.session" compact :citations="current.citations" :titles="materialTitles" :deleted="deletedMaterials" :id-prefix="`passage-${current.session}`" @open="openSource" />
-                  <div class="reply-foot"><ReplyMeta :seconds="measured[answerKey('session', current.session)]" :sources="current.citations.length" :tutor="answerLabel('session', current.session)" /><ReplyActions :message-key="`${current.session}:opening`" :text="current.lesson?.explanation || current.task?.question || ''" :what="current.lesson ? 'lesson' : 'practice question'" describedby="listen-reason" /></div>
+                  <div class="reply-foot"><ReplyMeta :seconds="measured[answerKey('session', current.session)]" :sources="current.citations.length" :tutor="answerLabel('session', current.session)" /><ReplyActions :message-key="`${current.session}:opening`" :text="copyText(current.lesson?.explanation || current.task?.question || '', !!current.lesson)" :listen-text="listenText(current.lesson?.explanation || current.task?.question || '', !!current.lesson)" :what="current.lesson ? 'lesson' : 'practice question'" describedby="listen-reason" /></div>
                 </article>
               </div>
               <div v-if="(current.dialogue.length || pending) && !unexplained" class="thread-divider" role="separator" aria-label="Conversation"><span aria-hidden="true">Conversation</span></div>
               <article v-for="(item, position) in current.dialogue" :key="item.turnIndex" class="message" :class="[item.turn.speaker === 'LEARNER' ? 'from-you' : 'from-tutor', { latest: position === current.dialogue.length - 1 }]" :title="messageTime(item.turn.at) || undefined">
                 <template v-if="item.turn.speaker === 'TUTOR'">
                   <div class="speaker-row"><span class="speaker"><span class="avatar"><PixelIcon name="leaf" :size="16" /></span> StillGotIt<span v-if="messageTime(item.turn.at)" class="sr-only">, <time :datetime="item.turn.at">{{ messageTime(item.turn.at) }}</time></span><span v-if="item.turn.purpose === 'HINT'" class="tag hint-tag">Hint</span><span v-else-if="item.turn.purpose === 'CORRECTION'" class="tag">Transcript correction</span></span></div>
-                  <MarkdownText class="prose" :text="item.turn.text" />
+                  <MarkdownText class="prose" :text="item.turn.text" :examples="current.lesson ? examplesIn(`example-${current.session}-${item.turnIndex}`) : null" @open="openSource" />
                   <SourcesUsed v-if="item.turn.citations.length" :key="`${current.session}:${item.turnIndex}`" :citations="item.turn.citations" :titles="materialTitles" :deleted="deletedMaterials" :id-prefix="`passage-${current.session}-${item.turnIndex}`" compact @open="openSource" />
                 </template>
                 <template v-else><span class="sr-only">You{{ purposeNote(item.turn.purpose) }}</span><span v-if="messageTime(item.turn.at)" class="sr-only">, <time :datetime="item.turn.at">{{ messageTime(item.turn.at) }}</time></span><span v-if="purposeNote(item.turn.purpose)" class="tag you-tag" aria-hidden="true">{{ purposeNote(item.turn.purpose).replace(' · ', '') }}</span>
                   <MarkdownText class="prose" kind="message" :text="item.turn.text" /></template>
                 <p v-for="(file, fileIndex) in item.turn.media" :key="file.file" class="attachment-label"><span class="attach-thumb" aria-hidden="true" />{{ item.turn.media.length > 1 ? `Attachment ${fileIndex + 1} of ${item.turn.media.length}` : 'Attachment' }} · {{ file.name }}</p>
-                <div v-if="item.turn.speaker === 'TUTOR'" class="reply-foot"><ReplyMeta :seconds="replySeconds(current, item.turnIndex)" :sources="item.turn.citations.length" :tutor="answerLabel('turn', current.session, item.turnIndex)" /><ReplyActions :message-key="`${current.session}:${item.turnIndex}`" :text="item.turn.text" :what="item.turn.purpose === 'HINT' ? 'hint' : 'tutor reply'" describedby="listen-reason" /></div></article>
+                <div v-if="item.turn.speaker === 'TUTOR'" class="reply-foot"><ReplyMeta :seconds="replySeconds(current, item.turnIndex)" :sources="item.turn.citations.length" :tutor="answerLabel('turn', current.session, item.turnIndex)" /><ReplyActions :message-key="`${current.session}:${item.turnIndex}`" :text="copyText(item.turn.text, !!current.lesson)" :listen-text="listenText(item.turn.text, !!current.lesson)" :what="item.turn.purpose === 'HINT' ? 'hint' : 'tutor reply'" describedby="listen-reason" /></div></article>
               <!-- A lesson question without a reply, or a lesson without its opening explanation: the retry sits where the tutor's answer would be. -->
               <div v-if="current.lesson && current.status === 'OPEN' && !archived && (current.dialogue.at(-1)?.turn.speaker === 'LEARNER' || unexplained) && !pending && !sessionSourcesGone" class="retry-row"><span class="avatar"><PixelIcon name="leaf" :size="16" /></span><button class="secondary dawn reply-retry" :disabled="busy || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="retryReply"><span aria-hidden="true">↻</span>Retry tutor reply</button></div>
               <div v-if="current.task && current.status === 'OPEN' && !archived && current.dialogue.some(item => item.turn.speaker === 'LEARNER' && item.turn.purpose === 'RESPONSE')" class="review-step">

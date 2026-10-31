@@ -3,7 +3,8 @@ import { onBeforeUnmount, ref } from "vue";
 import ListenButton from "./ListenButton.vue";
 // The small actions under one tutor answer: Copy puts the answer's text on the clipboard, and Listen reads it aloud.
 // `messageKey`, `what` and `describedby` pass to ListenButton; `what` also names the answer for Copy, such as "tutor reply".
-const props = defineProps<{ text: string; messageKey: string; what: string; describedby?: string }>();
+// `listenText`, when given, is what Listen reads instead of `text`, such as an answer that names its example in words.
+const props = defineProps<{ text: string; listenText?: string; messageKey: string; what: string; describedby?: string }>();
 const copied = ref<"" | "done" | "failed">("");
 let reset: ReturnType<typeof setTimeout> | undefined;
 /** Browsers without the clipboard API, or pages it refuses, copy through a hidden text box. Focus returns to the button. */
@@ -28,7 +29,7 @@ onBeforeUnmount(() => clearTimeout(reset));
 <template>
   <div class="reply-actions">
     <button type="button" class="reply-action" :disabled="!text.trim()" :aria-label="`Copy the ${what}`" @click="copy">{{ copied === 'done' ? 'Copied' : copied === 'failed' ? 'Copy failed' : 'Copy' }}</button>
-    <ListenButton :message-key="messageKey" :text="text" :what="what" :describedby="describedby" />
+    <ListenButton :message-key="messageKey" :text="listenText ?? text" :what="what" :describedby="describedby" />
     <slot />
     <span class="sr-only" role="status">{{ copied === 'done' ? `Copied the ${what}.` : copied === 'failed' ? 'The browser did not allow copying. Select the text to copy it.' : '' }}</span>
   </div>

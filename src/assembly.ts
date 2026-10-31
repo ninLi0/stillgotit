@@ -8,7 +8,7 @@ import type { Budgeting } from "./concepts/Budgeting/Budgeting.ts";
 import type { MasteryEstimating } from "./concepts/MasteryEstimating/MasteryEstimating.ts";
 import type { AssessmentReviewing } from "./concepts/AssessmentReviewing/AssessmentReviewing.ts";
 import { assemble, type ConceptImplementation } from "@mit-sdg/sync-engine/assembly";
-import { applicationConceptSet, type ConversationArchiving, type TreeStyling, TutorPreferring, ViewPreferring } from "./concepts.ts";
+import { AnswerPreferring, applicationConceptSet, type ConversationArchiving, type TreeStyling, TutorPreferring, ViewPreferring } from "./concepts.ts";
 import type { Db } from "mongodb";
 import type { FederatingConcept } from "./concepts/Federating/Federating.ts";
 import type { RegisteringConcept, User } from "./concepts/Registering/Registering.ts";
@@ -43,6 +43,7 @@ export function assembleApplication(instances: {
   TutorGenerating?: ConceptImplementation<typeof TutorGenerating>;
   TutorPreferring?: ConceptImplementation<typeof TutorPreferring>;
   ViewPreferring?: ConceptImplementation<typeof ViewPreferring>;
+  AnswerPreferring?: ConceptImplementation<typeof AnswerPreferring>;
   TreeStyling: ConceptImplementation<typeof TreeStyling>;
   ConversationArchiving: ConceptImplementation<typeof ConversationArchiving>;
 }, clock = () => new Date()) {
@@ -50,7 +51,8 @@ export function assembleApplication(instances: {
     conceptSet: applicationConceptSet,
     instances: { ...instances, TutorGenerating: instances.TutorGenerating ?? new TutorGenerating(),
       TutorPreferring: instances.TutorPreferring ?? new TutorPreferring(unconfiguredDatabase("TutorPreferring"), "TutorPreferring"),
-      ViewPreferring: instances.ViewPreferring ?? new ViewPreferring(unconfiguredDatabase("ViewPreferring"), "ViewPreferring") },
+      ViewPreferring: instances.ViewPreferring ?? new ViewPreferring(unconfiguredDatabase("ViewPreferring"), "ViewPreferring"),
+      AnswerPreferring: instances.AnswerPreferring ?? new AnswerPreferring(unconfiguredDatabase("AnswerPreferring"), "AnswerPreferring") },
     composition: { reusable: { accounts, commons }, Courses, Learning, Importing, Reads, Progress, Planning, Access, Settings },
     queryCache: "none",
     executionLimits,
@@ -59,8 +61,9 @@ export function assembleApplication(instances: {
 }
 
 /**
- * Assemblies built only for account or course checks may omit TutorPreferring and ViewPreferring, as they may omit TutorGenerating's provider.
- * Each stand-in store refuses every read and write, so a tutor choice or home view is never saved to or read from an unintended database.
+ * Assemblies built only for account or course checks may omit TutorPreferring, ViewPreferring, and AnswerPreferring, as they may omit
+ * TutorGenerating's provider. Each stand-in store refuses every read and write, so a tutor choice, home view, or answer style is never
+ * saved to or read from an unintended database.
  */
 const unconfiguredDatabase = (instance: string) => ({ collection: () => new Proxy({}, {
   get: () => () => Promise.reject(new Error(`${instance} has no database in this assembly.`)),
