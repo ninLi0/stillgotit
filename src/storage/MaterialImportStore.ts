@@ -1,6 +1,6 @@
 import { isDeepStrictEqual } from "node:util";
 import { type Collection, type Db, type Filter, MongoServerError, type UpdateFilter } from "mongodb";
-import type { MaterialImport } from "../concepts/MaterialKeeping/MaterialKeeping.ts";
+import type { MaterialImport, MaterialPurpose } from "../concepts/MaterialKeeping/MaterialKeeping.ts";
 import { isMediaList, type MediaList } from "../media.ts";
 
 /** Declared sources only. The importer must verify uploaded bytes before retaining them. */
@@ -18,8 +18,16 @@ export interface ImportRequest {
   scope: string;
   title: string;
   origin: "COURSE" | "REFERENCE";
+  /**
+   * Present only for the learner's own work, such as a file attached to an answer. A request without it is for a
+   * source, which keeps every request saved before purposes were recorded, and its retries, unchanged.
+   */
+  purpose?: "WORK";
   sources: readonly ImportSource[];
 }
+
+/** What the import's material is for. */
+export function requestPurpose(request: ImportRequest): MaterialPurpose { return request.purpose ?? "SOURCE"; }
 
 export interface ImportIdentity {
   owner: string;
@@ -56,6 +64,7 @@ export interface ImportOperation extends ImportIdentity {
   partial?: MediaList;
   recordings?: RecordingProgress[];
   failure?: ImportFailure;
+  /** Inputs prepared before purposes were recorded have no `purpose` and are sources. */
   prepared?: MaterialImport;
   material?: string;
   filesDeleted?: boolean;
@@ -318,7 +327,8 @@ export class MaterialImportStore {
     if (!Number.isSafeInteger(revision) || revision < 0) throw new InvalidImportRequest();
     const operation = await this.get(identity);
     if (!operation || prepared.owner !== operation.owner || prepared.importKey !== operation.importKey ||
-      prepared.scope !== operation.request.scope || prepared.title !== operation.request.title || prepared.origin !== operation.request.origin) {
+      prepared.scope !== operation.request.scope || prepared.title !== operation.request.title || prepared.origin !== operation.request.origin ||
+      prepared.purpose !== requestPurpose(operation.request)) {
       throw new ImportProgressConflict();
     }
     if (rank(operation.stage) >= rank("READY") && isDeepStrictEqual(operation.prepared, prepared)) return operation;
@@ -512,7 +522,9 @@ function validSource(value: unknown): value is ImportSource {
 }
 
 function validRequest(value: unknown): value is ImportRequest {
-  if (!fields(value, ["scope", "title", "origin", "sources"]) || !nonblank(value.scope) || !nonblank(value.title) ||
+  const work = value !== null && typeof value === "object" && Object.hasOwn(value, "purpose");
+  if (!fields(value, work ? ["scope", "title", "origin", "purpose", "sources"] : ["scope", "title", "origin", "sources"]) ||
+    !nonblank(value.scope) || !nonblank(value.title) || (work && value.purpose !== "WORK") ||
     (value.origin !== "COURSE" && value.origin !== "REFERENCE") || !Array.isArray(value.sources) || value.sources.length === 0) return false;
   for (let index = 0; index < value.sources.length; index++) {
     if (!Object.hasOwn(value.sources, index) || !validSource(value.sources[index])) return false;

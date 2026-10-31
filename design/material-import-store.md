@@ -6,7 +6,7 @@ The host uses `MaterialImportStore` to preserve one import across requests and a
 
 `getOrCreate` accepts `owner`, `requestId`, and `request`. The browser keeps the same request ID for retries of one intended import. A new intended import uses a new request ID. The server generates the separate `importKey` used later by the Library. Neither identifier grants access.
 
-The request has `scope` (the course ID), `title`, `origin` (`COURSE` or `REFERENCE`), and a nonempty ordered `sources` list. An upload descriptor has `kind: UPLOAD`, `name`, `size` in bytes, and a lowercase SHA-256 digest in `sha256`. A reference descriptor has `kind: REFERENCE` and `locator`. These are declared sources, not proof that bytes were uploaded, checked, or processed. Later import steps must verify the uploaded content against its declared digest and retain reference content as a fixed snapshot.
+The request has `scope` (the course ID), `title`, `origin` (`COURSE` or `REFERENCE`), and a nonempty ordered `sources` list. A request for the learner's own work, such as a file attached to an answer, also has `purpose: WORK`. A request without `purpose` is for a source, so requests saved before purposes were recorded, and their retries, are unchanged; no other `purpose` value is valid. Because the request is compared as a whole, a retry under the same request ID with the other purpose is a different request. An upload descriptor has `kind: UPLOAD`, `name`, `size` in bytes, and a lowercase SHA-256 digest in `sha256`. A reference descriptor has `kind: REFERENCE` and `locator`. These are declared sources, not proof that bytes were uploaded, checked, or processed. Later import steps must verify the uploaded content against its declared digest and retain reference content as a fixed snapshot.
 
 Inputs must contain exactly their declared fields. Identities, titles, names, and locators must be nonblank strings. Sizes must be nonnegative safe integers. Digests must contain 64 lowercase hexadecimal characters. Lists must not have missing elements. Strings are preserved exactly; list order matters and record field order does not.
 
@@ -25,7 +25,7 @@ The saved operation contains:
 | `partial` | From TRANSCRIBING on: the originals as read at upload. Each recording's renditions and limitations are still empty. |
 | `recordings` | From TRANSCRIBING on: one entry for each distinct audio or video file, in original order. Two originals with the same bytes and the same file extension share one retained file and so one entry, and the finished transcript serves both. |
 | `failure` | Optional, only in TRANSCRIBING: a failure of the final preparation. |
-| `prepared` | From READY on: the exact `Library.add` input. An import removed because the learner deleted its material no longer has it. |
+| `prepared` | From READY on: the exact `Library.add` input, including the material's `purpose`, which comes from the request. An input prepared before purposes were recorded has none, and the host saves it as a source. An import removed because the learner deleted its material no longer has it. |
 | `material` | In COMPLETE: the saved material identity. An import removed after its material was deleted keeps it. |
 | `filesDeleted` | Only in DISCARDED: `false` when the import is removed, and `true` once every file its declared sources can have under its import key has been deleted. |
 
@@ -179,7 +179,7 @@ then return it unchanged; return null when no operation matches
 when savePrepared is called
 where the operation is SOURCES_SAVED with no recordings, or TRANSCRIBING with every
       recording DONE and no failure, at the given revision, and prepared matches the
-      saved owner, key, course, title, and origin
+      saved owner, key, course, title, origin, and purpose
 then save prepared, set READY, and increase the revision
 
 when complete is called
@@ -249,7 +249,7 @@ Snapshot validated input before the first database wait. Unique indexes protect 
 
 Use primary reads with majority read concern and majority, journaled writes. Return no candidate key after a failed or uncertain write. A retry reads any completed write. The records have no automatic expiry. `get`, `pending`, `preparable`, `savedFor`, and `deletable` create no indexes and change no state. No method returns MongoDB's internal `_id`.
 
-The stages advance in this order. `saveSources` advances CREATED to SOURCES_SAVED with retained-file references. An import without recordings then goes from SOURCES_SAVED to READY through `savePrepared`. An import with recordings goes from SOURCES_SAVED to TRANSCRIBING through `startTranscription`, and from TRANSCRIBING to READY through `savePrepared` once every recording is DONE. `complete` advances READY to COMPLETE with the saved material identity. `discard` ends an import before READY, or ends a READY import whose prepared input AddMaterial refused as invalid or because its material was deleted. `discardSaved` ends a COMPLETE import whose material the learner deleted. `markFilesDeleted` records that a removed import's files are gone. `savePrepared` requires the owner, key, course, title, and origin to match the saved request.
+The stages advance in this order. `saveSources` advances CREATED to SOURCES_SAVED with retained-file references. An import without recordings then goes from SOURCES_SAVED to READY through `savePrepared`. An import with recordings goes from SOURCES_SAVED to TRANSCRIBING through `startTranscription`, and from TRANSCRIBING to READY through `savePrepared` once every recording is DONE. `complete` advances READY to COMPLETE with the saved material identity. `discard` ends an import before READY, or ends a READY import whose prepared input AddMaterial refused as invalid or because its material was deleted. `discardSaved` ends a COMPLETE import whose material the learner deleted. `markFilesDeleted` records that a removed import's files are gone. `savePrepared` requires the owner, key, course, title, origin, and purpose to match the saved request, where a request without `purpose` is for a source.
 
 Each transition requires the expected stage and revision, and an atomic update advances both. Transcript saves and failures instead require the recording's claim token, and one atomic update checks the stage and the claim together. A claim and its renewal are atomic updates of one recording that leave the revision unchanged. `markFilesDeleted` is an atomic update that requires DISCARDED. An exact replay of a saved checkpoint returns current progress. Changed preparation, a different material result, a lost claim, or a competing stale transition causes `IMPORT_PROGRESS_CONFLICT`. A caller can reread and retry after another matching request finishes. A lost reply never requires a new import key.
 

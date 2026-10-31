@@ -30,7 +30,7 @@ async function setup(key = "test-key-not-real") {
   jar.set(SESSION_COOKIE, signedIn.session);
   const { body: { course } } = await post("/courses/create", { title: "Linear algebra" });
   const { material } = await runtime.application.concepts.Library.add({ owner: user, importKey: crypto.randomUUID(), scope: course,
-    title: "Matrix multiplication", locator: "upload:test", content: "Multiply rows by columns. Inner dimensions must match.", originals: [], origin: "COURSE" });
+    title: "Matrix multiplication", locator: "upload:test", content: "Multiply rows by columns. Inner dimensions must match.", originals: [], origin: "COURSE", purpose: "SOURCE" });
   return { runtime, post, material, requests, urls, respond: (next: () => Response) => { reply = next; } };
 }
 const answer = (value: unknown) => Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify(value) }] }, finishReason: "STOP" }] });

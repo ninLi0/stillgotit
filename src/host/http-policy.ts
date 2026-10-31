@@ -118,6 +118,8 @@ export function stillGotItPolicy(publicOrigin: string, requestBodyBytes = BODY_L
       // ChooseTutor refusals. Nothing is saved; the learner chooses again from the Tutor panel.
       UNKNOWN_TUTOR_MODEL: "INVALID_REQUEST",
       UNSUPPORTED_THINKING_LEVEL: "INVALID_REQUEST",
+      // The learner's own work offered as a skill source or for skill suggestions (Courses.md and Learning.md).
+      WORK_MATERIAL_NOT_SOURCE: "INVALID_REQUEST",
       // The SetHomeView refusal. Nothing is saved; the learner chooses the skill tree or the task list.
       UNKNOWN_HOME_VIEW: "INVALID_REQUEST",
       // The ChooseUnitLook refusal. Nothing is saved; the learner chooses one of the offered tree kinds.
@@ -224,6 +226,8 @@ export const refusalDetails: Readonly<Record<string, string>> = {
   SESSION_CHANGED: "This session closed before the tutor's answer could be saved. Your own work in it is still saved.",
   SKILL_CHANGED: "This skill changed while the tutor was answering, so nothing was saved. Try again.",
   MATERIAL_UNAVAILABLE: "This material is not available in this course. Reload the page to see its materials.",
+  // Courses.md and Learning.md: the learner's own work, such as a photo attached to an answer, offered as a teaching source.
+  WORK_MATERIAL_NOT_SOURCE: "This file is your own work, which the tutor reads as evidence of your attempt, not as a teaching source. Choose one of the course's materials instead.",
   // Courses.md: the ChooseUnitLook refusal for a tree kind that is not offered.
   ...treeKindRefusals,
   // Courses.md: ArchiveCourse's refusal while an activity is in progress in the course.

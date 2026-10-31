@@ -47,7 +47,9 @@ type CourseData = StillGotItHttp["/courses/read"]["output"];
 type MaterialId = CourseData["materials"][number]["material"];
 type Suggestion = { title: string; outcome: string; gate: string };
 type Original = { file: string; name: string; mediaType?: string; limitations: string[] };
-const data = ref<CourseData>({ materials: [], deletedMaterials: [], units: [], skills: [], prerequisites: [], skillSources: [], versions: [], looks: [] });
+const data = ref<CourseData>({ materials: [], work: [], deletedMaterials: [], units: [], skills: [], prerequisites: [], skillSources: [], versions: [], looks: [] });
+// The course's materials and the learner's own work (files attached to answers), which the Materials view lists apart.
+const allMaterials = computed(() => [...data.value.materials, ...data.value.work]);
 // The materials the learner deleted from this course. Citations and skill sources that name them say so.
 const deletedIds = computed(() => data.value.deletedMaterials.map((row) => row.material as string));
 const busy = ref(false), message = ref(""), error = ref(""), justConfirmed = ref<string | null>(null);
@@ -115,10 +117,11 @@ async function refresh() {
   const deleted = new Set<string>(result.deletedMaterials.map((row) => row.material));
   try { if (deleted.size && draftSaves.forget(deleted)) pendingDraftCount.value = draftSaves.read().length; } catch { /* Reported by Retry saving drafts. */ }
   // A material deleted in another tab leaves the detail pane.
-  if (material.value && !result.materials.some((source) => source.material === material.value)) { material.value = ""; preview.value = null; jumpLocation.value = undefined; }
+  const listed = [...result.materials, ...result.work];
+  if (material.value && !listed.some((source) => source.material === material.value)) { material.value = ""; preview.value = null; jumpLocation.value = undefined; }
   if (!material.value && result.materials.length) {
     const previous = sessionStorage.getItem(sourceSelectionKey);
-    material.value = result.materials.find((source) => source.material === previous)?.material ?? result.materials[0]!.material;
+    material.value = listed.find((source) => source.material === previous)?.material ?? result.materials[0]!.material;
     sessionStorage.setItem(sourceSelectionKey, material.value);
   }
   if (!unit.value && result.units.length) unit.value = result.units[0]!.unit;
@@ -179,7 +182,7 @@ async function upload() {
 /** An unfinished import was saved, or left the file list: reload the course, then name the materials it saved. */
 async function importReady(saved: MaterialId[]) {
   try { await refresh(); } catch (problem) { error.value = problem instanceof Error ? problem.message : "The course could not be reloaded. Reload the page to see your materials."; }
-  if (saved.length) announcement.value = readyNotice(saved, data.value.materials);
+  if (saved.length) announcement.value = readyNotice(saved, data.value.materials, data.value.work);
 }
 async function readMaterial() {
   if (!material.value) return;
@@ -243,7 +246,14 @@ onMounted(() => task(async () => {
   await nextTick(); viewRestored = true;
   // The control that opened this course belonged to the course before it, so focus starts at the Plan heading.
   if (onPlan) document.querySelector<HTMLElement>("#plan-title")?.focus();
-  pendingDraftCount.value = draftSaves.read().length; await refresh(); await refreshAI();
+  pendingDraftCount.value = draftSaves.read().length; await refresh();
+  // A restored Materials view was shown before the course was read, so nothing was selected when it opened. Read the
+  // selected file and the file kinds now, as opening Materials does, so the detail has its downloads and kinds at once.
+  if (view.value === "setup") {
+    void readKinds();
+    if (material.value && !preview.value) readMaterial().catch((problem) => { error.value = problem instanceof Error ? problem.message : "That material could not be opened. Try again."; });
+  }
+  await refreshAI();
 }));
 
 // ---- Shell ----
@@ -326,7 +336,12 @@ function setHomeView(next: HomeView) { emit("update:homeView", next); }
 const matTab = ref<"preview" | "skills" | "text">("preview");
 const jumpLocation = ref<string | undefined>(undefined);
 const gradedImport = ref<InstanceType<typeof GradedImport> | null>(null), gradedButton = ref<HTMLButtonElement | null>(null);
-const selectedMaterial = computed(() => data.value.materials.find((source) => source.material === material.value));
+const selectedMaterial = computed(() => allMaterials.value.find((source) => source.material === material.value));
+// The learner's own work opens like a material, but it is not a source: it offers no skills to find and no questions to ask.
+const selectedWork = computed(() => data.value.work.some((item) => item.material === material.value));
+// The "Your work" group starts collapsed, and opens when one of its files is shown.
+const workOpen = ref(false);
+watch(selectedWork, (work) => { if (work) { workOpen.value = true; if (matTab.value === "skills") matTab.value = "preview"; } }, { immediate: true });
 function skillsOf(source: string) { const ids = new Set(data.value.skillSources.filter((row) => row.material === source).map((row) => row.skill)); return data.value.skills.filter((skill) => ids.has(skill.skill) && (skill.status === "DRAFT" || skill.status === "CONFIRMED")); }
 // A file's kind from the material read's originals: media type first, then the file name's extension.
 const kinds = ref<Record<string, string[]>>({});
@@ -342,7 +357,7 @@ function kindLabel(source: string) { const list = [...new Set(kinds.value[source
 function iconKind(source: string) { const label = kindLabel(source); return ["PDF", "PPTX", "IMG", "MD"].includes(label) ? label : "OTHER"; }
 // Kinds for files not opened yet, read once in the background when Materials opens. A failed read only leaves the kind out.
 async function readKinds() {
-  for (const source of data.value.materials) {
+  for (const source of allMaterials.value) {
     if (kinds.value[source.material]) continue;
     try { const read = await api.courses.materials.read({ material: source.material }); if (!("error" in read)) kinds.value = { ...kinds.value, [source.material]: read.originals.map(kindOf) }; } catch { /* Leave the kind out. */ }
   }
@@ -475,7 +490,7 @@ function openGraded() { void gradedImport.value?.startUpload(); }
 
 // ---- Deleting a material ----
 // Deleting asks first, in a dialog that says what happens. The material is deleted for good; nothing is archived.
-const deleteDialog = ref<HTMLDialogElement | null>(null), deleteTarget = ref<{ material: MaterialId; title: string } | null>(null);
+const deleteDialog = ref<HTMLDialogElement | null>(null), deleteTarget = ref<{ material: MaterialId; title: string; work: boolean } | null>(null);
 const deleteError = ref(""), deleting = ref(false);
 // A waiting draft save may name this material, and the server would refuse it once the material is gone.
 const deleteReason = computed(() => pendingDraftCount.value ? "Finish saving your skill drafts first." : "");
@@ -497,7 +512,7 @@ const deleteEffects = computed(() => {
 const count = (n: number, one: string, many: string) => n === 1 ? `One ${one}` : `${n} ${many}`;
 function askDelete(source: { material: MaterialId; title: string }) {
   if (busy.value || deleteReason.value) return;
-  deleteTarget.value = { material: source.material, title: source.title }; deleteError.value = "";
+  deleteTarget.value = { material: source.material, title: source.title, work: data.value.work.some((item) => item.material === source.material) }; deleteError.value = "";
   deleteDialog.value?.showModal();
 }
 async function confirmDelete() {
@@ -549,7 +564,13 @@ function ask(request: AskAboutPage) {
   lessonDraft.value = { skill: skill.skill, text: request.question };
   openSkill(skill.skill);
 }
-watch(view, (now) => { if (now === "setup") void readKinds(); }, { immediate: false });
+// Work attached to an answer is saved from the study page, so opening Materials reads the course again to list it. A
+// view restored when the course opens is read after the course's first refresh instead (onMounted).
+watch(view, (now) => {
+  if (now !== "setup" || !viewRestored) return;
+  refresh().catch((problem) => { error.value = problem instanceof Error ? problem.message : "The course could not be reloaded. Reload the page to see your materials."; })
+    .finally(() => void readKinds());
+}, { immediate: false });
 watch(view, (now) => { if (now === "setup" && material.value && !preview.value) readMaterial().catch((problem) => { error.value = problem instanceof Error ? problem.message : "That material could not be opened. Try again."; }); });
 </script>
 
@@ -702,7 +723,7 @@ watch(view, (now) => { if (now === "setup" && material.value && !preview.value) 
         </section>
 
         <!-- Shown while the course has a file or an unfinished import, so the import cards keep listing before the first file is saved. -->
-        <div v-show="data.materials.length || importsShown" class="mat-grid">
+        <div v-show="data.materials.length || data.work.length || importsShown" class="mat-grid">
           <nav class="file-list" aria-label="Files">
             <p class="eyebrow">Files</p>
             <MaterialImports :course="course.course" :active="view === 'setup'" :busy="busy" @shown="importsShown = $event" @ready="importReady" @removed="(id) => { if (id === requestId) resetImport(); }" />
@@ -714,23 +735,36 @@ watch(view, (now) => { if (now === "setup" && material.value && !preview.value) 
                 </button>
               </li>
             </ul>
+            <details v-if="data.work.length" class="work-group" :open="workOpen" @toggle="workOpen = ($event.target as HTMLDetailsElement).open">
+              <summary>Your work ({{ data.work.length }})</summary>
+              <p class="hint work-note">Files you attached to your answers, newest first. The tutor reads each one with its answer and never teaches from it.</p>
+              <ul>
+                <li v-for="item in data.work" :key="item.material">
+                  <button type="button" class="file-row" :class="{ current: material === item.material }" :aria-current="material === item.material ? 'true' : undefined" @click="selectMaterial(item.material)">
+                    <span class="doc-tile"><PixelIcon :rows="docIcon(iconKind(item.material))" :size="24" /></span>
+                    <span class="file-text"><strong>{{ item.title }}</strong><small>{{ kindLabel(item.material) || 'File' }}</small></span>
+                  </button>
+                </li>
+              </ul>
+            </details>
           </nav>
           <section v-if="selectedMaterial" class="detail" :aria-label="selectedMaterial.title">
             <h2 class="display detail-title">{{ selectedMaterial.title }}</h2>
             <div class="detail-meta">
-              <span class="hint">{{ preview ? `${preview.originals.length} ${preview.originals.length === 1 ? 'file' : 'files'}` : 'Course material' }} · {{ fileMeta(selectedMaterial.material) }}</span>
+              <span class="hint">{{ preview ? `${preview.originals.length} ${preview.originals.length === 1 ? 'file' : 'files'}` : selectedWork ? 'Your work' : 'Course material' }}{{ selectedWork ? (preview ? ' · Your work' : '') : ` · ${fileMeta(selectedMaterial.material)}` }}</span>
               <div v-if="preview" class="file-chips"><button v-for="file in preview.originals" :key="file.file" class="file-chip" :disabled="busy" @click="download(file.file, file.name)">↓ {{ file.name }}</button></div>
               <GradedImport :key="selectedMaterial.material" :course="course.course" :material="selectedMaterial.material" :title="selectedMaterial.title" />
-              <span v-if="!selectedMaterial.title.startsWith('Graded work: ')" class="find-wrap"><button class="secondary sand" :disabled="busy || !!suggestReason" :aria-describedby="suggestReason ? 'suggest-reason' : undefined" @click="suggestFrom(selectedMaterial.material)">Find skills</button><p v-if="suggestReason" id="suggest-reason" class="hint reason">{{ suggestReason }}</p></span>
+              <span v-if="!selectedWork && !selectedMaterial.title.startsWith('Graded work: ')" class="find-wrap"><button class="secondary sand" :disabled="busy || !!suggestReason" :aria-describedby="suggestReason ? 'suggest-reason' : undefined" @click="suggestFrom(selectedMaterial.material)">Find skills</button><p v-if="suggestReason" id="suggest-reason" class="hint reason">{{ suggestReason }}</p></span>
               <span class="delete-wrap"><button type="button" class="quiet delete-material" aria-haspopup="dialog" :disabled="busy || !!deleteReason" :aria-describedby="deleteReason ? 'delete-reason' : undefined" @click="askDelete(selectedMaterial)">Delete material…</button><p v-if="deleteReason" id="delete-reason" class="hint reason">{{ deleteReason }}</p></span>
             </div>
+            <p v-if="selectedWork" class="hint work-note">You attached this file to an answer. The tutor reads it as your own work, together with that answer, and never teaches from it, so it has no skills to find.</p>
             <div class="mat-tabs" role="tablist" aria-label="Material views">
               <button id="mat-tab-preview" type="button" role="tab" :aria-selected="matTab === 'preview'" aria-controls="mat-panel" @click="matTab = 'preview'">Preview</button>
-              <button id="mat-tab-skills" type="button" role="tab" :aria-selected="matTab === 'skills'" aria-controls="mat-panel" @click="matTab = 'skills'">Skills ({{ materialSkills.length }})</button>
+              <button v-if="!selectedWork" id="mat-tab-skills" type="button" role="tab" :aria-selected="matTab === 'skills'" aria-controls="mat-panel" @click="matTab = 'skills'">Skills ({{ materialSkills.length }})</button>
               <button id="mat-tab-text" type="button" role="tab" :aria-selected="matTab === 'text'" aria-controls="mat-panel" @click="matTab = 'text'">Readable text</button>
             </div>
             <div id="mat-panel" role="tabpanel" :aria-labelledby="`mat-tab-${matTab}`" class="mat-panel">
-              <MaterialViewer v-if="matTab === 'preview'" :material="selectedMaterial.material" :title="selectedMaterial.title" :skills="viewerSkills" :initial-location="jumpLocation" @ask="ask" @open-skill="openSkill" @review-draft="reviewDraft" />
+              <MaterialViewer v-if="matTab === 'preview'" :material="selectedMaterial.material" :title="selectedMaterial.title" :skills="viewerSkills" :initial-location="jumpLocation" :askable="!selectedWork" @ask="ask" @open-skill="openSkill" @review-draft="reviewDraft" />
               <ul v-else-if="matTab === 'skills'" class="skill-rows">
                 <li v-if="!materialSkills.length" class="skill-row"><span class="hint">No skills from this file yet. Use Find skills.</span></li>
                 <li v-for="skill in materialSkills" :id="`skill-row-${skill.skill}`" :key="skill.skill" class="skill-row"><span class="status-dot" :class="{ draft: skill.status === 'DRAFT' }" aria-hidden="true"></span>
@@ -754,7 +788,7 @@ watch(view, (now) => { if (now === "setup" && material.value && !preview.value) 
     <!-- Mounted each time it opens, so its curves draw once on the way in and are read fresh. -->
     <MemoryView v-if="view === 'memory'" :course="course.course" @open="openSkill" @navigate="navigate" />
     <div v-show="view === 'chat'" class="lesson-view">
-      <KeepAlive :max="12"><SkillStudy v-if="current?.status === 'CONFIRMED'" ref="study" :key="current.skill" :skill="current.skill" :course="course.course" :learner="username" :materials="data.materials" :deleted-materials="deletedIds" :skill-materials="currentSources" :ai-available="ai.available" :ai-reason="ai.reason" :active="view === 'chat'" :initial-draft="lessonDraft?.skill === current.skill ? lessonDraft.text : undefined" @changed="progressChanged" @back="showOnTree(current.skill)" @open-source="openSource" @session="sessionShown" @tutor="emit('tutor')" /></KeepAlive>
+      <KeepAlive :max="12"><SkillStudy v-if="current?.status === 'CONFIRMED'" ref="study" :key="current.skill" :skill="current.skill" :course="course.course" :learner="username" :materials="allMaterials" :deleted-materials="deletedIds" :skill-materials="currentSources" :ai-available="ai.available" :ai-reason="ai.reason" :active="view === 'chat'" :initial-draft="lessonDraft?.skill === current.skill ? lessonDraft.text : undefined" @changed="progressChanged" @back="showOnTree(current.skill)" @open-source="openSource" @session="sessionShown" @tutor="emit('tutor')" /></KeepAlive>
       <div v-if="current?.status !== 'CONFIRMED'" class="no-lesson"><h2 class="display" tabindex="-1">Choose a leaf to begin.</h2><button class="primary meadow" @click="view = 'home'">Go to your tree</button></div>
     </div>
   </section>
@@ -765,7 +799,8 @@ watch(view, (now) => { if (now === "setup" && material.value && !preview.value) 
     <h2 id="delete-title" class="display">Delete “{{ deleteTarget?.title }}”?</h2>
     <div id="delete-text" class="delete-text">
       <p>The material and its files leave your library for good. This can't be undone.</p>
-      <p>The tutor stops using it for new lessons, practice and skill suggestions. Past lessons and practice keep their text, and their citations of it will say that it was deleted.</p>
+      <p v-if="deleteTarget?.work">It is your own work, attached to an answer. The answer keeps its text, but the tutor can no longer open this file.</p>
+      <p v-else>The tutor stops using it for new lessons, practice and skill suggestions. Past lessons and practice keep their text, and their citations of it will say that it was deleted.</p>
       <p v-if="deleteEffects.unconfirmed">{{ count(deleteEffects.unconfirmed, "suggested skill", "suggested skills") }} from it that you haven't confirmed will be discarded.</p>
       <p v-if="deleteEffects.confirmed">{{ deleteEffects.confirmed === 1 ? "The confirmed skill" : "Confirmed skills" }} taught from it keep{{ deleteEffects.confirmed === 1 ? "s its" : " their" }} progress.<template v-if="deleteEffects.stranded">{{ " " }}{{ deleteEffects.stranded === 1 ? (deleteEffects.confirmed === 1 ? "It has" : "One of them has") : `${deleteEffects.stranded} of them have` }} no other source, so add another source under Manage skills before {{ deleteEffects.stranded === 1 ? "its" : "their" }} next lesson.</template></p>
     </div>
@@ -856,6 +891,12 @@ watch(view, (now) => { if (now === "setup" && material.value && !preview.value) 
 .file-text strong { font-size: 13px; font-weight: 650; overflow-wrap: anywhere; }
 .file-text small { font-size: 12px; color: var(--muted); }
 .file-text small.waiting { color: var(--sand-note); font-weight: 600; }
+/* The learner's own work, below the course's files, collapsed until opened. */
+.work-group { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line); }
+.work-group summary { padding: 6px 8px; border-radius: 10px; cursor: pointer; font-size: 13px; font-weight: 650; color: var(--soft); }
+.work-group summary:hover { background: var(--inset); color: var(--ink); }
+.work-note { margin: 6px 8px 0; font-size: 12px; line-height: 1.45; }
+.detail > .work-note { margin: 0 0 14px; font-size: 13px; }
 .detail { min-width: 0; }
 .detail-title { margin: 0 0 6px; font-size: 28px; overflow-wrap: anywhere; }
 .detail-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 14px; }

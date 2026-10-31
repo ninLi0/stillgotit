@@ -65,8 +65,8 @@ prerequisitesReady(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.
 progressRows(skills: SkillMapping.SkillMapRows, tracks: MasteryEstimating.ProgressRows) : SkillProgress
   Pairs each course skill with its estimate for the current definition.
 
-responseInput(data: GroundedTutoring.StudyRecord, text: String, channel: GroundedTutoring.Channel, attachments: AttachmentList, sources: Library.SourceRecords) : ResponseInput
-  Checks each listed material against the supplied sources, which are the learner's own materials in the session's course, and treats a list that names one material twice as invalid. One failing entry makes the whole response invalid. Rejects a response with neither text nor an attachment. The media are the retained files of each listed material in list order, keeping each material's own file order.
+responseInput(data: GroundedTutoring.StudyRecord, text: String, channel: GroundedTutoring.Channel, attachments: AttachmentList, sources: Library.SourceRecords, work: Library.SourceRecords) : ResponseInput
+  Checks each listed material against the supplied sources and work, which together are the learner's own materials in the session's course: the sources they learn from and their own work, such as a photo uploaded for this answer. It treats a list that names one material twice as invalid. One failing entry makes the whole response invalid. Rejects a response with neither text nor an attachment. The media are the retained files of each listed material in list order, keeping each material's own file order.
 
 reviewApproved(reviewed: Flag, unseen: Flag, outsideHelp: Flag) : Flag
   Requires explicit whole-attempt review and Boolean freshness and outside-help declarations.

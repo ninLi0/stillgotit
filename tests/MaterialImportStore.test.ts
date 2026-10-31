@@ -47,6 +47,34 @@ function identity({ owner, requestId }: Start): ImportIdentity { return { owner,
 /** What a separate process reads back: dates arrive as text. */
 const json = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 
+test("a request for the learner's own work keeps its purpose, and its prepared input must say the same", async () => {
+  const { store, name } = setup(), input = { ...start(), request: { ...start().request, purpose: "WORK" as const } }, id = identity(input);
+  const created = await store.getOrCreate(input);
+  expect(created.request).toEqual(input.request);
+  // The same request returns the same import; the request without its purpose is a different one.
+  expect(await store.getOrCreate(structuredClone(input))).toEqual(created);
+  const { purpose: _, ...asSource } = input.request;
+  await expect(store.getOrCreate({ ...input, request: asSource })).rejects.toBeInstanceOf(ImportRequestConflict);
+  const source = [{ file: "retained/answer.jpg", name: "answer.jpg", mediaType: "image/jpeg", renditions: [], limitations: [] }];
+  const retained = await store.saveSources({ ...id, revision: 0, sources: source });
+  const prepared = { owner: input.owner, importKey: created.importKey, scope: input.request.scope, title: input.request.title,
+    locator: `upload:${created.importKey}`, content: "My answer", originals: source, origin: input.request.origin, purpose: "WORK" as const };
+  await expect(store.savePrepared({ ...id, revision: retained.revision, prepared: { ...prepared, purpose: "SOURCE" } })).rejects.toBeInstanceOf(ImportProgressConflict);
+  const ready = await store.savePrepared({ ...id, revision: retained.revision, prepared });
+  expect(ready).toMatchObject({ stage: "READY", prepared });
+  expect((await new MaterialImportStore(connection!.db, name).get(id))!.request).toEqual(input.request);
+});
+
+test("a source's prepared input must not name the learner's work", async () => {
+  const { store } = setup(), input = start(), id = identity(input), created = await store.getOrCreate(input);
+  const source = [{ file: "retained/source.pdf", name: "lesson.pdf", mediaType: "application/pdf", renditions: [], limitations: [] }];
+  const retained = await store.saveSources({ ...id, revision: 0, sources: source });
+  const prepared = { owner: input.owner, importKey: created.importKey, scope: input.request.scope, title: input.request.title,
+    locator: `upload:${created.importKey}`, content: "Matrix multiplication", originals: source, origin: input.request.origin, purpose: "WORK" as const };
+  await expect(store.savePrepared({ ...id, revision: retained.revision, prepared })).rejects.toBeInstanceOf(ImportProgressConflict);
+  expect((await store.get(id))!.stage).toBe("SOURCES_SAVED");
+});
+
 test("import checkpoints freeze preparation and survive a lost reply and restart", async () => {
   const { store, name, records } = setup(), input = start(), id = identity(input);
   const created = await store.getOrCreate(input);
@@ -54,7 +82,7 @@ test("import checkpoints freeze preparation and survive a lost reply and restart
   const retained = await store.saveSources({ ...id, revision: 0, sources: source });
   expect(retained.stage).toBe("SOURCES_SAVED");
   const prepared = { owner: input.owner, importKey: created.importKey, scope: input.request.scope, title: input.request.title,
-    locator: `upload:${created.importKey}`, content: "Matrix multiplication", originals: source, origin: input.request.origin };
+    locator: `upload:${created.importKey}`, content: "Matrix multiplication", originals: source, origin: input.request.origin, purpose: "SOURCE" as const };
   const original = Collection.prototype.updateOne;
   const write = spyOn(Collection.prototype, "updateOne").mockImplementation(async function(this: Collection, ...args: Parameters<typeof original>) {
     const result = await original.apply(this, args);
@@ -156,7 +184,7 @@ describe("MaterialImportStore", () => {
     const before = await records.find().toArray();
     const file = input.request.sources[0]!;
     const changes: Partial<ImportRequest>[] = [
-      { scope: "course-physics" }, { title: "Different lesson" }, { origin: "REFERENCE" },
+      { scope: "course-physics" }, { title: "Different lesson" }, { origin: "REFERENCE" }, { purpose: "WORK" },
       { sources: [...input.request.sources].reverse() },
       { sources: [{ ...file, kind: "UPLOAD", name: "lesson.pdf", size: 1024, sha256: "b".repeat(64) }] },
       { sources: [{ kind: "REFERENCE", locator: "https://example.test/other-lesson" }] },
@@ -211,6 +239,8 @@ describe("MaterialImportStore", () => {
     const invalid = [null, [], undefined, { ...input, owner: "" }, { ...input, requestId: { $ne: "" } },
       { ...input, importKey: "browser-chosen" }, ...[
         { ...input.request, title: " " }, { ...input.request, scope: "" }, { ...input.request, origin: "UNKNOWN" },
+        // Only the learner's own work names a purpose; a source names none.
+        { ...input.request, purpose: "SOURCE" }, { ...input.request, purpose: "work" }, { ...input.request, purpose: undefined },
         { ...input.request, sources: [] }, { ...input.request, sources: new Array(1) },
         { ...input.request, sources: [{ kind: "REFERENCE", locator: " " }] },
         { ...input.request, sources: [{ kind: "UPLOAD", name: "lesson.pdf", size: -1, sha256: "a".repeat(64) }] },
@@ -512,7 +542,7 @@ describe("Transcription progress", () => {
     await expect(restarted.retry({ owner: "sam", requestId: "older" })).rejects.toBeInstanceOf(ImportNotRetryable);
     const newer = ready[1]!;
     const prepared = { owner: "sam", importKey: newer.importKey, scope: newer.request.scope, title: newer.request.title, locator: `upload:${newer.importKey}`,
-      content: "[k/lines/1-1]\nNotes", originals: newer.partial!, origin: "COURSE" as const };
+      content: "[k/lines/1-1]\nNotes", originals: newer.partial!, origin: "COURSE" as const, purpose: "SOURCE" as const };
     expect((await restarted.savePrepared({ owner: "sam", requestId: "newer", revision: newer.revision, prepared })).stage).toBe("READY");
     expect(await restarted.preparable()).toEqual([]);
     // A waiting import cannot be prepared.
@@ -547,7 +577,7 @@ describe("Transcription progress", () => {
     const source = [{ file: `${created.importKey}/${"a".repeat(64)}.pdf`, name: "lesson.pdf", mediaType: "application/pdf", renditions: [], limitations: [] }];
     const saved = await store.saveSources({ ...id, revision: 0, sources: source });
     const prepared = { owner: input.owner, importKey: created.importKey, scope: input.request.scope, title: input.request.title,
-      locator: `upload:${created.importKey}`, content: "Matrix multiplication", originals: source, origin: input.request.origin };
+      locator: `upload:${created.importKey}`, content: "Matrix multiplication", originals: source, origin: input.request.origin, purpose: "SOURCE" as const };
     const ready = await store.savePrepared({ ...id, revision: saved.revision, prepared });
     await expect(store.discard(id)).rejects.toBeInstanceOf(ImportAlreadySaved);
     await expect(store.markFilesDeleted(id)).rejects.toBeInstanceOf(ImportProgressConflict);
@@ -567,7 +597,7 @@ describe("Transcription progress", () => {
       const source = [{ file: `${created.importKey}/${"a".repeat(64)}.pdf`, name: "lesson.pdf", mediaType: "application/pdf", renditions: [], limitations: [] }];
       const withSources = await store.saveSources({ ...id, revision: 0, sources: source });
       const ready = await store.savePrepared({ ...id, revision: withSources.revision, prepared: { owner, importKey: created.importKey, scope: input.request.scope,
-        title: input.request.title, locator: `upload:${created.importKey}`, content: "Matrix multiplication", originals: source, origin: input.request.origin } });
+        title: input.request.title, locator: `upload:${created.importKey}`, content: "Matrix multiplication", originals: source, origin: input.request.origin, purpose: "SOURCE" as const } });
       return store.complete({ ...id, revision: ready.revision, material });
     };
     const first = await saved("sam", "r1", "m1"), second = await saved("sam", "r2", "m2");
@@ -596,7 +626,7 @@ describe("Transcription progress", () => {
     const source = [{ file: `${created.importKey}/${"a".repeat(64)}.pdf`, name: "lesson.pdf", mediaType: "application/pdf", renditions: [], limitations: [] }];
     const withSources = await store.saveSources({ ...id, revision: 0, sources: source });
     const ready = await store.savePrepared({ ...id, revision: withSources.revision, prepared: { owner: input.owner, importKey: created.importKey, scope: input.request.scope,
-      title: input.request.title, locator: `upload:${created.importKey}`, content: "Matrix multiplication", originals: source, origin: input.request.origin } });
+      title: input.request.title, locator: `upload:${created.importKey}`, content: "Matrix multiplication", originals: source, origin: input.request.origin, purpose: "SOURCE" as const } });
     await expect(store.discard(id)).rejects.toBeInstanceOf(ImportAlreadySaved);
     const discarded = (await store.discard({ ...id, materialDeleted: true }))!;
     expect(discarded).toMatchObject({ stage: "DISCARDED", filesDeleted: false, revision: ready.revision + 1, request: input.request });

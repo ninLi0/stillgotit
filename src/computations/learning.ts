@@ -145,10 +145,13 @@ export function suggestRequest({ selected }: { selected: SourceContext[] }): Tut
 export function taskCriteria({ outcome, gate }: { outcome: string; gate: string }): string { return `${outcome}\nFull demonstration gate: ${gate}`; }
 /** The material identities a learner attaches to one response, in the order attached. It may be empty. */
 export type AttachmentList = string[];
-/** Every listed material must be one of the supplied sources and appear once; one failing entry invalidates the whole response. */
-export function responseInput({ data, text, channel, attachments, sources }: { data: StudySession; text: string; channel: Channel; attachments: AttachmentList; sources: SourceContext[] }) {
-  const listed = Array.isArray(attachments) ? attachments : [];
-  const attached = listed.map((material) => sources.find((source) => source.material === material));
+/**
+ * Every listed material must be one of the learner's materials supplied, a source or their own work, and appear once; one
+ * failing entry invalidates the whole response.
+ */
+export function responseInput({ data, text, channel, attachments, sources, work }: { data: StudySession; text: string; channel: Channel; attachments: AttachmentList; sources: SourceContext[]; work: SourceContext[] }) {
+  const listed = Array.isArray(attachments) ? attachments : [], owned = [...sources, ...work];
+  const attached = listed.map((material) => owned.find((source) => source.material === material));
   const found = attached.filter((source): source is SourceContext => source !== undefined);
   const valid = Array.isArray(attachments) && found.length === listed.length && new Set(listed).size === listed.length &&
     (Boolean(text.trim()) || listed.length > 0);

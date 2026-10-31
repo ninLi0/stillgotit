@@ -97,8 +97,10 @@ export function refusalStartsNewImport(problem: unknown): boolean {
 export async function uploadMaterial(form: FormData): Promise<{ material: MaterialId }> {
   const answer = await importMaterial(form);
   if ("material" in answer) return answer;
+  // The attach control saves the learner's own work, which Materials lists under "Your work".
+  const where = form.get("purpose") === "WORK" ? "Your work in Materials" : "Course materials";
   throw new HostError(answer.state === "TRANSCRIBING"
-    ? "This recording was added to Course materials to be transcribed, so it can't be attached here. Attach a photo of your work."
+    ? `This recording was added to ${where} to be transcribed, so it can't be attached here. Attach a photo of your work.`
     : "Your work was saved but isn't ready to attach yet. Try again in a minute.", answer.state, true);
 }
 

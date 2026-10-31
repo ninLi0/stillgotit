@@ -98,7 +98,7 @@ export const materialInput: EndpointValidator = (value) => {
   const record = value as Record<string, unknown>;
   return { ok: ["course", "importKey", "title", "locator"].every((key) => typeof record[key] === "string" && (record[key] as string).trim().length > 0) &&
     (record.session === null || typeof record.session === "string") && typeof record.content === "string" && record.content.length <= 500000 &&
-    isMediaList(record.originals) && (record.origin === "COURSE" || record.origin === "REFERENCE") };
+    isMediaList(record.originals) && (record.origin === "COURSE" || record.origin === "REFERENCE") && (record.purpose === "SOURCE" || record.purpose === "WORK") };
 };
 
 /** A tutor choice names a model and a level, each a string of at most 100 characters. The flow checks them against the catalog. */

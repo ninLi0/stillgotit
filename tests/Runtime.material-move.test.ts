@@ -58,10 +58,11 @@ test("a material saved under GroundedTutoring moves to the Library and stays rea
   expect(await rows(database, "library.materials")).toEqual([saved]);
 
   const library = runtime.application.concepts.Library, { _id: material, importKey, ...data } = saved;
-  expect(await library._materials({ owner, scope })).toEqual([{ material, title: saved.title, locator: saved.locator, origin: saved.origin }]);
-  expect(await library._material({ material })).toEqual([data]);
+  // A material saved before purposes were recorded reads as a source.
+  expect(await library._materials({ owner, scope })).toEqual([{ material, title: saved.title, locator: saved.locator, origin: saved.origin, purpose: "SOURCE" }]);
+  expect(await library._material({ material })).toEqual([{ ...data, purpose: "SOURCE" }]);
   // The import key moved with the material, so a retry of the original import still returns it.
-  expect(await library.add({ ...data, importKey })).toEqual({ material });
+  expect(await library.add({ ...data, importKey, purpose: "SOURCE" })).toEqual({ material });
   expect(await rows(database, "library.materials")).toEqual([saved]);
 });
 
