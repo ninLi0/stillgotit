@@ -34,7 +34,7 @@ const gradedCommands: Record<string, EndpointValidator> = { "/courses/graded/ext
  * The skill read at /learning/read is not one: its repairs can save evidence and close a task, so it keeps the lock.
  * Paths exclude `/api`.
  */
-const plainReads = new Set(["/learning/progress", "/learning/continue", "/learning/recent", "/learning/memory", "/planning/read"]);
+const plainReads = new Set(["/learning/progress", "/learning/continue", "/learning/recent", "/learning/archived", "/learning/memory", "/planning/read"]);
 /**
  * Requests that run under the learner's lock after admission, with the tutor's failure reason added over HTTP: every
  * learning and planning command, the skill read with its repairs, and the commands that ask the tutor about a material.

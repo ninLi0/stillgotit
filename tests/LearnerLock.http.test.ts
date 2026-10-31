@@ -107,10 +107,11 @@ test("plain reads answer while a tutor request holds the learner's lock, from th
   let replied = false;
   void held.reply.finally(() => { replied = true; });
 
-  // The five learning and planning reads that used to wait behind the lock, then the reads that never took it.
+  // The five learning and planning reads that used to wait behind the lock, the archived conversations, then the reads
+  // that never took it.
   const reads: [string, Record<string, unknown>][] = [
     ["/learning/recent", { course }], ["/learning/continue", { course }], ["/learning/memory", { course }], ["/learning/progress", { course }],
-    ["/planning/read", { course }],
+    ["/planning/read", { course }], ["/learning/archived", { course }],
     ["/courses", {}], ["/courses/read", { course }], ["/courses/scores", {}], ["/courses/graded/read", { material: learner.material }],
     ["/courses/materials/read", { material: learner.material }], ["/courses/materials/imports", { course }], ["/settings/tutor", {}], ["/settings/view", {}],
   ];
@@ -130,12 +131,13 @@ test("plain reads answer while a tutor request holds the learner's lock, from th
   expect(answers["/learning/memory"]!.body.skills).toEqual([expect.objectContaining({ skill })]);
   expect(answers["/learning/progress"]!.body.data.estimates).toEqual([expect.objectContaining({ skill })]);
   expect(answers["/planning/read"]!.body.data.preferences).toMatchObject({ dailyMinutes: 30 });
+  expect(answers["/learning/archived"]!.body.sessions).toEqual([]);
 
   // Native callers' plain reads do not wait either.
   const native = await within(app.runtime.gateway.invoke("/learning/recent", { session: learner.session, course }, { timeoutMs: 5000 }));
   expect(native).toMatchObject({ ok: true, value: { sessions: [expect.objectContaining({ studySession: held.lesson })] } });
-  // Without a session, the five reads are refused with the same answer as when they took the lock.
-  for (const [path, input] of reads.slice(0, 5)) expect(await app.anonymous(path, input), path).toEqual({ status: 401, body: { error: "UNAUTHORIZED" } });
+  // Without a session, the six reads are refused with the same answer as when they took the lock.
+  for (const [path, input] of reads.slice(0, 6)) expect(await app.anonymous(path, input), path).toEqual({ status: 401, body: { error: "UNAUTHORIZED" } });
 
   held.release();
   expect(await held.reply).toEqual({ status: 200, body: { tutor: expect.objectContaining({ model: expect.any(String) }) } });
