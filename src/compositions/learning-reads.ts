@@ -3,7 +3,7 @@ import { compute, each, former, no, now, view, where, whether } from "@mit-sdg/s
 import { concepts, computations } from "../concepts.ts";
 import { composition as Courses } from "./courses.ts";
 import { learningInput, structuredOutput, validators } from "./reusable/inputs.ts";
-const { Sessioning, SkillMapping: Mapping, Library, GroundedTutoring: Tutoring, AssessmentReviewing: Assessment, MasteryEstimating: Mastery, StudyPlanning: Planning } = concepts;
+const { Sessioning, SkillMapping: Mapping, Library, GroundedTutoring: Tutoring, AssessmentReviewing: Assessment, MasteryEstimating: Mastery, StudyPlanning: Planning, ConversationArchiving: Archive } = concepts;
 export const OwnedSkill = view("(owner) owns study skill (skill)", ({ owner, skill }, { course, definition, status }, { unit }) => where(
   Mapping._skill({ skill }).is({ unit, current: definition, status }), Mapping._unit({ unit }).is({ course }), Courses.OwnedCourse({ owner, course }),
 )).optional();
@@ -11,9 +11,10 @@ export const ActiveSkill = view("(owner) can study confirmed (skill)", ({ owner,
 export const OwnedSession = view("(owner) owns study session (studySession)", ({ owner, studySession }, { skill, course, definition }) => where(
   Tutoring._session({ session: studySession }).is({ owner, topic: skill, definition }), OwnedSkill({ owner, skill }).is({ course }),
 )).optional();
+// An archived conversation is read-only until it is restored, so it is not one the learner can change.
 export const OpenSession = view("(owner) can change session (studySession)", ({ owner, studySession }, { skill, course, definition }) => where(
   OwnedSession({ owner, studySession }).is({ skill, course, definition }), Tutoring._session({ session: studySession }).is({ status: "OPEN" }),
-  no(Assessment._byTask({ author: owner, task: studySession })),
+  no(Assessment._byTask({ author: owner, task: studySession })), no(Archive._archived({ owner, item: studySession })),
 )).optional();
 // The learner's open session with its saved dialogue and the learner's sources in its course. The two queries always
 // answer for an existing session, so this view holds exactly when OpenSession holds; OpenSession stays the refusal guard.
@@ -39,12 +40,14 @@ export const SkillContext = view("the current context of (skill) for (owner)", (
   Library._sourceSet({ owner, scope: course }).is({ sources }), compute(computations.selectSkill, { skills, skill }, context),
 )).optional();
 // `at` is the Read flow's instant. The explanation is an optional row: without one, `explanation` is null and the record is unchanged.
-export const SkillData = former("study data for (owner) and (skill) at (at)", ({ owner, skill, at }, { context, definition, tracks, sessions, cases, track, estimate, explanation, timeline }) => where(
+// `archived` names the skill's sessions that the learner archived, which the page shows read-only.
+export const SkillData = former("study data for (owner) and (skill) at (at)", ({ owner, skill, at }, { context, definition, tracks, sessions, cases, track, estimate, explanation, timeline, items, archived }) => where(
   SkillContext({ owner, skill }).is({ context, definition, tracks }), Tutoring._study({ owner, topic: skill }).is({ sessions }),
   Assessment._history({ author: owner, subject: skill }).is({ cases }), compute(computations.studyDetail, { context, tracks, sessions, cases }, { track, estimate }),
   whether(Mastery._explanation({ learner: owner, subject: skill, definition, at }).is({ explanation })),
   compute(computations.estimateTimeline, { explanation, tracks }, timeline),
-).form({ skill: context, track, estimate, sessions, cases, explanation: timeline }));
+  Archive._itemSet({ owner }).is({ items }), compute(computations.archivedAmong, { sessions, items }, archived),
+).form({ skill: context, track, estimate, sessions, cases, explanation: timeline, archived }));
 export const SessionData = former("saved study session (studySession)", ({ studySession }, { data }) => where(Tutoring._sessionData({ session: studySession }).is({ data })).form({ data }));
 export const Progress = former("skill estimates for (owner) in (course)", ({ owner, course }, { skills, tracks, estimates }) => where(
   Mapping._map({ course }).is({ skills }), Mastery._progress({ learner: owner }).is({ tracks }), compute(computations.progressRows, { skills, tracks }, estimates),
@@ -80,20 +83,37 @@ const Continue = endpoint("/learning/continue", ({ session, course, owner }) => 
     where(Courses.OwnedCourse({ owner, course })).then(respond({ sessions: OpenStudy({ owner, course }) })).named("owned"),
     where(no(Courses.OwnedCourse({ owner, course }))).then(respond({ error: "COURSE_UNAVAILABLE" })).named("missing"),
   ), { validators: { ...validators, input: learningInput, output: structuredOutput } });
-/** How many conversations the sidebar lists. */
-export const RECENT_LIMIT = 40;
 // The sidebar's conversations: the learner's latest lessons and practice sessions across the course's confirmed skills,
-// open or closed, most recently active first. _recent orders and caps them; each row then reads its own record.
-export const RecentStudy = former("recent study sessions for (owner) in (course)", ({ owner, course }, { skills, topics, studySession, skill, status, skillTitle, data, kind, title, startedAt, lastActivity }) =>
+// open or closed, most recently active first, leaving out the ones the learner archived. _recent orders and caps them
+// at 40 for each page the sidebar shows; each row then reads its own record.
+export const RecentStudy = former("recent study sessions for (owner) in (course), (pages) pages", ({ owner, course, pages }, { skills, topics, hidden, limit, studySession, skill, status, skillTitle, data, kind, title, startedAt, lastActivity }) =>
   each(Mapping._map({ course }).is({ skills }))
-    .where(compute(computations.studyTopics, { skills }, topics), Tutoring._recent({ owner, topics, limit: RECENT_LIMIT }).is({ session: studySession, topic: skill, status }),
+    .where(compute(computations.studyTopics, { skills }, topics), Archive._itemSet({ owner }).is({ items: hidden }), compute(computations.recentLimit, { pages }, limit),
+      Tutoring._recent({ owner, topics, hidden, limit }).is({ session: studySession, topic: skill, status }),
       Mapping._skill({ skill }).is({ title: skillTitle }), Tutoring._sessionData({ session: studySession }).is({ data }),
       compute(computations.recentSession, { data, skillTitle }, { kind, title, startedAt, lastActivity }))
     .form({ studySession, skill, skillTitle, kind, status, title, startedAt, lastActivity }),
 );
-const Recent = endpoint("/learning/recent", ({ session, course, owner }) => receive({ session, course })
+// `pages` is how many pages of 40 the sidebar shows: 1 at first, and one more for each "Show older conversations". Every
+// read asks for all of them, so the list stays whole while conversations move to the top.
+const Recent = endpoint("/learning/recent", ({ session, course, pages, owner }) => receive({ session, course, pages })
   .then(Sessioning.use({ session }).responds({ subject: owner })).then(
-    where(Courses.OwnedCourse({ owner, course })).then(respond({ sessions: RecentStudy({ owner, course }) })).named("owned"),
+    where(Courses.OwnedCourse({ owner, course })).then(respond({ sessions: RecentStudy({ owner, course, pages }) })).named("owned"),
+    where(no(Courses.OwnedCourse({ owner, course }))).then(respond({ error: "COURSE_UNAVAILABLE" })).named("missing"),
+  ), { validators: { ...validators, input: learningInput, output: structuredOutput }, input: { required: ["session", "course"], defaults: { pages: 1 } } });
+// The conversations the learner archived in the course, most recently archived first, with the same fields as the
+// sidebar's rows and when each was archived. Like the sidebar, it lists conversations of confirmed skills only.
+export const ArchivedStudy = former("archived study sessions for (owner) in (course)", ({ owner, course }, { studySession, archivedAt, skill, status, unit, skillTitle, data, kind, title, startedAt, lastActivity }) =>
+  each(Archive._items({ owner }).is({ item: studySession, archivedAt }))
+    .where(Tutoring._session({ session: studySession }).is({ owner, topic: skill, status }), Mapping._skill({ skill }).is({ unit, title: skillTitle, status: "CONFIRMED" }),
+      Mapping._unit({ unit }).is({ course }), Tutoring._sessionData({ session: studySession }).is({ data }),
+      compute(computations.recentSession, { data, skillTitle }, { kind, title, startedAt, lastActivity }))
+    .arranged(archivedAt, "descending")
+    .form({ studySession, skill, skillTitle, kind, status, title, startedAt, lastActivity, archivedAt }),
+);
+const Archived = endpoint("/learning/archived", ({ session, course, owner }) => receive({ session, course })
+  .then(Sessioning.use({ session }).responds({ subject: owner })).then(
+    where(Courses.OwnedCourse({ owner, course })).then(respond({ sessions: ArchivedStudy({ owner, course }) })).named("owned"),
     where(no(Courses.OwnedCourse({ owner, course }))).then(respond({ error: "COURSE_UNAVAILABLE" })).named("missing"),
   ), { validators: { ...validators, input: learningInput, output: structuredOutput } });
 
@@ -158,4 +178,4 @@ export const CourseScores = former("the confidence in each active course of (own
 const Scores = endpoint("/courses/scores", ({ session, owner }) => receive({ session })
   .then(Sessioning.use({ session }).responds({ subject: owner }))
   .then(respond({ courses: CourseScores({ owner }) })), { validators: { ...validators, output: structuredOutput } });
-export const composition = { OwnedSkill, ActiveSkill, OwnedSession, OpenSession, SessionSources, PendingGrade, OwnedCase, OwnedAnyCase, SkillContext, SkillData, SessionData, Progress, PlanData, PlanContext, CanReplan, NeedsEvidence, OpenStudy, Continue, RecentStudy, Recent, SkillCurve, MemorySkills, MemoryPolicy, Memory, CourseScores, Scores };
+export const composition = { OwnedSkill, ActiveSkill, OwnedSession, OpenSession, SessionSources, PendingGrade, OwnedCase, OwnedAnyCase, SkillContext, SkillData, SessionData, Progress, PlanData, PlanContext, CanReplan, NeedsEvidence, OpenStudy, Continue, RecentStudy, Recent, ArchivedStudy, Archived, SkillCurve, MemorySkills, MemoryPolicy, Memory, CourseScores, Scores };

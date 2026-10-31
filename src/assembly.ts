@@ -8,7 +8,7 @@ import type { Budgeting } from "./concepts/Budgeting/Budgeting.ts";
 import type { MasteryEstimating } from "./concepts/MasteryEstimating/MasteryEstimating.ts";
 import type { AssessmentReviewing } from "./concepts/AssessmentReviewing/AssessmentReviewing.ts";
 import { assemble, type ConceptImplementation } from "@mit-sdg/sync-engine/assembly";
-import { applicationConceptSet, type TreeStyling, TutorPreferring, ViewPreferring } from "./concepts.ts";
+import { applicationConceptSet, type ConversationArchiving, type TreeStyling, TutorPreferring, ViewPreferring } from "./concepts.ts";
 import type { Db } from "mongodb";
 import type { FederatingConcept } from "./concepts/Federating/Federating.ts";
 import type { RegisteringConcept, User } from "./concepts/Registering/Registering.ts";
@@ -44,6 +44,7 @@ export function assembleApplication(instances: {
   TutorPreferring?: ConceptImplementation<typeof TutorPreferring>;
   ViewPreferring?: ConceptImplementation<typeof ViewPreferring>;
   TreeStyling: ConceptImplementation<typeof TreeStyling>;
+  ConversationArchiving: ConceptImplementation<typeof ConversationArchiving>;
 }, clock = () => new Date()) {
   return assemble({
     conceptSet: applicationConceptSet,

@@ -67,8 +67,12 @@ test("a more specific sentence applies only where its design gives it, the gener
   // A concept's sentence applies on every endpoint.
   expect(refusalDetail("/courses/units/add", "UNIT_COURSE_UNAVAILABLE")).toBe(message(UnitCourseUnavailableError));
   // Learning.md, "Refusal sentences": the four codes that once reached the browser as their category alone.
-  const openSession = "This session is closed or is not one of yours. Choose one of your open sessions.";
-  for (const path of ["/learning/respond", "/learning/transcript", "/learning/assess", "/learning/retry"]) expect(refusalDetail(path, "SESSION_UNAVAILABLE"), path).toBe(openSession);
+  const openSession = "This session is closed, archived, or not one of yours. Choose one of your open sessions.";
+  for (const path of ["/learning/respond", "/learning/transcript", "/learning/assess", "/learning/retry", "/learning/finish"]) expect(refusalDetail(path, "SESSION_UNAVAILABLE"), path).toBe(openSession);
+  // Learning.md, "Archiving a conversation": archiving and restoring accept any of the learner's own conversations.
+  for (const path of ["/learning/archive", "/learning/restore"]) {
+    expect(refusalDetail(path, "SESSION_UNAVAILABLE"), path).toBe("This conversation is not one of yours. Choose one of your own conversations.");
+  }
   expect(refusalDetail("/learning/hint", "SESSION_CHANGED")).toBe("This session closed before the tutor's answer could be saved. Your own work in it is still saved.");
   expect(refusalDetail("/learning/task", "SKILL_CHANGED")).toBe("This skill changed while the tutor was answering, so nothing was saved. Try again.");
   expect(refusalDetail("/courses/skills/suggest", "MATERIAL_UNAVAILABLE")).toBe("This material is not available in this course. Reload the page to see its materials.");

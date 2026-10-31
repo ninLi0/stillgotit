@@ -141,6 +141,40 @@ test("Recent answers at most 40 sessions, the most recently active ones", async 
   expect(ids(sessions)).toEqual([lessons[0]!, ...lessons.slice(3).reverse()]);
 }, 120_000);
 
+test("Recent answers more pages of 40 when asked, leaves archived conversations out before the cap, and refuses a page count it does not offer", async () => {
+  const app = await setup(), { learner, user, course, skill } = await learningFixture(app, "recent-pages");
+  const lessons: string[] = [];
+  for (let n = 1; n <= 81; n++) lessons.push((await learner.ok("/learning/lesson", { skill, request: `Question ${n}` })).lesson);
+  const newest = [...lessons].reverse();
+  // One page is the default, so the first load reads what it read before; each further page adds the next 40.
+  const page = async (pages?: number) => ids((await learner.ok("/learning/recent", pages === undefined ? { course } : { course, pages })).sessions);
+  expect(await page()).toEqual(newest.slice(0, 40));
+  expect(await page(1)).toEqual(newest.slice(0, 40));
+  expect(await page(2)).toEqual(newest.slice(0, 80));
+  // The third page holds the one conversation left, so it comes back short, which tells the sidebar there is nothing older.
+  expect(await page(3)).toEqual(newest);
+  expect(await page(25)).toEqual(newest);
+
+  // Archived conversations are left out before the cap, so the page still holds 40 and the next ones move up.
+  await learner.ok("/learning/archive", { studySession: newest[0] });
+  await learner.ok("/learning/archive", { studySession: newest[45] });
+  const shown = newest.filter((lesson) => lesson !== newest[0] && lesson !== newest[45]);
+  expect(await page()).toEqual(shown.slice(0, 40));
+  expect(await page(2)).toEqual(shown.slice(0, 80));
+  expect(await page(3)).toEqual(shown);
+  await learner.ok("/learning/restore", { studySession: newest[45] });
+  expect(await page(2)).toEqual(newest.slice(1, 81));
+
+  // A page count must be a whole number from 1 to 25, so one read lists at most 1,000 conversations.
+  const owner = await app.native(user);
+  for (const pages of [0, -1, 26, 1.5, "2", null, true]) {
+    expect(await learner.post("/learning/recent", { course, pages }), String(pages)).toEqual({ status: 400, body: { error: "INVALID_REQUEST" } });
+    expect(await owner.gateway("/learning/recent", { course, pages }), String(pages)).toMatchObject({ ok: false, error: { kind: "framework", code: "INVALID_INPUT" } });
+  }
+  const answered = await owner.gateway("/learning/recent", { course, pages: 2 }) as { ok: true; value: { sessions: Row[] } };
+  expect(ids(answered.value.sessions)).toEqual(newest.slice(1, 81));
+}, 240_000);
+
 test("Recent refuses a course the learner does not own and shows nothing of it", async () => {
   const app = await setup(), { learner, user, course, skill } = await learningFixture(app, "recent-owner");
   const { lesson } = await learner.ok("/learning/lesson", { skill, request: "Explain products." });

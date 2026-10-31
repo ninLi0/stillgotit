@@ -215,7 +215,7 @@ export const refusalDetails: Readonly<Record<string, string>> = {
   REGRADE_IMPORTED_UNAVAILABLE: "Imported coursework has no practice task to regrade, so correct it manually instead.",
   // Learning.md, "Refusal sentences": the learning endpoints' session and change refusals, and the material refusal that
   // Suggest shares with the course endpoints.
-  SESSION_UNAVAILABLE: "This session is closed or is not one of yours. Choose one of your open sessions.",
+  SESSION_UNAVAILABLE: "This session is closed, archived, or not one of yours. Choose one of your open sessions.",
   SESSION_CHANGED: "This session closed before the tutor's answer could be saved. Your own work in it is still saved.",
   SKILL_CHANGED: "This skill changed while the tutor was answering, so nothing was saved. Try again.",
   MATERIAL_UNAVAILABLE: "This material is not available in this course. Reload the page to see its materials.",
@@ -234,6 +234,9 @@ export const scopedRefusalDetails: Readonly<Record<string, { readonly applies: (
   COURSE_UNAVAILABLE: { applies: (path) => path.startsWith("/planning/"), detail: "Choose one of your own courses." },
   // Learning.md: Adjust answers a skill that is not one of the learner's confirmed skills with this sentence.
   SKILL_UNAVAILABLE: { applies: (path) => path === "/learning/adjust", detail: "Choose one of your confirmed skills before adjusting its estimate." },
+  // Learning.md, "Archiving a conversation": archiving and restoring accept any of the learner's own conversations, so
+  // they answer one that is not the learner's with this sentence.
+  SESSION_UNAVAILABLE: { applies: (path) => path === "/learning/archive" || path === "/learning/restore", detail: "This conversation is not one of yours. Choose one of your own conversations." },
 };
 
 /**

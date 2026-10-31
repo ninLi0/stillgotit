@@ -1,6 +1,6 @@
 # Shared learning reads
 
-[OwnedSkill](view:Reads.OwnedSkill) joins a skill through its unit to the learner's course. [ActiveSkill](view:Reads.ActiveSkill) also requires confirmation, and gives the skill's course and current definition. [OwnedSession](view:Reads.OwnedSession) checks both session ownership and access to its skill. [OpenSession](view:Reads.OpenSession) excludes closed sessions and any task with submitted assessment work. [OwnedCase](view:Reads.OwnedCase) joins an assessment to its author and course.
+[OwnedSkill](view:Reads.OwnedSkill) joins a skill through its unit to the learner's course. [ActiveSkill](view:Reads.ActiveSkill) also requires confirmation, and gives the skill's course and current definition. [OwnedSession](view:Reads.OwnedSession) checks both session ownership and access to its skill. [OpenSession](view:Reads.OpenSession) excludes closed sessions, archived sessions, and any task with submitted assessment work; an archived session is read-only until it is restored, as the [learning flows](Learning.md) describe under "Archiving a conversation". [OwnedCase](view:Reads.OwnedCase) joins an assessment to its author and course.
 
 [SessionSources](view:Reads.SessionSources) adds the open session's saved dialogue and the learner's sources in the session's course. Both queries answer for any session that exists, so SessionSources holds exactly when OpenSession holds. The endpoints still use OpenSession as their refusal guard, because its absence is what the refusal is about. [PendingGrade](view:Reads.PendingGrade) gives a submitted attempt in the learner's own session that has no judgment yet, with the case's work, the saved session, and the learner's sources in its course. These are everything a grading request reads. Assess and RetryAssessment grade through PendingGrade, and the admission check for a retry reads it too.
 
@@ -8,7 +8,7 @@
 
 The four endpoints declared here, [Continue](reaction:Reads.Continue), [Recent](reaction:Reads.Recent), [Memory](reaction:Reads.Memory), and [Scores](reaction:Reads.Scores), change nothing except the session's time of last use. The host therefore answers them without the learner's lock, even while one of the learner's tutor requests holds it, so the sidebar, Home, the Memory view, and the course menu never wait for the tutor. Each answers from the records saved at that moment: a lesson whose opening the tutor is still writing is listed with its request, and an estimate that a running assessment will change keeps its earlier value until the next read. The [runtime responsibilities](../runtime.md) explain why such a read never sees part of a single change.
 
-[SkillData](former:Reads.SkillData) presents current requirements, the matching mastery track, saved sessions, original work, and judgment history. [SessionData](former:Reads.SessionData) presents a saved tutoring session. [Progress](former:Reads.Progress) builds the tree's estimate list. [PlanData](former:Reads.PlanData) presents preferences, today's budget, the next activity, and the active plan.
+[SkillData](former:Reads.SkillData) presents current requirements, the matching mastery track, saved sessions, original work, and judgment history. It also lists, as `archived`, the identities of the skill's sessions that the learner archived: it reads every archived conversation of the learner with `ConversationArchiving._itemSet`, and [archivedAmong](computation:archivedAmong) keeps those among the skill's sessions, in the sessions' order. The page shows those sessions read-only and does not open one by itself when the skill opens. [SessionData](former:Reads.SessionData) presents a saved tutoring session. [Progress](former:Reads.Progress) builds the tree's estimate list. [PlanData](former:Reads.PlanData) presents preferences, today's budget, the next activity, and the active plan.
 
 ## Evidence behind the estimate
 
@@ -45,19 +45,41 @@ Reads.Continue at /learning/continue
 
 ## Conversations in the sidebar
 
-The sidebar lists the learner's latest conversations in the course, open or closed, so the learner can go back to any of them from any page. It is the only list of conversations, since the lesson page shows one conversation at a time, and its "+ New conversation" starts one in the open skill without a read. [Recent](reaction:Reads.Recent) answers that list.
+The sidebar lists the learner's latest conversations in the course, open or closed, so the learner can go back to any of them from any page. It is the only list of conversations, since the lesson page shows one conversation at a time, and its "+ New conversation" starts one in the open skill without a read. [Recent](reaction:Reads.Recent) answers that list. It takes the course and `pages`, the number of pages of 40 conversations the sidebar shows, a whole number from 1 to 25 that is 1 when the request leaves it out.
 
 - When the request arrives with a course, `Sessioning.use` turns the session into the acting learner, as for Continue.
 - Where [OwnedCourse](view:Courses.OwnedCourse) holds for that learner and course, the endpoint answers `sessions` with [RecentStudy](former:Reads.RecentStudy).
 - Where OwnedCourse does not hold, the endpoint answers `COURSE_UNAVAILABLE` and reads no session.
 
-RecentStudy reads the course map with `SkillMapping._map`, and [studyTopics](computation:studyTopics) keeps its confirmed skills, since only a confirmed skill has a study page. `GroundedTutoring._recent` then gives at most 40 of the learner's sessions in those skills, in every status, most recently active first: by the latest turn's time, or, before the first turn, by the time the session started. The cap and the order come from the concept query, because a former can order rows but cannot keep only the first few. For each of those sessions, RecentStudy reads the skill's title with `SkillMapping._skill` and the session's record with `GroundedTutoring._sessionData`, and [recentSession](computation:recentSession) gives its kind, its title, when it started, and when it was last active. A row keeps the order `_recent` gave it.
+RecentStudy reads the course map with `SkillMapping._map`, and [studyTopics](computation:studyTopics) keeps its confirmed skills, since only a confirmed skill has a study page. It reads the conversations the learner archived with `ConversationArchiving._itemSet`, and [recentLimit](computation:recentLimit) gives 40 for each page. `GroundedTutoring._recent` then gives at most that many of the learner's sessions in those skills, leaving out the archived ones, in every status, most recently active first: by the latest turn's time, or, before the first turn, by the time the session started. The cap and the order come from the concept query, because a former can order rows but cannot keep only the first few, and the archived conversations are passed to the query as `hidden` for the same reason: the query leaves them out before it applies the cap, so an archived conversation never takes the place of one that should be listed. For each of those sessions, RecentStudy reads the skill's title with `SkillMapping._skill` and the session's record with `GroundedTutoring._sessionData`, and [recentSession](computation:recentSession) gives its kind, its title, when it started, and when it was last active. A row keeps the order `_recent` gave it.
 
 Each row gives the session, its skill and the skill's title, its kind, its status, its title, `startedAt`, and `lastActivity`. A lesson's title is its opening request, shortened to about 60 characters at a word boundary; a practice session's title is "Practice · " and the skill's title. `startedAt` is null for a session saved before identities recorded the time, and `lastActivity` is then null until its first turn. Selecting a row opens that skill's study page on that session, the way a Continue row does.
+
+### Older conversations
+
+The first read asks for one page, so it costs what it did when the sidebar showed at most 40 conversations. When a read comes back with a full set of pages, 40 conversations for each page asked for, older ones may exist, so the sidebar ends with a "Show older conversations" row. Choosing it reads again with one more page. Every later read of the sidebar, such as the one after the learner sends a message, asks for the same number of pages, so the list stays whole and in order while conversations move to the top; a read that asked only for the newest page would drop the conversations that a new one pushed past the first 40. When the larger read comes back short of its pages, the row goes away, and when it brought no conversation the list did not already show, a note in its place says that there are no older conversations. Showing more pages costs one read of each listed conversation's record, as the first page does, so the sidebar asks for more only when the learner chooses to see them, and the page count starts at 1 again when the course page loads. One read lists at most 25 pages, which is 1,000 conversations.
+
+### Archived conversations
+
+The sidebar's Conversations group ends with "Archived conversations". The learner archives a conversation from the "⋯" button on its row, which opens a small menu with "Archive conversation", so a single slip of the pointer never archives one; the sidebar then says which conversation was archived and offers Undo, which restores it. [Archived](reaction:Reads.Archived) answers the archived list when the learner opens it.
+
+- When the request arrives with a course, `Sessioning.use` turns the session into the acting learner, as for Recent.
+- Where OwnedCourse holds for that learner and course, the endpoint answers `sessions` with [ArchivedStudy](former:Reads.ArchivedStudy).
+- Where OwnedCourse does not hold, the endpoint answers `COURSE_UNAVAILABLE` and reads no session.
+
+ArchivedStudy has one row for each conversation the learner archived that belongs to a confirmed skill in the course, most recently archived first: `ConversationArchiving._items` gives them in that order, and the former also declares it, so conversations archived at the same moment keep the query's order by identity. For each archived item it reads the session's skill and status with `GroundedTutoring._session`, keeps the session when `SkillMapping._skill` and `SkillMapping._unit` place a confirmed skill in this course, and reads its record with `GroundedTutoring._sessionData`, so recentSession gives the same kind, title, `startedAt`, and `lastActivity` as a sidebar row. Each row also gives `archivedAt`. A conversation of an archived or draft skill is left out, as it is from the sidebar, and shows again when its skill is restored. The list is not paged: it holds only what the learner chose to archive, and it is read only when the learner opens it.
+
+Each row has Restore, and selecting the row opens the conversation read-only on its skill's study page, the way a sidebar row opens one. Restoring moves the conversation back into the sidebar at its place by last activity.
 
 ```computations
 studyTopics(skills: SkillMapping.SkillMapRows) : TopicList
   Lists the skills in the course map whose status is CONFIRMED.
+
+recentLimit(pages: Number) : Number
+  Gives how many conversations that many pages of the sidebar hold: 40 for each page.
+
+archivedAmong(sessions: GroundedTutoring.StudyRecords, items: ConversationArchiving.ItemSet) : SessionList
+  Lists the identities of the sessions in sessions that are also in items, in the order of sessions.
 
 recentSession(data: GroundedTutoring.StudyRecord, skillTitle: String) : RecentSession
   Names the session's kind, LESSON or PRACTICE, and gives its title: a lesson's opening request with its spaces collapsed and, when it is longer than 60 characters, cut at the last word before that with an ellipsis; or "Practice · " followed by skillTitle. startedAt is the time the session's identity records, or null when it records none. lastActivity is the server time of the latest dialogue turn, or startedAt when there is no turn.
@@ -65,6 +87,7 @@ recentSession(data: GroundedTutoring.StudyRecord, skillTitle: String) : RecentSe
 
 ```endpoints
 Reads.Recent at /learning/recent
+Reads.Archived at /learning/archived
 ```
 
 ## Planning reads

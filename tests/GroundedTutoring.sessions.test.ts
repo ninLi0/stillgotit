@@ -122,17 +122,37 @@ describe("Grounded tutoring sessions", () => {
     // A session saved before identities recorded the time, with no turn, comes last.
     const sessions = connection.db.collection<{ _id: string }>(`${name.toLowerCase()}.sessions`), legacy = "00000000-0000-4000-8000-000000000000";
     await sessions.insertOne({ ...(await sessions.findOne({ _id: older }))!, _id: legacy });
-    const recent = async (limit = 10) => (await tutoring._recent({ owner: "sam", topics: ["products", "dimensions"], limit })).map(({ session }): string => session);
+    const recent = async (limit = 10, hidden: string[] = []) => (await tutoring._recent({ owner: "sam", topics: ["products", "dimensions"], hidden: hidden as never[], limit })).map(({ session }): string => session);
     expect(await recent()).toEqual([newer, task, older, legacy]);
     // A turn makes a session the most recent one; closing it keeps it listed with its status.
     now += 60_000; await tutoring.respond({ owner: "sam", session: older, text: "Why?", media: [], channel: "TEXT" });
     await tutoring.close({ owner: "sam", session: older });
-    expect((await tutoring._recent({ owner: "sam", topics: ["products", "dimensions"], limit: 10 })).map((row) => ({ ...row, session: String(row.session) }))).toEqual([
+    expect((await tutoring._recent({ owner: "sam", topics: ["products", "dimensions"], hidden: [], limit: 10 })).map((row) => ({ ...row, session: String(row.session) }))).toEqual([
       { session: String(older), topic: "products", status: "CLOSED" }, { session: String(newer), topic: "products", status: "OPEN" },
       { session: String(task), topic: "dimensions", status: "OPEN" }, { session: legacy, topic: "products", status: "OPEN" }]);
     expect(await recent(2)).toEqual([older, newer]);
     expect(await recent(0)).toEqual([]);
-    expect(await tutoring._recent({ owner: "sam", topics: [], limit: 10 })).toEqual([]);
-    await expect(tutoring._recent({ owner: "sam", topics: ["products"], limit: 1.5 })).rejects.toThrow(TypeError);
+    expect(await tutoring._recent({ owner: "sam", topics: [], hidden: [], limit: 10 })).toEqual([]);
+    await expect(tutoring._recent({ owner: "sam", topics: ["products"], hidden: [], limit: 1.5 })).rejects.toThrow(TypeError);
+    await expect(tutoring._recent({ owner: "sam", topics: ["products"], hidden: [" " as never], limit: 10 })).rejects.toThrow(TypeError);
+  });
+
+  test("recent leaves out the hidden sessions before the limit applies, so they never take a listed session's place", async () => {
+    let now = Date.parse("2026-10-22T15:00:00Z");
+    const tutoring = new GroundedTutoring(connection.db, `Tutoring_${crypto.randomUUID()}`, () => new Date(now));
+    const { material } = await notes();
+    const context = { owner: "sam", topic: "products", definition: "v1", materials: [material], citations: [{ material, location: "content" }] };
+    const lessons: string[] = [];
+    for (let n = 0; n < 5; n++) { now += 60_000; lessons.push((await explainedLesson(tutoring, { ...context, request: `Question ${n}`, explanation: "Match rows to columns." })).lesson); }
+    const [first, second, third, fourth, fifth] = lessons as [string, string, string, string, string];
+    const recent = async (hidden: string[], limit: number) => (await tutoring._recent({ owner: "sam", topics: ["products"], hidden: hidden as never[], limit })).map(({ session }): string => session);
+    expect(await recent([], 3)).toEqual([fifth, fourth, third]);
+    // Hiding the two newest still gives three sessions: the next ones in order fill their places.
+    expect(await recent([fifth, fourth], 3)).toEqual([third, second, first]);
+    // A hidden session that is not the owner's, or not in the topics, changes nothing.
+    expect(await recent(["someone-else", "00000000-0000-7000-8000-000000000000"], 2)).toEqual([fifth, fourth]);
+    // Hiding every session leaves nothing, and the hidden sessions themselves are unchanged.
+    expect(await recent(lessons, 10)).toEqual([]);
+    expect((await tutoring._session({ session: fifth as never }))[0]).toMatchObject({ owner: "sam", status: "OPEN" });
   });
 });

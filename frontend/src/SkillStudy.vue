@@ -26,6 +26,7 @@ import { sessionRequest, takeSession } from "./continue-session.ts";
 import { pendingOpening, trackOpening, type PendingOpening } from "./pending-openings.ts";
 import { ComposerDrafts, conversationSlot, joinDrafts, newConversationSlot, sentAsLesson, sentInConversation, settleSending, slotSession,
   type ComposerDraft, type SendingDraft } from "./composer-drafts.ts";
+import { isArchived, readDone, readStarted, setArchived } from "./conversation-list.ts";
 type SkillData = StillGotItHttp["/learning/read"]["output"]["data"];
 type StudySession = SkillData["sessions"][number];
 /** A file uploaded for the answer being written. `preview` is a local picture of an image file, so learners can tell images apart; other files have none. */
@@ -49,6 +50,13 @@ const currentCases = computed(() => data.value?.cases.filter((item) => item.task
 // unexplained: the thread shows the request and, in the explanation's place, the tutor's dots or "Retry tutor reply",
 // and nothing can be sent in it.
 const unexplained = computed(() => !!current.value?.lesson && !current.value.lesson.explanation.trim());
+// An archived conversation is read-only (design/compositions/Learning.md, "Archiving a conversation"): the page shows it
+// without the message box and the buttons that add to it, and offers "Restore conversation" in their place. An archive
+// or restore made in the sidebar applies here at once.
+const archived = computed(() => !!current.value && isArchived(current.value.session, data.value?.archived ?? []));
+// An archive or restore made in the sidebar makes the page's last message out of date, such as "Conversation restored",
+// so the message goes. The page's own Restore is busy while it changes the conversation, and sets its message after.
+watch(archived, () => { if (!busy.value) { notice.value = ""; error.value = ""; } });
 const canSend = computed(() => !busy.value && !recording.value && !unexplained.value && (props.aiAvailable || !!current.value?.task) && (!!response.value.trim() || (attachments.value.length > 0 && !!current.value)));
 // ---- Unsent drafts (frontend/src/composer-drafts.ts) ----
 // The message box holds the draft of the conversation on screen, and each conversation keeps its own: in memory while
@@ -97,11 +105,16 @@ const assessReason = computed(() => unsavedTranscripts.value ? "Save your transc
 function describedBy(...ids: (string | false)[]) { return ids.filter(Boolean).join(" ") || undefined; }
 function purposeNote(purpose: string) { return purpose === "HINT" ? " · hint" : purpose === "CORRECTION" ? " · transcript correction" : ""; }
 async function load() {
-  const skill = props.skill, result = unwrap(await api.learning.read({ skill })).data;
+  const skill = props.skill, started = readStarted(), result = unwrap(await api.learning.read({ skill })).data;
   if (skill !== props.skill) return;
+  readDone(started, result.sessions.map((session) => session.session));
   data.value = result;
-  // With nothing chosen, the page shows the latest open conversation, or else the latest one. Sessions come oldest first.
-  if (!freshLesson.value && !result.sessions.some((session) => session.session === selected.value)) selected.value = result.sessions.findLast((session) => session.status === "OPEN")?.session ?? result.sessions.at(-1)?.session ?? "";
+  // With nothing chosen, the page shows the latest open conversation, or else the latest one, leaving out archived ones;
+  // with every conversation archived it starts a new one. Sessions come oldest first.
+  if (!freshLesson.value && !result.sessions.some((session) => session.session === selected.value)) {
+    const listed = result.sessions.filter((session) => !isArchived(session.session, result.archived));
+    selected.value = listed.findLast((session) => session.status === "OPEN")?.session ?? listed.at(-1)?.session ?? "";
+  }
 }
 // `success` is shown after the step finishes; a function gives a sentence that depends on how the step went.
 // Focus returns to the control the learner used, or to the result when that control is gone.
@@ -321,6 +334,12 @@ async function finishLesson() {
   if (response.value.trim() || attachments.value.length) { notice.value = ""; error.value = "Send or clear your message before finishing this lesson."; await nextTick(); errorBox.value?.focus(); return; }
   // A finished lesson has no message box, so a note about files from its draft has nothing left to say.
   await act(async () => { unwrap(await api.learning.finish({ studySession: active.session })); missingFiles.value = []; }, "Lesson finished. Its conversation stays here to read.");
+}
+/** Restoring puts the conversation back in the sidebar exactly as it was, so an open one can be continued. */
+async function restoreConversation() {
+  const active = current.value; if (!active || busy.value || recording.value) return;
+  await act(async () => { await setArchived(active.session, false); },
+    active.status === "OPEN" ? "Conversation restored. It is back in Conversations, and you can continue it." : "Conversation restored. It is back in Conversations.");
 }
 async function correctTranscript(turnIndex: number) { const active = current.value; if (!active) return; await act(async () => { unwrap(await api.learning.transcript({ studySession: active.session, turnIndex, text: speechEdits.value[turnIndex] ?? "" })); reviewed.value = false; }, "Transcript correction saved. Review your answer again before assessment."); }
 async function requestRegrade(assessment: string, basedOn: string) {
@@ -664,8 +683,8 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
                 <p v-for="(file, fileIndex) in item.turn.media" :key="file.file" class="attachment-label"><span class="attach-thumb" aria-hidden="true" />{{ item.turn.media.length > 1 ? `Attachment ${fileIndex + 1} of ${item.turn.media.length}` : 'Attachment' }} · {{ file.name }}</p>
                 <div v-if="item.turn.speaker === 'TUTOR'" class="reply-foot"><ReplyMeta :seconds="replySeconds(current, item.turnIndex)" :sources="item.turn.citations.length" :tutor="answerLabel('turn', current.session, item.turnIndex)" /><ReplyActions :message-key="`${current.session}:${item.turnIndex}`" :text="item.turn.text" :what="item.turn.purpose === 'HINT' ? 'hint' : 'tutor reply'" describedby="listen-reason" /></div></article>
               <!-- A lesson question without a reply, or a lesson without its opening explanation: the retry sits where the tutor's answer would be. -->
-              <div v-if="current.lesson && current.status === 'OPEN' && (current.dialogue.at(-1)?.turn.speaker === 'LEARNER' || unexplained) && !pending" class="retry-row"><span class="avatar"><PixelIcon name="leaf" :size="16" /></span><button class="secondary dawn reply-retry" :disabled="busy || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="retryReply"><span aria-hidden="true">↻</span>Retry tutor reply</button></div>
-              <div v-if="current.task && current.status === 'OPEN' && current.dialogue.some(item => item.turn.speaker === 'LEARNER' && item.turn.purpose === 'RESPONSE')" class="review-step">
+              <div v-if="current.lesson && current.status === 'OPEN' && !archived && (current.dialogue.at(-1)?.turn.speaker === 'LEARNER' || unexplained) && !pending" class="retry-row"><span class="avatar"><PixelIcon name="leaf" :size="16" /></span><button class="secondary dawn reply-retry" :disabled="busy || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="retryReply"><span aria-hidden="true">↻</span>Retry tutor reply</button></div>
+              <div v-if="current.task && current.status === 'OPEN' && !archived && current.dialogue.some(item => item.turn.speaker === 'LEARNER' && item.turn.purpose === 'RESPONSE')" class="review-step">
                 <button class="secondary dawn" :disabled="busy || recording" :aria-expanded="reviewOpen" @click="reviewOpen = !reviewOpen">{{ reviewOpen ? 'Close review' : 'Review and assess my work' }}</button>
                 <div v-if="reviewOpen" class="attempt-review">
                   <div class="review-title"><h3>Ready for assessment?</h3><InfoBubble text="Review your complete answer before assessment. Your answers to these three questions go with your work, and Assess stays off until you confirm the review." /></div>
@@ -700,7 +719,7 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
       </div>
       <div class="composer-area">
         <div class="composer-inner">
-          <template v-if="!current || current.status === 'OPEN'">
+          <template v-if="!current || (current.status === 'OPEN' && !archived)">
             <div class="composer" :class="{ 'is-recording': recording }" :aria-busy="!!pending">
               <p v-if="missingFiles.length" id="draft-files-note" class="draft-files"><span>{{ missingNote }}</span><button type="button" class="message-action" @click="dismissMissing">Dismiss</button></p>
               <ul v-if="attachments.length" ref="attachmentList" class="attachment-list" aria-label="Files attached to this answer">
@@ -717,6 +736,7 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
             </div>
             <p v-if="recording" class="composer-note" role="status">Recording. Stop to review your words before sending.</p>
           </template>
+          <div v-else-if="archived" class="finished-message archived-message"><p>{{ current.status === 'OPEN' ? 'This conversation is archived, so it is read-only. Restore it to continue where you left off.' : 'This conversation is archived. Restore it to list it in Conversations again.' }}</p><button class="secondary dawn" :disabled="busy || recording" @click="restoreConversation">Restore conversation</button><button class="message-action" :disabled="busy" @click="newLesson">Keep learning</button></div>
           <div v-else-if="current.lesson" class="finished-message"><p>This lesson is finished. Start a new conversation to keep going.</p><button class="message-action" :disabled="busy" @click="newLesson">Keep learning</button></div>
           <div v-else class="finished-message"><p>This attempt is saved.</p><button v-if="!currentCases.some(item => item.judgment)" class="secondary dawn" :disabled="busy || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="startTask">Try a fresh check</button><button class="message-action" :disabled="busy" @click="newLesson">Keep learning</button></div>
           <p v-if="aiOff" id="ai-reason-chat" class="hint">{{ aiOff }}</p>

@@ -8,7 +8,7 @@ import { randomUUID } from "node:crypto";
 import type { ActionRefusal } from "@mit-sdg/sync-engine/assembly";
 import type { Db } from "mongodb";
 import { assembleApplication } from "../src/assembly.ts";
-import { TreeStyling } from "../src/concepts.ts";
+import { ConversationArchiving, TreeStyling } from "../src/concepts.ts";
 import { FederatingConcept } from "../src/concepts/Federating/Federating.ts";
 import { MemoryProvider } from "../src/concepts/Federating/provider.ts";
 import { RegisteringConcept, type User } from "../src/concepts/Registering/Registering.ts";
@@ -69,6 +69,7 @@ async function setup() {
     Library: new MaterialKeeping(db, name),
     GroundedTutoring: new GroundedTutoring(db, name),
     TreeStyling: new TreeStyling(db, "TreeStyling"),
+    ConversationArchiving: new ConversationArchiving(db, "ConversationArchiving"),
   });
   const application = await assembleFor(connection!.db);
   applications.push(application);
