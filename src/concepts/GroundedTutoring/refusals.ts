@@ -79,3 +79,7 @@ export class SessionCloseUnavailable extends Error {
   readonly code = "SESSION_CLOSE_UNAVAILABLE";
   constructor() { super("Choose one of your open sessions."); this.name = "SessionCloseUnavailable"; }
 }
+export class LessonReopenUnavailable extends Error {
+  readonly code = "LESSON_REOPEN_UNAVAILABLE";
+  constructor() { super("Choose one of your finished lessons."); this.name = "LessonReopenUnavailable"; }
+}

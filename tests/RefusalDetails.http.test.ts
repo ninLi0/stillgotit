@@ -52,7 +52,8 @@ test("the host's sentences are the ones the concepts and compositions state, as 
   // Every composition answer that states a detail. The engine keeps only the code, so the host must restate the sentence.
   const composed = [...readBack.matchAll(/RequestBoundary\.respond \(detail: "([^"]+)", error: "([A-Z_]+)"/g)].map(([, sentence, code]) => [code!, sentence!] as const);
   expect(composed.length).toBeGreaterThan(0);
-  for (const [code, sentence] of composed) expect(scopedRefusalDetails[code]?.detail ?? refusalDetails[code], code).toBe(sentence);
+  // A composition's sentence is either a path-specific sentence of its code or the code's general one.
+  for (const [code, sentence] of composed) expect([...(scopedRefusalDetails[code] ?? []).map((scoped) => scoped.detail), refusalDetails[code]], code).toContain(sentence);
 });
 
 test("a more specific sentence applies only where its design gives it, the general one everywhere else, and every public code has a sentence", () => {
@@ -73,6 +74,10 @@ test("a more specific sentence applies only where its design gives it, the gener
   for (const path of ["/learning/archive", "/learning/restore"]) {
     expect(refusalDetail(path, "SESSION_UNAVAILABLE"), path).toBe("This conversation is not one of yours. Choose one of your own conversations.");
   }
+  // Learning.md, "Continuing a finished lesson": reopening accepts only the learner's own finished lesson that is not archived.
+  expect(refusalDetail("/learning/reopen", "SESSION_UNAVAILABLE"))
+    .toBe("This session is still open, archived, a practice task, or not one of yours. Choose one of your finished lessons to continue.");
+  expect(refusalDetail("/learning/reopen", "LESSON_REOPEN_UNAVAILABLE")).toBe("Choose one of your finished lessons.");
   expect(refusalDetail("/learning/hint", "SESSION_CHANGED")).toBe("This session closed before the tutor's answer could be saved. Your own work in it is still saved.");
   expect(refusalDetail("/learning/task", "SKILL_CHANGED")).toBe("This skill changed while the tutor was answering, so nothing was saved. Try again.");
   expect(refusalDetail("/courses/skills/suggest", "MATERIAL_UNAVAILABLE")).toBe("This material is not available in this course. Reload the page to see its materials.");
@@ -80,7 +85,8 @@ test("a more specific sentence applies only where its design gives it, the gener
   expect(refusalDetail("/courses/units/look", "UNKNOWN_TREE_KIND")).toBe("Choose one of the offered tree kinds.");
   // Every code in the policy's table has a non-empty sentence: on every endpoint, or on the endpoints its design names.
   const publicCodes = Object.keys(stillGotItPolicy(ORIGIN).publicErrors ?? {});
-  const sentence = (code: string) => Object.hasOwn(refusalDetails, code) ? refusalDetails[code] : scopedRefusalDetails[code]?.detail;
+  const sentence = (code: string) => Object.hasOwn(refusalDetails, code) ? refusalDetails[code] : scopedRefusalDetails[code]?.[0]?.detail;
+  expect(Object.values(scopedRefusalDetails).flat().filter((scoped) => !scoped.detail.trim())).toEqual([]);
   expect(publicCodes.length).toBeGreaterThan(100);
   expect(publicCodes.filter((code) => !sentence(code)?.trim())).toEqual([]);
 });

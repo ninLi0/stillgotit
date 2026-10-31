@@ -700,6 +700,14 @@ export type StillGotItWire = {
     };
     error: { error: AppWideError | "CLARIFICATION_CASE_UNAVAILABLE" | "DEADLINE_TRADEOFF_CONFIRMATION_REQUIRED" | "EVIDENCE_DATE_MISMATCH" | "EVIDENCE_REVISION_NOT_NEW" | "EVIDENCE_TRACK_MISMATCH" | "EVIDENCE_TRACK_UNAVAILABLE" | "GENERATION_FAILED" | "INVALID_INPUT" | "INVALID_MASTERY_EVIDENCE" | "INVALID_PLAN_INPUT" | "INVALID_REVISED_JUDGMENT" | "INVALID_WORK_CLARIFICATION" | "JUDGMENT_REVISION_OUTDATED" | "NOT_SIGNED_IN" | "PLAN_PREFERENCES_UNAVAILABLE" | "PLAN_SESSION_IN_PROGRESS" | "REGRADE_IMPORTED_UNAVAILABLE" | "REVISION_CASE_UNAVAILABLE" | "ROUTINE_PLAN_OUTDATED" | "ROUTINE_PLAN_UNAVAILABLE" | "ROUTINE_SESSION_IN_PROGRESS" };
   };
+  "/learning/reopen": {
+    input: {
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
+      "studySession": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["reopenLesson"]>[0], ["lesson"]>>;
+    };
+    output: Record<string, never>;
+    error: { error: AppWideError | "INVALID_INPUT" | "LESSON_REOPEN_UNAVAILABLE" | "NOT_SIGNED_IN" | "SESSION_UNAVAILABLE" };
+  };
   "/learning/reply": {
     input: {
       "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["use"]>[0], ["session"]>>;
@@ -1663,6 +1671,13 @@ export type StillGotItHttp = {
         "model": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.computations)["requestChoice"]["fn"]>>, ["model"]>>;
       };
     };
+    error: { error: HttpAppWideError | "INVALID_REQUEST" | "UNAUTHORIZED" };
+  };
+  "/learning/reopen": {
+    input: {
+      "studySession": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GroundedTutoring"]["reopenLesson"]>[0], ["lesson"]>>;
+    };
+    output: Record<string, never>;
     error: { error: HttpAppWideError | "INVALID_REQUEST" | "UNAUTHORIZED" };
   };
   "/learning/reply": {

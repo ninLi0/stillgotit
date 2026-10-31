@@ -103,6 +103,18 @@ export class GroundedTutoring<Learner extends string = string, Material extends 
     return this.#edit(owner, session, undefined, refusal.SessionCloseUnavailable, (record) => { record.status = "CLOSED"; });
   }
 
+  /**
+   * Opens the owner's finished lesson again, so the learner can continue it. Only its status changes: its request,
+   * explanation, citations, and dialogue stay as they were. A practice task never reopens. The one conditional update
+   * also moves the revision, so a change prepared while the lesson was open before cannot overwrite it.
+   */
+  async reopenLesson({ owner, lesson }: { owner: Learner; lesson: Session }): Promise<Record<string, never>> {
+    requireIdentity(owner); requireIdentity(lesson);
+    const { matchedCount } = await this.sessions.updateOne({ _id: lesson, owner, kind: "LESSON", status: "CLOSED" }, { $set: { status: "OPEN" }, $inc: { revision: 1 } });
+    if (matchedCount !== 1) throw new refusal.LessonReopenUnavailable();
+    return {};
+  }
+
   async _sessions({ owner, topic }: { owner: Learner; topic: Topic }) {
     requireIdentity(owner); requireIdentity(topic);
     return (await this.sessions.find({ owner, topic }).sort({ _id: 1 }).toArray())

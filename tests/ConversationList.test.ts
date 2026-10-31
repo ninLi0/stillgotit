@@ -157,6 +157,55 @@ describe("Archiving from the sidebar", () => {
   });
 });
 
+describe("Changes reported by a study page", () => {
+  test("a restore on the study page clears the sidebar's Undo note, so Undo cannot act on a conversation that is already back", async () => {
+    let changes = 0;
+    const server = fakeServer(3, "page-restore"), list = useConversationList("course", { requests: server.requests, changed: () => { changes++; } });
+    await list.load();
+    const target = list.rows[0]!;
+    expect(await list.archive(target)).toBe(true);
+    expect(list.note?.undo).toEqual(target);
+    // The sidebar's own reads keep the note: only a change reported by a study page clears it.
+    await list.refresh();
+    expect(list.note?.undo).toEqual(target);
+
+    // The lesson page restores the same conversation and reports it.
+    await setArchived(target.studySession, false, server.requests);
+    const asked = server.asked.length;
+    await list.pageChanged();
+    expect(list.note).toBeNull();
+    expect(server.asked.slice(asked)).toEqual(["recent 1"]);
+    expect(ids(list.rows)).toEqual(["page-restore-3", "page-restore-2", "page-restore-1"]);
+    expect(isArchived(target.studySession, [])).toBe(false);
+    // Undo has nothing left to act on, so it sends no request.
+    expect(await list.undo()).toBe(false);
+    expect(server.asked.filter((ask) => ask.startsWith("restore"))).toEqual(["restore page-restore-3"]);
+    // The page told the workspace itself, so the list does not report the change a second time.
+    expect(changes).toBe(1);
+  });
+
+  test("after a step refused on the study page, the sidebar reads both lists again and shows a change made in another tab", async () => {
+    const server = fakeServer(3, "page-refused"), list = useConversationList("course", { requests: server.requests });
+    await list.load();
+    await list.toggleArchived();
+    expect(list.archivedRows).toEqual([]);
+    // Another tab archives the newest conversation. This sidebar does not know yet, and still lists it.
+    server.archived.set("page-refused-3", "2026-10-30T12:00:00Z");
+    expect(ids(list.rows)).toContain("page-refused-3");
+    // The study page's Continue on that conversation is refused, and the page reports it. A note left from an earlier
+    // step in the sidebar goes too, since it may no longer be true.
+    server.failOnce("Choose one of your own conversations to archive.");
+    expect(await list.archive(list.rows[1]!)).toBe(false);
+    expect(list.note?.failed).toBe(true);
+    const asked = server.asked.length;
+    await list.pageChanged();
+    expect(server.asked.slice(asked).sort()).toEqual(["archived", "recent 1"]);
+    expect(ids(list.rows)).toEqual(["page-refused-2", "page-refused-1"]);
+    expect(list.archivedRows.map((item) => String(item.studySession))).toEqual(["page-refused-3"]);
+    expect(list.note).toBeNull();
+  });
+});
+
 describe("Archived state on the study pages", () => {
   test("a page's read replaces the changes made before it started, and keeps one made while it was on its way", async () => {
     const requests = fakeServer(0, "page").requests;

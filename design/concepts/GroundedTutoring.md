@@ -6,7 +6,7 @@ Help learners understand and practice a topic using sources they can inspect.
 
 ## Principle
 
-A learner selects course material and starts a lesson with a free question or a study button. The lesson is saved with that request before the tutor answers, so the request is kept even when the tutor is slow or fails. The tutor then explains from those sources, and the explanation becomes the lesson's opening. The learner asks follow-up questions by voice and can correct transcription errors. The lesson can close without a transcript approval step. Later, the learner completes an independent practice task. A requested hint is recorded as help. The learner reviews the task's voice transcripts together before submitting work for assessment. The saved record preserves the requirements, sources, responses, and assistance used.
+A learner selects course material and starts a lesson with a free question or a study button. The lesson is saved with that request before the tutor answers, so the request is kept even when the tutor is slow or fails. The tutor then explains from those sources, and the explanation becomes the lesson's opening. The learner asks follow-up questions by voice and can correct transcription errors. The learner finishes the lesson without a transcript approval step, and can reopen it later to ask more in the same conversation. Later, the learner completes an independent practice task. A requested hint is recorded as help. The learner reviews the task's voice transcripts together before submitting work for assessment, and a task never reopens once it is closed. The saved record preserves the requirements, sources, responses, and assistance used.
 
 ## Types
 
@@ -72,10 +72,10 @@ a set of Practice Sessions with
   a fresh Flag
   a hintRequested Flag
 Rule: each session is in exactly one of Lesson Sessions or Practice Sessions. A lesson means a member of Lesson Sessions; a task means a member of Practice Sessions.
-Rule: an owner's open lesson or task must exist, have that owner and kind, and have status OPEN. An unknown session belongs to no owner.
+Rule: an owner's open lesson or task must exist, have that owner and kind, and have status OPEN. An owner's closed lesson must exist, have that owner, be a lesson, and have status CLOSED. An unknown session belongs to no owner.
 Rule: the material rules hold when the owner is not blank and the materials are a nonempty set of distinct identities. The source rules hold when the material rules hold and the citations are nonempty and distinct, each naming one of those materials and a nonblank location. Ownership of the materials and their belonging to one scope are checked by the application before a session is created, and the location of each citation is checked by the host against the material's readable renditions before the answer reaches this concept.
 Rule: a lesson whose explanation is empty is unexplained: it is waiting for the tutor's opening explanation, and its citations are empty. An unexplained lesson takes its explanation and opening citations once, with explainLesson. Its dialogue stays empty until then: respond and answerLesson refuse it, so a learner question never precedes the opening explanation.
-Rule: session sources, topic, definition, and opening content never change, except that an unexplained lesson's empty explanation and citations are set once. Dialogue is append-only while OPEN. CLOSED sessions cannot change.
+Rule: session sources, topic, definition, and opening content never change, except that an unexplained lesson's empty explanation and citations are set once. Dialogue is append-only while OPEN. CLOSED sessions cannot change, with one exception: a finished lesson, one whose status is CLOSED, may be reopened by its owner, which sets its status back to OPEN and changes nothing else, so its request, explanation, citations, and dialogue stay as they were. A practice task never reopens: its attempt is reviewed and submitted for assessment once, and the reviewed attempt must stay as it was.
 Rule: dialogue indices are zero-based and remain stable. checkedVoiceTurns contains only indices of learner RESPONSE turns with channel VOICE. The effective transcript is the latest CORRECTION for that response, or its original text when there is no correction.
 Rule: ordinary lessons need no transcript confirmation. Assessment requires every voice response in the task to have its effective transcript confirmed. Closing a session alone does not submit work for assessment.
 Rule: the tutor adds turns to a task only as hints. Any tutor message in a task is recorded as a HINT, even when it is phrased as a question.
@@ -209,6 +209,15 @@ close(owner: Learner, session: Session) : returns ()
   where session belongs to owner and is OPEN
   then
     set status to CLOSED
+    returns
+
+reopenLesson(owner: Learner, lesson: Session) : returns ()
+  where lesson is not owner's closed lesson
+  then
+    refuses LESSON_REOPEN_UNAVAILABLE "Choose one of your finished lessons."
+  where lesson is owner's closed lesson
+  then
+    set status to OPEN
     returns
 ```
 

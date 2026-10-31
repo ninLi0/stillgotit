@@ -133,8 +133,9 @@ async function refreshProgress() {
   emit("progress");
 }
 // Lesson changes update the tree's shading in the background. This must not clear the message from the learner's last action.
+// The sidebar reads its lists again, and its archive note goes, so its Undo never acts on a conversation the page restored.
 function progressChanged() {
-  void conversations.refresh();
+  void conversations.pageChanged();
   refreshProgress().catch((problem) => { error.value = problem instanceof Error ? problem.message : "Your progress could not be refreshed. Reload the page to try again."; });
 }
 async function refreshAI() {
@@ -754,7 +755,7 @@ watch(view, (now) => { if (now === "setup" && material.value && !preview.value) 
     <!-- Mounted each time it opens, so its curves draw once on the way in and are read fresh. -->
     <MemoryView v-if="view === 'memory'" :course="course.course" @open="openSkill" @navigate="navigate" />
     <div v-show="view === 'chat'" class="lesson-view">
-      <KeepAlive :max="12"><SkillStudy v-if="current?.status === 'CONFIRMED'" ref="study" :key="current.skill" :skill="current.skill" :course="course.course" :learner="username" :materials="data.materials" :deleted-materials="deletedIds" :skill-materials="currentSources" :ai-available="ai.available" :ai-reason="ai.reason" :active="view === 'chat'" :initial-draft="lessonDraft?.skill === current.skill ? lessonDraft.text : undefined" @changed="progressChanged" @back="showOnTree(current.skill)" @open-source="openSource" @session="sessionShown" @tutor="emit('tutor')" /></KeepAlive>
+      <KeepAlive :max="12"><SkillStudy v-if="current?.status === 'CONFIRMED'" ref="study" :key="current.skill" :skill="current.skill" :course="course.course" :learner="username" :materials="data.materials" :deleted-materials="deletedIds" :skill-materials="currentSources" :ai-available="ai.available" :ai-reason="ai.reason" :active="view === 'chat'" :initial-draft="lessonDraft?.skill === current.skill ? lessonDraft.text : undefined" @changed="progressChanged" @conversation-refused="conversations.pageChanged()" @back="showOnTree(current.skill)" @open-source="openSource" @session="sessionShown" @tutor="emit('tutor')" /></KeepAlive>
       <div v-if="current?.status !== 'CONFIRMED'" class="no-lesson"><h2 class="display" tabindex="-1">Choose a leaf to begin.</h2><button class="primary meadow" @click="view = 'home'">Go to your tree</button></div>
     </div>
   </section>
