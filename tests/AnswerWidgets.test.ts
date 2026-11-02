@@ -16,8 +16,8 @@ const pdf = { file: "f".repeat(8), name: "slides.pdf", mediaType: "application/p
 const sources = [{ material, data: { owner: "sam", scope: "math", title: "Matrices", locator: "lesson", content: "Rows multiply columns.", originals: [pdf], origin: "COURSE" as const } }];
 const SOURCE: WidgetSource = { material, location: "content" };
 const [SLIDER, TABLE, STEPS, CHOICE] = cannedWidgets(SOURCE);
-/** The host's source check for this lesson, as tutor-generation.ts applies it. */
-const citable = (source: WidgetSource) => source.material === material && (source.location === "content" || source.location === PAGE);
+/** The host's source check for this lesson, as tutor-generation.ts applies it: the source as it is saved, or nothing when it fails. */
+const citable = (source: WidgetSource) => source.material === material && (source.location === "content" || source.location === PAGE) ? source : undefined;
 const answer = (...blocks: unknown[]) => ["Rows meet columns.", ...blocks.map(widgetBlock), "That is why the order matters."].join("\n\n");
 
 let warnings: string[] = [];
@@ -184,6 +184,22 @@ describe("The host checks examples in lesson answers", () => {
       }
     }
     expect(warnings).toEqual(Array(4).fill(`Tutor answer example dropped: ${WIDGET_PROBLEMS.SOURCE}.`));
+  });
+
+  test("an example whose source names its material by file name or title is kept, and saved with the material's identity", async () => {
+    for (const [named, location, naming] of [["slides.pdf", PAGE, "file name"], ["Matrices", "content", "title"]] as const) {
+      warnings = [];
+      const result = await generatorAnswering(answer({ ...STEPS, source: { material: named, location } })).generate("sam", request("REPLY", "interactive"));
+      expect(result.text).toBe(`Rows meet columns.\n\n\`\`\`stillgotit-widget\n${JSON.stringify({ ...STEPS, source: { material, location } })}\n\`\`\`\n\nThat is why the order matters.`);
+      expect(warnings).toEqual([`Tutor answer example named its source by its ${naming}; resolved to the material.`]);
+    }
+    // A name the lesson's material does not have, or the right name at a location the material lacks, is dropped as before.
+    for (const source of [{ material: "slides.PDF", location: PAGE }, { material: "slides.pdf", location: "0123456789abcdef/page/9" }]) {
+      warnings = [];
+      const result = await generatorAnswering(answer({ ...STEPS, source })).generate("sam", request("LESSON", "interactive"));
+      expect(result.text).toBe("Rows meet columns.\n\nThat is why the order matters.");
+      expect(warnings).toEqual([`Tutor answer example dropped: ${WIDGET_PROBLEMS.SOURCE}.`]);
+    }
   });
 
   test("an answer without an example comes back exactly as the tutor wrote it", async () => {

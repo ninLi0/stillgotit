@@ -3,6 +3,7 @@
  * list. Response shapes follow Google's documented REST answers.
  */
 import { DEFAULT_MODEL } from "../../src/host/gemini.ts";
+import type { SourceContext } from "../../src/tutor-types.ts";
 
 const HOST = "https://generativelanguage.googleapis.com";
 
@@ -127,4 +128,23 @@ export function cannedWidgets(source: { material: string; location: string }) {
 /** An example as the tutor writes it into an answer: a fenced block with the example's JSON. */
 export function widgetBlock(widget: unknown): string {
   return `\`\`\`stillgotit-widget\n${JSON.stringify(widget, null, 2)}\n\`\`\``;
+}
+
+// ---- Canned practice task ----
+
+/** The question of the browser fixture's canned practice task. */
+export const CANNED_TASK_QUESTION = "1. Multiply A = [[1, 2], [3, 4]] by B = [[2, 0], [1, 2]].\n\n2. Multiply C = [[2, 1], [0, 3]] by D = [[1, 2], [4, 0]].\n\n" +
+  "Show how you form each entry. Explain why changing the order can change the answer.";
+
+/**
+ * The browser fixture's canned practice task (browser-app.ts). Like Gemini 4 Argon in the P5 test, it names the cited
+ * material by its first file's name, or by its title when it has no file, instead of by its identity, so the fixture's
+ * practice flow goes through the host's resolution of names (src/host/tutor-generation.ts). When another source has the
+ * same title or file name, which the host would refuse as ambiguous, it cites the identity instead.
+ */
+export function cannedTask(sources: readonly SourceContext[]) {
+  const source = sources[0]!, file = source.data.originals[0];
+  const name = file?.name ?? source.data.title, location = file?.renditions[0]?.location ?? "content";
+  const unique = sources.filter((item) => item.data.title === name || item.data.originals.some((other) => other.name === name)).length === 1;
+  return { question: CANNED_TASK_QUESTION, citations: [{ material: unique ? name : source.material, location }] };
 }
