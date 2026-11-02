@@ -10,7 +10,7 @@ This page is the facilitator's working copy for the two user tests described on 
 - [ ] https://stillgotit.mit-sdg.dev loads, and three things that only the P5 build has are visible: every sidebar conversation row has a "⋯" button with "Archive conversation", the Materials page offers "Delete material…", and reopening a conversation shows its messages at once.
 - [ ] The laptop used for the sessions is signed in to the owner's account. Sign in again on the morning of each session, so a session that expired overnight does not interrupt task 1.
 - [ ] The message box's model pill reads Gemini 4 Argon at Medium. In the P4 test the other models often failed the server's checks.
-- [ ] In Settings, "Interactive examples" is off on the owner's account, so the participants see plain answers unless they turn it on themselves. Before Sunday, turn it on once, ask one lesson question on the deployed app, and note whether the real model produced a valid example; then turn it off again.
+- [ ] In Settings, "Interactive examples" is off on the owner's account, so the participants see plain answers unless they turn it on themselves. Before the first session, turn it on once, ask one lesson question on the deployed app, and note whether the real model produced a valid example; then turn it off again. In the local pilot on November 2 the real model produced a valid example in three answers out of three.
 - [ ] A tutor call works end to end on the deployed app: ask one question in an existing conversation and see the answer arrive with its citations.
 - [ ] The task course does not exist yet. It is created empty right before each session (see "The task course" below), so both participants start from the same state.
 
@@ -88,7 +88,7 @@ What to watch for in each task, so the notes catch it:
 3. Say how well you know one: whether the confidence control is found from the skill, what they think the number that appears means, and whether the (i) bubbles are opened.
 4. Learn with the tutor: whether the message box is obvious, whether citations are noticed and followed, and whether the source pane is trusted.
 5. Prove it: whether the help declaration is understood, whether the verdict and its reason are read, and whether the change in the estimate is noticed without prompting.
-6. Plan for a quiz: the order in which budget, exam and schedule are found, whether the proposal is read as a choice, and what they say the sea shows.
+6. Plan for a quiz: the order in which budget, exam and schedule are found, whether the proposal is read as a choice, and what they say the sea shows. The proposal appears only when the preparation does not fit before the exam: with the task course's two skills and a quiz tomorrow, a 15-minute budget is 5 minutes short and the Plan page asks for a decision, while 30 minutes, or a quiz next week, fits everything. If the participant chooses a longer time, let them, and note that the decision moment did not occur.
 7. Come back later: whether the Memory view is found, what they say the curve means, and how long the tree picker takes to find.
 
 ### Debrief (20 minutes)
