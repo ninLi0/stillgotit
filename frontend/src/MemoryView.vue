@@ -220,19 +220,17 @@ const summary = computed(() => {
           <template v-else-if="read?.explanation && chosenSkill.projection && chosenSkill.leftAlone">
             <MemoryShaped :key="chosenSkill.skill" :points="points" :as-of="data.asOf" :estimate="chosenSkill.estimate" :projection="chosenSkill.projection"
               :review-by="chosenSkill.reviewBy" :left-alone="chosenSkill.leftAlone" :threshold="threshold" labelledby="shaped-heading" />
+            <!-- The summary above already names the starting point and its day, so the list holds only what moved it. -->
+            <template v-if="evidence.length">
             <h3 class="rows-title">What moved it</h3>
             <ol class="evidence-rows">
-              <li class="evidence-row">
-                <span class="evidence-day">{{ planDay(read.explanation.start.at) }}</span>
-                <PixelIcon :rows="MARKS.start" :size="10" :label="KIND_NAMES.START" />
-                <span class="evidence-text">The estimate started at {{ percent(read.explanation.start.confidence) }}.</span>
-              </li>
               <li v-for="row in evidence" :key="row.key" class="evidence-row">
                 <span class="evidence-day">{{ row.day }}</span>
                 <PixelIcon :rows="MARKS[row.mark]" :size="10" :label="row.name" />
                 <span class="evidence-text">{{ row.text }}</span>
               </li>
             </ol>
+            </template>
           </template>
           <button type="button" class="secondary dawn shaped-open" @click="emit('open', chosenSkill.skill)">Open {{ chosenSkill.title }}</button>
         </template>

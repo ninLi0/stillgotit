@@ -12,8 +12,9 @@ import { MARKS, PAL, iconRects, ringOf, type MarkName } from "./pixel-art.ts";
 // its tooltip shows, and a visually hidden table lists every row, so nothing is reachable only by pointing.
 // When the chart appears (the evidence opening), the line draws itself from the starting point to today on the
 // entrance curve, and each marker and the value now appear as the line reaches them (design/visual-design.md,
-// "Motion"). Nothing in the chart moves after that.
-const props = defineProps<{ points: ChartPoint[]; provisional: boolean; labelledby?: string }>();
+// "Motion"). Nothing in the chart moves after that. Why a provisional estimate has moved is said once, beside the
+// "Provisional" pill under "How the estimate got here" (EstimatePanel.vue), not again under the chart.
+const props = defineProps<{ points: ChartPoint[]; labelledby?: string }>();
 
 // When, as a share of the draw duration, the line arrives at a marker. The line's last few pixels land so softly that
 // a marker waiting for them would look late, so a marker at the very end appears when 98% of the line is drawn.
@@ -55,12 +56,6 @@ const legend = computed(() => {
   if (kinds.has("ADJUSTMENT")) items.push({ mark: "adjustment", text: KIND_NAMES.ADJUSTMENT });
   if (kinds.has("TIME") || lowered) items.push({ mark: "time", text: KIND_NAMES.TIME });
   return items;
-});
-const note = computed(() => {
-  if (!props.provisional) return "";
-  return props.points.some((p) => p.kind === "ADJUSTMENT")
-    ? "No assessed attempt yet, so only your adjustments and time have moved it."
-    : "No assessed attempt yet, so only time has moved it.";
 });
 
 // ---- Tooltip: shown on hover, on keyboard focus, or after a tap; Escape hides it ----
@@ -124,7 +119,6 @@ onBeforeUnmount(() => { observer?.disconnect(); document.removeEventListener("po
         <strong>{{ values(tip.point) }}</strong><span>{{ tip.point.label }}</span><span class="tip-day">{{ planDay(tip.point.at) }}</span>
       </div>
     </div>
-    <p v-if="note" class="note">{{ note }}</p>
     <ul class="legend" aria-hidden="true">
       <li v-for="item in legend" :key="item.mark"><PixelIcon :rows="MARKS[item.mark]" :size="10" />{{ item.text }}</li>
     </ul>
@@ -156,7 +150,6 @@ onBeforeUnmount(() => { observer?.disconnect(); document.removeEventListener("po
 .tip.below{transform:translateX(-50%)}
 .tip strong{font-size:13px;font-weight:700}
 .tip-day{color:var(--tip-soft)}
-.note{margin:4px 0 0;color:var(--soft);font-size:12px;line-height:1.45}
 .legend{display:flex;flex-wrap:wrap;gap:4px 12px;margin:6px 0 0;padding:0;list-style:none;color:var(--muted);font-size:11px;line-height:1.4}
 .legend li{display:inline-flex;align-items:center;gap:5px}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}

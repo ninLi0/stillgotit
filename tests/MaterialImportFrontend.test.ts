@@ -9,7 +9,7 @@ import { sourceLabel } from "../frontend/src/labels.ts";
 import {
   HostError, hostRequest, importMaterial, listImports, materialFile, refusalStartsNewImport, removeImport, retryImport, uploadMaterial,
 } from "../frontend/src/host-api.ts";
-import { readyNotice } from "../frontend/src/material-imports.ts";
+import { importStatus, readyNotice, submitImport } from "../frontend/src/material-imports.ts";
 import { useAttachUpload } from "../frontend/src/attach-upload.ts";
 
 /** Material IDs are branded strings in the browser's types. */
@@ -141,6 +141,21 @@ describe("upload route", () => {
     expect(await attach.upload(page)).toBe(material("m4"));
     const again = calls[0]!.init.body as FormData;
     expect([again.get("requestId"), again.get("purpose")]).toEqual([first.get("requestId"), "WORK"]);
+  });
+  test("the status line after an upload says it was saved, and leaves the timing to the import's card", async () => {
+    const upload = () => { const data = form(); data.set("course", "c-none"); data.append("files", new File(["audio"], "lecture.m4a", { type: "audio/mp4" })); return data; };
+    let restarts = 0;
+    answer(() => json({ requestId: "r1", state: "TRANSCRIBING" }));
+    const transcribing = await submitImport(upload(), () => { restarts += 1; });
+    expect(transcribing.message).toBe("Upload saved. Your recording is being transcribed.");
+    // The card's sentence is the one place that says how long it takes and that the learner can keep studying.
+    expect(transcribing.message).not.toContain("longer for long recordings");
+    expect(transcribing.message).not.toContain("You can keep studying");
+    expect(importStatus({ ...entry, state: "TRANSCRIBING" } as Parameters<typeof importStatus>[0])).toBe(
+      "Transcribing. This usually takes a few minutes, and longer for long recordings. You can keep studying.");
+    answer(() => json({ requestId: "r1", state: "SAVING" }));
+    expect((await submitImport(upload(), () => { restarts += 1; })).message).toBe("Upload saved. Your material will appear in a moment.");
+    expect(restarts).toBe(2);
   });
   test("the announcement for saved imports says where each one is listed", () => {
     const sources = [{ material: "m1", title: "Lecture 5" }], work = [{ material: "m2", title: "My work: explanation.m4a" }];

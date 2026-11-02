@@ -68,7 +68,8 @@ const estimated = computed(() => skills.value.filter(hasEstimate).length);
 const courseNote = computed(() => {
   const total = skills.value.length;
   if (!total) return "No skills yet";
-  if (!estimated.value) return `No estimates yet across ${plural(total, "skill")}`;
+  // The "new" count beside it already says how many skills have no estimate.
+  if (!estimated.value) return "No estimates yet";
   return estimated.value === total ? `across ${plural(total, "skill")}` : `across the ${estimated.value} of ${plural(total, "skill")} with an estimate`;
 });
 const topics = computed(() => units.value.map((u) => ({ unit: u.unit, title: u.title, kind: u.kind ?? null, skills: u.skills, avg: average(u.skills), open: topic.value === u.unit })));
@@ -372,7 +373,7 @@ onUnmounted(() => {
               <button type="button" class="secondary meadow" :aria-label="`Practice ${current.skill.title}`" @click="emit('practice', current.skill.skill)">Practice</button>
             </div>
           </template>
-          <p v-else-if="empty" class="card-empty">Nothing is growing yet. Plant a topic from your course materials to grow its first tree.</p>
+          <p v-else-if="empty" class="card-empty">Nothing is growing yet.</p>
           <p v-else class="card-empty">Choose a leaf or a signpost.</p>
         </section>
 

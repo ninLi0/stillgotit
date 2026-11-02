@@ -93,13 +93,11 @@ onBeforeUnmount(() => observer?.disconnect());
 
         <div class="field">
           <div class="field-head"><label class="field-label" :for="ids.outcome">What you should be able to do</label><InfoBubble label="About the outcome" text="Start with a verb and name something you could show, such as “Compute a matrix product and explain how its entries are formed.”" /></div>
-          <p :id="`${ids.outcome}-hint`" class="field-hint">What you can do once you have this skill.</p>
-          <textarea :id="ids.outcome" v-model="fields.outcome" rows="2" :aria-describedby="`${ids.outcome}-hint`" :disabled="busy" />
+          <textarea :id="ids.outcome" v-model="fields.outcome" rows="2" :disabled="busy" />
         </div>
         <div class="field">
           <div class="field-head"><label class="field-label" :for="ids.gate">How you will demonstrate it</label><InfoBubble label="About the requirements" text="Each practice task asks for all of this, and your answer is checked against it. A good one asks for two new problems solved with your reasoning, plus a why or how question." /></div>
-          <p :id="`${ids.gate}-hint`" class="field-hint">What practice will ask you to show.</p>
-          <textarea :id="ids.gate" v-model="fields.gate" rows="3" :aria-describedby="`${ids.gate}-hint`" :disabled="busy" />
+          <textarea :id="ids.gate" v-model="fields.gate" rows="3" :disabled="busy" />
         </div>
       </template>
 

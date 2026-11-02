@@ -8,7 +8,7 @@ import { KIND_MARKS, KIND_NAMES, type ChartPoint } from "./estimate-chart.ts";
 import { MARKS } from "./pixel-art.ts";
 import { focusedControl, restoreFocus } from "./focus.ts";
 import { planDay } from "./labels.ts";
-import { isImported, caseName as nameOf, resultName, changeText as sentence, kindLabel as markLabel, type Case, type Change, type SkillData } from "./evidence-text.ts";
+import { isImported, caseName as nameOf, resultName, changeText as sentence, kindLabel as markLabel, provisionalText, startText, timingText, type Case, type Change, type SkillData } from "./evidence-text.ts";
 import { PendingAdjustment, sessionStore, type AdjustmentInput } from "./pending-adjustment.ts";
 // `sessionLabels` names conversations, such as "Practice 2". `reload` reads the skill again and rejects when that read fails.
 const props = defineProps<{ skill: string; data: SkillData; sessionLabels: Record<string, string>; busy: boolean; reload: () => Promise<void> }>();
@@ -104,20 +104,12 @@ const casesById = computed(() => new Map(props.data.cases.map((item) => [item.ca
 function caseName(item: Case | undefined) { return nameOf(item, props.sessionLabels); }
 function result(item: Case | undefined) { return resultName(item); }
 function percent(value: number) { return `${Math.round(value)}%`; }
-function points(amount: number) { const whole = Math.round(amount); return whole < 1 ? "less than 1 point" : whole === 1 ? "1 point" : `${whole} points`; }
 function kindLabel(change: Change) { return markLabel(change, casesById.value, props.sessionLabels); }
-/** Days since the previous row and the decay folded into this row. Small same-day decay is left out. */
-function timing(change: Change, index: number) {
-  const since = index === 0 ? "the starting point" : "the previous change";
-  const gap = change.days < 1 ? `Less than a day after ${since}.` : `${change.days === 1 ? "1 day" : `${change.days} days`} after ${since}.`;
-  const decay = Math.round(change.decay) >= 1 || (change.decay > 0 && change.days >= 1) ? points(change.decay) : "";
-  if (!decay) return gap;
-  return change.kind === "TIME" ? `${gap} Time lowered it ${decay}.` : `${gap} Time lowered it ${decay} before this.`;
-}
-const startText = computed(() => props.data.explanation?.start.startingBasis === "PREVIOUS_DEFINITION"
-  ? "Carried over from an earlier version of this skill." : "Your reported starting confidence.");
+// The starting point's sentence carries its value and its source; the provisional line says why no attempt has moved it.
+const startSentence = computed(() => props.data.explanation ? startText(props.data.explanation.start) : "");
+const provisionalSentence = computed(() => provisionalText(props.data.explanation?.changes ?? []));
 
-// ---- The evidence timeline's rows: a date, a mark for the kind, a plain sentence, and the values in their own column ----
+// ---- The evidence timeline's rows: a date, a mark for the kind, and a plain sentence that carries the values ----
 /** "Tue, Oct 13" as the date over the weekday; a date planDay could not read stays whole. */
 function dateParts(at: string) {
   const [weekday, day] = planDay(at).split(", ");
@@ -127,7 +119,7 @@ function changeText(change: Change) { return sentence(change, casesById.value, p
 /** The starting point's date and one row per change, in the concept's order. */
 const startDate = computed(() => dateParts(props.data.explanation?.start.at ?? ""));
 const changeRows = computed(() => (props.data.explanation?.changes ?? []).map((change, index) => ({
-  key: `${index}:${change.kind}:${change.source}`, change, date: dateParts(change.at), text: changeText(change), detail: timing(change, index),
+  key: `${index}:${change.kind}:${change.source}`, change, date: dateParts(change.at), text: changeText(change), detail: timingText(change, index),
 })));
 /** Each attempt that did not count, named as the timeline has always named it, with the case's date when it is known. */
 const ignoredRows = computed(() => (props.data.explanation?.ignored ?? []).map((row, index) => {
@@ -184,24 +176,21 @@ const chartPoints = computed<ChartPoint[]>(() => {
 
     <template v-if="data.explanation">
       <h3 id="estimate-chart-heading">Estimate over time</h3>
-      <EstimateChart :points="chartPoints" :provisional="data.explanation.provisional" labelledby="estimate-chart-heading" />
+      <EstimateChart :points="chartPoints" labelledby="estimate-chart-heading" />
       <div class="section-head"><h3>How the estimate got here</h3><InfoBubble v-if="basisText" class="head-info" label="About this history" :text="basisText" /></div>
-      <p v-if="data.explanation.provisional" class="basis"><span class="provisional">Provisional</span>No assessed attempt has counted toward this estimate yet.</p>
-      <!-- One row per change: the date, the kind's mark, a plain sentence with its timing, and the values, which the
-           sentence also says, so screen readers skip the values column. -->
+      <p v-if="data.explanation.provisional" class="basis"><span class="provisional">Provisional</span>{{ provisionalSentence }}</p>
+      <!-- One row per change: the date, the kind's mark, and a plain sentence that carries the values, with its timing
+           under it. The values are said once, in the sentence, so the rows have no separate values column. -->
       <ol class="rows timeline">
         <li class="row" :style="stagger(0)">
           <span class="row-when"><span>{{ startDate.day }}</span><span class="row-weekday">{{ startDate.weekday }}</span></span>
           <span class="row-mark"><PixelIcon :rows="MARKS.start" :size="10" :label="KIND_NAMES.START" /></span>
-          <p class="row-text">The estimate started at {{ percent(data.explanation.start.confidence) }}.</p>
-          <span class="row-values" aria-hidden="true"><strong>{{ percent(data.explanation.start.confidence) }}</strong></span>
-          <div class="row-more"><p class="row-detail">{{ startText }}</p></div>
+          <p class="row-text">{{ startSentence }}</p>
         </li>
         <li v-for="({ key, change, date, text, detail }, index) in changeRows" :key="key" class="row" :style="stagger(index + 1)">
           <span class="row-when"><span>{{ date.day }}</span><span class="row-weekday">{{ date.weekday }}</span></span>
           <span class="row-mark"><PixelIcon :rows="MARKS[KIND_MARKS[change.kind]]" :size="10" :label="KIND_NAMES[change.kind]" /></span>
           <p class="row-text">{{ text }}</p>
-          <span class="row-values" aria-hidden="true"><strong>{{ percent(change.after) }}</strong><span>from {{ percent(change.before) }}</span></span>
           <div class="row-more">
             <p v-if="change.kind === 'ADJUSTMENT' && change.reason" class="row-reason">“{{ change.reason }}”</p>
             <p class="row-detail">{{ detail }}</p>
@@ -215,7 +204,6 @@ const chartPoints = computed<ChartPoint[]>(() => {
             <span class="row-when"><template v-if="item.date"><span>{{ item.date.day }}</span><span class="row-weekday">{{ item.date.weekday }}</span></template></span>
             <span class="row-mark"><PixelIcon :rows="MARKS.ignored" :size="10" label="Did not count" /></span>
             <p class="row-text">{{ item.name }}</p>
-            <span class="row-values" aria-hidden="true"><span>No change</span></span>
             <div class="row-more"><p class="row-detail">{{ item.reason }}</p></div>
           </li>
         </ul>
@@ -268,22 +256,19 @@ const chartPoints = computed<ChartPoint[]>(() => {
 h3{font-family:var(--font-display);font-weight:500;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--estimate-eyebrow);margin:16px 0 6px}
 .basis{margin:0 0 6px;color:var(--soft);line-height:1.5;font-size:12px}
 .provisional{display:inline-block;margin-right:6px;padding:0 7px;border-radius:999px;font-size:11px;font-weight:700;color:var(--dawn-soft-text);background:var(--dawn-soft)}
-/* Evidence rows: the date, the kind's mark on a lavender rail, the sentence, and the values. The date and values
-   columns have fixed widths so the attempts that did not count line up under the same columns. */
+/* Evidence rows: the date, the kind's mark on a lavender rail, and the sentence. The date column has a fixed width so
+   the attempts that did not count line up under the same columns. */
 .rows{list-style:none;margin:10px 0 0;padding:0}
-.row{position:relative;display:grid;grid-template-columns:38px 10px minmax(0,1fr) 52px;grid-template-areas:"date mark text values" "date mark more more";gap:0 8px;padding:0 0 12px;line-height:1.35;animation:sgRise var(--dur-enter) var(--ease-enter) calc(var(--row, 0) * var(--dur-enter) / 6) both}
+.row{position:relative;display:grid;grid-template-columns:38px 10px minmax(0,1fr);grid-template-areas:"date mark text" "date mark more";gap:0 8px;padding:0 0 12px;line-height:1.35;animation:sgRise var(--dur-enter) var(--ease-enter) calc(var(--row, 0) * var(--dur-enter) / 6) both}
 .timeline .row:not(:last-child)::before{content:"";position:absolute;left:50px;top:14px;bottom:-3px;width:2px;background:var(--estimate-track)}
 .row-when{grid-area:date;display:flex;flex-direction:column;color:var(--ink);font-size:11px;font-weight:600;line-height:1.35;white-space:nowrap}
 .row-weekday{color:var(--muted);font-weight:400}
 .row-mark{grid-area:mark;display:flex;padding-top:3px}
 .row-text{grid-area:text;min-width:0;margin:0;color:var(--ink);font-size:12px;line-height:1.4}
-/* The reason and the timing run under the values column too, so they wrap less in the narrow rail. */
 .row-more{grid-area:more;min-width:0}
 .row-more p{margin:2px 0 0;font-size:12px;line-height:1.4}
 .row-detail{color:var(--faint)}
 .row-reason{color:var(--ink);font-style:italic}
-.row-values{grid-area:values;display:flex;flex-direction:column;align-items:flex-end;color:var(--muted);font-size:11px;line-height:1.35;text-align:right;white-space:nowrap}
-.row-values strong{color:var(--ink);font-size:13px;font-weight:700;line-height:1.25}
 .row-date{color:var(--dim);font-size:12px;white-space:nowrap}
 .case-history{list-style:none;margin:0;padding:0}
 .case-history li{padding:8px 0;border-top:1px solid var(--lesson-divider)}

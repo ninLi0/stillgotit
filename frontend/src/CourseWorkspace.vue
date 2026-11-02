@@ -598,7 +598,7 @@ watch(view, (now) => { if (now === "setup" && material.value && !preview.value) 
         <template v-else-if="!plan.preferences">
           <p class="eyebrow scene-eyebrow">{{ todayLong }}</p>
           <h2 class="display scene-title">Set a daily study time</h2>
-          <p class="scene-reason">Choose how many minutes a day you have for this course to get a plan.</p>
+          <p class="scene-reason">This course has no plan until you do.</p>
           <div class="scene-actions"><button class="primary meadow" type="button" @click="setStudyTime">Set study time</button></div>
         </template>
         <template v-else-if="next">
@@ -752,13 +752,13 @@ watch(view, (now) => { if (now === "setup" && material.value && !preview.value) 
           <section v-if="selectedMaterial" class="detail" :aria-label="selectedMaterial.title">
             <h2 class="display detail-title">{{ selectedMaterial.title }}</h2>
             <div class="detail-meta">
-              <span class="hint">{{ preview ? `${preview.originals.length} ${preview.originals.length === 1 ? 'file' : 'files'}` : selectedWork ? 'Your work' : 'Course material' }}{{ selectedWork ? (preview ? ' · Your work' : '') : ` · ${fileMeta(selectedMaterial.material)}` }}</span>
+              <span class="hint">{{ preview ? `${preview.originals.length} ${preview.originals.length === 1 ? 'file' : 'files'}` : selectedWork ? 'Your work' : 'Course material' }}{{ selectedWork && preview ? ' · Your work' : '' }}</span>
               <div v-if="preview" class="file-chips"><button v-for="file in preview.originals" :key="file.file" class="file-chip" :disabled="busy" @click="download(file.file, file.name)">↓ {{ file.name }}</button></div>
               <GradedImport :key="selectedMaterial.material" :course="course.course" :material="selectedMaterial.material" :title="selectedMaterial.title" />
               <span v-if="!selectedWork && !selectedMaterial.title.startsWith('Graded work: ')" class="find-wrap"><button class="secondary sand" :disabled="busy || !!suggestReason" :aria-describedby="suggestReason ? 'suggest-reason' : undefined" @click="suggestFrom(selectedMaterial.material)">Find skills</button><p v-if="suggestReason" id="suggest-reason" class="hint reason">{{ suggestReason }}</p></span>
               <span class="delete-wrap"><button type="button" class="quiet delete-material" aria-haspopup="dialog" :disabled="busy || !!deleteReason" :aria-describedby="deleteReason ? 'delete-reason' : undefined" @click="askDelete(selectedMaterial)">Delete material…</button><p v-if="deleteReason" id="delete-reason" class="hint reason">{{ deleteReason }}</p></span>
             </div>
-            <p v-if="selectedWork" class="hint work-note">You attached this file to an answer. The tutor reads it as your own work, together with that answer, and never teaches from it, so it has no skills to find.</p>
+            <p v-if="selectedWork" class="hint work-note">It has no skills to find.</p>
             <div class="mat-tabs" role="tablist" aria-label="Material views">
               <button id="mat-tab-preview" type="button" role="tab" :aria-selected="matTab === 'preview'" aria-controls="mat-panel" @click="matTab = 'preview'">Preview</button>
               <button v-if="!selectedWork" id="mat-tab-skills" type="button" role="tab" :aria-selected="matTab === 'skills'" aria-controls="mat-panel" @click="matTab = 'skills'">Skills ({{ materialSkills.length }})</button>
@@ -799,7 +799,7 @@ watch(view, (now) => { if (now === "setup" && material.value && !preview.value) 
   <dialog ref="deleteDialog" class="delete-dialog" aria-labelledby="delete-title" aria-describedby="delete-text">
     <h2 id="delete-title" class="display">Delete “{{ deleteTarget?.title }}”?</h2>
     <div id="delete-text" class="delete-text">
-      <p>The material and its files leave your library for good. This can't be undone.</p>
+      <p>The material and its files leave your library. This can't be undone.</p>
       <p v-if="deleteTarget?.work">It is your own work, attached to an answer. The answer keeps its text, but the tutor can no longer open this file.</p>
       <p v-else>The tutor stops using it for new lessons, practice and skill suggestions. Past lessons and practice keep their text, and their citations of it will say that it was deleted.</p>
       <p v-if="deleteEffects.unconfirmed">{{ count(deleteEffects.unconfirmed, "suggested skill", "suggested skills") }} from it that you haven't confirmed will be discarded.</p>

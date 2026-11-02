@@ -116,8 +116,8 @@ async function older() {
             <li v-for="row in group.rows" :key="row.studySession" class="conv-item" :class="{ 'menu-open': menuFor === row.studySession }" @focusout="leaveRow" @keydown.esc="escapeMenu($event, row)">
               <button type="button" class="conv-row" :class="{ current: row.studySession === current }" :aria-current="row.studySession === current ? 'true' : undefined" :title="row.title" :data-conversation="row.studySession" @click="choose(row)">
                 <span class="conv-line"><span class="conv-name">{{ row.title }}</span><span v-if="row.status === 'OPEN'" class="conv-open" aria-hidden="true" /></span>
-                <span class="conv-meta" aria-hidden="true"><span class="conv-skill">{{ row.skillTitle }}</span><span v-if="row.lastActivity" class="conv-ago"> · {{ shortAgo(row.lastActivity, now) }}</span></span>
-                <span class="sr-only">, {{ row.skillTitle }}{{ row.status === 'OPEN' ? ', open' : '' }}<template v-if="row.lastActivity">, last active {{ messageTime(row.lastActivity) }}</template></span>
+                <span class="conv-meta" aria-hidden="true"><span v-if="row.kind === 'LESSON'" class="conv-skill">{{ row.skillTitle }}</span><span v-if="row.lastActivity" class="conv-ago">{{ row.kind === 'LESSON' ? ' · ' : '' }}{{ shortAgo(row.lastActivity, now) }}</span></span>
+                <span class="sr-only">{{ row.kind === 'LESSON' ? `, ${row.skillTitle}` : '' }}{{ row.status === 'OPEN' ? ', open' : '' }}<template v-if="row.lastActivity">, last active {{ messageTime(row.lastActivity) }}</template></span>
               </button>
               <button type="button" class="conv-more" :aria-expanded="menuFor === row.studySession" :aria-controls="menuId(row)" :aria-label="`More actions for ${row.title}`" :title="`More actions for ${row.title}`" :data-more="row.studySession" :disabled="list.busy" @click="toggleMenu(row)">
                 <svg aria-hidden="true" viewBox="0 0 16 16" width="16" height="16"><rect x="2" y="7" width="2.5" height="2.5" fill="currentColor" /><rect x="6.75" y="7" width="2.5" height="2.5" fill="currentColor" /><rect x="11.5" y="7" width="2.5" height="2.5" fill="currentColor" /></svg>
@@ -143,8 +143,8 @@ async function older() {
             <li v-for="(row, index) in list.archivedRows" :key="row.studySession" class="conv-item conv-archived-item">
               <button type="button" class="conv-row" :class="{ current: row.studySession === current }" :aria-current="row.studySession === current ? 'true' : undefined" :title="row.title" @click="choose(row)">
                 <span class="conv-line"><span class="conv-name">{{ row.title }}</span></span>
-                <span class="conv-meta" aria-hidden="true"><span class="conv-skill">{{ row.skillTitle }}</span><span v-if="row.lastActivity" class="conv-ago"> · {{ shortAgo(row.lastActivity, now) }}</span></span>
-                <span class="sr-only">, {{ row.skillTitle }}, archived, opens read-only<template v-if="row.lastActivity">, last active {{ messageTime(row.lastActivity) }}</template></span>
+                <span class="conv-meta" aria-hidden="true"><span v-if="row.kind === 'LESSON'" class="conv-skill">{{ row.skillTitle }}</span><span v-if="row.lastActivity" class="conv-ago">{{ row.kind === 'LESSON' ? ' · ' : '' }}{{ shortAgo(row.lastActivity, now) }}</span></span>
+                <span class="sr-only">{{ row.kind === 'LESSON' ? `, ${row.skillTitle}` : '' }}, archived, opens read-only<template v-if="row.lastActivity">, last active {{ messageTime(row.lastActivity) }}</template></span>
               </button>
               <button type="button" class="quiet conv-restore" :disabled="list.busy" :aria-label="`Restore ${row.title}`" @click="restore(row, index)">Restore</button>
             </li>

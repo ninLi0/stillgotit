@@ -36,7 +36,7 @@ The browser replaces or keeps the request ID by these rules:
 
 When no answer arrives, or the answer is not the app's own, such as an error page from Cloudflare after its 100-second limit, the browser shows "The upload didn't get an answer in time. It may still be saving. Wait a minute, then choose Import material again. The app continues from what it already saved." It then lists imports, so an import that reached TRANSCRIBING or READY appears in the library. A retry with the same request ID sends the files again and answers from saved progress.
 
-After a `TRANSCRIBING` answer, the browser lists imports so the new import appears in the library and shows "Upload saved. Your recording is being transcribed. This usually takes a few minutes, and longer for long recordings. You can keep studying." After a `SAVING` answer, it lists imports and shows "Upload saved. Your material will appear in a moment."
+After a `TRANSCRIBING` answer, the browser lists imports so the new import appears in the library and shows "Upload saved. Your recording is being transcribed." The import's card below it says how long that takes. After a `SAVING` answer, it lists imports and shows "Upload saved. Your material will appear in a moment."
 
 The upload form describes what it accepts: "PDF (including scans), Word, PowerPoint, Excel, text, notebook, image (PNG, JPEG, WebP, HEIC, HEIF), audio, or video files. Up to 12 files and 95 MB in total. Recordings and videos can be up to 2 hours long." The notice about Google adds "Google keeps copies of large files and recordings for up to 48 hours."
 
@@ -119,7 +119,7 @@ A file the learner attaches to an answer on the lesson page is their own work: e
 The Materials view keeps the learner's work apart from the course's files:
 
 - The file list, the count beside the heading ("N files"), and the empty state count only the course's sources. Below the sources, a collapsed group "Your work (N)" lists the learner's work, newest first, with the note "Files you attached to your answers, newest first. The tutor reads each one with its answer and never teaches from it." The group is not shown when the learner has no work in the course. It opens on its own when one of its files is shown, for example after a reload that restores that selection.
-- Choosing a file of work opens it in the same viewer as any material, with its downloads and readable text. The detail says "Your work" in place of "Course material", and explains "You attached this file to an answer. The tutor reads it as your own work, together with that answer, and never teaches from it, so it has no skills to find." It offers no Find skills button, no Skills tab, and no "Ask about" button in the viewer.
+- Choosing a file of work opens it in the same viewer as any material, with its downloads and readable text. The detail says "Your work" in place of "Course material", and says "It has no skills to find.", since the group's note above it already explains that the tutor reads work with its answer and never teaches from it. It offers no Find skills button, no Skills tab, and no "Ask about" button in the viewer.
 - "Delete material…" works as for any material. Its dialog says "It is your own work, attached to an answer. The answer keeps its text, but the tutor can no longer open this file." in place of the sentence about lessons, practice, and skill suggestions.
 - Work is saved from the lesson page, so opening Materials reads the course again, and work attached since the course was last read is listed.
 
@@ -133,7 +133,7 @@ A learner can delete one of their materials for good, for example a duplicate up
 
 **The page.** A material's detail in Materials has "Delete material…" beside Find skills, in the error colours both themes define. While a draft save is still waiting for its reply, the button is off with "Finish saving your skill drafts first.", because that save may name this material. The button opens a dialog titled "Delete “TITLE”?" that says in plain sentences what will happen:
 
-- "The material and its files leave your library for good. This can't be undone."
+- "The material and its files leave your library. This can't be undone."
 - "The tutor stops using it for new lessons, practice and skill suggestions. Past lessons and practice keep their text, and their citations of it will say that it was deleted."
 - When skills suggested from it are not confirmed yet, counting saved drafts and suggestions still on screen: "N suggested skills from it that you haven't confirmed will be discarded."
 - When confirmed skills are taught from it: "Confirmed skills taught from it keep their progress." When some of them have no other source, it adds that they need another source under Manage skills before their next lesson.

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
-import { answerParts, answerProse, answerWithWidgetsAs, checkAnswerWidgets, readWidget, scanWidgets, WIDGET_LIMITS, WIDGET_PROBLEMS, widgetHeading, widgetPlainText,
+import { answerParts, answerProse, answerWithWidgetsAs, checkAnswerWidgets, readWidget, scanWidgets, stepText, WIDGET_LIMITS, WIDGET_PROBLEMS, widgetHeading, widgetPlainText,
   type Widget, type WidgetSource } from "../src/answer-widgets.ts";
 import { AnswerNotGrounded, tutorGenerator } from "../src/host/tutor-generation.ts";
 import { SUBMITTED_WORK } from "../src/host/tutor.ts";
@@ -239,6 +239,33 @@ describe("Examples as plain text", () => {
     expect(answerWithWidgetsAs("Plain.", widgetPlainText)).toBe("Plain.");
     expect(answerWithWidgetsAs(answer({ kind: "chart" }), widgetPlainText)).toBe("Rows meet columns.\n\n\nThat is why the order matters.");
     expect(answerProse(answer(STEPS))).toBe("Rows meet columns.\n\n\nThat is why the order matters.");
+  });
+});
+
+describe("Step labels in a steps example", () => {
+  test("a step that begins with its own label shows without it, since the list numbers each step", () => {
+    expect(stepText("Step 1: Exponentiate each logit.", 0)).toBe("Exponentiate each logit.");
+    expect(stepText("step 2. Add the results.", 1)).toBe("Add the results.");
+    expect(stepText("STEP 3 - Divide each by the sum.", 2)).toBe("Divide each by the sum.");
+    expect(stepText("Step 4 \u2013 Check that they add to 1.", 3)).toBe("Check that they add to 1.");
+    expect(stepText("  Step 5:Read off the largest.", 4)).toBe("Read off the largest.");
+  });
+
+  test("the repeated label is gone from what the learner reads, while the saved step keeps its words", () => {
+    const widget = { kind: "steps", title: "Softmax", source: SOURCE,
+      steps: ["Step 1: Exponentiate each logit.", "Step 2: Divide each by the sum."] } as Widget;
+    expect(widgetPlainText(widget)).toBe("Softmax\n1. Exponentiate each logit.\n2. Divide each by the sum.");
+    expect(widgetPlainText(widget)).not.toContain("Step 1:");
+    expect(widget.kind === "steps" && widget.steps[0]).toBe("Step 1: Exponentiate each logit.");
+  });
+
+  test("a label with another number, a decimal, a word that only starts like it, or nothing after it stays as written", () => {
+    expect(stepText("Step 2: Add the results.", 0)).toBe("Step 2: Add the results.");
+    expect(stepText("Step 12: Stop.", 0)).toBe("Step 12: Stop.");
+    expect(stepText("Step 1.5 is optional.", 0)).toBe("Step 1.5 is optional.");
+    expect(stepText("Stepwise, multiply the rows.", 0)).toBe("Stepwise, multiply the rows.");
+    expect(stepText("Step 1:", 0)).toBe("Step 1:");
+    expect(stepText("Take row 1 of A: [1, 2].", 0)).toBe("Take row 1 of A: [1, 2].");
   });
 });
 
