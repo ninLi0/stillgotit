@@ -247,12 +247,13 @@ export function readWidget(body: string): { ok: true; widget: Widget } | { ok: f
 // ---- Checking an answer ----
 
 /**
- * The host's check of a lesson answer. Each block must be closed, read as an example, and name a source that `citable`
- * accepts, which is the same check a citation passes; only the first such block is kept. A kept block is rewritten in
- * canonical form. A dropped block leaves the answer with the blank line that separated it, so the text around it reads as
- * before. An answer without blocks comes back exactly as it was.
+ * The host's check of a lesson answer. Each block must be closed, read as an example, and name a source that `cite`
+ * accepts, which is the same check a citation passes; only the first such block is kept. `cite` returns the source as it
+ * is saved, or nothing when it fails: a source that names its material by title or file name comes back with the material's
+ * identity. A kept block is rewritten in canonical form with that source. A dropped block leaves the answer with the blank
+ * line that separated it, so the text around it reads as before. An answer without blocks comes back exactly as it was.
  */
-export function checkAnswerWidgets(answer: string, citable: (source: WidgetSource) => boolean): { text: string; kept: Widget[]; dropped: WidgetProblem[] } {
+export function checkAnswerWidgets(answer: string, cite: (source: WidgetSource) => WidgetSource | undefined): { text: string; kept: Widget[]; dropped: WidgetProblem[] } {
   const { lines, blocks } = scanWidgets(answer);
   if (!blocks.length) return { text: answer, kept: [], dropped: [] };
   const kept: Widget[] = [], dropped: WidgetProblem[] = [], out: string[] = [];
@@ -267,10 +268,12 @@ export function checkAnswerWidgets(answer: string, citable: (source: WidgetSourc
     from = block.end + 1;
     const read = block.closed ? readWidget(block.body) : { ok: false as const, reason: "MALFORMED" as const };
     if (!read.ok) { drop(read.reason); continue; }
-    const problem = !citable(read.widget.source) ? "SOURCE" : kept.length ? "EXTRA" : null;
-    if (problem) { drop(problem); continue; }
-    kept.push(read.widget);
-    out.push(`\`\`\`${WIDGET_FENCE}`, JSON.stringify(read.widget), "```");
+    const source = cite(read.widget.source);
+    if (!source) { drop("SOURCE"); continue; }
+    if (kept.length) { drop("EXTRA"); continue; }
+    const widget: Widget = { ...read.widget, source: { material: source.material, location: source.location } };
+    kept.push(widget);
+    out.push(`\`\`\`${WIDGET_FENCE}`, JSON.stringify(widget), "```");
   }
   out.push(...lines.slice(from));
   // A block dropped at the end leaves no blank line behind.
