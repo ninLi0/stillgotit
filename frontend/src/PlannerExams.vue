@@ -2,6 +2,7 @@
 import { computed, nextTick, ref, useId } from "vue";
 import { planDay } from "./labels.ts";
 import { examWhen, type CourseSkill, type CourseUnit, type Exam, type ExamInput } from "./planning.ts";
+import { allCovered, toggleAll } from "./exam-cover.ts";
 // The course's active exams and the form that adds one. The parent sends the requests and owns busy, messages, and focus.
 const props = defineProps<{ exams: Exam[]; skills: CourseSkill[]; units: CourseUnit[]; today: string; busy: boolean; addReason: string; error: string }>();
 const emit = defineEmits<{ save: [input: ExamInput]; remove: [date: string] }>();
@@ -15,8 +16,11 @@ const groups = computed(() => {
   const known = new Set(props.units.map((unit) => unit.unit));
   const grouped = props.units.map((unit) => ({ key: unit.unit, title: unit.title, skills: confirmed.filter((skill) => skill.unit === unit.unit) }));
   grouped.push({ key: "", title: "Other skills", skills: confirmed.filter((skill) => !known.has(skill.unit)) });
-  return grouped.filter((group) => group.skills.length);
+  return grouped.filter((group) => group.skills.length).map((group) => ({ ...group, ids: group.skills.map((skill) => skill.skill) }));
 });
+// "Select all" beside the list's title and each topic's own button only change the ticked boxes, so saving sends the same request.
+const listed = computed(() => groups.value.flatMap((group) => group.ids));
+function pick(skills: string[]) { covered.value = toggleAll(covered.value, skills); }
 const sameDate = computed(() => props.exams.some((exam) => exam.date === date.value));
 function coveredTitles(exam: Exam) { return exam.covered.map((skill) => titles.value.get(skill) ?? "A skill no longer in this course"); }
 async function toggle() {
@@ -46,11 +50,12 @@ defineExpose({ close, alertBox: () => errorBox.value });
     <form v-if="open" :id="`${id}-form`" class="exam-form" novalidate @submit.prevent="submit">
       <label>Exam date<input ref="dateInput" v-model="date" type="date" :min="today" :disabled="busy" /></label>
       <p v-if="sameDate" class="hint">An exam on this date is already listed. Saving replaces the skills it covers.</p>
-      <fieldset class="skill-choice">
-        <legend>Skills it covers</legend>
+      <!-- Each legend holds its group's button after the title. aria-labelledby names the group by the title alone, so the button's words stay out of the group's name. -->
+      <fieldset class="skill-choice" :aria-labelledby="`${id}-covers`">
+        <legend><span class="legend-row"><span :id="`${id}-covers`">Skills it covers</span><button v-if="groups.length" type="button" class="quiet pick" :disabled="busy" @click="pick(listed)">{{ allCovered(covered, listed) ? 'Clear all' : 'Select all' }}</button></span></legend>
         <p v-if="!groups.length" class="hint">Confirm a skill first. An exam covers confirmed skills.</p>
-        <fieldset v-for="group in groups" :key="group.key" class="unit-group">
-          <legend>{{ group.title }}</legend>
+        <fieldset v-for="(group, index) in groups" :key="group.key" class="unit-group" :aria-labelledby="`${id}-unit-${index}`">
+          <legend><span class="legend-row"><span :id="`${id}-unit-${index}`">{{ group.title }}</span><button type="button" class="quiet pick" :disabled="busy" :aria-label="allCovered(covered, group.ids) ? `Clear the skills in ${group.title}` : `Select all skills in ${group.title}`" @click="pick(group.ids)">{{ allCovered(covered, group.ids) ? 'Clear' : 'Select all' }}</button></span></legend>
           <label v-for="skill in group.skills" :key="skill.skill" class="check"><input v-model="covered" type="checkbox" :value="skill.skill" :disabled="busy" /><span class="box" aria-hidden="true" /><span>{{ skill.title }}</span></label>
         </fieldset>
       </fieldset>
@@ -79,6 +84,10 @@ fieldset{border:0;padding:0;margin:14px 0 0;min-width:0}
 legend{padding:0;font-size:13px;font-weight:700}
 .unit-group{margin-top:8px}
 .unit-group legend{font-family:var(--font-display);font-weight:400;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--faint)}
+/* A group's button follows its legend text in a lighter, plainer face, so the name stays what a reader sees first.
+   When a long title leaves no room, the button moves to the next line and starts at the left edge. */
+.legend-row{display:flex;flex-wrap:wrap;align-items:baseline;column-gap:12px}
+.pick{padding:6px 0;font-family:var(--font-body);font-size:12px;font-weight:400;letter-spacing:0;text-transform:none;color:var(--muted);white-space:nowrap}
 .check{position:relative;display:flex;align-items:flex-start;gap:10px;font-size:13px!important;font-weight:400!important;margin:8px 0!important;cursor:pointer}
 .check input{position:absolute;opacity:0;width:18px;height:18px;min-height:0;margin:0;left:0}
 .check .box{width:18px;height:18px;flex:none;border-radius:5px;border:1.5px solid var(--check-line);background:var(--field);display:grid;place-items:center}
