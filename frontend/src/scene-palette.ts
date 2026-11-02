@@ -119,7 +119,7 @@ const SKIES = new Set([
 ].map((day) => parseInt(NIGHT[day]!.slice(1), 16)));
 /** The sign-in grove's sky above the trees, darkest at the top, from the band nearest the grove upward. */
 export const WELCOME_NIGHT_SKY = ["#1D2643", "#1A2240", "#171F3B", "#151C37", "#131A33"] as const;
-/** The grove's own four sky bands by night, from the top down, so the sign-in page can carry them past the grove's edges. */
+/** The grove's own four sky bands by night, from the top down. The sign-in page's sky above the grove starts from the first. */
 export const GROVE_NIGHT_SKY = ["#CFE3EE", "#D7E8F1", "#DEECF3", "#E5F0F5"].map((day) => NIGHT[day]!);
 for (const band of WELCOME_NIGHT_SKY) SKIES.add(parseInt(band.slice(1), 16));
 

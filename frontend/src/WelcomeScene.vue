@@ -1,14 +1,15 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { CELL, GROUND, HEIGHT, drawGrove, growGrove, type GroveTopic, type GroveTree } from "./GroveScene.ts";
+import { CELL, GROUND, drawGrove, growGrove, shiftGrove, type GroveTopic, type GroveTree } from "./GroveScene.ts";
 import { STAGE_LABELS, rng, type Stage } from "./pixel-art.ts";
 import PixelIcon from "./PixelIcon.vue";
-import { GROVE_NIGHT_SKY, MOON, WELCOME_NIGHT_SKY, dayOrNight, isNight, scatterStars, sceneColor } from "./scene-palette.ts";
+import { MOON, WELCOME_NIGHT_SKY, dayOrNight, isNight, scatterStars, sceneColor } from "./scene-palette.ts";
 import { currentTheme } from "./theme.ts";
+import { WELCOME_SCALE, fitGrove } from "./welcome-fit.ts";
 
 // The welcome panel shows the app's own picture of learning before anyone signs in: a sample grove drawn with the same
-// code as the Home screen (design/revamp/README.md), at half size so three topic trees fit the panel. Each tree is a
-// topic from an example course; each leaf is a skill at its own stage of growth. Nothing here is live data.
+// code as the Home screen (design/revamp/README.md), at half size, or smaller when the panel is too narrow for that.
+// Each tree is a topic from an example course; each leaf is a skill at its own stage of growth. Nothing here is live data.
 const SAMPLE: GroveTopic[] = [
   { id: "vectors", title: "Vectors", kind: "oak", skills: [
     { skill: "v1", title: "Add and scale vectors", mastery: 92, due: false },
@@ -30,9 +31,11 @@ const SAMPLE: GroveTopic[] = [
   ] },
 ];
 const LEGEND: Stage[] = ["bud", "sprout", "leaf", "full", "bloom"];
-const SCALE = 0.5, FOOT = 40, SKY = ["#CFE3EE", "#D3E6F0", "#D7E8F1", "#DBEAF2", "#DFECF3"];
+const FOOT = 40, SKY = ["#CFE3EE", "#D3E6F0", "#D7E8F1", "#DBEAF2", "#DFECF3"];
 const wrap = ref<HTMLElement | null>(null), canvas = ref<HTMLCanvasElement | null>(null);
 const planks = ref<{ key: string; title: string; meta: string; left: number; top: number }[]>([]);
+// The signs' size against their half-size design, and the soil colour that the caption under the scene stands on.
+const plankScale = ref(1), soil = ref("");
 let observer: ResizeObserver | undefined, measure: CanvasRenderingContext2D | null | undefined, offscreen: HTMLCanvasElement | undefined;
 
 function textWidth(text: string, font: string) {
@@ -41,47 +44,54 @@ function textWidth(text: string, font: string) {
   measure.font = font;
   return measure.measureText(text).width;
 }
-// Planks are measured at the size they are shown (half the grove's), so the trees keep the same spacing as on Home.
+// Planks are measured at their half-size design (half the grove's), so the trees keep the same spacing as on Home. When
+// the grove is drawn smaller, the planks shrink with it, so each still fits its tree's slot.
 function plankCells(title: string, meta: string) {
-  const text = Math.max(textWidth(title, '12px "Pixelify Sans", monospace'), textWidth(meta, '600 11px "Instrument Sans", sans-serif')) / SCALE;
+  const text = Math.max(textWidth(title, '12px "Pixelify Sans", monospace'), textWidth(meta, '600 11px "Instrument Sans", sans-serif')) / WELCOME_SCALE;
   return Math.ceil((Math.min(280, Math.ceil(text) + 20) + 4 + 8) / CELL);
 }
 function draw() {
   const el = wrap.value, cv = canvas.value; if (!el || !cv) return;
   const w = Math.max(1, Math.round(el.clientWidth)), h = Math.max(1, Math.round(el.clientHeight)), dpr = window.devicePixelRatio || 1;
-  const grove = growGrove(SAMPLE, 11, plankCells);
+  // The whole grove fits the panel's width (welcome-fit.ts), moved to the middle and drawn as wide as the panel, so its
+  // sky and ground reach both edges. It is drawn straight at its scale rather than shrunk from a larger picture, so every
+  // cell's edges land on whole screen pixels even when a cell is not a whole number of them.
+  const grove = growGrove(SAMPLE, 11, plankCells), fit = fitGrove(w, grove.width), shown = shiftGrove(grove, fit.shift);
   const off = offscreen ??= document.createElement("canvas");
-  const groveCss = grove.width * CELL;
-  drawGrove(off, grove, groveCss, dpr, null, null);
+  drawGrove(off, shown, fit.columns * CELL, dpr * fit.scale, null, null);
   cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); cv.style.width = `${w}px`; cv.style.height = `${h}px`;
   const ctx = cv.getContext("2d"); if (!ctx) return;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.imageSmoothingEnabled = false;
-  // The grove image sits at the bottom; the sky above it continues the grove's own top band, with a sun and clouds in 2px cells.
-  // By night the sky darkens upward, and the moon and a few stars come out (scene-palette.ts).
-  // The grove stops FOOT pixels above the caption so the signposts under the ground stay in view.
-  const gh = Math.round(HEIGHT * CELL * SCALE), gw = Math.round(groveCss * SCALE), top = h - gh - FOOT, x0 = Math.round((w - gw) / 2);
-  const U = CELL * SCALE, band = Math.ceil(Math.max(top, 1) / SKY.length);
-  (isNight() ? WELCOME_NIGHT_SKY : SKY).forEach((colour, i) => { ctx.fillStyle = colour; ctx.fillRect(0, Math.max(0, top - (i + 1) * band), w, band); });
-  const cell = (x: number, y: number, colour: string) => { ctx.fillStyle = sceneColor(colour); ctx.fillRect(Math.round(x) * U, Math.round(y) * U, U, U); };
-  const sunX = Math.round(w / U) - 16, sunY = 12;
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.imageSmoothingEnabled = false;
+  // From here on, sizes are in device pixels. U is one of the grove's cells; the soil under the grove (FOOT, which keeps
+  // the signposts under the ground in view) and the signs themselves are scaled with the grove by k.
+  const U = CELL * fit.scale * dpr, k = fit.scale / WELCOME_SCALE, W = cv.width, H = cv.height;
+  const top = Math.max(0, H - off.height - Math.round(FOOT * k * dpr));
+  // The grove image sits at the bottom; the sky above it continues the grove's own top band, with a sun and clouds in
+  // the grove's cells. By night the sky darkens upward, and the moon and a few stars come out (scene-palette.ts).
+  const band = Math.ceil(Math.max(top, 1) / SKY.length);
+  (isNight() ? WELCOME_NIGHT_SKY : SKY).forEach((colour, i) => { ctx.fillStyle = colour; ctx.fillRect(0, Math.max(0, top - (i + 1) * band), W, band); });
+  const rect = (x: number, y: number, cw: number, ch: number, colour: string) => {
+    const left = Math.round(x * U), up = Math.round(y * U);
+    ctx.fillStyle = sceneColor(colour); ctx.fillRect(left, up, Math.round((x + cw) * U) - left, Math.round((y + ch) * U) - up);
+  };
+  const cell = (x: number, y: number, colour: string) => rect(Math.round(x), Math.round(y), 1, 1, colour);
+  const sunX = Math.round(W / U) - 16, sunY = 12;
   for (let dy = -5; dy <= 5; dy++) for (let dx = -5; dx <= 5; dx++) { const q = dx * dx + dy * dy; if (q <= 26) cell(sunX + dx, sunY + dy, q <= 8 ? dayOrNight("#F3CD7A", MOON.face) : dayOrNight("#F9E3A8", MOON.rim)); }
   if (isNight()) { cell(sunX + 1, sunY - 2, MOON.crater); cell(sunX - 2, sunY + 1, MOON.crater); cell(sunX + 2, sunY + 2, MOON.crater); }
-  const R = rng(5), cols = Math.floor(w / U);
+  const R = rng(5), cols = Math.floor(W / U);
   for (let i = 0; i < 4; i++) {
     const cw = 10 + Math.floor(R() * 10), x = Math.floor(R() * Math.max(1, cols - cw)), y = 6 + Math.floor(R() * Math.max(1, Math.floor(top / U) - 20));
-    ctx.fillStyle = sceneColor("#FFFFFF"); ctx.fillRect(x * U, y * U, cw * U, 2 * U); ctx.fillRect((x + 2) * U, (y - 1) * U, Math.max(3, cw - 5) * U, U);
-    ctx.fillStyle = sceneColor("#EEF6F9"); ctx.fillRect((x + 1) * U, (y + 2) * U, (cw - 2) * U, U);
+    rect(x, y, cw, 2, "#FFFFFF"); rect(x + 2, y - 1, Math.max(3, cw - 5), 1, "#FFFFFF"); rect(x + 1, y + 2, cw - 2, 1, "#EEF6F9");
   }
-  // By night the grove's sky bands are darker than the page's sky, so they run the full width instead of ending at the grove.
-  if (isNight()) { const bandPx = Math.ceil(GROUND / GROVE_NIGHT_SKY.length) * U; GROVE_NIGHT_SKY.forEach((colour, i) => { ctx.fillStyle = colour; ctx.fillRect(0, top + i * bandPx, w, bandPx); }); }
-  ctx.drawImage(off, 0, 0, off.width, off.height, x0, top, gw, gh);
-  // Below the grove, the ground continues in the grove's own bottom colour, across the whole width.
-  const soil = off.getContext("2d")?.getImageData(Math.floor(off.width / 2), off.height - 1, 1, 1).data;
-  const soilColour = soil ? `rgb(${soil[0]}, ${soil[1]}, ${soil[2]})` : sceneColor("#B9A26E");
-  ctx.fillStyle = soilColour; ctx.fillRect(0, top + gh, w, FOOT);
-  if (gw < w) { const groundTop = top + Math.round(GROUND * CELL * SCALE); ctx.fillRect(0, groundTop, x0, h - groundTop); ctx.fillRect(x0 + gw, groundTop, w - x0 - gw, h - groundTop); }
-  scatterStars(ctx, U * dpr, Math.ceil(w / U), Math.ceil(h / U), 5);
-  planks.value = grove.trees.map((tree: GroveTree) => ({ key: tree.key, title: tree.title, meta: tree.meta, left: x0 + tree.cx * CELL * SCALE, top: top + (GROUND + 4) * CELL * SCALE }));
+  ctx.drawImage(off, 0, top);
+  // Below the grove, the ground continues in the grove's own bottom colour to the bottom of the scene, and the panel
+  // behind the caption takes the same colour, so the caption stands on the ground.
+  const ground = off.getContext("2d")?.getImageData(Math.floor(off.width / 2), off.height - 1, 1, 1).data;
+  soil.value = ground ? `rgb(${ground[0]}, ${ground[1]}, ${ground[2]})` : sceneColor("#B9A26E");
+  ctx.fillStyle = soil.value; ctx.fillRect(0, top + off.height, W, H - top - off.height);
+  scatterStars(ctx, U, Math.ceil(W / U), Math.ceil(H / U), 5);
+  plankScale.value = k;
+  planks.value = shown.trees.map((tree: GroveTree) => ({ key: tree.key, title: tree.title, meta: tree.meta, left: tree.cx * U / dpr, top: (top + Math.round((GROUND + 4) * U)) / dpr }));
 }
 onMounted(() => {
   observer = new ResizeObserver(draw);
@@ -95,8 +105,8 @@ onBeforeUnmount(() => observer?.disconnect());
 </script>
 
 <template>
-  <figure class="welcome-scene">
-    <div ref="wrap" class="scene-wrap" role="img" aria-label="A sample grove: three topic trees from a linear algebra course, each leaf one skill at its own stage of growth.">
+  <figure class="welcome-scene" :style="soil ? { background: soil } : undefined">
+    <div ref="wrap" class="scene-wrap" :style="{ '--plank-scale': plankScale.toFixed(4) }" role="img" aria-label="A sample grove: three topic trees from a linear algebra course, each leaf one skill at its own stage of growth.">
       <canvas ref="canvas" aria-hidden="true" />
       <span v-for="plank in planks" :key="plank.key" class="plank" aria-hidden="true" :style="{ left: `${plank.left}px`, top: `${plank.top}px` }">
         <span class="plank-title">{{ plank.title }}</span><span class="plank-meta">{{ plank.meta }}</span>
@@ -113,16 +123,19 @@ onBeforeUnmount(() => observer?.disconnect());
 </template>
 
 <style scoped>
-.welcome-scene { position: relative; margin: 0; align-self: stretch; min-height: 460px; display: flex; flex-direction: column; justify-content: flex-end; border-radius: 24px; overflow: hidden; background: var(--sky); }
-.scene-wrap { position: absolute; inset: 0 0 112px; overflow: hidden; }
-canvas { display: block; image-rendering: pixelated; }
-.plank { position: absolute; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; max-width: 150px; padding: 3px 8px 4px; background: var(--plank); box-shadow: inset 0 -2px 0 var(--plank-edge), 0 0 0 2px var(--plank-ring); white-space: nowrap; }
+/* The panel is a column: the scene on top, the caption below it on the scene's ground. The scene's height follows its
+   width, so a narrow panel is not mostly sky and a tall window does not stretch it; the canvas is drawn to its size. */
+.welcome-scene { margin: 0; border-radius: 24px; overflow: hidden; background: var(--sky); }
+.scene-wrap { position: relative; width: 100%; aspect-ratio: 10 / 11; min-height: 340px; max-height: 480px; overflow: hidden; }
+canvas { position: absolute; top: 0; left: 0; display: block; image-rendering: pixelated; }
+.plank { position: absolute; transform: translateX(-50%) scale(var(--plank-scale, 1)); transform-origin: 50% 0; display: flex; flex-direction: column; align-items: center; max-width: 150px; padding: 3px 8px 4px; background: var(--plank); box-shadow: inset 0 -2px 0 var(--plank-edge), 0 0 0 2px var(--plank-ring); white-space: nowrap; }
 .plank-title { max-width: 100%; overflow: hidden; text-overflow: ellipsis; font: 400 12px/15px var(--font-display); color: var(--plank-ink); }
 .plank-meta { font: 600 11px/14px var(--font-body); color: var(--plank-soft); font-variant-numeric: tabular-nums; }
-.scene-caption { position: relative; margin: 14px; padding: 14px 16px; border-radius: 16px; background: var(--scene-card); box-shadow: 0 0 0 1px var(--card-border); }
+.scene-caption { margin: 0 14px 14px; padding: 14px 16px; border-radius: 16px; background: var(--scene-card); box-shadow: 0 0 0 1px var(--card-border); }
 .scene-caption .eyebrow { margin: 0 0 4px; }
 .caption-text { margin: 0 0 10px; font-size: 14px; color: var(--soft); line-height: 1.5; }
 .legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 14px; }
 .legend li { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--muted); }
-@media (max-width: 900px) { .welcome-scene { min-height: 400px; } }
+/* Below the text, on a tablet or a phone, the panel need not match the text's height, so the scene is wider than tall. */
+@media (max-width: 900px) { .scene-wrap { aspect-ratio: 5 / 4; min-height: 200px; max-height: 400px; } }
 </style>
