@@ -107,7 +107,7 @@ Then open **http://127.0.0.1:5174**. The fixture serves the built app with canne
 | `generated/` | The read-back and the HTTP contract that `bun run generate` writes. They are not edited by hand. |
 | `generated.config.ts` | The application that the checks and `bun run generate` assemble. |
 | `tests/` | Concept, HTTP, and scenario tests. `tests/fixtures/` holds the browser fixture and test files, and `tests/output/` holds the saved P3 test run. |
-| `scripts/` | The MongoDB start-up check and the SkillMapping demonstrations from P2, listed as `demo:*` in `package.json`. |
+| `scripts/` | The MongoDB start-up check and the SkillMapping demonstrations from P2, listed as `demo:*` in `package.json`, and `seed-in-page.js`, which fills a course with realistic activity from a signed-in page of the app, as the [session kit](docs/P5-session-kit.md#seeding-a-course-from-the-page) explains. |
 | `docs/` | The design document, the status pages for P2 to P4, the tree-drawing research from P1, and the P1 sketches in `docs/images/`. |
 | `docs/history/` | Earlier records kept for reference: the P1 design submission, the P1 concept design, and the [implementation steps](docs/history/implementation-steps.md) that the README listed until P4. |
 | `reference_docs/` | Copies of the course pages: [background readings, rubrics, and project directions](reference_docs/README.md). |
