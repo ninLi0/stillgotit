@@ -42,7 +42,7 @@ const headline = computed(() => {
         <template v-if="cuts.length">
           <h4>What would be left out</h4>
           <ul class="cuts">
-            <li v-for="row in cuts" :key="`${row.cut.deadline}:${row.cut.candidateKey}`"><p class="cut-title"><strong>{{ row.label }}</strong> · {{ minutes(row.cut.minutes) }}</p><p>{{ row.cut.reason }}</p><p class="hint">{{ row.cut.consequence }}</p></li>
+            <li v-for="row in cuts" :key="`${row.cut.deadline}:${row.cut.candidateKey}`"><p>{{ row.cut.consequence }}</p><p class="hint">{{ row.cut.reason }}</p></li>
           </ul>
         </template>
         <template v-if="items.length">
@@ -51,7 +51,6 @@ const headline = computed(() => {
         </template>
         <p v-else class="hint">The proposed plan schedules no activities.</p>
         <p v-if="examDay" class="hint">This preparation was not finished before the exam. Routine updates for this course wait until you confirm.</p>
-        <p class="hint">{{ hasActivePlan ? 'Your current plan stays in use until you confirm.' : 'No plan starts until you confirm.' }}</p>
       </details>
     </div>
     <div class="decision">
@@ -82,7 +81,7 @@ h4{font-size:13px;margin:12px 0 4px}
 .cuts{list-style:none;padding:0;margin:0}
 .cuts li{padding:8px 10px;margin:6px 0;border-radius:10px;background:var(--card)}
 .cuts .hint{margin:2px 0 0;font-size:12px}
-.cut-title{margin:0!important}
+.cuts p:first-child{margin:0}
 .scheduled{padding-left:20px;margin:4px 0}
 .scheduled li{font-size:12px;margin:6px 0}
 .decision{display:flex;flex-direction:column;gap:8px;min-width:190px}

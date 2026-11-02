@@ -30,7 +30,8 @@ async function saveSettings() { await save(); if (!error.value) settings.value?.
 const startReason = computed(() => {
   const next = data.value?.next, today = data.value?.today;
   if (!next || !today) return "";
-  if (next.day > today) return `Scheduled for ${planDay(next.day)}. You can start it that day.`;
+  // The "Next up" line above the button already gives the day, so the reason does not repeat it.
+  if (next.day > today) return "You can start it on the day it is scheduled.";
   if (next.day < today) return "This review was scheduled for an earlier day. Mark it missed or update the plan.";
   const left = data.value?.budget?.remainingMinutes;
   return typeof left === "number" && next.candidate.minutes > left ? `This review needs about ${next.candidate.minutes} minutes and ${Math.max(0, Math.round(left))} are left today. Raise your daily budget or update the plan.` : "";
@@ -94,7 +95,7 @@ async function start() {
   await act("activity", async () => {
     await change(async () => settle(await api.planning.begin({ course: props.course, item: next.item })), () => beginRefusal(next.item, data.value!), { blockable: true });
     emit("select", next.candidate.subject); await read();
-    return "Review started. Come back here to record your time when you finish.";
+    return "Review started.";
   });
 }
 async function finish() { const item = data.value?.next?.item, spent = actualMinutes.value; if (item) await act("top", async () => { settle(await api.planning.finish({ course: props.course, item, actualMinutes: spent })); await read(); return `Review finished. ${spent} minutes recorded.`; }); }

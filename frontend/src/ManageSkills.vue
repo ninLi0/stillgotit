@@ -267,7 +267,7 @@ function archive({ skill, keys, reasons }: Item) {
     (kind) => kind === "FORBIDDEN" ? "COURSE_UNAVAILABLE" : kind !== "CONFLICT" ? undefined
       : statusOf(id) === "CONFIRMED" && dependentsOf(id).length ? "SKILL_STILL_REQUIRED" : "SKILL_ARCHIVE_UNAVAILABLE",
     // The panel closes; the message moves with the skill to the Archived list.
-    () => { open[id] = false; return "Archived. It keeps its history, and you can restore it here."; });
+    () => { open[id] = false; return "Archived."; });
 }
 
 function restore({ skill, key, reason }: ArchivedItem) {
@@ -283,7 +283,7 @@ function setEmphasis(unit: UnitRow, emphasized: boolean) {
   return act(`${unit.unit}:emphasis`, () => api.courses.units.emphasis({ unit: unit.unit, emphasized }),
     // The unit's ownership is checked before the action runs.
     (kind) => kind === "FORBIDDEN" ? "COURSE_UNAVAILABLE" : undefined,
-    () => { emphasis[unit.unit] = emphasized; return emphasized ? "Marked as emphasized by your professor." : "No longer marked as emphasized."; });
+    () => { emphasis[unit.unit] = emphasized; return "Saved."; });
 }
 </script>
 

@@ -418,13 +418,12 @@ const openingTime = computed(() => {
 // Every source this skill's conversations were taught from, once each, for the rail's Taught from card.
 const railCitations = computed(() => citedSources(data.value?.sessions ?? []));
 const SUCCESS = new Set(["INDEPENDENT", "SUPPORTED"]);
-/** The estimate before and after an assessed attempt, and the change, from the timeline row whose attempt is that case. */
+/** The estimate before and after an assessed attempt, from the timeline row whose attempt is that case. */
 function attemptChange(assessment: string) {
   const change = data.value?.explanation?.changes.find((row) => row.kind === "ATTEMPT" && row.source === assessment);
   if (!change) return null;
-  const delta = Math.round(change.after) - Math.round(change.before);
-  return { before: `${Math.round(change.before)}%`, after: `${Math.round(change.after)}%`,
-    delta: delta === 0 ? "No change" : `${delta > 0 ? "+" : "−"}${Math.abs(delta)} ${Math.abs(delta) === 1 ? "point" : "points"}` };
+  // The card shows the values once, as "50% → 95%"; a separate "+45 points" would only restate them.
+  return { before: `${Math.round(change.before)}%`, after: `${Math.round(change.after)}%` };
 }
 /** Why an assessed attempt did not count toward the estimate, as the timeline gives it, or empty when it counted. */
 function ignoredReason(assessment: string) { return data.value?.explanation?.ignored.find((row) => row.evidence === assessment)?.reason ?? ""; }
@@ -740,14 +739,14 @@ onBeforeUnmount(() => { stopSpeaking(); previews.forEach((url) => URL.revokeObje
               <button v-if="current.task && current.status === 'CLOSED' && !currentCases.some(item => item.judgment)" class="secondary dawn" :disabled="busy || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="assess">Retry saved assessment</button>
               <article v-for="item in currentCases" :key="item.case" class="assessment">
                 <template v-if="item.judgment">
-                  <div class="result-top"><div><p class="eyebrow">Assessment</p><h3 :class="{ success: SUCCESS.has(item.judgment.result) }">{{ resultLabels[item.judgment.result] }}</h3></div><div v-if="attemptChange(item.case)" class="result-figure"><p class="eyebrow">Mastery</p><p class="result-pct"><span aria-hidden="true">{{ attemptChange(item.case)!.before }} → {{ attemptChange(item.case)!.after }}</span><span class="sr-only">from {{ attemptChange(item.case)!.before }} to {{ attemptChange(item.case)!.after }}</span></p><p class="result-delta">{{ attemptChange(item.case)!.delta }}</p></div>
+                  <div class="result-top"><div><p class="eyebrow">Assessment</p><h3 :class="{ success: SUCCESS.has(item.judgment.result) }">{{ resultLabels[item.judgment.result] }}</h3></div><div v-if="attemptChange(item.case)" class="result-figure"><p class="eyebrow">Mastery</p><p class="result-pct"><span aria-hidden="true">{{ attemptChange(item.case)!.before }} → {{ attemptChange(item.case)!.after }}</span><span class="sr-only">from {{ attemptChange(item.case)!.before }} to {{ attemptChange(item.case)!.after }}</span></p></div>
                     <div v-else-if="ignoredReason(item.case)" class="result-figure unchanged"><p class="eyebrow">Mastery</p><p class="result-same">Did not change the estimate</p><p class="result-delta">{{ ignoredReason(item.case) }}</p></div></div>
                   <MarkdownText class="prose rationale" :text="item.judgment.rationale" />
                   <p v-if="answerLabel('judgment', item.judgment.judgment)" class="tutor-label">{{ answerLabel('judgment', item.judgment.judgment) }}</p>
                   <div class="result-actions"><button v-if="current.status === 'CLOSED'" class="secondary dawn" :disabled="busy || !aiAvailable" :aria-describedby="aiAvailable ? undefined : 'ai-reason-chat'" @click="startTask">Try a fresh check</button></div>
                   <details class="regrade"><summary>This seems wrong? Review or correct this assessment</summary><label>Reason<textarea v-model="reason" rows="3" /></label><p v-if="!reason.trim()" :id="`reason-needed-${item.case}`" class="hint reason">Write a reason to request a regrade or save a correction.</p><button class="message-action" :disabled="busy || !aiAvailable || !reason.trim()" :aria-describedby="describedBy(!reason.trim() && `reason-needed-${item.case}`, !aiAvailable && 'ai-reason-chat')" @click="requestRegrade(item.case, item.judgment.judgment)">Request regrade</button>
                     <label>Manual correction<select v-model="correction"><option v-for="(label,value) in resultLabels" :key="value" :value="value">{{ label }}</option></select></label><label class="check"><input v-model="fullGate" type="checkbox" /><span class="box" aria-hidden="true" />All requirements were met in fresh independent work.</label><button class="message-action" :disabled="busy || !reason.trim()" :aria-describedby="reason.trim() ? undefined : `reason-needed-${item.case}`" @click="saveCorrection(item.case, item.judgment.judgment)">Save correction</button><ol><li v-for="judgment in item.history" :key="judgment.judgment">{{ resultLabels[judgment.result] }} · {{ judgment.origin === 'AI' ? 'Tutor' : 'Your correction' }}<MarkdownText :text="judgment.rationale" /></li></ol></details>
-                </template><p v-else>Your answer is saved. Assessment is pending.</p>
+                </template><p v-else>Assessment is pending.</p>
               </article>
             </template>
             <div role="status"><p v-if="notice && !busy" ref="noticeBox" class="notice" tabindex="-1">{{ notice }}</p></div>

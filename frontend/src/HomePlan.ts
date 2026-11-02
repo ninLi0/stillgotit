@@ -60,7 +60,7 @@ export function useHomePlan(course: string) {
         throw new PlanningFailure(beginRefusal(item.item, data.value!));
       }
       open(item.candidate.subject); await read();
-      return "Review started. Record your time in Plan when you finish.";
+      return "Review started.";
     });
   }
   async function miss() {

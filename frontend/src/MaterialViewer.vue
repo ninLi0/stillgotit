@@ -373,7 +373,7 @@ onBeforeUnmount(() => {
     <div v-if="status === 'loading'" class="state" role="status">Loading page 1…</div>
     <div v-else-if="status === 'deleted'" class="state" role="status"><p class="state-title">This material was deleted, so it can no longer be shown.</p></div>
     <div v-else-if="status === 'failed'" class="state" role="alert">
-      <p class="state-title">Couldn't load this file. Try again.</p>
+      <p class="state-title">Couldn't load this file.</p>
       <p v-if="failure" class="hint">{{ failure }}</p>
       <button type="button" class="secondary sand" @click="load">Try again</button>
     </div>
@@ -401,7 +401,7 @@ onBeforeUnmount(() => {
         <!-- PDF: drawn at the page's display width, so pdf.js keeps the text sharp. -->
         <div v-if="page.kind === 'pdf'" class="stage">
           <div v-if="fileState?.state === 'failed'" class="file-problem" role="alert">
-            <p><strong>Couldn't load this file. Try again.</strong><span v-if="fileState.message"> {{ fileState.message }}</span></p>
+            <p><strong>Couldn't load this file.</strong><span v-if="fileState.message"> {{ fileState.message }}</span></p>
             <button type="button" class="secondary sand small" @click="retryFile(page.file)">Try again</button>
           </div>
           <div v-if="pdfDoc(page.file) && fileState?.state !== 'failed'" class="page-frame" :class="{ flash: flashPage === page.key }"
@@ -439,7 +439,7 @@ onBeforeUnmount(() => {
             <div class="photo-frame" :class="{ flash: flashPage === page.key }">
               <img v-if="imageUrl(page.image)" :src="imageUrl(page.image)" :alt="`${page.unit} ${page.number} of ${displayTitle}`" />
               <div v-else-if="fileState?.state === 'failed'" class="photo-state" role="alert">
-                <p><strong>Couldn't load this file. Try again.</strong></p>
+                <p><strong>Couldn't load this file.</strong></p>
                 <p v-if="fileState.message" class="hint">{{ fileState.message }}</p>
                 <button type="button" class="secondary sand small" @click="retryFile(page.file)">Try again</button>
               </div>

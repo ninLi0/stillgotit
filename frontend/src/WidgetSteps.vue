@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from "vue";
-import type { StepsWidget } from "../../src/answer-widgets.ts";
+import { stepText, type StepsWidget } from "../../src/answer-widgets.ts";
 
 // A steps example: an ordered list that starts with its first step. "Show next step" reveals one more, "Show all" reveals
 // the rest, and "Start over" goes back to the first. Each new step is announced. A learner who asked their device for
 // reduced motion sees every step at once, with no controls, because revealing them one by one is a kind of motion.
+// The list numbers each step, so a step that begins with its own "Step N:" shows without it (stepText).
 const props = defineProps<{ widget: StepsWidget }>();
 const reduced = typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const count = ref(reduced ? props.widget.steps.length : 1);
@@ -25,7 +26,7 @@ async function restart() { count.value = 1; await nextTick(); nextButton.value?.
 <template>
   <div class="steps-example">
     <ol class="steps-list" aria-live="polite" aria-relevant="additions">
-      <li v-for="(step, index) in shown" :key="index" class="steps-item" :class="{ rise: index >= startCount }"><span class="steps-number" aria-hidden="true">{{ index + 1 }}</span><span class="steps-text"><span class="sr-only">Step {{ index + 1 }}: </span>{{ step }}</span></li>
+      <li v-for="(step, index) in shown" :key="index" class="steps-item" :class="{ rise: index >= startCount }"><span class="steps-number" aria-hidden="true">{{ index + 1 }}</span><span class="steps-text"><span class="sr-only">Step {{ index + 1 }}: </span>{{ stepText(step, index) }}</span></li>
     </ol>
     <div v-if="!reduced" class="steps-actions">
       <template v-if="!done">

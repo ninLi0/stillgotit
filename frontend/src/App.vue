@@ -304,7 +304,7 @@ onMounted(async () => {
         <template v-else>
           <p class="eyebrow">{{ courses.length ? 'A new course' : 'Your first course' }}</p>
           <h1 id="page-title" class="display hero-title small">Give your learning a place to grow.</h1>
-          <p class="intro">{{ courses.length ? 'Each course keeps its own materials and skills.' : 'Start with one course.' }} Choose a name you will recognize when you return.</p>
+          <p class="intro">{{ courses.length ? 'Each course keeps its own materials and skills. ' : '' }}Choose a name you will recognize when you return.</p>
           <form @submit.prevent="createCourse">
             <label for="course-title">Course name</label>
             <input id="course-title" v-model="title" required maxlength="160" autocomplete="off" :disabled="busy" aria-describedby="course-hint" />

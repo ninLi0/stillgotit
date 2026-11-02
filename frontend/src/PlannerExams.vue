@@ -38,7 +38,7 @@ defineExpose({ close, alertBox: () => errorBox.value });
         <ul class="skill-chips" aria-hidden="true"><li v-for="(title, index) in coveredTitles(exam)" :key="index">{{ title }}</li></ul>
       </li>
     </ul>
-    <p v-else class="hint empty">No exams yet. Add an exam date to plan preparation before it.</p>
+    <p v-else class="hint empty">No exams yet. The plan schedules preparation before each exam.</p>
     <div class="exam-actions">
       <button type="button" class="secondary ocean add-exam" :disabled="busy || (!open && !!addReason)" :aria-expanded="open" :aria-controls="`${id}-form`" :aria-describedby="addReason && !open ? `${id}-reason` : undefined" @click="toggle">{{ open ? 'Close' : '+ Add an exam' }}</button>
       <p v-if="addReason && !open" :id="`${id}-reason`" class="hint reason">{{ addReason }}</p>

@@ -123,7 +123,6 @@ onBeforeUnmount(() => objectUrls.forEach((url) => URL.revokeObjectURL(url)));
               <p>{{ entry.read.message }}</p><button type="button" class="source-retry" @click="show(entry.citation)">Try again</button>
             </div>
             <template v-else>
-              <p class="passage-label">{{ entry.label }}</p>
               <template v-if="entry.parts.length">
                 <template v-for="(part, partIndex) in entry.parts" :key="partIndex">
                   <p v-if="part.kind === 'TEXT'" class="passage-text" tabindex="0">{{ part.text }}</p>
@@ -166,7 +165,6 @@ onBeforeUnmount(() => objectUrls.forEach((url) => URL.revokeObjectURL(url)));
 .file-tag{flex:none;font-size:9px;font-weight:800;padding:2px 5px;border-radius:5px;background:var(--coral-wash);color:var(--file-tag)}
 .source-toggle[aria-expanded="true"]{box-shadow:0 0 0 2px var(--dawn-edge)}
 .passage{flex-basis:100%;margin:2px 0 10px;padding:12px 14px;border:1px solid var(--line);border-left:3px solid var(--dawn-edge);border-radius:10px;background:var(--card);color:var(--ink)}
-.passage-label{margin:0 0 8px;font-size:12px;font-weight:600;color:var(--muted)}
 .passage-text{margin:0 0 8px;max-height:260px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;line-height:1.7}
 .passage-text:focus-visible{outline:3px solid var(--dawn-edge);outline-offset:2px}
 .passage .hint{font-size:12px;margin:0 0 8px}

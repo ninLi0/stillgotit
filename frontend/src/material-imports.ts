@@ -57,7 +57,7 @@ export async function submitImport(form: FormData, restart: () => void): Promise
   if ("material" in answer) return { material: answer.material, message: "Material saved. Check the readable text, then find skills in it." };
   await listImportsAgain(course);
   return { message: answer.state === "TRANSCRIBING"
-    ? "Upload saved. Your recording is being transcribed. This usually takes a few minutes, and longer for long recordings. You can keep studying."
+    ? "Upload saved. Your recording is being transcribed."
     : "Upload saved. Your material will appear in a moment." };
 }
 

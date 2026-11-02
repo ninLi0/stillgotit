@@ -293,6 +293,19 @@ export function widgetHeading(widget: Widget): string {
   return widget.kind === "table" ? widget.caption : widget.kind === "choice" ? widget.question : widget.title;
 }
 
+/**
+ * A step's text as the page shows it. The page numbers each step itself, so a step the tutor began with its own label,
+ * such as "Step 1: Exponentiate each logit", would read "Step 1: Step 1: …". When the text starts with "Step N:",
+ * "Step N." or "Step N -" (any case, also with an en or em dash), and N is the step's own number, that label is left
+ * out. The saved text keeps it; a label with another number, a number such as "Step 1.5", or a label with nothing
+ * after it stays.
+ */
+export function stepText(step: string, index: number): string {
+  const label = new RegExp(`^\\s*step\\s+${index + 1}(?!\\d)\\s*(?:[:\\-\u2013\u2014]|\\.(?!\\d))\\s*`, "i");
+  const rest = step.replace(label, "");
+  return rest.trim() ? rest : step;
+}
+
 /** An example written out as plain text, for copying an answer. A choice ends with its answer and explanation. */
 export function widgetPlainText(widget: Widget): string {
   switch (widget.kind) {
@@ -302,7 +315,7 @@ export function widgetPlainText(widget: Widget): string {
       return `${widget.title}\n${widget.output} = ${parsed.ok ? formulaText(parsed.tree) : widget.formula}, where ${ranges}.`;
     }
     case "table": return [widget.caption, widget.columns.join(" | "), ...widget.rows.map((row) => row.join(" | "))].join("\n");
-    case "steps": return [widget.title, ...widget.steps.map((step, index) => `${index + 1}. ${step}`)].join("\n");
+    case "steps": return [widget.title, ...widget.steps.map((step, index) => `${index + 1}. ${stepText(step, index)}`)].join("\n");
     case "choice": return [widget.question, ...widget.options.map((option) => `- ${option}`), `Answer: ${widget.answer}. ${widget.explanation}`].join("\n");
   }
 }
