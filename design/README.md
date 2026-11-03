@@ -30,6 +30,7 @@ The selected composition documents match the current implementation. Unselected 
 
 - [Runtime contract](runtime.md): host boundaries, provider access, and recovery.
 - [Host actors](host.md): each part of the host, what it owns, what it calls or serves, and the page that describes it.
+- [Visual design study](visual-design.md): the look of the interface and the reasons behind it.
 - [Material data](material-data.md): retained originals and readable renditions.
 - [Import store](material-import-store.md): one key and frozen preparation per import.
 - [Shared identities](types.md): bindings across concepts.
